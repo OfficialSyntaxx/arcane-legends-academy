@@ -1,1 +1,14 @@
-{"name":"Arcane Legends - Wizard TCG","short_name":"Arcane Legends","description":"A 3D walkable academy world where you gather, scribe spell cards, grade them into slabs, build decks, and duel AI rivals or real players.","start_url":".","scope":".","display":"standalone","orientation":"portrait","background_color":"#1a1440","theme_color":"#1a1440","icons":[{"src":"https://d8j0ntlcm91z4.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/hf_20260803_135222_906df834-35d2-428a-bfaf-747f586d60d2.png","sizes":"512x512","type":"image/png"}]}
+{
+  "name": "Arcane Legends — Wizard TCG",
+  "short_name": "Arcane Legends",
+  "description": "A 3D walkable academy world where you gather, scribe spell cards, grade them into slabs, build decks, and duel AI rivals or real players.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1440",
+  "theme_color": "#1a1440",
+  "icons": [
+    { "src": "https://d8j0ntlcm91z4.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/hf_20260803_135222_906df834-35d2-428a-bfaf-747f586d60d2.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

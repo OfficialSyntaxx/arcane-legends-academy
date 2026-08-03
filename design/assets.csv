@@ -1,0 +1,13 @@
+id,role,type,description,size/ratio,style line ref,source
+title_bg,background-l1,image,"main menu backdrop: a grand wizard academy hall with floating spell cards and a starry night sky, evocative, wide establishing view",16:9,stylization formula,generate
+duel_bg,background-l2,image,"duel battlefield: two facing wizard platforms in a magical arena, floating card table, soft depth, no characters",16:9,stylization formula,generate
+school_fire,card-art-fire,image,"fire school emblem art: a blazing phoenix / flame dragon head, orange-red flames",1:1,stylization formula,generate
+school_ice,card-art-ice,image,"ice school emblem art: a frost golem / ice crystal castle, pale cyan ice",1:1,stylization formula,generate
+school_storm,card-art-storm,image,"storm school emblem art: a thundercloud / lightning tiger, electric violet-teal storm",1:1,stylization formula,generate
+school_myth,card-art-myth,image,"myth school emblem art: a minotaur / basilisk beast, emerald green",1:1,stylization formula,generate
+school_life,card-art-life,image,"life school emblem art: a unicorn / pixie in a garden, rose-gold and soft green",1:1,stylization formula,generate
+school_death,card-art-death,image,"death school emblem art: a skeletal reaper / raven, bone-white and onyx",1:1,stylization formula,generate
+school_balance,card-art-balance,image,"balance school emblem art: a golden scale / sun-and-moon, amber gold",1:1,stylization formula,generate
+pack_art,ui-booster,image,"a glowing wizard booster pack with a wax seal, colorful, single centered object",1:1,stylization formula,generate
+cover,deploy-thumbnail,image,"game cover: a wizard holding a glowing legendary card amid floating spell cards, bold, title readable",16:9,stylization formula,generate
+icon,deploy-favicon,image,"square game icon: a single glowing wizard spell card with a star emblem",1:1,stylization formula,generate

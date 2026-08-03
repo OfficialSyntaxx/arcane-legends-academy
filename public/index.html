@@ -1,0 +1,1101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1a1440">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/png" href="https://d8j0ntlcm91z4.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/hf_20260803_135222_906df834-35d2-428a-bfaf-747f586d60d2.png">
+<title>Arcane Legends — Wizard TCG</title>
+<style>
+:root{
+  --gold:#ffc94d; --gold2:#e8a33d; --violet:#2a1f4d; --panel:#1a1430; --panel2:#241c44;
+  --ink:#f2ecff; --muted:#a99fc9; --line:rgba(255,201,77,.25);
+  --danger:#ff6b6b; --ok:#6ee7a0; --info:#7aa8ff;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;height:100%;background:#0d0a1f;color:var(--ink);
+  font-family:"Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden;}
+#bg{position:fixed;inset:0;background:center/cover url(./assets/title_bg.jpg);filter:brightness(.45) saturate(1.1);z-index:0;}
+#app{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;max-width:1200px;margin:0 auto;}
+
+/* top bar */
+#topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(180deg,rgba(20,14,40,.95),rgba(20,14,40,.7));
+  border-bottom:1px solid var(--line);flex-wrap:wrap;z-index:5;}
+#topbar .logo{font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--gold);
+  text-shadow:0 0 12px rgba(255,201,77,.5);letter-spacing:1px;margin-right:auto;}
+.stat{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:14px;}
+.stat b{color:var(--gold);font-weight:700;}
+
+/* nav */
+#nav{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;background:rgba(20,14,40,.9);border-bottom:1px solid var(--line);z-index:5;}
+.navbtn{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;border-radius:10px;
+  border:1px solid transparent;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;min-width:64px;}
+.navbtn .ic{font-size:20px;}
+.navbtn:hover{background:var(--panel2);color:var(--ink);}
+.navbtn.on{background:var(--panel2);color:var(--gold);border-color:var(--line);}
+
+/* screens */
+#screen{padding:14px;overflow-y:auto;flex:1;padding-bottom:40px;}
+.screen{display:none;animation:fade .25s ease;}
+.screen.on{display:block;}
+@keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;}}
+h2{font-family:Georgia,serif;color:var(--gold);margin:2px 0 12px;font-size:22px;letter-spacing:.5px;}
+h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
+.sub{color:var(--muted);font-size:13px;margin:-6px 0 12px;}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px;}
+.row{display:flex;gap:10px;flex-wrap:wrap;}
+
+/* buttons */
+.btn{background:linear-gradient(180deg,#3a2d6e,#241c44);color:var(--ink);border:1px solid var(--line);border-radius:10px;
+  padding:10px 16px;font-size:14px;cursor:pointer;font-weight:600;}
+.btn:hover{filter:brightness(1.15);}
+.btn.gold{background:linear-gradient(180deg,#e8a33d,#b97a1e);color:#24170a;border-color:#ffd98a;}
+.btn.ok{background:linear-gradient(180deg,#2f9e63,#1f6b42);border-color:#6ee7a0;}
+.btn.danger{background:linear-gradient(180deg,#b33,#6e1f1f);border-color:#ff6b6b;}
+.btn:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.4);}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:8px;}
+
+/* cards */
+.card{width:108px;border-radius:10px;overflow:hidden;position:relative;border:2px solid #fff;cursor:pointer;
+  background:#0c0a1c;box-shadow:0 4px 12px rgba(0,0,0,.5);transition:transform .1s;}
+.card.wide{width:150px;}
+.card:hover{transform:translateY(-4px);}
+.card .art{height:74px;background:center/cover;position:relative;}
+.card.wide .art{height:104px;}
+.card .cost{position:absolute;top:4px;left:4px;background:radial-gradient(circle,#6a8cff,#2c3f8a);color:#fff;font-weight:800;
+  width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;border:1px solid #9db4ff;}
+.card .atk,.card .hp{position:absolute;bottom:4px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:13px;color:#fff;border:1px solid #fff;}
+.card .atk{left:4px;background:#c0392b;}
+.card .hp{right:4px;background:#2e9e5b;}
+.card .body{padding:5px 6px;}
+.card .nm{font-size:12px;font-weight:700;line-height:1.1;min-height:26px;}
+.card .tx{font-size:10px;color:var(--muted);line-height:1.2;margin-top:2px;min-height:26px;}
+.card .grade{position:absolute;top:4px;right:4px;font-size:14px;background:rgba(0,0,0,.5);border-radius:8px;padding:1px 5px;}
+.card .serial{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--gold);background:rgba(0,0,0,.6);border-radius:6px;padding:1px 6px;letter-spacing:1px;font-weight:700;white-space:nowrap;}
+.card.slab{border-image:linear-gradient(135deg,#e8c36a,#fff,#7be0ff,#e8c36a) 1;box-shadow:0 0 14px rgba(255,201,77,.55),0 4px 12px rgba(0,0,0,.5);}
+.card.slab .art{outline:1px solid rgba(255,215,120,.6);}
+.card .val{position:absolute;bottom:4px;right:4px;font-size:10px;color:var(--gold);background:rgba(0,0,0,.55);padding:1px 5px;border-radius:6px;}
+.card .slot{position:absolute;top:4px;right:4px;font-size:13px;background:rgba(0,0,0,.5);border-radius:8px;padding:1px 5px;}
+.card.sel{outline:3px solid var(--gold);transform:translateY(-6px);}
+.card.disabled{opacity:.45;cursor:not-allowed;}
+.card.tired{opacity:.6;}
+.card .tired-ic{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:20px;opacity:.9;text-shadow:0 0 6px #000;}
+
+/* list rows */
+.lrow{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--panel2);flex-wrap:wrap;}
+.lrow .grow{flex:1;min-width:120px;}
+.lrow .t{font-weight:700;font-size:14px;}
+.lrow .d{font-size:12px;color:var(--muted);}
+.ic{font-size:20px;}
+
+/* duel */
+#duelWrap{display:flex;flex-direction:column;gap:10px;height:100%;}
+.duelzone{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);min-height:120px;background:var(--panel);}
+.duelzone.bg{background:center/cover url(./assets/duel_bg.jpg);min-height:150px;}
+.zonecap{position:absolute;top:6px;left:10px;font-size:12px;color:var(--muted);z-index:2;}
+.wizbar{position:absolute;top:6px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:2px;z-index:2;}
+.wizbar .bar{width:150px;height:12px;background:#00000066;border:1px solid #fff3;border-radius:6px;overflow:hidden;}
+.wizbar .bar>div{height:100%;background:linear-gradient(90deg,#ff6b6b,#ff9a5a);}
+.wizbar .bar.o>div{background:linear-gradient(90deg,#54a0ff,#7aa8ff);}
+.board{display:flex;gap:8px;padding:40px 10px 10px;flex-wrap:wrap;justify-content:center;min-height:120px;}
+.hand{display:flex;gap:8px;padding:8px;overflow-x:auto;justify-content:center;flex-wrap:wrap;}
+.pipbar{display:flex;gap:4px;align-items:center;padding:6px 10px;}
+.pip{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,#6a8cff,#2c3f8a);border:1px solid #9db4ff;}
+.pip.full{background:radial-gradient(circle,#ffd94a,#c8860a);border-color:#fff0a0;}
+#duelLog{font-size:12px;color:var(--muted);min-height:20px;padding:6px 10px;background:var(--panel);border-radius:10px;border:1px solid var(--line);}
+#duelStatus{font-size:14px;font-weight:700;color:var(--gold);text-align:center;padding:4px;}
+
+/* progress */
+.pbar{height:10px;background:#00000055;border-radius:6px;overflow:hidden;border:1px solid #fff3;}
+.pbar>div{height:100%;background:linear-gradient(90deg,#e8a33d,#ffd94a);transition:width .1s;}
+
+/* skill grid */
+.skillgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;}
+.kpi .lv{font-size:26px;font-weight:800;color:var(--gold);}
+.kpi .nm{font-size:13px;color:var(--muted);margin-top:2px;}
+
+/* toast */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#24170a;color:var(--gold);
+  border:1px solid var(--gold);padding:10px 18px;border-radius:10px;font-weight:700;z-index:99;display:none;box-shadow:0 6px 20px #000;}
+#err{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#3a0f0f;color:#ffb3b3;border:1px solid #ff6b6b;padding:10px 18px;border-radius:10px;font-weight:700;z-index:99;display:none;}
+
+/* responsive */
+@media (max-width:640px){
+  .card{width:96px;} .card.wide{width:128px;}
+  .card .art{height:64px;} .card.wide .art{height:88px;}
+  #topbar .logo{font-size:16px;}
+  .navbtn{min-width:54px;font-size:11px;}
+}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<div id="app">
+  <div id="topbar">
+    <div class="logo">✦ Arcane Legends</div>
+    <div class="stat">🪙 <b id="sGold">0</b></div>
+    <div class="stat">⭐ <b id="sLvl">1</b></div>
+    <div class="stat">🧙 <b id="sXp">0</b></div>
+  </div>
+  <div id="nav"></div>
+  <div id="screen"></div>
+  <div id="worldWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#1a1440">
+    <canvas id="world" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+    <div id="worldHud" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(20,14,40,.8);border:1px solid var(--line);border-radius:12px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--gold);display:none;pointer-events:none;z-index:3"></div>
+    <div id="joy" style="position:absolute;left:20px;bottom:24px;width:110px;height:110px;z-index:4;display:none;touch-action:none"></div>
+    <div id="prompt" style="position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:4;display:none"></div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="err"></div>
+<div id="dialogue" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:98;align-items:center;justify-content:center">
+  <div style="background:var(--panel);border:1px solid var(--gold);border-radius:18px;max-width:430px;width:92%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.6)">
+    <div id="dlgName" style="color:var(--gold);font-weight:800;font-size:18px;margin-bottom:4px"></div>
+    <div id="dlgRole" style="color:var(--muted);font-size:12px;margin-bottom:10px"></div>
+    <div id="dlgLines" style="color:var(--ink);font-size:14px;margin-bottom:16px;line-height:1.6"></div>
+    <div id="dlgBtns" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  </div>
+</div>
+<div id="overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:97;overflow-y:auto">
+  <div style="max-width:760px;margin:16px auto;background:var(--panel);border:1px solid var(--gold);border-radius:18px;padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.6)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div id="ovTitle" style="color:var(--gold);font-weight:800;font-size:20px"></div>
+      <button class="btn sm" onclick="window.__ev('ovClose')">✕ Close</button>
+    </div>
+    <div id="ovBody"></div>
+  </div>
+</div>
+<div id="schoolPicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:99;overflow-y:auto">
+  <div style="max-width:680px;margin:10vh auto;background:var(--panel);border:1px solid var(--gold);border-radius:22px;padding:30px;text-align:center">
+    <div style="color:var(--gold);font-weight:800;font-size:26px">Choose Your School</div>
+    <div style="color:var(--muted);font-size:14px;margin-top:8px" id="spSub">Answer a few questions and the Academy will suggest the school that fits you best.</div>
+    <div id="spBody" style="margin-top:20px"></div>
+  </div>
+</div>
+<script src="./vendor/three.min.js"></script>
+<script type="module">
+import { STR } from "./strings.js";
+import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
+import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS } from "./items.js";
+import * as G from "./game.js";
+import { createWorld } from "./world.js";
+
+// ================= state =================
+let S = G.load();
+let screen = "world";
+let battle = null;          // local duel battle
+let pendingTarget = null;   // {kind:"spell",idx} | {kind:"attack",idx}
+let gatherCooldown = 0;
+let online = null;          // online duel state
+let duelTimeLeft = 30, duelTimerInt = null;   // 30s turn timer (docs)
+
+const $ = id => document.getElementById(id);
+
+// ================= helpers =================
+function save(){ G.save(S); refreshTop(); }
+function refreshTop(){
+  $("sGold").textContent = S.gold;
+  $("sLvl").textContent = S.level;
+  $("sXp").textContent = Math.floor(S.xp);
+}
+let toastT;
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.style.display="block"; clearTimeout(toastT); toastT=setTimeout(()=>t.style.display="none",1600); }
+let errT;
+function err(msg){ const t=$("err"); t.textContent=msg; t.style.display="block"; clearTimeout(errT); errT=setTimeout(()=>t.style.display="none",2000); }
+const LTL = "Level too low";
+
+// ================= in-world NPC dialogue =================
+let dlgButtons = null;
+function showDialogue(name, role, lines, buttons){
+  $("dlgName").textContent = name;
+  $("dlgRole").textContent = role;
+  $("dlgLines").innerHTML = lines.map(l=>`<p style="margin:0 0 8px">${l}</p>`).join("");
+  $("dlgBtns").innerHTML = buttons.map((b,i)=>`<button class="btn ${b.primary?"gold":""}" onclick="window.__ev('dlgBtn|${i}')">${b.label}</button>`).join("");
+  dlgButtons = buttons;
+  $("dialogue").style.display = "flex";
+}
+function closeDialogue(){ $("dialogue").style.display = "none"; dlgButtons = null; }
+
+// ================= School picker (character creation) =================
+const SCHOOL_ICON = { fire:"🔥", ice:"❄️", storm:"⚡", myth:"🐉", life:"🌿", death:"💀", balance:"⚖️" };
+const SCHOOL_DESC = {
+  fire:"Direct, blazing damage. Melt your enemies with raw power.",
+  ice:"Defensive and resolute. Shrug off blows with shields and frost.",
+  storm:"Burst and fury. Strike fast with overwhelming force.",
+  myth:"Summon mythical beasts to fight by your side.",
+  life:"Heal and endure. Outlast any foe.",
+  death:"Drain and weaken. Take what your enemies have.",
+  balance:"Versatile and adaptive. A little of everything.",
+};
+const SCHOOL_Q = [
+  { q:"How do you prefer to win a duel?", opts:[["Overwhelming power","fire"],["Outlast my opponent","ice"],["Strike fast and hard","storm"],["Summon creatures to fight","myth"],["Keep myself alive","life"],["Drain the enemy's strength","death"],["A bit of everything","balance"]] },
+  { q:"Which element calls to you?", opts:[["Flame and warmth","fire"],["Frost and stillness","ice"],["Lightning and fury","storm"],["Mythical beasts","myth"],["Growth and renewal","life"],["Shadow and decay","death"],["Harmony and balance","balance"]] },
+  { q:"What kind of spells do you like most?", opts:[["Blazing damage","fire"],["Protective shields","ice"],["Big burst hits","storm"],["Creature summons","myth"],["Healing magic","life"],["Life-stealing","death"],["Utility and control","balance"]] },
+];
+let spAnswers = [];
+function showSchoolPicker(){
+  spAnswers = [];
+  $("schoolPicker").style.display = "block";
+  $("spSub").textContent = "Answer a few questions and the Academy will suggest the school that fits you best.";
+  renderSPQuestion(0);
+}
+function renderSPQuestion(i){
+  const q = SCHOOL_Q[i];
+  $("spBody").innerHTML = `<div style="font-weight:700;font-size:18px;margin-bottom:14px">${q.q}</div><div class="row" style="justify-content:center">` +
+    q.opts.map(([label,s],j)=>`<button class="btn" style="min-width:150px" onclick="window.__ev('spPick|${i}|${j}')">${label}</button>`).join("") + `</div>`;
+}
+function renderSPSuggest(sug){
+  const sc = SCHOOLS[sug];
+  $("spSub").textContent = "The Academy suggests...";
+  $("spBody").innerHTML = `<div style="font-size:52px;margin:8px 0">${SCHOOL_ICON[sug]}</div>
+    <div style="font-weight:800;font-size:30px;color:${sc.color}">${sc.name} School</div>
+    <div style="color:var(--muted);margin:8px 0 18px">${SCHOOL_DESC[sug]}</div>
+    <div class="row" style="justify-content:center">
+      <button class="btn gold" onclick="window.__ev('chooseSchool|${sug}')">Pick ${sc.name}</button>
+      <button class="btn" onclick="window.__ev('spAll')">Choose another</button>
+    </div>`;
+}
+function renderSPAll(){
+  $("spSub").textContent = "Pick your school:";
+  $("spBody").innerHTML = `<div class="row" style="justify-content:center">` + Object.keys(SCHOOLS).map(s=>{
+    const sc = SCHOOLS[s];
+    return `<button class="panel" style="flex:1;min-width:130px;cursor:pointer;border:2px solid ${sc.color}" onclick="window.__ev('chooseSchool|${s}')"><div style="font-size:30px;margin-top:6px">${SCHOOL_ICON[s]}</div><div style="font-weight:800;color:${sc.color};margin:4px 0">${sc.name}</div><div style="font-size:11px;color:var(--muted)">${SCHOOL_DESC[s].split(".")[0]}.</div></button>`;
+  }).join("") + `</div>`;
+}
+function showOverlay(title, html){ $("ovTitle").textContent = title; $("ovBody").innerHTML = html; $("overlay").style.display = "block"; }
+function buildScribing(){
+  let h = `<p class="sub">Refine wood, fish, and ore into card materials, then scribe a spell card. Higher Scribing skill yields better grades.</p><div class="row">`;
+  for (const cm of CARD_MATERIALS){
+    const sources = cm.from.map(fid=>{ const s=MATERIALS.find(m=>m.id===fid); return s?`${s.icon} ${s.name} (${s.lvl})`:"⚪"; }).join(" · ");
+    const have = S.inventory[cm.id]||0;
+    h += `<div class="panel" style="flex:1;min-width:170px"><div style="font-weight:700">${cm.icon} ${cm.name} <span style="color:var(--gold)">×${have}</span></div><div class="sub">Refine from: ${sources}</div><div class="row" style="gap:4px">`;
+    for (const fid of cm.from){ const mat = MATERIALS.find(m=>m.id===fid); if(!mat) continue; const can = (S.inventory[fid]||0)>0; h += `<button class="btn sm ${can?"ok":""}" ${can?"":"disabled"} onclick="window.__ev('refine|${cm.id}|${fid}')">${mat.icon}</button>`; }
+    h += `</div></div>`;
+  }
+  h += `</div>`;
+  const canScribe = (S.inventory.canvas||0)>0 && (S.inventory.ink||0)>0 && (S.inventory.reagent||0)>0;
+  h += `<div class="panel"><div style="font-weight:700">🪶 Scribe a Spell Card</div><div class="sub">Spend 1 🖼️ Canvas + 1 🖋️ Ink + 1 🧪 Reagent to create a random card (grade 1-10). Grades 9-10 become slabs.</div><button class="btn gold ${canScribe?"":"disabled"}" ${canScribe?"":"disabled"} onclick="window.__ev('scribe')">Scribe · 🖼️${S.inventory.canvas||0} 🖋️${S.inventory.ink||0} 🧪${S.inventory.reagent||0}</button></div>`;
+  return h;
+}
+function buildForge(){
+  let h = `<p class="sub">Smelt bars and forge equipment to boost your dueling power. Brew potions for extra healing.</p>`;
+  h += `<h3>⚒️ Smelt bars</h3><div class="row">`;
+  for (const b of BARS){ const req = Object.entries(b.req).map(([id,n])=>`${fname(id)}×${n}`).join(" + "); const ok = G.canCraft(S,b); h += `<div class="panel" style="flex:1;min-width:150px"><div style="font-weight:700">${b.icon} ${b.name}</div><div class="sub">Smelting ${b.lvl} · +${b.xp} xp</div><div class="sub">${req}</div><button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('smelt|${b.id}')">Smelt</button></div>`; }
+  h += `</div><h3>⚒️ Forge equipment</h3><div class="row">`;
+  for (const metal of Object.keys(METALS)) for (const slot of SLOTS){
+    const e = equipmentFor(metal, slot.id); const ok = G.skillLevel(S,"smithing") >= e.lvl && (S.inventory[e.barId]||0) >= e.bars;
+    h += `<div class="panel" style="flex:1;min-width:150px"><div style="font-weight:700">${e.icon} ${e.name}</div><div class="sub">Smelting ${e.lvl} · ${e.bars}× ${e.name.split(" ")[0]} bar</div><div class="sub" style="color:var(--gold)">${equipStatsLabel(e)}</div><button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('forge|${e.id}')">Forge</button></div>`;
+  }
+  h += `</div><h3>⚗️ Brew potions</h3><div class="row">`;
+  for (const p of POTIONS){ const ok = G.skillLevel(S,"alchemy") >= p.lvl && G.hasItems(S,p.req); const req = Object.entries(p.req).map(([id,n])=>`${fname(id)}×${n}`).join(" + "); h += `<div class="panel" style="flex:1;min-width:150px"><div style="font-weight:700">${p.icon} ${p.name}</div><div class="sub">Alchemy ${p.lvl} · heals ${p.heal}</div><div class="sub">${req}</div><button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('brew|${p.id}')">Brew</button></div>`; }
+  h += `</div>`;
+  return h;
+}
+
+// simple WebAudio SFX
+let AC=null;
+function sfx(freq,dur,type="sine",vol=.12){ try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(),g=AC.createGain(); o.type=type;o.frequency.value=freq;g.gain.value=vol;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+dur);o.stop(AC.currentTime+dur);}catch(e){} }
+const playSfx=()=>sfx(520,.08); const dmgSfx=()=>sfx(140,.12,"sawtooth"); const winSfx=()=>{sfx(523,.15);sfx(659,.15);sfx(784,.25);}; const loseSfx=()=>{sfx(330,.2);sfx(220,.3);};
+
+// ================= card renderer =================
+function cardFace(c, opts={}){
+  const school = SCHOOLS[c.school];
+  const rarity = RARITY[c.rarity];
+  const grade = (opts.grade) ? gradeForRoll(opts.grade) : null;
+  const val = (opts.value!=null) ? opts.value : cardValue(c.id, opts.grade!=null?opts.grade:100);
+  const cls = ["card"];
+  if (opts.wide) cls.push("wide");
+  if (opts.sel) cls.push("sel");
+  if (opts.disabled) cls.push("disabled");
+  if (opts.tired) cls.push("tired");
+  if (opts.slab) cls.push("slab");
+  const art = school.art;
+  let flag = "";
+  if (opts.tired) flag = `<div class="tired-ic">😴</div>`;
+  let attrs = "";
+  if (opts.onclick) attrs = ` onclick="window.__ev('${opts.onclick}')"`;
+  return `<div class="${cls.join(" ")}" style="border-color:${rarity.color}" ${attrs}>
+    <div class="art" style="background-image:url(./assets/${art})">
+      <div class="cost">${c.cost}</div>
+      ${c.type==="creature" ? `<div class="atk">${c.atk}</div><div class="hp">${c.hp}</div>` : ""}
+      ${grade ? `<div class="grade" title="${grade.name}">${grade.icon}</div>` : ""}
+      ${opts.slab ? `<div class="serial">#${opts.serial}</div>` : ""}
+      ${opts.value!=null ? `<div class="val">🪙${val}</div>` : ""}
+      ${flag}
+    </div>
+    <div class="body">
+      <div class="nm">${c.name}</div>
+      <div class="tx">${c.text||""}</div>
+    </div>
+  </div>`;
+}
+// global event router for inline onclick
+window.__ev = function(fn){ const [name, ...args] = fn.split("|"); const f = window.__EV[name]; if (f) f(...args); };
+window.__EV = {};
+window.__EV.dlgBtn = (i)=>{ const b = dlgButtons && dlgButtons[i]; if(!b) return; closeDialogue(); if(b.action) b.action(); };
+window.__EV.dlgClose = ()=>{ closeDialogue(); };
+window.__EV.ovClose = ()=>{ $("overlay").style.display = "none"; };
+window.__EV.spPick = (i,j)=>{
+  i = +i; j = +j;
+  spAnswers.push(SCHOOL_Q[i].opts[j][1]);
+  if (i < SCHOOL_Q.length-1) renderSPQuestion(i+1);
+  else { const tally={}; for(const s of spAnswers) tally[s]=(tally[s]||0)+1; const sug=Object.entries(tally).sort((a,b)=>b[1]-a[1])[0][0]; renderSPSuggest(sug); }
+};
+window.__EV.spAll = ()=>renderSPAll();
+window.__EV.chooseSchool = (s)=>{
+  G.setSchool(S, s); S.flags.schoolPicked = true;
+  G.issueSchoolStarter(S, s);
+  save();
+  $("schoolPicker").style.display = "none";
+  if (world) world.setPlayerColor(SCHOOLS[s].color);
+  toast(`Welcome to the ${SCHOOLS[s].name} School! Your school's cards were added to your collection.`); render();
+};
+
+// ================= navigation =================
+const NAV = [
+  ["world","🌍","World"],["home","🏰",STR.nav_home],["skills","⛏️",STR.nav_skills],["collection","🃏",STR.nav_collection],
+  ["loadout","🗡️",STR.nav_loadout],["market","🛒",STR.nav_market],["quests","📜",STR.nav_quests],["pvp","⚔️",STR.nav_pvp],
+];
+function buildNav(){
+  $("nav").innerHTML = NAV.map(([id,ic,label])=>`<button class="navbtn ${id===screen?"on":""}" data-screen="${id}"><span class="ic">${ic}</span>${label}</button>`).join("");
+  document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>{ screen=b.dataset.screen; render(); });
+}
+function render(){
+  buildNav();
+  const scr = $("screen");
+  const worldWrap = $("worldWrap");
+  if (screen==="world"){
+    scr.style.display = "none";
+    worldWrap.style.display = "block";
+    if (world) world.resize();
+    refreshTop();
+    return;
+  }
+  scr.style.display = "block";
+  worldWrap.style.display = "none";
+  scr.innerHTML = `<div class="screen on" id="scr_${screen}"></div>`;
+  const el = $(`scr_${screen}`);
+  if (screen==="home") renderHome(el);
+  if (screen==="skills") renderSkills(el);
+  if (screen==="collection") renderCollection(el);
+  if (screen==="loadout") renderLoadout(el);
+  if (screen==="market") renderMarket(el);
+  if (screen==="quests") renderQuests(el);
+  if (screen==="pvp") renderPvp(el);
+  if (screen==="duel") renderDuel(el);
+  if (screen==="online") renderOnline(el);
+  save();
+}
+
+// ================= HOME =================
+function renderHome(el){
+  let h = `<h2>${STR.hall_title}</h2>`;
+  if (!S.home.owned){
+    h += `<div class="panel"><div class="t" style="font-weight:700;font-size:16px">🏰 ${STR.hall_locked}</div>
+      <p class="sub">${STR.hall_prompt}</p>
+      <button class="btn gold" onclick="window.__ev('buyHome')">${STR.hall_buy}</button></div>`;
+  } else {
+    h += `<div class="panel"><div class="row" style="justify-content:space-between;align-items:center">
+      <div><div style="font-weight:700;font-size:18px">🏰 Your Guild Hall</div>
+      <div class="sub">${STR.tagline}</div></div>
+      <div><button class="btn ok" onclick="window.__ev('toPvp')">⚔️ ${STR.nav_pvp}</button></div></div></div>`;
+    h += `<div class="row">`;
+    for (const u of HOME_UPGRADES){
+      const n = S.home.upgrades[u.id];
+      const cost = u.cost(n), timber = u.timber(n);
+      const maxed = n>=u.max;
+      h += `<div class="panel" style="flex:1;min-width:200px">
+        <div style="font-weight:700">${u.icon} ${u.name} <span style="color:var(--gold)">Lv ${n}/${u.max}</span></div>
+        <div class="sub">${u.desc}</div>
+        <div class="pbar" style="margin-bottom:8px"><div style="width:${n/u.max*100}%"></div></div>
+        <button class="btn sm ${maxed?"":"gold"}" ${maxed?"disabled":""} onclick="window.__ev('upgrade|${u.id}')">${maxed?"MAX":`Upgrade · 🪙${cost} 🪵${timber}`}</button>
+      </div>`;
+    }
+    h += `</div>`;
+  }
+  // quick stats
+  h += `<div class="row">`;
+  h += `<div class="kpi"><div class="lv" style="font-size:18px">${G.academyRank(S)}</div><div class="nm">Academy Rank</div></div>`;
+  h += `<div class="kpi"><div class="lv">${S.stats.won}</div><div class="nm">Duels Won</div></div>`;
+  h += `<div class="kpi"><div class="lv">${S.cards.length}</div><div class="nm">Cards Owned</div></div>`;
+  h += `<div class="kpi"><div class="lv">${G.totalCollectionValue(S)}</div><div class="nm">Collection Value</div></div>`;
+  h += `<div class="kpi"><div class="lv">${S.stats.slabs}</div><div class="nm">Slabs</div></div>`;
+  h += `</div>`;
+  // daily quest
+  const dl = G.dailyLabel(S);
+  h += `<div class="panel" style="margin-top:12px"><h3>📅 Daily Quest</h3><div class="row" style="align-items:center">
+    <div class="grow"><b>${dl.text}</b> · ${dl.progress}/${dl.target} <span class="sub">${dl.claimed?"claimed":"reward: gold + 2 cards"}</span></div>
+    <button class="btn gold ${(dl.claimed||dl.progress<dl.target)?"":"ok"}" ${(dl.claimed||dl.progress<dl.target)?"disabled":""} onclick="window.__ev('claimDaily')">${dl.claimed?"Claimed":"Claim"}</button>
+  </div></div>`;
+  // your school
+  h += `<div class="panel" style="margin-top:12px"><h3>🎓 Your School: ${SCHOOLS[S.school].name}</h3><div class="row" style="align-items:center">
+    <div class="grow sub">${SCHOOL_DESC[S.school]} Your school's creatures gain +1 attack, and your spells deal bonus damage against their counter-school.</div>
+    <button class="btn" onclick="window.__ev('openSchoolPicker')">Change School</button>
+  </div></div>`;
+  h += `<div class="panel" style="margin-top:14px"><h3>${STR.skills_title}</h3><div class="row">`;
+  for (const [skill,info] of Object.entries(SKILLS)) h += `<div class="kpi"><div class="lv" style="font-size:20px">${info.icon} ${S.skills[skill]}</div><div class="nm">${info.name}</div></div>`;
+  h += `</div></div>`;
+  el.innerHTML = h;
+}
+window.__EV.buyHome = ()=>{ const r=G.buyHome(S); r.ok?toast("🏰 Guild hall acquired!"):err(r.err==="gold"?"Not enough gold (200g)":""); render(); };
+window.__EV.upgrade = (id)=>{ const r=G.upgradeHome(S,id); r.ok?toast("Upgraded!"):err(r.err==="gold"?"Not enough gold":r.err==="timber"?"Need timber (chop wood)":"Max"); render(); };
+window.__EV.toPvp = ()=>{ screen="pvp"; render(); };
+window.__EV.claimDaily = ()=>{ const r=G.claimDaily(S); if(r.ok){ toast(`📅 Daily complete! +${r.reward}g +${r.drops.length} cards`); winSfx(); } save(); render(); };
+window.__EV.openSchoolPicker = ()=>{ showSchoolPicker(); };
+
+// ================= SKILLS =================
+function renderSkills(el){
+  let h = `<h2>${STR.skills_title}</h2><p class="sub">Mine, fish, and chop to gather. Smith and brew to craft gear and potions.</p>`;
+  // skill levels
+  h += `<div class="skillgrid" style="margin-bottom:12px">`;
+  for (const [skill,info] of Object.entries(SKILLS)){
+    const lv = S.skills[skill]; const xp = S.skillXp[skill]; const need = G.xpForLevel(lv);
+    h += `<div class="kpi"><div class="lv">${info.icon} ${lv}</div><div class="nm">${info.name}</div>
+      <div class="pbar" style="margin-top:6px"><div style="width:${Math.min(100,xp/need*100)}%"></div></div>
+      <div style="font-size:10px;color:var(--muted)">${Math.floor(xp)}/${need} xp</div></div>`;
+  }
+  h += `</div>`;
+  // gathering
+  h += `<h3>⛏️ Gather</h3><div class="row">`;
+  for (const m of MATERIALS){
+    const can = G.canGather(S,m);
+    h += `<div class="panel" style="flex:1;min-width:150px">
+      <div style="font-weight:700"><span class="ic">${m.icon}</span> ${m.name}</div>
+      <div class="sub">${SKILLS[m.skill].name} ${m.lvl} · +${m.xp} xp</div>
+      <button class="btn sm ${can&&gatherCooldown<=0?"ok":""}" ${can?"":"disabled"} onclick="window.__ev('gather|${m.id}')">${can?"Gather":"Lv too low"}</button>
+    </div>`;
+  }
+  h += `</div>`;
+  // smithing
+  h += `<h3>⚒️ Smith (smelt bars)</h3><div class="row">`;
+  for (const b of BARS){
+    const req = Object.entries(b.req).map(([id,n])=>`${fname(id)}×${n}`).join(" + ");
+    const ok = G.canCraft(S,b);
+    h += `<div class="panel" style="flex:1;min-width:150px">
+      <div style="font-weight:700"><span class="ic">${b.icon}</span> ${b.name}</div>
+      <div class="sub">Smelting ${b.lvl} · +${b.xp} xp</div>
+      <div class="sub">${req}</div>
+      <button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('smelt|${b.id}')">Smelt</button></div>`;
+  }
+  h += `</div>`;
+  // forging
+  h += `<h3>⚒️ Forge equipment</h3><div class="row">`;
+  for (const metal of Object.keys(METALS)){
+    for (const slot of SLOTS){
+      const e = equipmentFor(metal, slot.id);
+      const ok = G.skillLevel(S,"smithing") >= e.lvl && (S.inventory[e.barId]||0) >= e.bars;
+      h += `<div class="panel" style="flex:1;min-width:150px">
+        <div style="font-weight:700">${e.icon} ${e.name}</div>
+        <div class="sub">Smelting ${e.lvl} · ${e.bars}× ${e.name.split(" ")[0]} bar</div>
+        <div class="sub" style="color:var(--gold)">${equipStatsLabel(e)}</div>
+        <button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('forge|${e.id}')">Forge</button></div>`;
+    }
+  }
+  h += `</div>`;
+  // alchemy
+  h += `<h3>⚗️ Brew potions</h3><div class="row">`;
+  for (const p of POTIONS){
+    const ok = G.skillLevel(S,"alchemy") >= p.lvl && G.hasItems(S,p.req);
+    const req = Object.entries(p.req).map(([id,n])=>`${fname(id)}×${n}`).join(" + ");
+    h += `<div class="panel" style="flex:1;min-width:150px">
+      <div style="font-weight:700">${p.icon} ${p.name}</div>
+      <div class="sub">Alchemy ${p.lvl} · heals ${p.heal} in duels</div>
+      <div class="sub">${req}</div>
+      <button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('brew|${p.id}')">Brew</button></div>`;
+  }
+  h += `</div>`;
+  // scribing
+  h += `<h3>🪶 Scribe cards (the Arcanum loop)</h3><p class="sub">Refine wood, fish, and ore into card materials, then scribe a spell card. Higher Scribing skill yields better grades.</p>`;
+  h += `<div class="row">`;
+  for (const cm of CARD_MATERIALS){
+    const sources = cm.from.map(fid=>{ const s=MATERIALS.find(m=>m.id===fid); return s?`${s.icon} ${s.name} (${s.lvl})`:"⚪"; }).join(" · ");
+    const have = S.inventory[cm.id]||0;
+    h += `<div class="panel" style="flex:1;min-width:170px">
+      <div style="font-weight:700">${cm.icon} ${cm.name} <span style="color:var(--gold)">×${have}</span></div>
+      <div class="sub">Refine from: ${sources}</div>
+      <div class="row" style="gap:4px">`;
+    for (const fid of cm.from){
+      const mat = MATERIALS.find(m=>m.id===fid);
+      if (!mat) continue;
+      const can = (S.inventory[fid]||0) > 0;
+      h += `<button class="btn sm ${can?"ok":""}" ${can?"":"disabled"} onclick="window.__ev('refine|${cm.id}|${fid}')">${mat.icon}</button>`;
+    }
+    h += `</div></div>`;
+  }
+  h += `</div>`;
+  const canScribe = (S.inventory.canvas||0)>0 && (S.inventory.ink||0)>0 && (S.inventory.reagent||0)>0;
+  h += `<div class="panel"><div style="font-weight:700">🪶 Scribe a Spell Card</div>
+    <div class="sub">Spend 1 🖼️ Canvas + 1 🖋️ Ink + 1 🧪 Reagent to create a random card (grade 1-10). Grades 9-10 become slabs with a serial number.</div>
+    <button class="btn gold ${canScribe?"":"disabled"}" ${canScribe?"":"disabled"} onclick="window.__ev('scribe')">Scribe · 🖼️${S.inventory.canvas||0} 🖋️${S.inventory.ink||0} 🧪${S.inventory.reagent||0}</button></div>`;
+  el.innerHTML = h;
+}
+function fname(id){ const m=MATERIALS.find(x=>x.id===id); return m?m.name:id; }
+window.__EV.gather = (id)=>{
+  if (gatherCooldown>0) return;
+  const m = MATERIALS.find(x=>x.id===id);
+  const r = G.gather(S,m);
+  if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); sfx(400,.06); gatherCooldown = 1.4; }
+  else err(LTL);
+  render();
+};
+window.__EV.smelt = (id)=>{ const b=BARS.find(x=>x.id===id); const r=G.smelt(S,b); r.ok?toast(`+${b.icon} ${b.name}`):err(LTL); render(); };
+window.__EV.forge = (id)=>{ const e=equipmentFor(id.split("_")[0],id.split("_")[1]); const r=G.forge(S,e); r.ok?toast(`⚒️ Forged ${e.name}!`):err(r.err==="resources"?"Not enough bars":LTL); render(); };
+window.__EV.brew = (id)=>{ const p=POTIONS.find(x=>x.id===id); const r=G.brew(S,p); r.ok?toast(`+${p.icon} ${p.name}`):err(r.err==="resources"?"Not enough fish":LTL); render(); };
+window.__EV.refine = (cm,fid)=>{ const r=G.refine(S,cm,fid); r.ok?toast("Refined card material!"):err("No materials"); sfx(400,.05); render(); };
+window.__EV.scribe = ()=>{
+  const r=G.scribe(S);
+  if(!r.ok){ err("Need 1 canvas + 1 ink + 1 reagent"); return; }
+  const g=gradeForRoll(r.inst.roll);
+  if(g.slab){ toast(`🪶 Scribed a ${g.icon} ${g.name} SLAB #${r.inst.serial}!`); sfx(700,.2); sfx(900,.25); }
+  else { toast(`🪶 Scribed ${CARD_MAP[r.inst.id].name} (${g.name})`); sfx(500,.12); }
+  render();
+};
+
+// ================= COLLECTION =================
+function renderCollection(el){
+  const gear = G.equipStats(S);
+  let h = `<h2>${STR.collection_title}</h2><p class="sub">${S.cards.length} cards · value ${G.totalCollectionValue(S)}g · pack ${G.PACK_COST}g</p>`;
+  h += `<div class="row" style="margin-bottom:10px">
+    <button class="btn gold" onclick="window.__ev('pack')">🃏 Open Pack (${G.PACK_COST}g)</button>
+    <button class="btn" onclick="window.__ev('toLoadout')">🗡️ ${STR.nav_loadout}</button></div>`;
+  h += `<div class="row">`;
+  for (const c of S.cards){
+    const def = CARD_MAP[c.id];
+    const val = cardValue(c.id, c.roll);
+    const g = c.graded ? gradeForRoll(c.roll) : null;
+    h += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">${cardFace(def, { grade:c.graded?c.roll:null, value:val, slab:g&&g.slab, serial:c.serial })}
+      <div class="row" style="gap:4px">
+        <button class="btn sm ok" ${c.graded?"disabled":""} onclick="window.__ev('grade|${c.uid}')">${c.graded?`<span style="font-size:10px">${g.icon} ${g.name}</span>`:"Grade"}</button>
+        ${c.graded?`<button class="btn sm" onclick="window.__ev('regrade|${c.uid}')">Regrade</button>`:""}
+        <button class="btn sm danger" onclick="window.__ev('sell|${c.uid}')">Sell</button>
+      </div></div>`;
+  }
+  h += `</div>`;
+  h += `<div class="panel" style="margin-top:12px"><h3>📖 Grading</h3><div class="row">`;
+  for (const g of GRADES) h += `<div class="kpi" style="flex:1"><div style="font-size:22px">${g.icon}</div><div class="nm">${g.name} (${g.min}+) · ×${g.x}</div></div>`;
+  h += `</div></div>`;
+  el.innerHTML = h;
+}
+window.__EV.pack = ()=>{ const r=G.openPack(S); if(!r.ok){ err("Not enough gold"); return; } sfx(600,.2); toast("✨ Pack opened!"); render(); };
+window.__EV.grade = (uid)=>{ const c=G.cardInstance(S,uid); if(!c||c.graded) return; const fee=gradeFee(c.id); const r=G.gradeCard(S,uid); r.ok?toast(`${r.grade.icon} ${r.grade.name}!`):err(`Need ${fee}g to grade`); render(); };
+window.__EV.regrade = (uid)=>{ const r=G.regradeCard(S,uid); if(!r.ok){ err("Not enough gold"); return; } toast(`Regraded: ${r.old.icon} ${r.old.name} → ${r.grade.icon} ${r.grade.name}!`); sfx(500,.1); render(); };
+window.__EV.sell = (uid)=>{ const r=G.sellCard(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
+window.__EV.toLoadout = ()=>{ screen="loadout"; render(); };
+
+// ================= LOADOUT =================
+function renderLoadout(el){
+  const gear = G.equipStats(S);
+  let h = `<h2>${STR.loadout_title}</h2>`;
+  h += `<div class="panel"><h3>🎒 Equipment</h3><div class="row">`;
+  for (const slot of SLOTS){
+    const euid = S.loadout[slot.id];
+    const eq = euid ? S.equipment.find(x=>x.uid===euid) : null;
+    const def = eq ? equipmentFor(eq.metal, eq.slot) : null;
+    h += `<div class="panel" style="flex:1;min-width:150px;text-align:center">
+      <div style="font-size:26px">${slot.icon}</div>
+      <div class="nm" style="font-weight:700;font-size:13px">${slot.name}</div>
+      ${def ? `<div style="color:var(--gold);font-size:13px;font-weight:700">${def.name}</div>
+        <div class="sub">${equipStatsLabel(def)}</div>
+        <button class="btn sm danger" onclick="window.__ev('unequip|${slot.id}')">Unequip</button>`
+        : `<div class="sub">Empty</div>`}
+    </div>`;
+  }
+  h += `</div><div class="sub" style="margin-top:8px">Total bonus: <b style="color:var(--gold)">${equipStatsLabel({stats:gear})}</b></div></div>`;
+  // owned equipment
+  h += `<div class="panel"><h3>Owned Equipment</h3><div class="row">`;
+  if (S.equipment.length===0) h += `<div class="sub">Forge gear in the Skills tab.</div>`;
+  for (const e of S.equipment){
+    const def = equipmentFor(e.metal, e.slot);
+    const equipped = Object.values(S.loadout).includes(e.uid);
+    h += `<div class="panel" style="flex:1;min-width:150px">
+      <div style="font-weight:700">${def.icon} ${def.name} ${equipped?"<span style='color:var(--ok)'>✓</span>":""}</div>
+      <div class="sub">${equipStatsLabel(def)}</div>
+      <div class="row">
+        <button class="btn sm ok" ${equipped?"disabled":""} onclick="window.__ev('equip|${e.uid}')">Equip</button>
+        <button class="btn sm danger" onclick="window.__ev('sellEq|${e.uid}')">Sell ${def.value}g</button>
+      </div></div>`;
+  }
+  h += `</div></div>`;
+  // deck
+  h += `<div class="panel"><h3>🃏 Deck (${S.deck.length}/${G.MAX_DECK})</h3><div class="sub">${STR.deck_need}</div><div class="row">`;
+  const counts = G.deckCounts(S.deck);
+  for (const id of Object.keys(counts)){
+    const c = CARD_MAP[id];
+    h += `<div class="panel" style="flex:1;min-width:140px;display:flex;align-items:center;gap:8px">
+      <div class="ic">${SCHOOLS[c.school].art==="school_fire.jpg"?"🔥":""}</div>
+      <div style="flex:1"><div style="font-weight:700;font-size:13px">${c.name}</div><div class="sub">×${counts[id]}</div></div>
+      <button class="btn sm danger" onclick="window.__ev('deckRm|${id}')">−</button></div>`;
+  }
+  h += `</div></div>`;
+  // card pool
+  h += `<div class="panel"><h3>Add to deck (owned cards)</h3><div class="row">`;
+  const pool = {};
+  for (const c of S.cards) pool[c.id]=(pool[c.id]||0)+1;
+  for (const id of Object.keys(pool)){
+    const c = CARD_MAP[id];
+    const inDeck = counts[id]||0;
+    const canAdd = inDeck < pool[id] && inDeck < G.MAX_COPIES && S.deck.length < G.MAX_DECK;
+    h += cardFace(c, { disabled: !canAdd, onclick:`deckAdd|${id}` });
+  }
+  h += `</div></div>`;
+  el.innerHTML = h;
+}
+window.__EV.equip = (uid)=>{ G.equip(S,uid); render(); };
+window.__EV.unequip = (slot)=>{ G.unequip(S,slot); render(); };
+window.__EV.sellEq = (uid)=>{ const r=G.sellEquipment(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
+window.__EV.deckAdd = (id)=>{ const r=G.addToDeck(S,id); if(!r.ok) err(r.err==="full"?"Deck full (20)":r.err==="max"?"Max 3 copies":r.err==="copies"?"You don't own that many":"Error"); render(); };
+window.__EV.deckRm = (id)=>{ G.removeFromDeck(S,id); render(); };
+
+// ================= MARKET =================
+function renderMarket(el){
+  G.auctionTick(S);
+  let h = `<h2>${STR.market_title}</h2>`;
+  // bazaar: buy cards
+  h += `<div class="panel"><h3>🛒 Bazaar — Buy Cards</h3><div class="row">`;
+  for (const c of CARDS){
+    const price = RARITY[c.rarity].base*2;
+    h += cardFace(c, { value:price, onclick:`buy|${c.id}` });
+  }
+  h += `</div></div>`;
+  // bazaar: sell items
+  h += `<div class="panel"><h3>📦 Sell Materials</h3><div class="row">`;
+  const mats = [...MATERIALS, ...BARS, ...POTIONS].filter(m => (S.inventory[m.id]||0)>0);
+  if (mats.length===0) h += `<div class="sub">No materials to sell.</div>`;
+  for (const m of mats){
+    h += `<div class="panel" style="flex:1;min-width:150px">
+      <div style="font-weight:700">${m.icon} ${m.name} <span style="color:var(--muted)">×${S.inventory[m.id]}</span></div>
+      <div class="sub">worth ${m.value}g each</div>
+      <button class="btn sm" onclick="window.__ev('sellItem|${m.id}')">Sell 1</button></div>`;
+  }
+  h += `</div></div>`;
+  // auctions
+  h += `<div class="panel"><h3>🔨 Auction House</h3>`;
+  if (S.auctions.length===0) h += `<div class="sub">${STR.no_auctions}</div>`;
+  for (const a of S.auctions){
+    const c = CARD_MAP[a.card.id];
+    const left = Math.max(0, Math.ceil((a.ends - performance.now())/1000));
+    h += `<div class="lrow"><span class="ic">${gradeForRoll(a.card.roll).icon}</span>
+      <div class="grow"><div class="t">${c.name}</div>
+      <div class="d">${gradeForRoll(a.card.roll).name} · ${a.card.graded?"graded":"ungraded"} · bid ${a.bid||a.price}g</div></div>
+      <div class="d">⏱ ${left}s</div></div>`;
+  }
+  h += `<div class="sub">List an ungraded card below to auction it to NPC collectors.</div></div>`;
+  // list auction
+  h += `<div class="panel"><h3>List a card for auction</h3><div class="row">`;
+  for (const c of S.cards.slice(0,40)){
+    const def = CARD_MAP[c.id];
+    h += cardFace(def, { grade:c.graded?c.roll:null, value:cardValue(c.id,c.roll), onclick:`listA|${c.uid}` });
+  }
+  h += `</div></div>`;
+  el.innerHTML = h;
+}
+window.__EV.buy = (id)=>{ const r=G.buyCard(S,id); r.ok?toast("Purchased!"):err("Not enough gold"); render(); };
+window.__EV.sellItem = (id)=>{ const r=G.sellItem(S,id); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
+window.__EV.listA = (uid)=>{ const r=G.listAuction(S,uid, cardValue(G.cardInstance(S,uid)?.id||"", 100)); r.ok?toast("Listed for auction!"):null; render(); };
+
+// ================= QUESTS =================
+function renderQuests(el){
+  let h = `<h2>${STR.quests_title}</h2><p class="sub">Defeat rising wizard bosses to earn gold, XP, and card drops.</p>`;
+  for (let i=0;i<G.QUESTS.length;i++){
+    const qq = G.QUESTS[i];
+    const unlocked = G.canDoQuest(S,i);
+    const done = G.questDone(S,i);
+    h += `<div class="lrow">
+      <div class="ic">${done?"✅":unlocked?"⚔️":"🔒"}</div>
+      <div class="grow"><div class="t">${qq.title}</div>
+      <div class="d">${qq.name} (${SCHOOLS[qq.school].name}) · ${qq.hp} HP</div></div>
+      <div class="d">Reward: 🪙${qq.reward} + ${qq.dropN} cards</div>
+      <button class="btn sm ${done?"":unlocked?"gold":""}" ${done||!unlocked?"disabled":""} onclick="window.__ev('startQuest|${i}')">${done?"Done":unlocked?"Duel":"Locked"}</button>
+    </div>`;
+  }
+  el.innerHTML = h;
+}
+window.__EV.startQuest = (i)=>{ startLocalDuel(G.QUESTS[i].deck, G.QUESTS[i].gear, G.QUESTS[i].title, i, true); };
+
+// ================= PVP =================
+function renderPvp(el){
+  let h = `<h2>${STR.pvp_title}</h2>`;
+  h += `<div class="panel"><h3>🤖 ${STR.pvp_local}</h3><p class="sub">Fight a random AI wizard with your deck and gear. Win gold.</p>`;
+  h += `<div class="row"><button class="btn gold" onclick="window.__ev('localPvp')">⚔️ Duel an AI Wizard</button></div></div>`;
+  h += `<div class="panel"><h3>🌐 ${STR.pvp_online}</h3><p class="sub">Real players. Create a match and share the link, or join via an invite link.</p>`;
+  h += `<div class="row"><button class="btn ok" onclick="window.__ev('online')">${STR.create_room}</button></div>`;
+  if (online && online.room) h += `<div class="sub" style="margin-top:8px">Your room: <b style="color:var(--gold)">${location.href.split("?")[0]}?room=${online.room}</b></div>`;
+  h += `</div>`;
+  h += `<div class="row"><div class="kpi"><div class="lv">${S.pvp.wins}</div><div class="nm">PvP Wins</div></div>
+  <div class="kpi"><div class="lv">${S.pvp.losses}</div><div class="nm">PvP Losses</div></div></div>`;
+  el.innerHTML = h;
+}
+function randomAiDeck(){
+  // build a 30-card deck from random cards
+  const pool = [];
+  for (const c of CARDS){ for (let i=0;i<3;i++) pool.push(c.id); }
+  const deck = [];
+  while (deck.length < 30) deck.push(pool[Math.floor(Math.random()*pool.length)]);
+  return deck;
+}
+window.__EV.localPvp = ()=>{
+  const gearTier = 1 + Math.floor(S.level/3);
+  const gear = { hp: gearTier*5, atk: gearTier, def: Math.floor(gearTier/2), pip: gearTier>=4?1:0 };
+  startLocalDuel(randomAiDeck(), gear, "AI Wizard", -1, false);
+};
+window.__EV.online = ()=>{ setupOnline(); };
+
+// ================= LOCAL DUEL =================
+function startPracticeDuel(){
+  const practiceDeck = ["fire_cat","fire_cat","fire_elf","fire_elf","firebolt","ice_golem","pixie","novice","elixir","fire_elf"];
+  startLocalDuel(practiceDeck, {hp:0,atk:0,def:0,pip:0}, "Trainer Lyra", -1, false);
+}
+function startLocalDuel(enemyDeck, enemyGear, enemyName, questIdx, isQuest){
+  // ensure deck valid
+  if (S.deck.length !== G.MAX_DECK){ err(STR.deck_need); return; }
+  const enemyHp = isQuest ? G.QUESTS[questIdx].hp : 100;
+  const enemySchool = isQuest ? G.QUESTS[questIdx].school : "balance";
+  battle = G.startDuel(S.deck, G.equipStats(S), enemyDeck, enemyGear, enemyHp, S.school, enemySchool);
+  battle.enemyName = enemyName; battle.questIdx = questIdx; battle.isQuest = isQuest;
+  pendingTarget = null;
+  screen = "duel";
+  render();
+}
+function renderDuel(el){
+  if (!battle){ el.innerHTML = `<h2>Duel</h2>${G.isOver(battle||{}).over?"":""}`; return; }
+  const over = G.isOver(battle);
+  const you = battle.you, enemy = battle.enemy;
+  const myTurn = battle.turn==="you";
+  let h = `<h2>⚔️ ${battle.enemyName||"Duel"}</h2>`;
+  h += `<div id="duelStatus">${over.over ? (over.winner==="you"?STR.you_win:STR.you_lose) : (myTurn?STR.your_turn:STR.enemy_turn)}</div>`;
+  h += `<div id="duelTimer" style="text-align:center;font-size:20px;font-weight:800;color:${duelTimeLeft<=10?"var(--danger)":"var(--gold)"}">${myTurn&&!over.over?duelTimeLeft+"s":"—"}</div>`;
+  h += `<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:6px">You: ${(you.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${(you.traps||[]).length?`· 🪤${you.traps.length}`:""} &nbsp;|&nbsp; Enemy: ${(enemy.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${(enemy.traps||[]).length?`· 🪤${enemy.traps.length}`:""}</div>`;
+  h += `<div style="text-align:center;font-size:12px;color:var(--gold);margin-bottom:6px">🎓 ${SCHOOLS[you.school].name} School vs ${SCHOOLS[enemy.school].name} School</div>`;
+  // enemy zone
+  const canTargetWiz = pendingTarget && (pendingTarget.kind==="spell" || pendingTarget.kind==="attack");
+  h += `<div class="duelzone bg"><div class="zonecap">${battle.enemyName||"Enemy"}</div>`;
+  h += `<div class="wizbar" ${canTargetWiz?`style="cursor:crosshair" onclick="window.__ev('dmgWiz')"`:""}><div class="bar"><div style="width:${Math.max(0,enemy.hp/enemy.maxHp*100)}%"></div></div>
+    <div style="font-size:12px">${enemy.hp}/${enemy.maxHp} HP${enemy.shield?` · 🛡${enemy.shield}`:""}</div></div>`;
+  h += `<div class="board">`;
+  for (let i=0;i<enemy.board.length;i++){
+    const c = enemy.board[i]; const def = CARD_MAP[c.id];
+    h += cardFace(def, { sel:false, tired:c.exhausted||c.summoning,
+      onclick: pendingTarget ? `dmgTarget|${i}` : "" });
+  }
+  h += `</div></div>`;
+  // your zone
+  h += `<div class="duelzone"><div class="zonecap">You · ${you.pips} ⚡ pips</div>`;
+  h += `<div class="wizbar"><div class="bar o"><div style="width:${Math.max(0,you.hp/you.maxHp*100)}%"></div></div>
+    <div style="font-size:12px">${you.hp}/${you.maxHp} HP${you.shield?` · 🛡${you.shield}`:""}</div></div>`;
+  h += `<div class="board">`;
+  for (let i=0;i<you.board.length;i++){
+    const c = you.board[i]; const def = CARD_MAP[c.id];
+    const canAtk = myTurn && !c.exhausted && !c.summoning;
+    h += cardFace(def, { sel: pendingTarget&&pendingTarget.kind==="attack"&&pendingTarget.idx===i,
+      tired:c.exhausted||c.summoning, onclick: canAtk ? `atkFrom|${i}` : "" });
+  }
+  h += `</div></div>`;
+  // hand
+  h += `<div class="panel"><div class="zonecap" style="position:static">${STR.hand} (${you.hand.length})</div><div class="hand">`;
+  for (let i=0;i<you.hand.length;i++){
+    const id = you.hand[i]; const c = CARD_MAP[id];
+    const playable = myTurn && you.pips>=c.cost && !over.over;
+    const isTargeted = c.type==="spell" && c.fx.some(f=>f.k==="dmg");
+    h += cardFace(c, { sel: pendingTarget&&pendingTarget.kind==="spell"&&pendingTarget.idx===i,
+      disabled: !playable, onclick: playable ? (isTargeted?`cast|${i}`:`play|${i}`) : "" });
+  }
+  h += `</div></div>`;
+  // actions
+  h += `<div class="row" style="justify-content:center">
+    <button class="btn gold" ${myTurn&&!over.over?"":"disabled"} onclick="window.__ev('endTurn')">${STR.end_turn}</button></div>`;
+  h += `<div id="duelLog">${battle.log.slice(-4).join(" · ")}</div>`;
+  if (over.over){
+    h += `<div class="row" style="justify-content:center;margin-top:8px">
+      <button class="btn ok" onclick="window.__ev('duelAgain')">${STR.play_again}</button>
+      <button class="btn" onclick="window.__ev('toPvp')">Exit</button></div>`;
+  }
+  el.innerHTML = h;
+  // turn timer: clear always; start countdown when it's the player's turn
+  clearInterval(duelTimerInt);
+  if (!over.over && battle.turn==="you"){
+    duelTimeLeft = 30;
+    duelTimerInt = setInterval(()=>{
+      if (!battle || battle.turn!=="you" || G.isOver(battle).over){ clearInterval(duelTimerInt); return; }
+      duelTimeLeft--;
+      const el = document.getElementById("duelTimer");
+      if (el){ el.textContent = duelTimeLeft+"s"; el.style.color = duelTimeLeft<=10 ? "var(--danger)" : "var(--gold)"; }
+      if (duelTimeLeft <= 0){ clearInterval(duelTimerInt); G.endTurn(battle); render(); }
+    }, 1000);
+  }
+  // if it's enemy turn and not over, run AI
+  if (!over.over && battle.turn==="enemy"){
+    setTimeout(()=>{ if (battle && battle.turn==="enemy"){ G.aiTurn(battle); render(); } }, 500);
+  }
+}
+window.__EV.play = (idx)=>{ const r=G.playCard(battle, battle.you, idx, null); if(r.ok) sfx(playSfx); render(); };
+window.__EV.cast = (idx)=>{
+  const c = CARD_MAP[battle.you.hand[idx]];
+  if (c.fx.some(f=>f.k==="dmg")){ pendingTarget = {kind:"spell", idx}; render(); }
+  else { G.playCard(battle, battle.you, idx, null); render(); }
+};
+window.__EV.dmgTarget = (ti)=>{
+  if (pendingTarget && pendingTarget.kind==="spell"){
+    const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"creature", idx:ti});
+    pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
+  } else if (pendingTarget && pendingTarget.kind==="attack"){
+    const r = G.attack(battle, pendingTarget.idx, "creature", ti);
+    pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
+  }
+};
+window.__EV.dmgWiz = ()=>{
+  if (pendingTarget && pendingTarget.kind==="spell"){
+    const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"wiz"});
+    pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
+  } else if (pendingTarget && pendingTarget.kind==="attack"){
+    const r = G.attack(battle, pendingTarget.idx, "wiz", -1);
+    pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
+  }
+};
+window.__EV.atkFrom = (idx)=>{
+  // check taunt: if enemy has taunt, must target creature
+  const enemy = battle.enemy;
+  const hasTaunt = enemy.board.some(c=>c.taunt && c.hp>0);
+  if (hasTaunt){ pendingTarget = {kind:"attack", idx}; render(); }
+  else { const r=G.attack(battle, idx, "wiz", -1); if(r.ok) sfx(dmgSfx); render(); }
+};
+window.__EV.atkWiz = ()=>{
+  if (pendingTarget && pendingTarget.kind==="attack"){ const r=G.attack(battle, pendingTarget.idx, "wiz", -1); pendingTarget=null; if(r.ok) sfx(dmgSfx); render(); }
+};
+window.__EV.endTurn = ()=>{ const r=G.endTurn(battle); render(); };
+window.__EV.duelAgain = ()=>{
+  const over = G.isOver(battle);
+  const isQuest = battle && battle.isQuest;
+  const qIdx = battle && battle.questIdx;
+  const gear = G.equipStats(S);
+  const bonus = amt => Math.round(amt * gear.gold/100);
+  if (over.winner==="you"){
+    G.dailyProgress(S, "win");
+    if (isQuest && !G.questDone(S, qIdx)){
+      const qq = G.QUESTS[qIdx];
+      const r = G.completeQuest(S, qIdx);
+      G.gainGold(S, bonus(qq.reward));
+      toast(`Quest complete! +${qq.reward+bonus(qq.reward)}g, ${r.drops.length} cards added`);
+      winSfx();
+    } else {
+      const base = isQuest ? 30 : 40 + Math.floor(Math.random()*40);
+      G.gainGold(S, base + bonus(base));
+      if (!isQuest){ S.pvp.wins++; S.stats.won++; G.dropCards(S,1); toast(`Victory! +${base+bonus(base)}g +1 card`); }
+      else toast(`+${base+bonus(base)}g`);
+      winSfx();
+    }
+  } else {
+    loseSfx();
+    if (isQuest) toast("Defeated — try again!");
+    else { S.pvp.losses++; toast("Defeated"); }
+  }
+  save();
+  clearInterval(duelTimerInt);
+  battle=null; pendingTarget=null;
+  screen = isQuest ? "quests" : "pvp";
+  render();
+};
+
+// ================= ONLINE DUEL =================
+function setupOnline(){
+  const params = new URLSearchParams(location.search);
+  let room = params.get("room");
+  if (!room){ room = Math.random().toString(36).slice(2,8); params.set("room",room); history.replaceState(null,"",location.pathname+"?"+params); }
+  if (S.deck.length !== G.MAX_DECK){ err(STR.deck_need); return; }
+  online = { playerId: sessionStorage.getItem("mp-player-id")||("p-"+Math.random().toString(36).slice(2,10)), room, ws:null, state:null, deck: S.deck.slice() };
+  sessionStorage.setItem("mp-player-id", online.playerId);
+  screen = "online";
+  connectOnline();
+  render();
+}
+function renderOnline(el){
+  const o = online;
+  if (!o) return;
+  let h = `<h2>🌐 ${STR.pvp_online}</h2>`;
+  if (!o.state || o.state.status==="waiting"){
+    h += `<div class="panel"><div class="t" style="font-weight:700">${STR.waiting}</div>
+      <div class="sub">Invite link: <b style="color:var(--gold)">${location.href}</b></div>
+      <div class="sub">Open this link in another tab to play yourself, or send it to a friend.</div></div>`;
+  } else if (o.state.status==="playing"){
+    const v = o.state.view;
+    if (v && v.phase==="deck"){ h += `<div class="panel"><div class="t">${STR.waiting}</div><div class="sub">Waiting for opponent to submit deck…</div></div>`; }
+    else if (v && v.phase==="play"){
+      const myTurn = v.turn === o.state.you;
+      h += `<div id="duelStatus">${myTurn?STR.your_turn:STR.enemy_turn}</div>`;
+      h += `<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:6px">You: ${(v.you.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${v.you.traps?`· 🪤${v.you.traps}`:""} &nbsp;|&nbsp; Enemy: ${(v.opp.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${v.opp.traps?`· 🪤${v.opp.traps}`:""}</div>`;
+      // enemy board
+      h += `<div class="duelzone bg"><div class="zonecap">Opponent · ${v.opp.hp}/${v.opp.maxHp} HP${v.opp.shield?` 🛡${v.opp.shield}`:""} · ${v.opp.pips}⚡ · hand ${v.opp.hand}</div><div class="board">`;
+      for (let i=0;i<v.opp.board.length;i++){ const c=v.opp.board[i]; const def=CARD_MAP[c.id]; h += cardFace(def,{tired:c.exhausted||c.summoning, onclick: (pendingTarget&&pendingTarget.kind==="attack")?`oDmg|${i}`:""}); }
+      h += `</div></div>`;
+      // your board
+      h += `<div class="duelzone"><div class="zonecap">You · ${v.you.hp}/${v.you.maxHp} HP${v.you.shield?` 🛡${v.you.shield}`:""} · ${v.you.pips}⚡ · deck ${v.you.deck}</div><div class="board">`;
+      for (let i=0;i<v.you.board.length;i++){ const c=v.you.board[i]; const def=CARD_MAP[c.id]; const canAtk=myTurn&&!c.exhausted&&!c.summoning; h += cardFace(def,{tired:c.exhausted||c.summoning, onclick: canAtk?`oAtk|${i}`:""}); }
+      h += `</div></div>`;
+      // hand
+      h += `<div class="panel"><div class="zonecap" style="position:static">${STR.hand} (${v.you.hand.length})</div><div class="hand">`;
+      for (let i=0;i<v.you.hand.length;i++){ const id=v.you.hand[i]; const c=CARD_MAP[id]; const playable=myTurn&&v.you.pips>=c.cost; const targeted=c.type==="spell"&&c.fx.some(f=>f.k==="dmg"); h += cardFace(c,{disabled:!playable, onclick: playable?(targeted?`oCast|${i}`:`oPlay|${i}`):""}); }
+      h += `</div></div>`;
+      h += `<div class="row" style="justify-content:center"><button class="btn gold" ${myTurn?"":"disabled"} onclick="window.__ev('oEnd')">${STR.end_turn}</button></div>`;
+      h += `<div id="duelLog">${(v.log||[]).slice(-4).join(" · ")}</div>`;
+    }
+  } else if (o.state.status==="over"){
+    const r = o.state.result;
+    const won = r.winner === o.state.you;
+    h += `<div class="panel"><div class="t" style="font-size:20px;font-weight:800;color:${won?"var(--ok)":"var(--danger)"}">${won?STR.you_win:STR.you_lose}</div>
+      <div class="row" style="margin-top:10px"><button class="btn ok" onclick="window.__ev('oReset')">${STR.play_again}</button>
+      <button class="btn" onclick="window.__ev('toPvp')">Exit</button></div></div>`;
+  }
+  el.innerHTML = h;
+}
+function sendOnline(obj){ if (online && online.ws && online.ws.readyState===1) online.ws.send(JSON.stringify(obj)); }
+function connectOnline(){
+  const base = location.pathname.replace(/\/+$/,"");
+  const wsUrl = (location.protocol==="https:"?"wss://":"ws://") + location.host + base + "/ws/" + online.room;
+  online.ws = new WebSocket(wsUrl);
+  online.ws.onopen = ()=>{ sendOnline({type:"join", playerId: online.playerId}); sendOnline({type:"action", action:{type:"setDeck", deck: online.deck}}); };
+  online.ws.onclose = ()=>{ setTimeout(connectOnline, 1500); };
+  online.ws.onmessage = (e)=>{
+    const msg = JSON.parse(e.data);
+    if (msg.type==="error"){ err(msg.error); return; }
+    if (msg.type!=="state") return;
+    online.state = msg;
+    if (msg.status==="over" && !online.rewarded){
+      online.rewarded = true;
+      if (msg.result.winner===msg.you){ S.pvp.wins++; G.gainGold(S, 60); toast("+60g online win!"); }
+      else S.pvp.losses++;
+      save();
+    }
+    renderOnline();
+  };
+}
+window.__EV.oPlay = (i)=>{ sendOnline({type:"action", action:{type:"play", handIndex: i}}); };
+window.__EV.oCast = (i)=>{ const c=CARD_MAP[online.state.view.you.hand[i]]; if(c.fx.some(f=>f.k==="dmg")){ pendingTarget={kind:"oSpell", idx:i}; } else sendOnline({type:"action",action:{type:"play",handIndex:i}}); };
+window.__EV.oDmg = (ti)=>{ if(pendingTarget&&pendingTarget.kind==="oSpell"){ sendOnline({type:"action",action:{type:"play",handIndex:pendingTarget.idx,target:{kind:"creature",idx:ti}}}); pendingTarget=null; } else if(pendingTarget&&pendingTarget.kind==="oAtk"){ sendOnline({type:"action",action:{type:"attack",attacker:pendingTarget.idx,targetKind:"creature",targetIdx:ti}}); pendingTarget=null; } };
+window.__EV.oAtk = (i)=>{ const v=online.state.view; const hasTaunt=v.opp.board.some(c=>c.taunt&&c.hp>0); if(hasTaunt){ pendingTarget={kind:"oAtk",idx:i}; } else sendOnline({type:"action",action:{type:"attack",attacker:i,targetKind:"wiz"}}); };
+window.__EV.oEnd = ()=>{ sendOnline({type:"action",action:{type:"endTurn"}}); };
+window.__EV.oReset = ()=>{ sendOnline({type:"reset"}); online.rewarded=false; };
+
+// ================= WORLD (3D hub) =================
+let world = null, worldPrompt = null;
+function stationTarget(station){
+  return { scribe:"skills", smith:"skills", market:"market", duel:"pvp", quests:"quests", home:"home" }[station] || "home";
+}
+const NPC_DIALOGUE = {
+  quests: { name:"Professor Echo", role:"Dean of the Arcanum", lines:["Welcome to the Arcanum Academy, young spellwright.","The rivals of the seven schools await. Defeat them to earn renown, gold, and rare cards."], buttons:[{label:"📜 View Quests", primary:true, action:()=>{screen="quests";render();}}] },
+  market: { name:"Merchant Vell", role:"Arcade Stalls", lines:["Fresh goods from the Merchant Arcade!","Cards, materials, and rare finds — coin well spent."], buttons:[{label:"🛒 Open Market", primary:true, action:()=>{screen="market";render();}}] },
+  duel: { name:"Referee Kael", role:"Arena Master", lines:["The arena is open. Challenge an AI rival or duel a real player for glory."], buttons:[{label:"⚔️ Enter the Arena", primary:true, action:()=>{screen="pvp";render();}}] },
+  scribe: { name:"Scribing Hall", role:"Card Creation", lines:["Refine wood, fish, and ore into canvas, ink, and reagent, then scribe spell cards."], buttons:[{label:"🪶 Scribe & Refine", primary:true, action:()=>{ showOverlay("Scribing Hall", buildScribing()); }}] },
+  smith: { name:"Smithy", role:"Forge & Equipment", lines:["Smelt bars and forge equipment to boost your dueling power."], buttons:[{label:"⚒️ Forge & Brew", primary:true, action:()=>{ showOverlay("Smithy & Forge", buildForge()); }}] },
+  home: { name:"Student Dorms", role:"Your Home", lines:["Your own corner of the academy. Upgrade your guild hall."], buttons:[{label:"🏰 Your Hall", primary:true, action:()=>{screen="home";render();}}] },
+  trainer: { name:"Trainer Lyra", role:"Duel Coach", lines:["Want to warm up? I'll spar with you right here.","Drop your deck and let's see what you've got — a quick practice duel is the best way to test a new build."], buttons:[{label:"⚔️ Practice Duel", primary:true, action:()=>{ startPracticeDuel(); }}] },
+  librarian: { name:"Librarian Ossa", role:"Keeper of the Library of Echoes", lines:["The Library of Echoes holds every lesson and challenge record of the Arcanum.","Take on the day's challenge when you're ready, young spellwright."], buttons:[{label:"📜 Daily Challenge", primary:true, action:()=>{screen="quests";render();}}] },
+};
+function initWorld(){
+  const canvas = $("world");
+  try {
+    world = createWorld(canvas, {
+    onNearby(target){
+      worldPrompt = target;
+      const p = $("prompt");
+      if (target){
+        const isNPC = target.kind==="station" && NPC_DIALOGUE[target.data];
+        p.innerHTML = `<button class="btn gold" onclick="window.__ev('worldGo')">${target.kind==="gather"?"⛏️":(isNPC?"💬":"🚪")} ${target.label}</button>`;
+        p.style.display = "block";
+      } else p.style.display = "none";
+    },
+    onGather(matId){
+      if (gatherCooldown>0) return;
+      const m = MATERIALS.find(x=>x.id===matId);
+      if (!m) return;
+      const r = G.gather(S, m);
+      if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); sfx(400,.06); gatherCooldown = 1.4; }
+      else err(LTL);
+      save();
+    },
+    onStation(station){
+      const dlg = NPC_DIALOGUE[station];
+      if (dlg){ showDialogue(dlg.name, dlg.role, dlg.lines, dlg.buttons); }
+      else { screen = stationTarget(station); render(); }
+    },
+  });
+  } catch(e){ console.warn("3D world unavailable:", e); return; }
+  // joystick
+  const joy = $("joy");
+  let joyActive = false, joyBase = null;
+  function joyStart(e){
+    joyActive = true;
+    const r = joy.getBoundingClientRect();
+    joyBase = { x: r.left+r.width/2, y: r.top+r.height/2 };
+    joy.style.background = "radial-gradient(circle, rgba(255,255,255,.25), transparent 70%)";
+    joyMove(e);
+  }
+  function joyMove(e){
+    if (!joyActive) return;
+    const t = e.touches ? e.touches[0] : e;
+    let dx = (t.clientX-joyBase.x)/55, dy = (t.clientY-joyBase.y)/55;
+    dx = Math.max(-1, Math.min(1, dx)); dy = Math.max(-1, Math.min(1, dy));
+    world.setTouchMove(dx, dy);
+  }
+  function joyEnd(){ joyActive=false; joy.style.background=""; world.setTouchMove(0,0); }
+  joy.addEventListener("touchstart", joyStart, {passive:false});
+  joy.addEventListener("touchmove", joyMove, {passive:false});
+  joy.addEventListener("touchend", joyEnd);
+  joy.addEventListener("touchcancel", joyEnd);
+  joy.addEventListener("mousedown", joyStart);
+  joy.addEventListener("mousemove", joyMove);
+  joy.addEventListener("mouseup", joyEnd);
+  // tap-to-move (short tap) vs drag-to-rotate camera (right side) + pinch-to-zoom
+  let camDrag = null;
+  canvas.addEventListener("pointerdown", e=>{ if (e.target !== canvas) return; camDrag = { x:e.clientX, y:e.clientY, moved:false }; });
+  canvas.addEventListener("pointermove", e=>{
+    if (!camDrag) return;
+    const dx = e.clientX - camDrag.x, dy = e.clientY - camDrag.y;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) camDrag.moved = true;
+    if (camDrag.moved && world) world.rotateCam(dx);
+    camDrag.x = e.clientX; camDrag.y = e.clientY;
+  });
+  const endDrag = e=>{ if (camDrag && !camDrag.moved && world) world.tapAt(e.clientX, e.clientY); camDrag = null; };
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", ()=>{ camDrag = null; });
+  let pinch = null;
+  canvas.addEventListener("touchstart", e=>{ if (e.touches.length === 2) pinch = { d: Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY) }; }, {passive:true});
+  canvas.addEventListener("touchmove", e=>{
+    if (e.touches.length === 2 && pinch && world){ const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); world.zoomCam(d - pinch.d); pinch.d = d; }
+  }, {passive:true});
+  canvas.addEventListener("touchend", ()=>{ pinch = null; });
+  if ("ontouchstart" in window) joy.style.display = "block";
+  const hud = $("worldHud");
+  hud.textContent = "Walk to a node to gather · enter a hall to open it";
+  hud.style.display = "block";
+}
+window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
+
+// ================= boot =================
+function boot(){
+  initWorld();
+  if (world) world.setPlayerColor(SCHOOLS[S.school].color);
+  if (!S.flags.schoolPicked) showSchoolPicker();
+  // online room from URL
+  const roomParam = new URLSearchParams(location.search).get("room");
+  if (roomParam){
+    online = { playerId: sessionStorage.getItem("mp-player-id")||("p-"+Math.random().toString(36).slice(2,10)),
+      room: roomParam, ws:null, state:null, deck: S.deck.slice() };
+    sessionStorage.setItem("mp-player-id", online.playerId);
+    if (S.deck.length===G.MAX_DECK){ screen="online"; connectOnline(); }
+  }
+  render();
+  // gather cooldown tick
+  setInterval(()=>{ if (gatherCooldown>0) gatherCooldown-=0.1; }, 100);
+  // auction tick
+  setInterval(()=>{ if (screen==="market") render(); }, 1000);
+  setInterval(()=>{ G.save(S); }, 3000);
+}
+boot();
+</script>
+</body>
+</html>
