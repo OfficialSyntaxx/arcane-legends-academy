@@ -3,7 +3,7 @@
 // gathering nodes for every material, and NPCs that hand out quests and open the market.
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
 import { WORLD_NODES } from "./nodes.js";
-import { BUILDINGS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions } from "./structures.js";
+import { BUILDINGS, LANDMARKS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions } from "./structures.js";
 
 export function createWorld(canvas, callbacks){
   const THREE = window.THREE;
@@ -58,26 +58,40 @@ export function createWorld(canvas, callbacks){
   // ---------- building generator ----------
   const HOLLOW = 0x6a5b9e, VIO = 0x3a2d6e, GOLD = 0xffc94d, WOOD = 0x8a5a2b, ROOFB = 0x2f4f8a;
   function stucco(x,z,w,d,h,ry=0,wall=HOLLOW,roof=ROOFB){
-    const base = add(new THREE.BoxGeometry(w,h,d), mat(wall), x, h/2, z, {ry});
+    const parts = [];
+    const base = add(new THREE.BoxGeometry(w,h,d), mat(wall), x, h/2, z, {ry}); parts.push(base);
     // 0.78 of the LONGEST side as a radius made every roof ~1.56x the building wide — the dorm
     // roof alone was an 11-unit disc over a 7-unit building, big enough to fill the camera.
-    const p4 = add(new THREE.ConeGeometry(Math.max(w,d)*0.62, h*0.6, 4), mat(roof), x, h + h*0.3, z, {ry});
-    const door = add(new THREE.BoxGeometry(w*0.28, h*0.5, 0.25), mat(WOOD), x, h*0.25, z + d/2 + 0.05, {ry});
+    const p4 = add(new THREE.ConeGeometry(Math.max(w,d)*0.62, h*0.6, 4), mat(roof), x, h + h*0.3, z, {ry}); parts.push(p4);
+    const door = add(new THREE.BoxGeometry(w*0.28, h*0.5, 0.25), mat(WOOD), x, h*0.25, z + d/2 + 0.05, {ry}); parts.push(door);
     // windows
     for (const sx of [-0.3, 0.3]){
       const wx = x + (Math.cos(ry)*w*0.32*sx), wz = z + (Math.sin(ry)*w*0.32*sx);
-      add(new THREE.BoxGeometry(0.5, 0.5, 0.15), mat(0xffe9b0), wx, h*0.55, z + d*0.5*sx + (Math.sin(ry)*0.5), {cast:false});
+      parts.push(add(new THREE.BoxGeometry(0.5, 0.5, 0.15), mat(0xffe9b0), wx, h*0.55, z + d*0.5*sx + (Math.sin(ry)*0.5), {cast:false}));
     }
-    return base;
+    return parts;
   }
   // Buildings come from the shared table in structures.js, which also supplies their collision
   // boxes and door positions — so a building can never be solid in one place and walk-through
   // in another, and its station prompt is always reachable from outside.
-  for (const b of BUILDINGS) stucco(b.x, b.z, b.w, b.d, b.h, b.ry, b.wall, b.roof);
-  // Duel Arena (center-back) — round
-  const arena = add(new THREE.CylinderGeometry(11.6, 12.5, 3.4, 28), mat(0x4a3a7a), 0, 1.7, -32);
-  add(new THREE.ConeGeometry(13.2, 4.2, 28), mat(0x2a1f4d), 0, 5.5, -32);
-  add(new THREE.TorusGeometry(8.6, 0.55, 8, 28), mat(GOLD), 0, 6.0, -32);
+  // Each building's procedural box goes in its own Group so a generated GLB can replace it
+  // in-place once loaded (and stays as the visible fallback if the load fails).
+  const buildingGroups = {};
+  for (const b of BUILDINGS){
+    const g = new THREE.Group(); scene.add(g);
+    buildingGroups[b.id] = g;
+    for (const m of stucco(b.x, b.z, b.w, b.d, b.h, b.ry, b.wall, b.roof)) g.add(m);
+  }
+  // Duel Arena (center-back) — procedural placeholder, replaced by the generated GLB
+  const arenaGroup = new THREE.Group(); scene.add(arenaGroup);
+  {
+    const plat = new THREE.Mesh(new THREE.CylinderGeometry(11.6, 12.5, 3.4, 28), mat(0x4a3a7a));
+    plat.position.set(0, 1.7, -32); arenaGroup.add(plat);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(13.2, 4.2, 28), mat(0x2a1f4d));
+    cone.position.set(0, 5.5, -32); arenaGroup.add(cone);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(8.6, 0.55, 8, 28), mat(GOLD));
+    ring.position.set(0, 6.0, -32); arenaGroup.add(ring);
+  }
   // banners on buildings — removed (flat planes read as artifacts at this camera angle)
   // street lamps along paths
   function lamp(x,z){
@@ -363,7 +377,11 @@ export function createWorld(canvas, callbacks){
 
   // ---------- static landmark/building models (unlike characters, no fixed 1.8 target height —
   // each is scaled to its own footprint, and stays centered on X/Z with its base at y=0) ----------
-  function loadLandmarkModel(key, url, group, targetHeight, onReady){
+  // `fit` is "height" or "width": height for things whose height defines them (the tower),
+  // width when the FOOTPRINT is the gameplay-relevant dimension (the arena floor is the duel
+  // space, so its diameter must be right and the height follows from the model's proportions).
+  function loadLandmarkModel(key, url, group, opts){
+    const { size, fit = "height", x = 0, z = 0, ry = 0, onReady } = opts;
     loadState.total++;
     const loader = new THREE.GLTFLoader();
     const d = getDraco();
@@ -371,17 +389,20 @@ export function createWorld(canvas, callbacks){
     loader.load(url, gltf => {
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
-      const height = box.max.y - box.min.y;
-      const scale = height > 0.001 ? targetHeight / height : 1;
+      const h = box.max.y - box.min.y;
+      const w = Math.max(box.max.x - box.min.x, box.max.z - box.min.z);
+      const basis = fit === "width" ? w : h;
+      const scale = basis > 0.001 ? size / basis : 1;
       model.scale.setScalar(scale);
+      model.rotation.y = ry;
       model.updateMatrixWorld(true);
+      // centre on X/Z and sit the base on the ground, then move to the world position
       const cx = (box.min.x + box.max.x) / 2 * scale, cz = (box.min.z + box.max.z) / 2 * scale;
-      model.position.x -= cx; model.position.z -= cz;
-      model.position.y -= box.min.y * scale;
+      model.position.set(x - cx, -box.min.y * scale, z - cz);
       const placeholder = group.children.slice();
       group.add(model);
       for (const c of placeholder) group.remove(c);
-      chars[key] = { model, mixer:null, walk:null, idle:null, rawSize:height, computedScale:scale };
+      chars[key] = { model, mixer:null, walk:null, idle:null, rawSize:basis, computedScale:scale };
       loadState.done++; loadProgress();
       if (onReady) onReady();
     },
@@ -392,9 +413,19 @@ export function createWorld(canvas, callbacks){
       loadState.done++; loadState.failed.push(key); loadProgress();
     });
   }
-  // Tower generated via Tripo (2D->3D). 40m tall, matching the design-doc scale note; the
-  // collision radius in structures.js (OBSTACLES 'tower') is sized to this model's footprint.
-  loadLandmarkModel('tower', './assets/buildings/tower.glb', towerGroup, 40);
+  // Standalone landmarks (tower, arena) — generated via Tripo (2D->3D). Their collision shapes
+  // in structures.js are sized to these models' real footprints, not the old procedural ones.
+  const landmarkGroups = { tower: towerGroup, arena: arenaGroup };
+  for (const L of LANDMARKS){
+    const g = landmarkGroups[L.key];
+    if (g) loadLandmarkModel(L.key, './assets/buildings/' + L.url, g, { size:L.size, fit:L.fit, x:L.x, z:L.z, ry:L.ry });
+  }
+  // Buildings that have a generated model replace their procedural box in place.
+  for (const b of BUILDINGS){
+    if (!b.model) continue;
+    loadLandmarkModel('bld_' + b.id, './assets/buildings/' + b.model, buildingGroups[b.id],
+      { size:b.h, fit:"height", x:b.x, z:b.z, ry:b.ry + (b.modelRy || 0) });
+  }
 
   // ---------- input ----------
   const keys = new Set();
@@ -633,6 +664,17 @@ export function createWorld(canvas, callbacks){
       tapTarget = { x: hit.x, z: hit.z }; tapSet = true;
     },
     trigger,
+    // Move the player directly. Resolves collisions so a teleport can never land inside
+    // geometry, and cancels any tap-to-move target that is now stale.
+    teleport(x, z){
+      const p = resolveCollisions(
+        Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, x)),
+        Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, z)),
+        PLAYER_RADIUS, OBSTACLES);
+      player.position.x = p.x; player.position.z = p.z;
+      tapTarget = null; tapSet = false;
+      return { x:p.x, z:p.z };
+    },
     resize(){ onResize(); },
     dispose(){ window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); cancelAnimationFrame(raf); renderer.dispose(); },
   };

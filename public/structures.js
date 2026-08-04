@@ -17,8 +17,13 @@
 // wide (4-5 people tall, the proportion a real hall has), and the layout is spread to match so
 // the buildings have room to feel big. Any generated building model should be authored to these
 // footprints.
+// A building with a `model` loads that GLB in place of the procedural box. Its w/d are then the
+// model's REAL footprint at its target height (not the authored guess) so collision matches what
+// the player sees — the same rule the tower follows. `modelRy` rotates the mesh only, to point
+// its door at the `face` direction, without moving the collision box.
 export const BUILDINGS = [
-  { id:"scribe",  label:"Scribing Hall",   x:-31, z:-14, w:15, d:11, h:10.5, ry:0.3,  wall:0x6a5b9e, roof:0x2a1f4d, face:"z+" },
+  { id:"scribe",  label:"Scribing Hall",   x:-31, z:-14, w:11.1, d:10.7, h:10.5, ry:0.3,  wall:0x6a5b9e, roof:0x2a1f4d, face:"z+",
+    model:"scribe.glb", modelRy:0 },
   { id:"library", label:"Library",         x:-31, z:12,  w:13, d:11, h:9,    ry:-0.3, wall:0x5a4a8a, roof:0x2a1f4d, face:"z+", noStation:true },
   { id:"smith",   label:"Smithy & Forge",  x:31,  z:-14, w:15, d:11, h:9,    ry:-0.3, wall:0x7a5a6a, roof:0x8a3a2a, face:"z+" },
   { id:"market",  label:"Merchant Stall",  x:31,  z:12,  w:13, d:9,  h:7,    ry:0.3,  wall:0x8a6a3a, roof:0x2f6f4f, face:"z-" },
@@ -37,6 +42,16 @@ export function doorPos(b){
     default:   return { x:b.x - out, z:b.z };
   }
 }
+
+// ---------------------------------------------------------------- landmarks
+// Standalone generated models that aren't "buildings" with doors. `fit` picks which dimension
+// `size` refers to: "height" for things whose height defines them (the tower), "width" for
+// things whose FOOTPRINT is the gameplay-relevant dimension (the arena — its floor is the duel
+// space, so the diameter is what must be right; the height follows from the model's proportions).
+export const LANDMARKS = [
+  { key:"tower", url:"tower.glb", x:0, z:0,   ry:0, fit:"height", size:40 },
+  { key:"arena", url:"arena.glb", x:0, z:-32, ry:0, fit:"width",  size:25 },
+];
 
 // ---------------------------------------------------------------- NPCs
 // Positions live here so tools/test.mjs can prove none of them is standing inside a wall —
@@ -69,7 +84,8 @@ export const WORLD_BOUND = 72;      // half-extent of the walkable area
 
 export const OBSTACLES = [
   ...BUILDINGS.map(b => ({ kind:"box", x:b.x, z:b.z, w:b.w, d:b.d, ry:b.ry, id:b.id })),
-  { kind:"circle", x:0,  z:-32, r:12.6, id:"arena" },
+  // matches the generated arena model at its 25m-wide target (see LANDMARKS), plus a margin
+  { kind:"circle", x:0,  z:-32, r:13.0, id:"arena" },
   // radius matches the generated tower model (public/assets/buildings/tower.glb) scaled to its
   // 40m target height — the model's widest footprint (base/roof brim) comes out to ~7.86m half-
   // extent at that scale, so this is that plus a small margin, not the old procedural cylinder's.

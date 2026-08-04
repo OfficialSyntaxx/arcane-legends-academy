@@ -1187,6 +1187,9 @@ function initWorld(){
     },
   });
   } catch(e){ console.warn("3D world unavailable:", e); return; }
+  // Exposed for tools/browser-test.mjs, which drives the real input/collision paths that the
+  // headless smoke test cannot reach (createWorld needs WebGL).
+  window.__world = world;
   // ---------------- world input ----------------
   // Unified on Pointer Events so mouse, touch and pen all take the same path. Every gesture is
   // tracked by pointerId, which is what makes "drag to rotate" and "pinch to zoom" coexist:
