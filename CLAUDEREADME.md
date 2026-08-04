@@ -61,15 +61,19 @@ wizard-tcg/                 (the repo root)
 │   ├── strings.js          ALL player-visible text (external on purpose)
 │   ├── manifest.json       PWA manifest
 │   ├── vendor/             pinned libs (three.min.js, GLTFLoader.js, DRACOLoader.js, draco/)
-│   └── assets/             generated art + GLB character models (models/)
+│   └── assets/             generated art, character GLBs (models/), landmarks (buildings/)
 ├── tools/                  headless test suites
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
-│   ├── test.mjs            engine tests (87 checks)
+│   ├── test.mjs            engine tests (102 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
 │   ├── browser-test.mjs    real-Chromium responsive + input-gesture suite
 │   └── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
-└── design/                 design docs (plan, thresholds, asset manifest)
+├── design/                 design docs (plan, thresholds, asset manifest)
+└── docs/
+    ├── NEXT-PHASE-PLAN.md  the systems audit + phase tracker
+    ├── ASSET-BUDGET.md     what's generated, platform costs, CC0 sources, licensing
+    └── DESIGN-DECISIONS.md open design questions + answers (interiors, 3D duels, outfits)
 ```
 
 ---
@@ -91,7 +95,8 @@ The world is a walkable academy campus built in Three.js (procedural low-poly + 
   - Librarian → daily challenge
 - **Gathering nodes** (defined as data in `public/nodes.js`): ore crystals (copper/tin/iron/silver/gold/mithril/runite), wood stumps (oak/willow/magic), ponds (shrimp/salmon/lobster/shark). Each grants a material + skill XP.
 - **NPCs:** Professor, Merchant, Referee, Trainer, Librarian, and wandering students — all with dialogue.
-- **Character models:** generated via Meshy 2D→3D (`.glb`). The player and all 9 NPCs load (see §9).
+- **Character models:** generated via 2D→3D (`.glb`). The player and all 9 NPCs load (see §9).
+- **Landmark models:** Central Tower, Scribing Hall and Duel Arena are generated GLBs loaded by `loadLandmarkModel`; the rest are still procedural primitives. Buildings and landmarks are declared in `structures.js` (`BUILDINGS`, `LANDMARKS`).
 
 ---
 
@@ -287,13 +292,22 @@ sealed inside geometry.
 **Draco compression and sound are done** (see items 3 and 6 below). The deploy is now ~6MB total,
 down from ~24MB.
 
-**Costed plan for the remaining generated assets: `docs/ASSET-BUDGET.md`** — rates confirmed from
-the account's transaction history (2D→3D = 40 cr, text-to-3D = 25 cr), with tiers and a
-recommendation. Nothing has been spent.
+**Three generated landmarks are in:** the Central Tower (40m), Scribing Hall and Duel Arena, all
+via Tripo 2D→3D. They load through `loadLandmarkModel` in `world.js`, which scales by `height` or
+by `width` (the arena fits by width — its floor is the duel space, so the diameter is what must be
+right). Each keeps its procedural box as a visible fallback until the GLB loads.
+
+**Two planning documents, both current:**
+- **`docs/ASSET-BUDGET.md`** — what is already generated, measured platform costs
+  (Higgsfield $2.00/model vs Tripo ~$0.40 vs Meshy ~$0.40), free CC0 sources, the free-tier
+  licensing trap, and the costed remainder.
+- **`docs/DESIGN-DECISIONS.md`** — answers to the open design questions: building interiors,
+  Wizard101-style 3D duel staging, the character-creation/school-outfit system, and the known
+  camera-collision bug. Includes a priority order in which **four of the six items cost nothing**.
 
 **Known issues / next steps:** *(Phase D part 2; the items below still stand)*
-1. **All character models are now generated 3D models.** The player wizard, professor, merchant, referee, trainer, librarian, and 4 wandering students are all 2D→3D generated GLBs (except the professor, which is a static text-to-3D mesh). They load at ~1.8 units and render correctly. The fix in `makeCharModel` (`world.js`): for **skinned Meshy GLBs** the object box is degenerate (0) and the raw mesh box is only the *bind pose* — the real size is the **skeleton node span** (bones sit far above the mesh), so height is computed from node world positions. For **static meshes** (e.g. professor.glb has no skeleton), the real size is the **geometry box**. The loader auto-detects skinned vs static. NPC GLB keys match their roles (`duel`, `trainer`, `librarian`, `wander0`–`wander3`) so the update loop uses the GLB mixer. **All models were texture-resized to 512px** (gltf-transform) to keep the deploy under the ~50MB upload limit — the models folder is now ~22MB total.
-2. **The 2D→3D pipeline** (generate a 2D character portrait → image-to-3D, ~40 credits/model: ~2 for the image + ~38 for the conversion) produces a much better, recognizable character than text-to-3D (~25 credits, generic blob). All character GLBs were generated this way.
+1. **All character models are now generated 3D models.** The player wizard, professor, merchant, referee, trainer, librarian, and 4 wandering students are all 2D→3D generated GLBs (except the professor, which is a static text-to-3D mesh). They load at ~1.8 units and render correctly. The fix in `makeCharModel` (`world.js`): for **skinned Meshy GLBs** the object box is degenerate (0) and the raw mesh box is only the *bind pose* — the real size is the **skeleton node span** (bones sit far above the mesh), so height is computed from node world positions. For **static meshes** (e.g. professor.glb has no skeleton), the real size is the **geometry box**. The loader auto-detects skinned vs static. NPC GLB keys match their roles (`duel`, `trainer`, `librarian`, `wander0`–`wander3`) so the update loop uses the GLB mixer. Character textures are **512px** — not by choice, but because the source GLBs were downsized in an early session before the compression pipeline was fixed; that detail is not recoverable by recompressing and would need regeneration. Buildings generated since keep their full **2048px** source textures. The whole model set is ~5.9MB.
+2. **The 2D→3D pipeline** (2D reference image → image-to-3D) produces a much better, recognizable result than text-to-3D, which returned a generic blob. All character GLBs were generated this way, on Higgsfield at ~40 credits (~$2.00) each. **The tower, Scribing Hall and Duel Arena were generated on Tripo**, which is ~5× cheaper per asset — see `docs/ASSET-BUDGET.md` for the platform comparison and the licensing traps on free tiers.
 3. **GLB files are Draco-compressed with WebP textures at source resolution (2048px)** — the whole model set is ~5.9MB. The decoder is vendored at `public/vendor/draco/` and wired up in `world.js`; an uncompressed GLB still loads fine, so `npm run compress` is safe to re-run. **Run it after generating any new model.** Two traps the script now avoids, both of which silently destroyed quality: `gltf-transform optimize` runs `simplify` by **default** (decimates geometry — disabled), and the `webp` pass **decodes Draco without re-applying it**, so textures must run first and Draco last.
 4. **Procedural walk animation.** The Meshy GLBs only carry ONE animation clip each (idle). Rather than regenerate (which would cost credits and drop the idle), `makeCharModel` collects the skeleton bones (standard biped names: LeftLeg, RightLeg, LeftArm, RightArm, Spine…) and `world.js` applies a procedural walk cycle (bones swing via quaternion on top of the base pose) whenever a wanderer NPC is moving; it falls back to the idle clip when stationary. The stationary NPCs (referee, trainer, librarian) keep their idle. Same technique can add swing/attack/emote poses to any GLB character without extra generation.
 5. **Buildings, nodes, and props are still procedural** primitives — these are next to generate as 3D models. `structures.js` is the seam: each building carries an id, position, size and rotation, so a generated mesh can replace the primitive per id without touching collision or station wiring.
