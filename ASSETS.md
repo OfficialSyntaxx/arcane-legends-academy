@@ -22,6 +22,12 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 | `hex_tavern.glb` | KayKit – Medieval Hexagon | CC0 | Social hangout (-7,12) |
 | `hex_tower_A.glb` | KayKit – Medieval Hexagon | CC0 | Academy tower (-16,-16) |
 | `hex_home_A.glb` | KayKit – Medieval Hexagon | CC0 | Student Dorms (0,16) |
+| `dng_doorway.glb` | KayKit – Dungeon Remastered | CC0 | Dungeon entrance (20,-20) |
+| `dng_torch.glb` | KayKit – Dungeon Remastered | CC0 | Lit torch (20.5,-18.5) |
+| `enemy_skeleton.glb` | KayKit – Character Pack Skeletons | CC0 | PvE skeleton mob (95 anims), idles at (20,-23) |
+| `nat_CommonTree_1.glb` | Stylized Nature MegaKit (Quaternius) | CC0 | Decorative trees (22,10),(24,-6) |
+| `nat_Mushroom_Common.glb` | Stylized Nature MegaKit (Quaternius) | CC0 | Decorative mushrooms |
+| `nat_Flower_3_Single.glb` | Stylized Nature MegaKit (Quaternius) | CC0 | Decorative flower |
 
 **Downloaded (on disk, not yet imported):** KayKit Dungeon-Remastered, Character Pack Skeletons, Character Pack Adventures, Furniture Bits, City Builder Bits (all CC0, `.glb`/`.gltf`); **Universal Animation Library 2** by Quaternius (CC0, 130+ animations on a universal humanoid rig, `UAL2_Standard.glb` — for retargeting to our NPC skeletons later).
 

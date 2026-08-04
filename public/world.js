@@ -242,6 +242,19 @@ export function createWorld(canvas, callbacks){
   loadProp('./assets/models/hex_tower_A.glb', 8,   { x: -16, z: -16 });  // academy tower
   loadProp('./assets/models/hex_home_A.glb', 4.5, { x: 0,  z: 16 });   // Student Dorms
 
+  // KayKit Dungeon + Skeleton (CC0) — a dungeon corner with a PvE enemy
+  loadProp('./assets/models/dng_doorway.glb', 4,   { x: 20, z: -20 });  // dungeon entrance
+  loadProp('./assets/models/dng_torch.glb', 1.6,  { x: 20.5, z: -18.5 }); // lit torch
+  const enemyGroup = new THREE.Group(); enemyGroup.position.set(20, 0, -23); scene.add(enemyGroup);
+  makeCharModel('enemy0', './assets/models/enemy_skeleton.glb', enemyGroup); // skeleton PvE mob (idles)
+
+  // Nature pack (CC0) — decorative trees, mushrooms, flowers
+  loadProp('./assets/models/nat_CommonTree_1.glb', 5.5, { x: 22, z: 10 });
+  loadProp('./assets/models/nat_CommonTree_1.glb', 5.0, { x: 24, z: -6 });
+  loadProp('./assets/models/nat_Mushroom_Common.glb', 0.8, { x: 10, z: 4 });
+  loadProp('./assets/models/nat_Mushroom_Common.glb', 0.8, { x: -9, z: 14 });
+  loadProp('./assets/models/nat_Flower_3_Single.glb', 0.6, { x: 12, z: 2 });
+
   // ---------- stations ----------
   register('station', -16, -7, 'scribe', 'Scribing Hall', null);
   register('station', 16, -7, 'smith', 'Smithy & Forge', null);
