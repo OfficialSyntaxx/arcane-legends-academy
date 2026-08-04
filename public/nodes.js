@@ -8,6 +8,12 @@
 //
 // Coordinates scaled with the world (see structures.js SCALE note).
 // kind: "crystal" (ore, needs a color), "wood" (stump + tree), "pond" (fishing spot).
+// `model` swaps the procedural mesh for a CC0 GLB (KayKit, see ASSETS.md); `modelH` is its
+// target height in metres. The procedural mesh stays as the fallback if the GLB fails to load.
+export const NODE_MODELS = {
+  crystal: { url:"./assets/models/kaykit_rock.glb", h:2.2 },
+  wood:    { url:"./assets/models/kaykit_tree.glb", h:9.0 },
+};
 export const WORLD_NODES = [
   // ---- mining ----
   { kind:"crystal", id:"copper",      x:-11.7,  z:-7.8,  color:0xcd7f32, label:"Mine Copper" },

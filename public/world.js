@@ -2,8 +2,8 @@
 // Rich procedural low-poly characters (animated wizards), themed buildings, a fountain, trees,
 // gathering nodes for every material, and NPCs that hand out quests and open the market.
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
-import { WORLD_NODES } from "./nodes.js";
-import { BUILDINGS, LANDMARKS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions } from "./structures.js";
+import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
+import { BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions } from "./structures.js";
 
 export function createWorld(canvas, callbacks){
   const THREE = window.THREE;
@@ -257,20 +257,22 @@ export function createWorld(canvas, callbacks){
   }
   function crystalNode(x,z,color,data,label){
     const c = add(new THREE.IcosahedronGeometry(1.0, 0), mat(color), x, 1.3, z);
-    c.material.emissive = new THREE.Color(color); c.material.emissiveIntensity = 0.35;
-    add(new THREE.CylinderGeometry(0.5, 0.8, 2.6, 6), mat(0x5a5a66), x, 1.3, z);
-    add(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 6), mat(color), x+0.5, 0.9, z+0.4);
+    c.material.emissive = srgb(color); c.material.emissiveIntensity = 0.35;
+    const rock = add(new THREE.CylinderGeometry(0.5, 0.8, 2.6, 6), mat(0x5a5a66), x, 1.3, z);
+    const chip = add(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 6), mat(color), x+0.5, 0.9, z+0.4);
     torch(x, z);
     register('gather', x, z, data, label, c);
+    return [c, rock, chip];
   }
   function woodNode(x,z,data,label,magic){
     // magic trees glow faintly so the level-50 tier reads as special from a distance
-    add(new THREE.CylinderGeometry(0.9, 1.1, 1.3, 8), mat(magic?0x6a4a8a:0x8a5a2b), x, 0.65, z);
-    add(new THREE.CylinderGeometry(0.5, 0.5, 2.4, 6), mat(magic?0x5a3a7a:0x6a4a2b), x+0.7, 0.6, z-0.5);
+    const stump = add(new THREE.CylinderGeometry(0.9, 1.1, 1.3, 8), mat(magic?0x6a4a8a:0x8a5a2b), x, 0.65, z);
+    const trunk = add(new THREE.CylinderGeometry(0.5, 0.5, 2.4, 6), mat(magic?0x5a3a7a:0x6a4a2b), x+0.7, 0.6, z-0.5);
     const crown = add(new THREE.ConeGeometry(1.0, 1.4, 7), mat(magic?0x7be0ff:0x2f9e63), x+0.7, 2.2, z-0.5);
     if (magic){ crown.material.emissive = srgb(0x4a9edd); crown.material.emissiveIntensity = 0.45; }
     torch(x, z);
     register('gather', x, z, data, label, null);
+    return [stump, trunk, crown];
   }
   function pond(x,z,data,label,deep){
     // deep water (shark) is darker and wider than the shallow shrimp/salmon pools
@@ -282,10 +284,17 @@ export function createWorld(canvas, callbacks){
   }
   // Built from the shared node table (public/nodes.js) so the world and the recipe data in
   // items.js can't drift apart — tools/test.mjs asserts every recipe input has a node here.
+  const nodeGroups = {};
   for (const n of WORLD_NODES){
-    if (n.kind === 'crystal') crystalNode(n.x, n.z, n.color, n.id, n.label);
-    else if (n.kind === 'wood') woodNode(n.x, n.z, n.id, n.label, n.magic);
+    let parts = null;
+    if (n.kind === 'crystal') parts = crystalNode(n.x, n.z, n.color, n.id, n.label);
+    else if (n.kind === 'wood') parts = woodNode(n.x, n.z, n.id, n.label, n.magic);
     else if (n.kind === 'pond') pond(n.x, n.z, n.id, n.label, n.deep);
+    if (parts){
+      const g = new THREE.Group(); scene.add(g);
+      for (const m of parts) g.add(m);
+      nodeGroups[n.id] = g;
+    }
   }
 
   // ---------- stations ----------
@@ -462,12 +471,27 @@ export function createWorld(canvas, callbacks){
   const landmarkGroups = { tower: towerGroup, arena: arenaGroup };
   for (const L of LANDMARKS){
     const g = landmarkGroups[L.key];
-    if (g) loadLandmarkModel(L.key, './assets/buildings/' + L.url, g, { size:L.size, fit:L.fit, x:L.x, z:L.z, ry:L.ry });
+    if (g) loadLandmarkModel(L.key, L.url, g, { size:L.size, fit:L.fit, x:L.x, z:L.z, ry:L.ry });
+  }
+  // CC0 world dressing (KayKit / Quaternius — see ASSETS.md). Each goes in its own Group so a
+  // failed load leaves nothing behind rather than a half-placed object.
+  for (let i = 0; i < PROPS.length; i++){
+    const pr = PROPS[i];
+    const g = new THREE.Group(); scene.add(g);
+    loadLandmarkModel('prop' + i, pr.url, g, { size:pr.h, fit:"height", x:pr.x, z:pr.z, ry:pr.ry || 0 });
+  }
+  // Gathering nodes swap their procedural mesh for the CC0 model, keeping the procedural one as
+  // the fallback (the node's interaction prompt is registered either way).
+  for (const n of WORLD_NODES){
+    const spec = NODE_MODELS[n.kind];
+    if (!spec || !nodeGroups[n.id]) continue;
+    loadLandmarkModel('node_' + n.id, spec.url, nodeGroups[n.id],
+      { size: n.kind === 'wood' ? spec.h : spec.h, fit:"height", x:n.x, z:n.z, ry:(n.x * 0.7) % 3 });
   }
   // Buildings that have a generated model replace their procedural box in place.
   for (const b of BUILDINGS){
     if (!b.model) continue;
-    loadLandmarkModel('bld_' + b.id, './assets/buildings/' + b.model, buildingGroups[b.id],
+    loadLandmarkModel('bld_' + b.id, b.model, buildingGroups[b.id],
       { size:b.h, fit:"height", x:b.x, z:b.z, ry:b.ry + (b.modelRy || 0) });
   }
 

@@ -8,9 +8,15 @@
     "test:engine": "node tools/test.mjs",
     "test:logic": "node tools/logic-test.mjs",
     "test:ui": "node tools/ui-smoke.mjs",
-    "serve": "python3 -m http.server 8080 --directory public",
     "test:browser": "node tools/browser-test.mjs",
-    "compress": "node tools/compress-models.mjs"
+    "compress": "node tools/compress-models.mjs",
+    "import": "node tools/import-asset.mjs",
+    "serve": "python3 -m http.server 8080 --directory public"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/functions": "^4.4.2",
+    "fbx2gltf": "^0.9.7-p1"
   },
   "devDependencies": {
     "@gltf-transform/cli": "^4.4.2",

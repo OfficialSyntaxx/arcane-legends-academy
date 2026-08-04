@@ -93,12 +93,35 @@ The world is a walkable academy campus built in Three.js (procedural low-poly + 
   - Duel Trainer → practice duel
   - Student Dorms → home
   - Librarian → daily challenge
-- **Gathering nodes** (defined as data in `public/nodes.js`): ore crystals (copper/tin/iron/silver/gold/mithril/runite), wood stumps (oak/willow/magic), ponds (shrimp/salmon/lobster/shark). Each grants a material + skill XP.
+- **Gathering nodes** (data in `public/nodes.js`): ore crystals (copper/tin/iron/silver/gold/mithril/runite), wood stumps (oak/willow/magic), ponds (shrimp/salmon/lobster/shark). Each grants a material + skill XP. Ore and wood nodes render as **CC0 KayKit rock/tree** models (`NODE_MODELS`), falling back to the procedural mesh if a GLB fails — see §4.1 and `ASSETS.md`.
 - **NPCs:** Professor, Merchant, Referee, Trainer, Librarian, and wandering students — all with dialogue.
-- **Character models:** generated via 2D→3D (`.glb`). The player and all 9 NPCs load (see §9).
-- **Landmark models:** Central Tower, Scribing Hall and Duel Arena are generated GLBs loaded by `loadLandmarkModel`; the rest are still procedural primitives. Buildings and landmarks are declared in `structures.js` (`BUILDINGS`, `LANDMARKS`).
+- **Character models:** generated via 2D→3D (`.glb`). All 10 characters render at ~1.8 units; walk is added procedurally (see §9).
+- **Buildings & landmarks:** declared in `structures.js` (`BUILDINGS`, `LANDMARKS`, `PROPS`) and loaded by `loadLandmarkModel`. The everyday campus is **CC0 KayKit**; the **Central Tower and Duel Arena are generated Tripo** models — the two hero landmarks. Placement is data, never hand-written into `world.js`, and `npm test` fails if anything is sealed inside geometry or points at a missing file.
+### 4.1 Importing free 3D assets (itch.io / CraftPix / KayKit…)
 
----
+We can reuse free low-poly assets even though most ship as `.fbx`. Pipeline: **everything ends up as a resized `.glb`** before it enters the game. One command does it all:
+
+```bash
+node tools/import-asset.mjs <url|path> [--name out.glb] [--out public/assets/models] [--resize 512] [--target-height 6]
+```
+
+It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 512px → **print raw height + scale-to-target + texture status** (flags blank 1px textures).
+
+**Import checklist (do these before wiring a model into `world.js`):**
+1. **License first.** Prefer CC0 / "free for commercial use" packs (KayKit, Kenney, etc.). If the pack requires attribution, note it in the README. Do NOT ship unmodified copies as-is.
+2. **Format.** `.fbx` and `.gltf`/`.glb` are supported by the script. `.obj` is not — use the pack's gltf/fbx version or convert in Blender first.
+3. **Run the script** and check the output:
+   - `textures: N` — if it prints `⚠ BLANK (1px)` or `0 textures`, the pack is untextured (renders flat white). Skip it or retexture.
+   - `raw height` / `scale to Nu` — free assets use arbitrary units. Set `model.scale` to the printed scale (or pass `--target-height` to match world units: characters ~1.8, trees/rocks ~3–6, buildings ~6–8).
+4. **Wire it into `world.js`:** characters via `makeCharModel(key, url, group)` (auto-detects skinned vs static, scales to target); props/buildings via `new THREE.GLTFLoader().load(url, gltf => { resize + scene.add })` or a small loader helper.
+5. **Keep the deploy under ~50MB.** The script resizes textures to 512px; if the folder still grows too big, run `gltf-transform resize` at 256px or drop the lowest-use models.
+6. **Verify in-game** (walk to it, confirm scale + that it looks right), then commit + push.
+
+**Tools:** `@gltf-transform/core` + `@gltf-transform/functions` (read/resize/write GLB), `fbx2gltf` (binary FBX→GLB). Installed as npm dependencies (see `package.json`).
+
+**In use:** `kaykit_tree.glb` + `kaykit_rock.glb` (in `public/assets/models/`) are from the **KayKit Forest Nature Pack** by Kay Lousberg — **CC0** (free for commercial use, no attribution required; details in the pack's `License.txt`). Wired in via `loadProp()` in `world.js` as woodcutting + mining nodes.
+
+**Free-asset backlog:** see [`ASSETS.md`](ASSETS.md) — the curated list of recommended CC0/free packs (buildings, terrain, dungeons, characters, animations, crafting props) plus the pipeline reminder. Bring them in one at a time through `tools/import-asset.mjs`.
 
 ## 5. The Card Systems (core gameplay)
 

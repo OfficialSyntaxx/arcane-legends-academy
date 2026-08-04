@@ -147,10 +147,31 @@ check("a swept path across the map stays out of every obstacle", (()=>{
   return true;
 })());
 
+// The original bug was buildings 3.5-5.5m tall against 1.8m wizards — a "hall" barely 2.5 people
+// high, which read as a model village. The thresholds below encode THAT property (height, and a
+// footprint wide enough to hold a door), not the specific proportions of any one asset pack:
+// the CC0 KayKit cottages are legitimately narrower than the generated Tripo halls were.
 check("buildings are believably sized next to a 1.8m wizard", (()=>{
   const CH = 1.8;
-  return ST.BUILDINGS.every(b => b.h >= CH*3.5 && b.w >= CH*6 && b.d >= CH*4);
+  const bad = ST.BUILDINGS.filter(b => !(b.h >= CH*3.5 && b.w >= CH*3 && b.d >= CH*3));
+  if (bad.length) console.log("   undersized:", bad.map(b=>`${b.id} ${b.w}x${b.d}x${b.h}`).join(", "));
+  return bad.length === 0;
 })());
+check("every building model path resolves to a file that exists", (()=>{
+  const missing = ST.BUILDINGS.filter(b => b.model && !fs.existsSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", b.model.replace(/^\.\//, ""))));
+  if (missing.length) console.log("   missing:", missing.map(b=>b.model).join(", "));
+  return missing.length === 0;
+})());
+check("every landmark and prop model file exists", (()=>{
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
+  const urls = [...ST.LANDMARKS.map(l=>l.url), ...ST.PROPS.map(p=>p.url)];
+  const missing = urls.filter(u => !fs.existsSync(path.join(root, u.replace(/^\.\//, ""))));
+  if (missing.length) console.log("   missing:", [...new Set(missing)].join(", "));
+  return missing.length === 0;
+})());
+check("solid props contribute collision", ST.PROPS.filter(p=>p.solid).every(p =>
+  ST.OBSTACLES.some(o => o.id === "prop:" + p.url.split("/").pop())));
 check("the tree ring sits outside the walkable campus", ST.TREE_RING.every(t => Math.hypot(t.x,t.z) > 45));
 
 // ---- 4.36 audio config sanity (the synth itself needs a browser; the table does not) ----

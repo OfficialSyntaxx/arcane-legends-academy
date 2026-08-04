@@ -21,13 +21,27 @@
 // model's REAL footprint at its target height (not the authored guess) so collision matches what
 // the player sees — the same rule the tower follows. `modelRy` rotates the mesh only, to point
 // its door at the `face` direction, without moving the collision box.
+// ART DIRECTION (decided Aug 2026): the everyday campus is CC0 KayKit — one consistent
+// flat-shaded style, free, already imported. The two HERO LANDMARKS (Central Tower, Duel Arena)
+// are the richer generated Tripo models, because they are what the campus silhouette is built
+// around. See docs/DESIGN-DECISIONS.md.
+//
+// `model` is a path relative to public/. `w`/`d`/`h` are the model's REAL size at its target
+// height (measured from its own bounding box), not an authored guess — collision must match what
+// the player sees. `modelRy` rotates the mesh only, to point its door at `face`.
 export const BUILDINGS = [
-  { id:"scribe",  label:"Scribing Hall",   x:-31, z:-14, w:11.1, d:10.7, h:10.5, ry:0.3,  wall:0x6a5b9e, roof:0x2a1f4d, face:"z+",
-    model:"scribe.glb", modelRy:0 },
-  { id:"library", label:"Library",         x:-31, z:12,  w:13, d:11, h:9,    ry:-0.3, wall:0x5a4a8a, roof:0x2a1f4d, face:"z+", noStation:true },
-  { id:"smith",   label:"Smithy & Forge",  x:31,  z:-14, w:15, d:11, h:9,    ry:-0.3, wall:0x7a5a6a, roof:0x8a3a2a, face:"z+" },
-  { id:"market",  label:"Merchant Stall",  x:31,  z:12,  w:13, d:9,  h:7,    ry:0.3,  wall:0x8a6a3a, roof:0x2f6f4f, face:"z-" },
-  { id:"home",    label:"Student Dorms",   x:0,   z:32,  w:15, d:11, h:9,    ry:0,    wall:0x6a5b9e, roof:0x2f4f8a, face:"z-" },
+  { id:"scribe",  label:"Scribing Hall",   x:-31, z:-14, w:6.9,  d:7.7,  h:11, ry:0.3,  wall:0x6a5b9e, roof:0x2a1f4d, face:"z+",
+    model:"./assets/models/hex_church.glb", modelRy:0 },
+  { id:"library", label:"Library",         x:-31, z:12,  w:7.9,  d:9.1,  h:16, ry:-0.3, wall:0x5a4a8a, roof:0x2a1f4d, face:"z+", noStation:true,
+    model:"./assets/models/hex_castle.glb", modelRy:0 },
+  { id:"smith",   label:"Smithy & Forge",  x:31,  z:-14, w:10.5, d:10.1, h:8,  ry:-0.3, wall:0x7a5a6a, roof:0x8a3a2a, face:"z+",
+    model:"./assets/models/hex_blacksmith.glb", modelRy:0 },
+  { id:"market",  label:"Merchant Stall",  x:31,  z:12,  w:12.8, d:9.4,  h:7,  ry:0.3,  wall:0x8a6a3a, roof:0x2f6f4f, face:"z-",
+    model:"./assets/models/hex_market.glb", modelRy:0 },
+  { id:"home",    label:"Student Dorms",   x:0,   z:32,  w:6.8,  d:7.3,  h:8,  ry:0,    wall:0x6a5b9e, roof:0x2f4f8a, face:"z-",
+    model:"./assets/models/hex_home_A.glb", modelRy:0 },
+  { id:"tavern",  label:"The Rested Quill", x:-16, z:26, w:7.6,  d:8.6,  h:9,  ry:0.5,  wall:0x8a6a3a, roof:0x8a3a2a, face:"z-", noStation:true,
+    model:"./assets/models/hex_tavern.glb", modelRy:0 },
 ];
 
 // How far outside a building's face its station prompt sits.
@@ -49,8 +63,32 @@ export function doorPos(b){
 // things whose FOOTPRINT is the gameplay-relevant dimension (the arena — its floor is the duel
 // space, so the diameter is what must be right; the height follows from the model's proportions).
 export const LANDMARKS = [
-  { key:"tower", url:"tower.glb", x:0, z:0,   ry:0, fit:"height", size:40 },
-  { key:"arena", url:"arena.glb", x:0, z:-32, ry:0, fit:"width",  size:25 },
+  { key:"tower", url:"./assets/buildings/tower.glb", x:0, z:0,   ry:0, fit:"height", size:40 },
+  { key:"arena", url:"./assets/buildings/arena.glb", x:0, z:-32, ry:0, fit:"width",  size:25 },
+];
+
+// Decorative / world-dressing GLBs (all CC0 — see ASSETS.md). `solid` gives a collision radius;
+// anything the player should be able to walk past is left non-solid on purpose.
+export const PROPS = [
+  // dungeon corner + its PvE skeleton
+  { url:"./assets/models/dng_doorway.glb",  x:44, z:-44, h:8,   ry:0.4, solid:2.6 },
+  { url:"./assets/models/dng_torch.glb",    x:47, z:-40, h:3.2, ry:0 },
+  { url:"./assets/models/enemy_skeleton.glb", x:44, z:-50, h:1.9, ry:2.6, key:"skeleton" },
+  // library dressing, outside the Library's north face
+  { url:"./assets/models/fur_book_set.glb",   x:-27, z:19,   h:1.8, ry:0.2 },
+  { url:"./assets/models/fur_armchair.glb",   x:-25, z:20,   h:1.5, ry:-0.6 },
+  { url:"./assets/models/fur_lamp_standing.glb", x:-23.5, z:19, h:2.6, ry:0 },
+  // dorm dressing
+  { url:"./assets/models/fur_bed_single_A.glb", x:5,  z:31,  h:1.1, ry:1.57 },
+  { url:"./assets/models/fur_chair_A.glb",      x:4,  z:28,  h:1.6, ry:0.4 },
+  // CC0 KayKit Adventures mage (76 animations) — stands near the Library as a spell tutor.
+  // Decorative for now: giving it a station would duplicate the Trainer's practice-duel role.
+  { url:"./assets/models/npc_mage.glb", x:-24, z:6, h:1.9, ry:2.2, key:"mage" },
+  // nature dressing
+  { url:"./assets/models/nat_CommonTree_1.glb", x:24, z:26,  h:8.5, ry:0.3, solid:1.3 },
+  { url:"./assets/models/nat_CommonTree_1.glb", x:-20, z:-30, h:9.5, ry:1.9, solid:1.4 },
+  { url:"./assets/models/nat_Mushroom_Common.glb", x:20, z:30, h:1.2, ry:0 },
+  { url:"./assets/models/nat_Flower_3_Single.glb", x:-14, z:20, h:0.8, ry:0 },
 ];
 
 // ---------------------------------------------------------------- NPCs
@@ -92,6 +130,8 @@ export const OBSTACLES = [
   { kind:"circle", x:0,  z:0,   r:8.2,  id:"tower" },
   { kind:"circle", x:0,  z:-18, r:5.6,  id:"fountain" },
 ];
+// solid props contribute collision too
+for (const p of PROPS) if (p.solid) OBSTACLES.push({ kind:"circle", x:p.x, z:p.z, r:p.solid, id:"prop:"+p.url.split("/").pop() });
 // the tree ring — generated to match the meshes world.js places
 export const TREE_RING = [];
 for (let i=0;i<18;i++){
