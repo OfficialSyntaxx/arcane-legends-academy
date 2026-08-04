@@ -94,7 +94,7 @@ check("no two nodes overlap within interaction range", (()=>{
 
 // ---- 4.35 world collision: the academy must be solid AND walkable ----
 const insideTower = ST.resolveCollisions(0, 0);
-check("the central tower pushes the player out", Math.hypot(insideTower.x, insideTower.z) >= 6.4);
+check("the central tower pushes the player out", Math.hypot(insideTower.x, insideTower.z) >= 8.2);
 const insideHall = ST.resolveCollisions(-31, -14);
 check("a building pushes the player out", !ST.isClear(-31, -14) && ST.isClear(insideHall.x, insideHall.z));
 check("resolving is idempotent (no jitter loop)", (()=>{

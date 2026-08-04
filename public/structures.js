@@ -70,7 +70,10 @@ export const WORLD_BOUND = 72;      // half-extent of the walkable area
 export const OBSTACLES = [
   ...BUILDINGS.map(b => ({ kind:"box", x:b.x, z:b.z, w:b.w, d:b.d, ry:b.ry, id:b.id })),
   { kind:"circle", x:0,  z:-32, r:12.6, id:"arena" },
-  { kind:"circle", x:0,  z:0,   r:6.4,  id:"tower" },
+  // radius matches the generated tower model (public/assets/buildings/tower.glb) scaled to its
+  // 40m target height — the model's widest footprint (base/roof brim) comes out to ~7.86m half-
+  // extent at that scale, so this is that plus a small margin, not the old procedural cylinder's.
+  { kind:"circle", x:0,  z:0,   r:8.2,  id:"tower" },
   { kind:"circle", x:0,  z:-18, r:5.6,  id:"fountain" },
 ];
 // the tree ring — generated to match the meshes world.js places

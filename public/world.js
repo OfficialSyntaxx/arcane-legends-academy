@@ -86,10 +86,18 @@ export function createWorld(canvas, callbacks){
     l.material.emissive = new THREE.Color(0xffaa44); l.material.emissiveIntensity = 1.5;
   }
   lamp(13,13); lamp(-13,13); lamp(13,-13); lamp(-13,-13); lamp(0,24); lamp(0,-24); lamp(26,0); lamp(-26,0);
-  // central tower
-  add(new THREE.CylinderGeometry(4.7, 6.3, 30, 10), mat(0x5a4a8a), 0, 15, 0);
-  add(new THREE.ConeGeometry(7.1, 9.5, 10), mat(0x2a1f4d), 0, 34.8, 0);
-  add(new THREE.SphereGeometry(1.6, 12, 12), mat(GOLD), 0, 41, 0);
+  // central tower — procedural placeholder, replaced by the generated GLB once it loads
+  // (see loadLandmarkModel below). Grouped so the swap is a clean children-replace, the same
+  // idiom makeCharModel uses for the wizard/NPC placeholders.
+  const towerGroup = new THREE.Group(); scene.add(towerGroup);
+  (() => {
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(4.7, 6.3, 30, 10), mat(0x5a4a8a));
+    shaft.position.set(0, 15, 0); towerGroup.add(shaft);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(7.1, 9.5, 10), mat(0x2a1f4d));
+    roof.position.set(0, 34.8, 0); towerGroup.add(roof);
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(1.6, 12, 12), mat(GOLD));
+    orb.position.set(0, 41, 0); towerGroup.add(orb);
+  })();
   // floating crystal spires (blue diamond tips caused visual glitch in some GPUs) — moved far outside view
   for (let i=0;i<8;i++){
     const a = (i/8)*Math.PI*2 + 0.3, r = 130 + (i%2)*12;
@@ -352,6 +360,41 @@ export function createWorld(canvas, callbacks){
   makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>applyPlayerColor());
   for (const n of NPCS) makeCharModel(n.key, './assets/models/' + n.model, npcByKey[n.key]);
   for (let i=0;i<WANDERERS.length;i++) makeCharModel(WANDERERS[i].key, './assets/models/' + WANDERERS[i].model, wanderers[i]);
+
+  // ---------- static landmark/building models (unlike characters, no fixed 1.8 target height —
+  // each is scaled to its own footprint, and stays centered on X/Z with its base at y=0) ----------
+  function loadLandmarkModel(key, url, group, targetHeight, onReady){
+    loadState.total++;
+    const loader = new THREE.GLTFLoader();
+    const d = getDraco();
+    if (d) loader.setDRACOLoader(d);
+    loader.load(url, gltf => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const height = box.max.y - box.min.y;
+      const scale = height > 0.001 ? targetHeight / height : 1;
+      model.scale.setScalar(scale);
+      model.updateMatrixWorld(true);
+      const cx = (box.min.x + box.max.x) / 2 * scale, cz = (box.min.z + box.max.z) / 2 * scale;
+      model.position.x -= cx; model.position.z -= cz;
+      model.position.y -= box.min.y * scale;
+      const placeholder = group.children.slice();
+      group.add(model);
+      for (const c of placeholder) group.remove(c);
+      chars[key] = { model, mixer:null, walk:null, idle:null, rawSize:height, computedScale:scale };
+      loadState.done++; loadProgress();
+      if (onReady) onReady();
+    },
+    undefined,
+    err => {
+      // Keep the procedural placeholder rather than an empty patch of ground.
+      console.warn("landmark model failed to load:", url, err && err.message);
+      loadState.done++; loadState.failed.push(key); loadProgress();
+    });
+  }
+  // Tower generated via Tripo (2D->3D). 40m tall, matching the design-doc scale note; the
+  // collision radius in structures.js (OBSTACLES 'tower') is sized to this model's footprint.
+  loadLandmarkModel('tower', './assets/buildings/tower.glb', towerGroup, 40);
 
   // ---------- input ----------
   const keys = new Set();
