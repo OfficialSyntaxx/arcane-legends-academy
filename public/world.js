@@ -238,9 +238,11 @@ export function createWorld(canvas, callbacks){
   register('station', -16, 10, 'librarian', 'Librarian — Lore', librarian, 3.2);
   // wandering students
   const wanderColors = [[0x3ddc84,0xff6b6b],[0xa06bff,0x2a1f4d],[0xff9ecb,0x8a3a2a],[0xffc94d,0x2a1f4d]];
+  const wanderers = [];
   for (let i=0;i<4;i++){
     const a = (i/4)*Math.PI*2 + 0.5;
     const g = makeNpc(Math.cos(a)*18, Math.sin(a)*18, wanderColors[i][0], wanderColors[i][1], { role:'wander' });
+    wanderers.push(g);
   }
 
   // ---------- load GLB character models (replace procedural wizards) ----------
@@ -304,6 +306,13 @@ export function createWorld(canvas, callbacks){
   makeCharModel('player', './assets/models/player_wizard.glb', player);
   makeCharModel('quest', './assets/models/professor.glb', prof);
   makeCharModel('market', './assets/models/merchant.glb', merch);
+  makeCharModel('duel', './assets/models/referee.glb', ref);
+  makeCharModel('trainer', './assets/models/trainer.glb', trainer);
+  makeCharModel('librarian', './assets/models/librarian.glb', librarian);
+  makeCharModel('wander0', './assets/models/student_emerald.glb', wanderers[0]);
+  makeCharModel('wander1', './assets/models/student_violet.glb', wanderers[1]);
+  makeCharModel('wander2', './assets/models/student_pink.glb', wanderers[2]);
+  makeCharModel('wander3', './assets/models/student_gold.glb', wanderers[3]);
 
   // ---------- input ----------
   const keys = new Set();
