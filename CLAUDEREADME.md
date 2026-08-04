@@ -202,20 +202,22 @@ Use the `deploy_game` tool:
 **Working:** 3D world, camera, movement, in-world gathering/crafting, NPC dialogue, school system + elemental matrix, field/trap cards, grading/slabs + regrade, daily quests, academy rank, market/auctions, home/guild, all 8 quests, local AI PvP, online PvP, PWA manifest, all tests green.
 
 **Known issues / next steps:**
-1. **Generated character models are low-poly** — the Meshy "lowpoly" text-to-3D mode produces simple shapes. To get quality characters, use `model_type: standard` or image-to-3D from a reference character portrait. Each model costs ~25 credits.
-2. **GLB files are large** (4–9MB each) — need Draco compression + lower poly counts before mobile is comfortable.
-3. **Professor & merchant GLBs** had scale/positioning issues and are disabled in `world.js` (the player model loads fine).
-4. **Buildings, nodes, and props are still procedural** primitives — these are next to generate as 3D models.
-5. **Sound** is not yet implemented (procedural WebAudio SFX only in a few places).
-6. **Models/animations** need rigging verification once quality models are in.
+1. **Generated character models are not yet integrated** — the GLB files exist in `public/assets/models/` (player_wizard.glb via 2D→3D, professor.glb, merchant.glb via text-to-3D) but are **disabled in `world.js`** (the `makeCharModel` call is commented out) because the skinned-mesh scale/position integration was glitching. The procedural wizards render cleanly. **This is the top task for a collaborator.**
+2. **The 2D→3D pipeline** (generate a 2D character portrait → image-to-3D) produces a much better, recognizable character (~40 credits/model: ~1.5 for the image + ~38 for the conversion) than text-to-3D (~25 credits, generic blob). The player_wizard.glb is the 2D→3D result.
+3. **Key GLB integration insight:** Meshy character GLBs are **skinned meshes** with a degenerate object bounding box (reads as 0). To scale them correctly you must read the **raw vertex positions** (position attribute) and account for the **nested node world scale** (e.g. a 0.01 root scale). The `makeCharModel` function in `world.js` has the evolving logic but it is not yet working reliably.
+4. **GLB files are large** (4–9MB each) — need Draco compression + lower poly counts before mobile is comfortable.
+5. **Buildings, nodes, and props are still procedural** primitives — these are next to generate as 3D models.
+6. **Sound** is not yet implemented (procedural WebAudio SFX only in a few places).
+7. **Models/animations** need rigging verification once quality models are in.
 
 ## 10. Roadmap (in priority order)
 
-1. **Character model quality** — regenerate player + NPCs with standard quality or image-to-3D; rig + verify animations.
-2. **Buildings & world assets** — generate 3D models for the Scribing Hall, Smithy, Library, Merchant, Duel Arena, Dorms, tower, trees, nodes, fountain.
-3. **Mobile optimization** — Draco-compress GLBs, lower poly counts, verify on a phone viewport.
-4. **Sound** — music, SFX, and animated rigs.
-5. **More depth** — expand to 9 schools (Water/Earth/Air/etc.), a sideboard, houses/factions, seasonal events, more elemental spells.
+1. **Fix the GLB character integration** — get the 2D→3D player wizard rendering correctly (scale + position + walk/idle animations), then load the professor/merchant GLBs and generate the remaining NPCs.
+2. **Character model quality** — finish the full roster via 2D→3D (player + 6 named NPCs).
+3. **Buildings & world assets** — generate 3D models for the Scribing Hall, Smithy, Library, Merchant, Duel Arena, Dorms, tower, trees, nodes, fountain.
+4. **Mobile optimization** — Draco-compress GLBs, lower poly counts, verify on a phone viewport.
+5. **Sound** — music, SFX, and animated rigs.
+6. **More depth** — expand to 9 schools (Water/Earth/Air/etc.), a sideboard, houses/factions, seasonal events, more elemental spells.
 
 ---
 

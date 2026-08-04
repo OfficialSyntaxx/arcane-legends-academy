@@ -243,6 +243,64 @@ export function createWorld(canvas, callbacks){
     const g = makeNpc(Math.cos(a)*18, Math.sin(a)*18, wanderColors[i][0], wanderColors[i][1], { role:'wander' });
   }
 
+  // ---------- load GLB character models (replace procedural wizards) ----------
+  const chars = {}; // entityKey -> {model, mixer, walk, idle}
+  function makeCharModel(key, url, group, onReady){
+    const loader = new THREE.GLTFLoader();
+    loader.load(url, gltf => {
+      const model = gltf.scene;
+      // find the mesh's actual world scale (accounts for nested node scales like 0.01)
+      let meshWorldScale = 1;
+      model.updateMatrixWorld(true);
+      model.traverse(o => { if (o.isMesh && o.matrixWorld) meshWorldScale = o.matrixWorld.elements[5]; });
+      // compute bounds from the RAW vertex positions (skinned meshes have a degenerate bind-pose box)
+      const box = new THREE.Box3();
+      model.traverse(o => {
+        if (o.isMesh){
+          const g = o.geometry;
+          if (g && g.attributes && g.attributes.position){
+            const arr = g.attributes.position.array;
+            for (let i=0;i<arr.length;i+=3){
+              box.min.x = Math.min(box.min.x, arr[i]);
+              box.min.y = Math.min(box.min.y, arr[i+1]);
+              box.min.z = Math.min(box.min.z, arr[i+2]);
+              box.max.x = Math.max(box.max.x, arr[i]);
+              box.max.y = Math.max(box.max.y, arr[i+1]);
+              box.max.z = Math.max(box.max.z, arr[i+2]);
+            }
+          }
+        }
+      });
+      const size = box.getSize(new THREE.Vector3());
+      let scale = 1.8;
+      if (size.y > 0.001) scale = 1.8 / (meshWorldScale * size.y);   // account for the mesh's world scale
+      scale = Math.max(0.001, Math.min(300, scale));
+      model.scale.setScalar(scale);
+      // center so feet rest at y=0 (raw box, in world units)
+      const worldScale = meshWorldScale * scale;
+      const c = box.getCenter(new THREE.Vector3());
+      model.position.x -= c.x * worldScale; model.position.z -= c.z * worldScale;
+      model.position.y -= box.min.y * worldScale;
+      if (group){ while (group.children.length) group.remove(group.children[0]); group.add(model); }
+      const entry = { model, mixer: null, walk: null, idle: null };
+      if (gltf.animations && gltf.animations.length){
+        entry.mixer = new THREE.AnimationMixer(model);
+        for (const clip of gltf.animations){
+          const n = clip.name.toLowerCase();
+          if (n.includes('walk') || n.includes('run')) entry.walk = entry.mixer.clipAction(clip);
+          else if (!entry.idle) entry.idle = entry.mixer.clipAction(clip);
+        }
+        if (!entry.idle && gltf.animations[0]) entry.idle = entry.mixer.clipAction(gltf.animations[0]);
+        if (entry.idle) entry.idle.play();
+      }
+      chars[key] = entry;
+      if (onReady) onReady(entry);
+    });
+  }
+  // Generated GLB character models are DISABLED for now — the skinned-mesh scale/position
+  // integration needs fixing (see CLAUDEREADME §9). The procedural wizards render cleanly.
+  // makeCharModel('player', './assets/models/player_wizard.glb', player);
+
   // ---------- input ----------
   const keys = new Set();
   const BIND = { KeyW:'f', KeyS:'b', KeyA:'l', KeyD:'r', ArrowUp:'f', ArrowDown:'b', ArrowLeft:'l', ArrowRight:'r' };
@@ -253,6 +311,7 @@ export function createWorld(canvas, callbacks){
   let tapTarget = null, tapSet = false;
   // camera orbit (drag to rotate, pinch to zoom) — mobile open-world feel
   let camYaw = 0, camDist = 15, camHeight = 9;
+  let playerMoving = false;
 
   // ---------- nearby ----------
   let nearby = null;
@@ -292,6 +351,7 @@ export function createWorld(canvas, callbacks){
       if (d>0.6){ mx=dx/d; mz=dz/d; } else { tapTarget=null; tapSet=false; }
     }
     const moving = ml>0.02 || tapSet;
+    playerMoving = moving;
     if (moving){
       // camera-relative movement: forward = camera's facing, right = camera's right
       const fx = Math.sin(camYaw), fz = -Math.cos(camYaw);
@@ -307,12 +367,15 @@ export function createWorld(canvas, callbacks){
       while (diff>Math.PI) diff-=Math.PI*2; while (diff<-Math.PI) diff+=Math.PI*2;
       player.rotation.y += diff*Math.min(1, dt*10);
       walkT += dt;
-      animateWizard(player, walkT, Math.min(1, ml));
+      if (!chars.player) animateWizard(player, walkT, Math.min(1, ml));
     } else {
-      // idle bob
-      player.userData.armL.rotation.x = Math.sin(walkT*0.5)*0.05;
-      player.userData.armR.rotation.x = -Math.sin(walkT*0.5)*0.05;
-      player.position.y = 0;
+      if (chars.player){
+        // handled by GLB mixer
+      } else {
+        player.userData.armL.rotation.x = Math.sin(walkT*0.5)*0.05;
+        player.userData.armR.rotation.x = -Math.sin(walkT*0.5)*0.05;
+        player.position.y = 0;
+      }
     }
   }
 
@@ -331,9 +394,21 @@ export function createWorld(canvas, callbacks){
           if (n.t>2){ n.t=0; n.pause=0.8+Math.random()*1.6; const a=Math.random()*Math.PI*2, r=14+Math.random()*12; n.tx=Math.cos(a)*r; n.tz=Math.sin(a)*r; }
         }
       } else {
-        // stationary NPCs: subtle idle sway
-        animateWizard(n.mesh, now*0.001, 0);
+        // stationary NPCs: GLB models animate via mixer; procedural ones sway
+        if (!chars[n.role]) animateWizard(n.mesh, now*0.001, 0);
       }
+    }
+  }
+  // advance GLB character mixers (player walk/idle, NPC idle)
+  function updateChars(dt){
+    for (const key in chars){
+      const c = chars[key];
+      if (!c.mixer) continue;
+      if (key === 'player'){
+        if (playerMoving){ if (c.walk && !c.walk.isRunning()){ c.idle && c.idle.stop(); c.walk.play(); } }
+        else { if (c.idle && !c.idle.isRunning()){ c.walk && c.walk.stop(); c.idle.play(); } }
+      }
+      c.mixer.update(dt);
     }
   }
 
@@ -352,6 +427,7 @@ export function createWorld(canvas, callbacks){
     const dt = Math.min(0.05, (now-last)/1000); last = now;
     input(dt);
     npcUpdate(dt, now);
+    updateChars(dt);
     updateNearby();
     updateCamera();
     renderer.render(scene, camera);
@@ -373,7 +449,9 @@ export function createWorld(canvas, callbacks){
     const out = [];
     scene.traverse(o => { if (o.isMesh){ const b = new THREE.Box3().setFromObject(o); const s = b.getSize(new THREE.Vector3()); const c = b.getCenter(new THREE.Vector3()); const d = Math.round(c.distanceTo(cam)); out.push({ t: o.geometry.type, s: [Math.round(s.x),Math.round(s.y),Math.round(s.z)], p: [Math.round(o.position.x),Math.round(o.position.y),Math.round(o.position.z)], d }); } });
     out.sort((a,b)=> a.d - b.d);
-    return { cam: [Math.round(cam.x),Math.round(cam.y),Math.round(cam.z)], player: [Math.round(player.position.x),Math.round(player.position.y),Math.round(player.position.z)], near: out.slice(0,8) };
+    return { cam: [Math.round(cam.x),Math.round(cam.y),Math.round(cam.z)], player: [Math.round(player.position.x),Math.round(player.position.y),Math.round(player.position.z)], near: out.slice(0,8),
+      chars: Object.fromEntries(Object.entries(chars).map(([k,c])=>[k,{loaded:!!c.model, scale: c.model?+c.model.scale.x.toFixed(3):null, mixer: !!c.mixer, walk: !!c.walk, idle: !!c.idle}])),
+      playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };
   };
   return {
     setTouchMove(x, y){ joy.x = x; joy.y = y; },
