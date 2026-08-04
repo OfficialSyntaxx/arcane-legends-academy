@@ -34,6 +34,10 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 | `fur_bed_single_A.glb` | KayKit – Furniture Bits | CC0 | Dorms bed (1,17) |
 | `fur_chair_A.glb` | KayKit – Furniture Bits | CC0 | Dorms chair (0.5,16.5) |
 | `npc_mage.glb` | KayKit – Character Pack Adventures | CC0 | Spell-tutor wizard NPC (76 anims), (-16,8) |
+| `wpn_staff_A/B`, `wpn_wand_A`, `wpn_sword_A`, `wpn_shield_A`, `wpn_bow_A`, `wpn_axe_A`, `wpn_hammer_A` | KayKit – Fantasy Weapons Bits | CC0 | Wizard weapons (staffs, wand, sword, shield, bow, axe, hammer) |
+| `creature_Dragon.glb`, `creature_Slime.glb`, `creature_Bat.glb`, `creature_Skeleton.glb` | Quaternius Animated Monsters | CC0 | 3D duel creature summons (animated, tinted by school) |
+
+**3D duel arena:** `battle3d.js` renders the duel battlefield as animated 3D creature models that drop in when a creature card is played, synced to `logic.js` (`battle.you/.enemy.board`). Card→model mapping by keyword (dragon/wyrm→Dragon, bat→Bat, slime→Slime, skeleton→Skeleton, mage/elf→Mage, default→Skeleton). See CLAUDEREADME §combat.
 
 **Skipped (off-theme):** KayKit **City Builder Bits** — modern city (cars, traffic lights, dumpsters) doesn't fit the medieval wizard academy.
 
