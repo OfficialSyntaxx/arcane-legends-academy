@@ -8,7 +8,7 @@
 // for the hub for now — zones.json is the runtime contract. A second zone is authored purely as
 // JSON, which is the point: adding content must not require engine changes.
 
-import { BIOMES } from "./terrain.js";
+import { BIOMES, heightAt, flatsForZone } from "./terrain.js";
 
 export const ZONE_DEFAULTS = {
   chunkSize: 32,
@@ -104,6 +104,89 @@ export async function loadWorldConfig(url = "./world/zones.json", fetchImpl){
   const res = await f(url);
   if (!res.ok) throw new Error("world config " + url + " -> HTTP " + res.status);
   return buildWorld(await res.json());
+}
+
+// ---------------------------------------------------------------- deterministic scatter
+// WORLDSPEC §3: entries with a `count` are auto-scattered inside the zone bounds, avoiding the
+// spawn and each other. Deterministic from the zone seed, so a chunk re-scatters identically
+// every load (§4) and every client sees the same world.
+//
+// Pure and eagerly evaluated for the whole zone: step 3 buckets the results per chunk rather
+// than re-rolling them, which is what keeps reloads stable.
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Expand every `count`-bearing entry in a zone into concrete placements.
+ * @returns {{props:Array, resourceNodes:Array, enemies:Array}} each item carrying x/z
+ */
+export function scatterZone(zone, opts = {}){
+  const minGap = opts.minGap != null ? opts.minGap : 4;
+  const spawnClear = opts.spawnClear != null ? opts.spawnClear : 14;
+  // Scatter must respect the terrain it lands on, or trees grow out of lakes and ore spawns on
+  // cliff faces. Both are checked against the zone's own heightmap.
+  const flats = flatsForZone(zone);
+  const water = zone.terrain ? zone.terrain.waterLevel : null;
+  const maxSlope = opts.maxSlope != null ? opts.maxSlope : 0.9;
+  const groundOk = (x, z) => {
+    if (water != null && heightAt(x, z, zone.terrain, flats) < water + 0.3) return false;   // in/near water
+    const e = 0.75;
+    const dx = heightAt(x+e, z, zone.terrain, flats) - heightAt(x-e, z, zone.terrain, flats);
+    const dz = heightAt(x, z+e, zone.terrain, flats) - heightAt(x, z-e, zone.terrain, flats);
+    return Math.hypot(dx, dz) / (2*e) <= maxSlope;                                          // too steep
+  };
+  const rand = mulberry32((zone.terrain && zone.terrain.seed) || 1);
+  const { minX, maxX, minZ, maxZ } = zone.bounds;
+  const placed = [];                                   // everything already on the ground
+
+  // pre-seed with authored positions so scatter never lands on a hand-placed thing
+  for (const list of [zone.buildings, zone.landmarks, zone.npcs, zone.dungeonEntrances])
+    for (const e of list || []) if (e.x != null) placed.push({ x:e.x, z:e.z, r: Math.max(e.w||0, e.d||0, e.size||0)/2 + minGap });
+  for (const list of [zone.props, zone.resourceNodes])
+    for (const e of list || []) if (e.x != null) placed.push({ x:e.x, z:e.z, r:minGap });
+
+  const fits = (x, z, r) => {
+    if (zone.spawn && Math.hypot(x - zone.spawn.x, z - zone.spawn.z) < spawnClear) return false;
+    for (const p of placed) if (Math.hypot(x - p.x, z - p.z) < (p.r + r)) return false;
+    return true;
+  };
+
+  const expand = (list, defaultR) => {
+    const out = [];
+    for (const entry of list || []){
+      if (entry.x != null){ out.push(entry); continue; }      // already placed by hand
+      const n = entry.count | 0;
+      const r = entry.solid || defaultR;
+      const clear = entry.minDistFromSpawn || spawnClear;
+      for (let i = 0; i < n; i++){
+        let ok = false;
+        for (let tries = 0; tries < 80 && !ok; tries++){       // bounded: a full zone just yields fewer
+          const x = minX + rand() * (maxX - minX);
+          const z = minZ + rand() * (maxZ - minZ);
+          if (Math.hypot(x - (zone.spawn ? zone.spawn.x : 0), z - (zone.spawn ? zone.spawn.z : 0)) < clear) continue;
+          if (!groundOk(x, z)) continue;
+          if (!fits(x, z, r)) continue;
+          const item = { ...entry, x: +x.toFixed(3), z: +z.toFixed(3) };
+          delete item.count;
+          out.push(item); placed.push({ x, z, r }); ok = true;
+        }
+      }
+    }
+    return out;
+  };
+
+  return {
+    props:         expand(zone.props, minGap),
+    resourceNodes: expand(zone.resourceNodes, 5),
+    enemies:       expand(zone.enemies, 3),
+  };
 }
 
 // Chunk helpers (WORLDSPEC §4). Step 3 will consume these; defined here so the coordinate

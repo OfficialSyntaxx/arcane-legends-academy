@@ -249,10 +249,24 @@ A one-way exit strands the player. Tested.
 60 props/chunk that is 1,500 instances. Either raise `chunkSize` (fewer, bigger chunks) or lower
 the per-chunk cap for mobile. **Revisit these numbers when step 3 lands** — they are untested.
 
-**h. Known gap: content authored as `count` is not yet scattered.**
-`whispering_forest` declares `props`/`resourceNodes`/`enemies` with `count`. The deterministic
-scatter that turns a count into positions belongs to **step 3** (it is per-chunk). Until then
-those entries validate but do not render.
+**h. ✅ Deterministic scatter is implemented** (`worldconfig.js scatterZone`) — it belongs to the
+zone *semantics* (§3 conventions), not to chunk streaming. Counts expand to concrete positions
+from the zone seed, avoiding the spawn, each other, **water, and steep ground**. Step 3 buckets
+these results per chunk rather than re-rolling them, which is what keeps reloads stable.
+
+**i. Zone bounds and collision are per-zone, not global.**
+Movement, teleport and the ground/water meshes all clamp and centre on `zone.bounds`, and
+collision uses `zone.obstacles` when present. A zone with different bounds or a different
+building set would otherwise inherit the academy's.
+
+**j. `zones.json` is generated for the hub and drift-checked.**
+`tools/sync-zones.mjs` regenerates the `academy` zone from `structures.js`/`nodes.js`; `npm test`
+fails if it is stale. Two copies of the same data is exactly how the `logic.js` card catalog
+silently drifted from `cards.js`, so it gets the same guard. **Other zones are hand-authored in
+`zones.json` and are never touched by the generator.**
+
+**k. Still open for step 3:** water is rendered but not yet *gameplay* — the player can walk
+across it. Blocking or swimming belongs with chunk streaming, when water bodies become real.
 
 ---
 

@@ -23,6 +23,14 @@ export function createWorld(canvas, callbacks, zone){
   // that gets level ground — no separate list to keep in sync.
   const FLATS = flatsForZone(ZONE);
   const groundY = (x, z) => heightAt(x, z, ZONE.terrain, FLATS);
+  // Clamp to the ACTIVE ZONE's bounds, not a global constant — a zone with different bounds
+  // would otherwise trap the player early or let them walk off the edge of its terrain.
+  const B = ZONE.bounds;
+  const clampX = v => Math.max(B.minX, Math.min(B.maxX, v));
+  const clampZ = v => Math.max(B.minZ, Math.min(B.maxZ, v));
+  // Collision comes from the zone when it supplies its own set, so a second zone is not silently
+  // colliding with the academy's buildings.
+  const ZONE_OBSTACLES = (ZONE.obstacles && ZONE.obstacles.length) ? ZONE.obstacles : OBSTACLES;
   const THREE = window.THREE;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.5));
@@ -108,27 +116,27 @@ export function createWorld(canvas, callbacks, zone){
   // ---------- ground: procedural heightmap (WORLDSPEC §5) ----------
   // One displaced plane for the whole zone for now; step 3 (chunk streaming) subdivides this.
   const biome = BIOMES[ZONE.terrain.biome] || BIOMES.plains;
-  const groundSpan = Math.max(
-    ZONE.bounds.maxX - ZONE.bounds.minX, ZONE.bounds.maxZ - ZONE.bounds.minZ) + 80;
+  const groundSpan = Math.max(B.maxX - B.minX, B.maxZ - B.minZ) + 80;
+  const groundCX = (B.minX + B.maxX) / 2, groundCZ = (B.minZ + B.maxZ) / 2;
   const GROUND_SEGS = 96;                       // ~1.5m per quad at 150m span — smooth on mobile
   const groundGeo = new THREE.PlaneGeometry(groundSpan, groundSpan, GROUND_SEGS, GROUND_SEGS);
   {
     const pos = groundGeo.attributes.position;
     for (let i = 0; i < pos.count; i++){
       // the plane is built in XY then rotated onto XZ, so its local y IS world -z
-      const wx = pos.getX(i), wz = -pos.getY(i);
+      const wx = pos.getX(i) + groundCX, wz = -pos.getY(i) + groundCZ;
       pos.setZ(i, groundY(wx, wz));
     }
     pos.needsUpdate = true;
     groundGeo.computeVertexNormals();
   }
-  const ground = add(groundGeo, mat(biome.ground), 0, 0, 0, {receive:true});
+  const ground = add(groundGeo, mat(biome.ground), groundCX, 0, groundCZ, {receive:true});
   ground.rotation.x = -Math.PI/2;
   // water, only where the zone declares a level
   if (ZONE.terrain.waterLevel != null){
     const wm = new THREE.MeshLambertMaterial({ color: biome.water, transparent:true, opacity:0.72 });
     wm.color.convertSRGBToLinear();
-    const water = add(new THREE.PlaneGeometry(groundSpan, groundSpan), wm, 0, ZONE.terrain.waterLevel, 0, {receive:true, cast:false});
+    const water = add(new THREE.PlaneGeometry(groundSpan, groundSpan), wm, groundCX, ZONE.terrain.waterLevel, groundCZ, {receive:true, cast:false});
     water.rotation.x = -Math.PI/2;
   }
   // courtyard platform — removed (large flat disc reads as an edge-on artifact at this camera angle)
@@ -532,7 +540,7 @@ export function createWorld(canvas, callbacks, zone){
     const spec = NODE_MODELS[n.kind];
     if (!spec || !nodeGroups[n.id]) continue;
     loadLandmarkModel('node_' + n.id, spec.url, nodeGroups[n.id],
-      { size: n.kind === 'wood' ? spec.h : spec.h, fit:"height", x:n.x, z:n.z, ry:(n.x * 0.7) % 3 });
+      { size: spec.h, fit:"height", x:n.x, z:n.z, ry:(n.x * 0.7) % 3 });
   }
   // Buildings that have a generated model replace their procedural box in place.
   for (const b of BUILDINGS){
@@ -600,10 +608,10 @@ export function createWorld(canvas, callbacks, zone){
       const rx = Math.cos(camYaw), rz = Math.sin(camYaw);
       const wx = fx*mz + rx*mx;
       const wz = fz*mz + rz*mx;
-      const nx = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, player.position.x + wx*playerSpeed*dt));
-      const nz = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, player.position.z + wz*playerSpeed*dt));
+      const nx = clampX(player.position.x + wx*playerSpeed*dt);
+      const nz = clampZ(player.position.z + wz*playerSpeed*dt);
       // depenetrate rather than block, so the player slides along a wall instead of sticking
-      const hit = resolveCollisions(nx, nz, PLAYER_RADIUS, OBSTACLES);
+      const hit = resolveCollisions(nx, nz, PLAYER_RADIUS, ZONE_OBSTACLES);
       player.position.x = hit.x; player.position.z = hit.z;
       player.position.y = groundY(hit.x, hit.z);      // walk the heightmap (WORLDSPEC §5)
       // a tap-to-move target inside a building is unreachable — drop it instead of grinding
@@ -638,7 +646,7 @@ export function createWorld(canvas, callbacks, zone){
         const dx=n.tx-n.mesh.position.x, dz=n.tz-n.mesh.position.z, d=Math.hypot(dx,dz);
         if (d>0.8){
           const wnx = n.mesh.position.x + (dx/d)*4.0*dt, wnz = n.mesh.position.z + (dz/d)*4.0*dt;
-          const wh = resolveCollisions(wnx, wnz, PLAYER_RADIUS, OBSTACLES);
+          const wh = resolveCollisions(wnx, wnz, PLAYER_RADIUS, ZONE_OBSTACLES);
           n.mesh.position.x = wh.x; n.mesh.position.z = wh.z;
           n.mesh.position.y = groundY(wh.x, wh.z);
           n.mesh.rotation.y = Math.atan2(dx,dz);
@@ -657,7 +665,7 @@ export function createWorld(canvas, callbacks, zone){
             for (let k=0;k<6;k++){
               const a=Math.random()*Math.PI*2, r=26+Math.random()*22;
               const cx=Math.cos(a)*r, cz=Math.sin(a)*r;
-              const c2=resolveCollisions(cx, cz, PLAYER_RADIUS, OBSTACLES);
+              const c2=resolveCollisions(cx, cz, PLAYER_RADIUS, ZONE_OBSTACLES);
               if (Math.hypot(c2.x-cx, c2.z-cz) < 0.001 || k===5){ n.tx=c2.x; n.tz=c2.z; break; }
             }
           }
@@ -785,9 +793,8 @@ export function createWorld(canvas, callbacks, zone){
     // geometry, and cancels any tap-to-move target that is now stale.
     teleport(x, z){
       const p = resolveCollisions(
-        Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, x)),
-        Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, z)),
-        PLAYER_RADIUS, OBSTACLES);
+        clampX(x), clampZ(z),
+        PLAYER_RADIUS, ZONE_OBSTACLES);
       player.position.x = p.x; player.position.z = p.z;
       player.position.y = groundY(p.x, p.z);   // land on the surface, not at y=0
       tapTarget = null; tapSet = false;

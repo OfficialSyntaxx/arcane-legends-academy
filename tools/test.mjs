@@ -266,7 +266,68 @@ check("chunksInRadius grows with radius", WC.chunksInRadius(0,0,32,120).length >
 
 // ---- 4.38 WORLDSPEC step 2: procedural terrain ----
 const acad = WORLD.get("academy"), forest = WORLD.get("whispering_forest");
+const acadRaw = WORLD.get("academy");
 const acadFlats = TER.flatsForZone(acad), forestFlats = TER.flatsForZone(forest);
+
+// ---- 4.375 scatter, bounds and zone-local collision (step 1-2 completeness) ----
+check("count-based content scatters into concrete placements", (()=>{
+  const sc = WC.scatterZone(WORLD.get("whispering_forest"));
+  return sc.props.length > 100 && sc.resourceNodes.length >= 20 && sc.enemies.length === 8
+      && sc.props.every(p => typeof p.x === "number" && p.count === undefined);
+})());
+check("scatter is deterministic from the zone seed", (()=>{
+  const f = WORLD.get("whispering_forest");
+  return JSON.stringify(WC.scatterZone(f)) === JSON.stringify(WC.scatterZone(f));
+})());
+check("a different seed scatters differently", (()=>{
+  const f = WORLD.get("whispering_forest");
+  const g = { ...f, terrain: { ...f.terrain, seed: f.terrain.seed + 7 } };
+  return JSON.stringify(WC.scatterZone(f).props) !== JSON.stringify(WC.scatterZone(g).props);
+})());
+check("scattered content stays inside the zone bounds", (()=>{
+  const f = WORLD.get("whispering_forest"), sc = WC.scatterZone(f);
+  const all = [...sc.props, ...sc.resourceNodes, ...sc.enemies];
+  return all.every(e => e.x >= f.bounds.minX && e.x <= f.bounds.maxX && e.z >= f.bounds.minZ && e.z <= f.bounds.maxZ);
+})());
+check("scatter keeps clear of the spawn", (()=>{
+  const f = WORLD.get("whispering_forest"), sc = WC.scatterZone(f);
+  return [...sc.props, ...sc.resourceNodes].every(e => Math.hypot(e.x - f.spawn.x, e.z - f.spawn.z) >= 13.9);
+})());
+check("scatter does not stack items on top of each other", (()=>{
+  const sc = WC.scatterZone(WORLD.get("whispering_forest"));
+  const all = [...sc.props, ...sc.resourceNodes];
+  for (let i = 0; i < all.length; i++) for (let j = i+1; j < all.length; j++)
+    if (Math.hypot(all[i].x-all[j].x, all[i].z-all[j].z) < 2) return false;
+  return true;
+})());
+check("scatter never places anything underwater", (()=>{
+  const f = WORLD.get("whispering_forest"), sc = WC.scatterZone(f), fl = TER.flatsForZone(f);
+  const all = [...sc.props, ...sc.resourceNodes, ...sc.enemies];
+  const wet = all.filter(e => TER.isWater(e.x, e.z, f.terrain, fl));
+  if (wet.length) console.log("   underwater:", wet.length, "of", all.length);
+  return wet.length === 0;
+})());
+check("scatter never places anything on a cliff face", (()=>{
+  const f = WORLD.get("whispering_forest"), sc = WC.scatterZone(f), fl = TER.flatsForZone(f);
+  return [...sc.props, ...sc.resourceNodes].every(e => TER.slopeAt(e.x, e.z, f.terrain, fl) <= 0.9);
+})());
+check("hand-placed entries survive scatter untouched", (()=>{
+  const sc = WC.scatterZone(acadRaw);
+  return sc.props.length === acadRaw.props.length
+      && sc.props.every((p,i) => p.x === acadRaw.props[i].x && p.z === acadRaw.props[i].z);
+})());
+// zone-local collision: a second zone must not inherit the academy's buildings
+check("each zone carries its own obstacle set or none", (()=>{
+  const a = WORLD.get("academy"), f = WORLD.get("whispering_forest");
+  return Array.isArray(a.obstacles) && a.obstacles.length > 0 && !(f.obstacles && f.obstacles.length);
+})());
+check("the academy zone's obstacles match structures.js", (()=>
+  JSON.stringify(WORLD.get("academy").obstacles) === JSON.stringify(ST.OBSTACLES))());
+check("zone bounds differ between zones (so clamping must be per-zone)", (()=>{
+  const a = WORLD.get("academy").bounds, f = WORLD.get("whispering_forest").bounds;
+  return a.maxX !== f.maxX;
+})());
+
 check("terrain is deterministic for a given seed", (()=>{
   const a = TER.heightAt(12.3, -47.9, forest.terrain, forestFlats);
   const b = TER.heightAt(12.3, -47.9, forest.terrain, forestFlats);
@@ -324,6 +385,15 @@ check("flattening eases out rather than stepping", (()=>{
   return maxJump < 0.15;
 })());
 check("flattening is fully off far from any landmark", TER.flatteningFactor(500, 500, acadFlats) === 1);
+// world.js carries a fallback zone for when the config fetch fails. It duplicates the academy's
+// terrain settings, so it can drift — assert the two agree rather than discovering it visually.
+check("the world.js fallback zone matches the academy zone's terrain", (()=>{
+  const src = fs.readFileSync(path.join(ROOT_PUBLIC, "world.js"), "utf8");
+  const m = src.match(/terrain:\s*\{\s*seed:\s*(\d+),\s*scale:\s*([\d.]+),\s*amplitude:\s*([\d.]+),\s*baseHeight:\s*([\d.-]+),\s*biome:\s*"(\w+)"/);
+  if (!m) { console.log("   could not find the fallback terrain block in world.js"); return false; }
+  const t = acad.terrain;
+  return +m[1] === t.seed && +m[2] === t.scale && +m[3] === t.amplitude && +m[4] === t.baseHeight && m[5] === t.biome;
+})());
 check("the academy hub is gentle terrain", acad.terrain.amplitude * TER.BIOMES[acad.terrain.biome].rough <= 2);
 check("water only exists where a zone declares a water level", (()=>{
   if (TER.isWater(0, 0, acad.terrain, acadFlats)) return false;      // academy has no waterLevel

@@ -67,11 +67,14 @@ wizard-tcg/                 (the repo root)
 │   └── assets/             generated art, character GLBs (models/), landmarks (buildings/)
 ├── tools/                  headless test suites
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
-│   ├── test.mjs            engine tests (135 checks)
+│   ├── sync-zones.mjs      regenerates the academy zone in zones.json (--check in CI)
+│   ├── test.mjs            engine tests (148 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
 │   ├── browser-test.mjs    real-Chromium responsive + input-gesture suite
 │   └── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
+├── BACKLOG.md              whole-game feature backlog + recommended phase order
+├── WORLDSPEC.md            world architecture blueprint (zones, terrain, chunks, dungeons)
 ├── design/                 design docs (plan, thresholds, asset manifest)
 └── docs/
     ├── NEXT-PHASE-PLAN.md  the systems audit + phase tracker
