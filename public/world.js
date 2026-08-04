@@ -249,16 +249,31 @@ export function createWorld(canvas, callbacks){
     const loader = new THREE.GLTFLoader();
     loader.load(url, gltf => {
       const model = gltf.scene;
-      // The skinned mesh spans the skeleton bones (raw box is only the bind pose). Compute the
-      // character's world height from the node positions (bones), which reflects the real size.
-      model.updateMatrixWorld(true);
-      let minY = Infinity, maxY = -Infinity, minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      // Determine whether this is a skinned character (skeleton spans the real size) or a
+      // static mesh (the geometry box is the real size). Both are sized to ~1.8 units tall.
+      let isSkinned = false;
+      const geoBox = new THREE.Box3();
       model.traverse(o => {
-        const p = new THREE.Vector3(); o.getWorldPosition(p);
-        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-        minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+        if (o.isSkinnedMesh) isSkinned = true;
+        if (o.isMesh && o.geometry) geoBox.union(new THREE.Box3().setFromObject(o));
       });
+      model.updateMatrixWorld(true);
+      let minY, maxY, minX, maxX, minZ, maxZ;
+      if (isSkinned){
+        // Skinned Meshy GLBs: the object box is degenerate and the raw mesh box is only the
+        // bind pose — the real size is the SKELETON NODE SPAN (bones sit far above the mesh).
+        minY = Infinity; maxY = -Infinity; minX = Infinity; maxX = -Infinity; minZ = Infinity; maxZ = -Infinity;
+        model.traverse(o => {
+          const p = new THREE.Vector3(); o.getWorldPosition(p);
+          minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+          minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+        });
+      } else {
+        minY = geoBox.min.y; maxY = geoBox.max.y;
+        minX = geoBox.min.x; maxX = geoBox.max.x;
+        minZ = geoBox.min.z; maxZ = geoBox.max.z;
+      }
       const height = maxY - minY;
       let scale = 1.8;
       if (height > 0.001) scale = 1.8 / height;
@@ -285,8 +300,10 @@ export function createWorld(canvas, callbacks){
       if (onReady) onReady(entry);
     });
   }
-  // Generated GLB character models — the player wizard (2D→3D) is enabled; integration in progress.
+  // Generated GLB character models — keys match NPC roles so the update loop uses the GLB mixer.
   makeCharModel('player', './assets/models/player_wizard.glb', player);
+  makeCharModel('quest', './assets/models/professor.glb', prof);
+  makeCharModel('market', './assets/models/merchant.glb', merch);
 
   // ---------- input ----------
   const keys = new Set();
