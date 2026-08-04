@@ -202,13 +202,12 @@ Use the `deploy_game` tool:
 **Working:** 3D world, camera, movement, in-world gathering/crafting, NPC dialogue, school system + elemental matrix, field/trap cards, grading/slabs + regrade, daily quests, academy rank, market/auctions, home/guild, all 8 quests, local AI PvP, online PvP, PWA manifest, all tests green.
 
 **Known issues / next steps:**
-1. **Generated character models are not yet integrated** — the GLB files exist in `public/assets/models/` (player_wizard.glb via 2D→3D, professor.glb, merchant.glb via text-to-3D) but are **disabled in `world.js`** (the `makeCharModel` call is commented out) because the skinned-mesh scale/position integration was glitching. The procedural wizards render cleanly. **This is the top task for a collaborator.**
+1. **Generated character model integration works now.** The player wizard (2D→3D) loads at the correct scale and animates (walk/idle). The fix: for **skinned Meshy GLBs**, the object bounding box is degenerate (reads as 0) and the raw mesh box is only the *bind pose* — the real size is the **skeleton node span** (bones are far above the mesh). `makeCharModel` in `world.js` now computes the character's height from the node world positions (skeleton) and scales to ~1.8 units. The professor/merchant GLBs are still disabled; they can be re-enabled the same way once their skeletons are verified.
 2. **The 2D→3D pipeline** (generate a 2D character portrait → image-to-3D) produces a much better, recognizable character (~40 credits/model: ~1.5 for the image + ~38 for the conversion) than text-to-3D (~25 credits, generic blob). The player_wizard.glb is the 2D→3D result.
-3. **Key GLB integration insight:** Meshy character GLBs are **skinned meshes** with a degenerate object bounding box (reads as 0). To scale them correctly you must read the **raw vertex positions** (position attribute) and account for the **nested node world scale** (e.g. a 0.01 root scale). The `makeCharModel` function in `world.js` has the evolving logic but it is not yet working reliably.
-4. **GLB files are large** (4–9MB each) — need Draco compression + lower poly counts before mobile is comfortable.
-5. **Buildings, nodes, and props are still procedural** primitives — these are next to generate as 3D models.
-6. **Sound** is not yet implemented (procedural WebAudio SFX only in a few places).
-7. **Models/animations** need rigging verification once quality models are in.
+3. **GLB files are large** (4–9MB each) — need Draco compression + lower poly counts before mobile is comfortable.
+4. **Buildings, nodes, and props are still procedural** primitives — these are next to generate as 3D models.
+5. **Sound** is not yet implemented (procedural WebAudio SFX only in a few places).
+6. **Models/animations** need rigging verification once quality models are in.
 
 ## 10. Roadmap (in priority order)
 

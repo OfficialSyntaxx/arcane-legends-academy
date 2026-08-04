@@ -249,40 +249,28 @@ export function createWorld(canvas, callbacks){
     const loader = new THREE.GLTFLoader();
     loader.load(url, gltf => {
       const model = gltf.scene;
-      // find the mesh's actual world scale (accounts for nested node scales like 0.01)
-      let meshWorldScale = 1;
+      // The skinned mesh spans the skeleton bones (raw box is only the bind pose). Compute the
+      // character's world height from the node positions (bones), which reflects the real size.
       model.updateMatrixWorld(true);
-      model.traverse(o => { if (o.isMesh && o.matrixWorld) meshWorldScale = o.matrixWorld.elements[5]; });
-      // compute bounds from the RAW vertex positions (skinned meshes have a degenerate bind-pose box)
-      const box = new THREE.Box3();
+      let minY = Infinity, maxY = -Infinity, minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
       model.traverse(o => {
-        if (o.isMesh){
-          const g = o.geometry;
-          if (g && g.attributes && g.attributes.position){
-            const arr = g.attributes.position.array;
-            for (let i=0;i<arr.length;i+=3){
-              box.min.x = Math.min(box.min.x, arr[i]);
-              box.min.y = Math.min(box.min.y, arr[i+1]);
-              box.min.z = Math.min(box.min.z, arr[i+2]);
-              box.max.x = Math.max(box.max.x, arr[i]);
-              box.max.y = Math.max(box.max.y, arr[i+1]);
-              box.max.z = Math.max(box.max.z, arr[i+2]);
-            }
-          }
-        }
+        const p = new THREE.Vector3(); o.getWorldPosition(p);
+        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+        minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
       });
-      const size = box.getSize(new THREE.Vector3());
+      const height = maxY - minY;
       let scale = 1.8;
-      if (size.y > 0.001) scale = 1.8 / (meshWorldScale * size.y);   // account for the mesh's world scale
+      if (height > 0.001) scale = 1.8 / height;
       scale = Math.max(0.001, Math.min(300, scale));
       model.scale.setScalar(scale);
-      // center so feet rest at y=0 (raw box, in world units)
-      const worldScale = meshWorldScale * scale;
-      const c = box.getCenter(new THREE.Vector3());
-      model.position.x -= c.x * worldScale; model.position.z -= c.z * worldScale;
-      model.position.y -= box.min.y * worldScale;
+      // center so feet rest at y=0
+      model.updateMatrixWorld(true);
+      const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+      model.position.x -= cx * scale; model.position.z -= cz * scale;
+      model.position.y -= minY * scale;
+      const entry = { model, mixer: null, walk: null, idle: null, rawSize: height, meshWorldScale: 1, computedScale: scale };
       if (group){ while (group.children.length) group.remove(group.children[0]); group.add(model); }
-      const entry = { model, mixer: null, walk: null, idle: null };
       if (gltf.animations && gltf.animations.length){
         entry.mixer = new THREE.AnimationMixer(model);
         for (const clip of gltf.animations){
@@ -297,9 +285,8 @@ export function createWorld(canvas, callbacks){
       if (onReady) onReady(entry);
     });
   }
-  // Generated GLB character models are DISABLED for now — the skinned-mesh scale/position
-  // integration needs fixing (see CLAUDEREADME §9). The procedural wizards render cleanly.
-  // makeCharModel('player', './assets/models/player_wizard.glb', player);
+  // Generated GLB character models — the player wizard (2D→3D) is enabled; integration in progress.
+  makeCharModel('player', './assets/models/player_wizard.glb', player);
 
   // ---------- input ----------
   const keys = new Set();
@@ -450,7 +437,7 @@ export function createWorld(canvas, callbacks){
     scene.traverse(o => { if (o.isMesh){ const b = new THREE.Box3().setFromObject(o); const s = b.getSize(new THREE.Vector3()); const c = b.getCenter(new THREE.Vector3()); const d = Math.round(c.distanceTo(cam)); out.push({ t: o.geometry.type, s: [Math.round(s.x),Math.round(s.y),Math.round(s.z)], p: [Math.round(o.position.x),Math.round(o.position.y),Math.round(o.position.z)], d }); } });
     out.sort((a,b)=> a.d - b.d);
     return { cam: [Math.round(cam.x),Math.round(cam.y),Math.round(cam.z)], player: [Math.round(player.position.x),Math.round(player.position.y),Math.round(player.position.z)], near: out.slice(0,8),
-      chars: Object.fromEntries(Object.entries(chars).map(([k,c])=>[k,{loaded:!!c.model, scale: c.model?+c.model.scale.x.toFixed(3):null, mixer: !!c.mixer, walk: !!c.walk, idle: !!c.idle}])),
+      chars: Object.fromEntries(Object.entries(chars).map(([k,c])=>[k,{loaded:!!c.model, scale: c.model?+c.model.scale.x.toFixed(3):null, rawSize: c.rawSize?+c.rawSize.toFixed(3):null, meshWorldScale: c.meshWorldScale?+c.meshWorldScale.toFixed(4):null, computed: c.computedScale?+c.computedScale.toFixed(2):null, mixer: !!c.mixer, walk: !!c.walk, idle: !!c.idle}])),
       playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };
   };
   return {
