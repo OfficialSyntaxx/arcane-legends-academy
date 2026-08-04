@@ -4,6 +4,7 @@
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
 import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
 import { BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions } from "./structures.js";
+import { modelUrl, CDN } from "./cdn.js";
 
 export function createWorld(canvas, callbacks){
   const THREE = window.THREE;
@@ -351,6 +352,7 @@ export function createWorld(canvas, callbacks){
   }
   function makeCharModel(key, url, group, onReady){
     loadState.total++;
+    url = CDN[url.split('/').pop()] || url;   // CDN if hosted there, else the caller's path
     const loader = new THREE.GLTFLoader();
     const d = getDraco();
     if (d) loader.setDRACOLoader(d);
@@ -436,6 +438,7 @@ export function createWorld(canvas, callbacks){
   function loadLandmarkModel(key, url, group, opts){
     const { size, fit = "height", x = 0, z = 0, ry = 0, onReady } = opts;
     loadState.total++;
+    url = CDN[url.split('/').pop()] || url;   // CDN if hosted there, else the caller's path
     const loader = new THREE.GLTFLoader();
     const d = getDraco();
     if (d) loader.setDRACOLoader(d);

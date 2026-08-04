@@ -5,6 +5,7 @@ import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS } from "../publi
 import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
 import * as ST from "../public/structures.js";
 import { SFX as AUDIO_SFX } from "../public/audio.js";
+import { CDN } from "../public/cdn.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -157,19 +158,32 @@ check("buildings are believably sized next to a 1.8m wizard", (()=>{
   if (bad.length) console.log("   undersized:", bad.map(b=>`${b.id} ${b.w}x${b.d}x${b.h}`).join(", "));
   return bad.length === 0;
 })());
-check("every building model path resolves to a file that exists", (()=>{
-  const missing = ST.BUILDINGS.filter(b => b.model && !fs.existsSync(
-    path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", b.model.replace(/^\.\//, ""))));
-  if (missing.length) console.log("   missing:", missing.map(b=>b.model).join(", "));
+// A model is resolvable if it ships in public/ OR is hosted on the CDN (cdn.js) — the large
+// character/tree GLBs deliberately live in models_cdn/ and are fetched at runtime so the deploy
+// stays under the limit, so "not on disk under public/" is not the same as "missing".
+const ROOT_PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
+const resolves = u => {
+  const name = u.split("/").pop();
+  return !!CDN[name] || fs.existsSync(path.join(ROOT_PUBLIC, u.replace(/^\.\//, "")));
+};
+check("every building model resolves (local file or CDN)", (()=>{
+  const missing = ST.BUILDINGS.filter(b => b.model && !resolves(b.model)).map(b=>b.model);
+  if (missing.length) console.log("   missing:", missing.join(", "));
   return missing.length === 0;
 })());
-check("every landmark and prop model file exists", (()=>{
-  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
+check("every landmark and prop model resolves (local file or CDN)", (()=>{
   const urls = [...ST.LANDMARKS.map(l=>l.url), ...ST.PROPS.map(p=>p.url)];
-  const missing = urls.filter(u => !fs.existsSync(path.join(root, u.replace(/^\.\//, ""))));
-  if (missing.length) console.log("   missing:", [...new Set(missing)].join(", "));
+  const missing = [...new Set(urls.filter(u => !resolves(u)))];
+  if (missing.length) console.log("   missing:", missing.join(", "));
   return missing.length === 0;
 })());
+check("every character model resolves (local file or CDN)", (()=>{
+  const names = ["player_wizard.glb", ...ST.NPCS.map(n=>n.model), ...ST.WANDERERS.map(w=>w.model)];
+  const missing = [...new Set(names.filter(n => !resolves("./assets/models/" + n)))];
+  if (missing.length) console.log("   missing:", missing.join(", "));
+  return missing.length === 0;
+})());
+check("every CDN entry is a real https URL", Object.values(CDN).every(u => /^https:\/\//.test(u)));
 check("solid props contribute collision", ST.PROPS.filter(p=>p.solid).every(p =>
   ST.OBSTACLES.some(o => o.id === "prop:" + p.url.split("/").pop())));
 check("the tree ring sits outside the walkable campus", ST.TREE_RING.every(t => Math.hypot(t.x,t.z) > 45));

@@ -265,6 +265,9 @@ body.has-touch .worldbtn{display:flex;}
     <button id="zoomIn" class="worldbtn" aria-label="Zoom in">+</button>
     <button id="zoomOut" class="worldbtn" aria-label="Zoom out">−</button>
   </div>
+  <div id="battleWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#120c2e">
+    <canvas id="battle3d" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
+  </div>
 </div>
 <div id="toast"></div>
 <div id="err"></div>
@@ -302,11 +305,13 @@ import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, e
 import * as G from "./game.js";
 import { createWorld } from "./world.js";
 import { createAudio, SFX } from "./audio.js";
+import { createBattle3d } from "./battle3d.js";
 
 // ================= state =================
 let S = G.load();
 let screen = "world";
 let battle = null;          // local duel battle
+let battle3d = null;        // 3D duel arena instance
 let pendingTarget = null;   // {kind:"spell",idx} | {kind:"attack",idx}
 let gatherCooldown = 0;
 let online = null;          // online duel state
@@ -495,15 +500,25 @@ function render(){
   buildNav();
   const scr = $("screen");
   const worldWrap = $("worldWrap");
+  const battleWrap = $("battleWrap");
   if (screen==="world"){
     scr.style.display = "none";
     worldWrap.style.display = "block";
+    battleWrap.style.display = "none";
+    if (battle3d) battle3d.stop();
     if (world) world.resize();
     refreshTop();
     return;
   }
   scr.style.display = "block";
   worldWrap.style.display = "none";
+  if (screen==="duel"){
+    battleWrap.style.display = "block";
+    syncBattle3d();
+  } else {
+    battleWrap.style.display = "none";
+    if (battle3d) battle3d.stop();
+  }
   scr.innerHTML = `<div class="screen on" id="scr_${screen}"></div>`;
   const el = $(`scr_${screen}`);
   if (screen==="home") renderHome(el);
@@ -872,6 +887,19 @@ window.__EV.localPvp = ()=>{
 window.__EV.online = ()=>{ setupOnline(); };
 
 // ================= LOCAL DUEL =================
+// Sync the 3D duel arena to the battle board (summon/remove creatures as played).
+function syncBattle3d(){
+  try {
+    if (!battle) return;
+    const cv = $("battle3d");
+    if (!cv) return;
+    if (!battle3d) battle3d = createBattle3d(cv);
+    const r = cv.parentElement.getBoundingClientRect();
+    battle3d.setSize(r.width, r.height);
+    battle3d.sync(battle.you.board, battle.enemy.board);
+    battle3d.start();
+  } catch(e){ console.warn("3D battle unavailable:", e); }
+}
 function startPracticeDuel(){
   const practiceDeck = ["fire_cat","fire_cat","fire_elf","fire_elf","firebolt","ice_golem","pixie","novice","elixir","fire_elf"];
   startLocalDuel(practiceDeck, {hp:0,atk:0,def:0,pip:0}, "Trainer Lyra", -1, false);

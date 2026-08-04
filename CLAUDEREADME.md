@@ -80,6 +80,8 @@ wizard-tcg/                 (the repo root)
 
 ## 4. The 3D World
 
+> **World expansion blueprint:** see [`WORLDSPEC.md`](WORLDSPEC.md) — zone-based architecture, zone config schema, chunk streaming, procedural terrain, and dungeon instancing. This is the roadmap to move from the single campus to a large roamable world.
+
 The world is a walkable academy campus built in Three.js (procedural low-poly + generated GLB characters). Key facts:
 
 - **Camera:** auto-follow, **drag-to-rotate** (orbit), **pinch-to-zoom**, camera-relative movement. Touch joystick on the left, drag on the right, tap-to-move.
@@ -97,6 +99,7 @@ The world is a walkable academy campus built in Three.js (procedural low-poly + 
 - **NPCs:** Professor, Merchant, Referee, Trainer, Librarian, and wandering students — all with dialogue.
 - **Character models:** generated via 2D→3D (`.glb`). All 10 characters render at ~1.8 units; walk is added procedurally (see §9).
 - **Buildings & landmarks:** declared in `structures.js` (`BUILDINGS`, `LANDMARKS`, `PROPS`) and loaded by `loadLandmarkModel`. The everyday campus is **CC0 KayKit**; the **Central Tower and Duel Arena are generated Tripo** models — the two hero landmarks. Placement is data, never hand-written into `world.js`, and `npm test` fails if anything is sealed inside geometry or points at a missing file.
+- **CDN model loading:** large models (>1MB) are hosted on the Higgsfield CDN and loaded at runtime via `cdn.js` (`modelUrl()`), so the deployed `public/` stays ~6.5MB. Local copies live in `models_cdn/` (git, not deployed). See `ASSETS.md` §CDN.
 ### 4.1 Importing free 3D assets (itch.io / CraftPix / KayKit…)
 
 We can reuse free low-poly assets even though most ship as `.fbx`. Pipeline: **everything ends up as a resized `.glb`** before it enters the game. One command does it all:
@@ -246,7 +249,7 @@ Use the `deploy_game` tool:
 
 ## 9. Current State & Known Issues
 
-**Working:** 3D world, camera, movement, in-world gathering/crafting, NPC dialogue, school system + elemental matrix, field/trap cards, grading/slabs + regrade, daily quests, academy rank, market/auctions, home/guild, all 8 quests, local AI PvP, online PvP, PWA manifest, all tests green.
+**Working:** 3D world, camera, movement, in-world gathering/crafting, NPC dialogue, school system + elemental matrix, field/trap cards, grading/slabs + regrade, daily quests, academy rank, market/auctions, home/guild, all 8 quests, local AI PvP, online PvP, PWA manifest, all tests green. **3D duel arena** (`battle3d.js`): when a creature card is played, its animated 3D model drops onto a 3D battlefield (synced to `logic.js` boards; card→model by keyword: dragon/wyrm→Dragon, bat→Bat, slime→Slime, skeleton→Skeleton, mage/elf→Mage, default→Skeleton). Wired into `renderDuel` via `syncBattle3d()`; defensive try/catch so a 3D failure degrades to the 2D duel.
 
 **A full systems audit lives in `docs/NEXT-PHASE-PLAN.md`** — read it alongside this file. It
 lists verified defects and orders them into phases. **Phase A (correctness) is done:**

@@ -47,6 +47,10 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 | `fur_bed_single_A.glb` | KayKit – Furniture Bits | CC0 | Dorms bed (1,17) |
 | `fur_chair_A.glb` | KayKit – Furniture Bits | CC0 | Dorms chair (0.5,16.5) |
 | `npc_mage.glb` | KayKit – Character Pack Adventures | CC0 | Spell-tutor wizard NPC (76 anims), (-16,8) |
+| `wpn_staff_A/B`, `wpn_wand_A`, `wpn_sword_A`, `wpn_shield_A`, `wpn_bow_A`, `wpn_axe_A`, `wpn_hammer_A` | KayKit – Fantasy Weapons Bits | CC0 | Wizard weapons (staffs, wand, sword, shield, bow, axe, hammer) |
+| `creature_Dragon.glb`, `creature_Slime.glb`, `creature_Bat.glb`, `creature_Skeleton.glb` | Quaternius Animated Monsters | CC0 | 3D duel creature summons (animated, tinted by school) |
+
+**3D duel arena:** `battle3d.js` renders the duel battlefield as animated 3D creature models that drop in when a creature card is played, synced to `logic.js` (`battle.you/.enemy.board`). Card→model mapping by keyword (dragon/wyrm→Dragon, bat→Bat, slime→Slime, skeleton→Skeleton, mage/elf→Mage, default→Skeleton). See CLAUDEREADME §combat.
 
 ### Generated (paid) — hero landmarks only
 | File | Source | Used as |
@@ -72,7 +76,21 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 - **Spell-cast animations:** already have **Universal Animation Library 2** (Quaternius) — includes casting/attack anims to retarget to our rigged NPCs.
 - **Character creation:** this is a UI screen — build in code with the wizard GLB models (not an imported asset), see CLAUDEREADME roadmap.
 
+## 🐲 Creature / monster assets for duels (recommended; itch-session-protected)
+- **Quaternius Ultimate Monsters** — 50 fully animated monsters (CC0, FBX/OBJ) — https://quaternius.com/packs/ultimatemonsters.html — *we already imported 4 of the "Animated Monsters" set (Dragon/Slime/Bat/Skeleton) as 3D duel summons.*
+- **Quaternius 3D Card Kit – Fantasy** — 50 fully modeled fantasy scenes (heroes, elements, enemies) ideal for "cards come to life" — CC0, glTF — https://quaternius.com/packs/3dcardkitfantasy.html
+- **Quaternius Ultimate Fantasy RTS / Medieval Village / RPG packs** — more units/props for creature variety (CC0).
+- **KayKit Dungeon Pack** (already imported) — dungeon props for PvE arenas.
+
 > **KayKit packs are NOT here** — they're on GitHub (KayKit-Game-Assets org), so I can fetch them directly. Done for: Medieval Hexagon, Dungeon, Skeletons, Adventures, Furniture, City Builder.
+
+## ☁️ CDN hosting (keeps the deploy small)
+Large models (>1MB) are hosted on the **Higgsfield CDN** and loaded at runtime by URL, so the deployed `public/` stays ~6.5MB (well under the ~50MB deploy limit) while the world can hold many more models.
+
+- **`cdn.js`** (`public/`) maps local filename → CDN url (`modelUrl(name)` routes to the CDN if present, else `./assets/models/`).
+- **`world.js`** `makeCharModel`/`loadProp` and **`battle3d.js`** route their loads through `modelUrl()`.
+- **`models_cdn/`** (repo root, git-tracked, NOT in `public/`) holds the local copies of the CDN-hosted GLBs: `player_wizard, merchant, referee, trainer, librarian, student_{emerald,violet,pink,gold}, enemy_skeleton, npc_mage, nat_CommonTree_1`.
+- To add a big model to the CDN: `higgsfield_upload` it → add the url to `cdn.js` → move the local file to `models_cdn/`.
 
 ---
 
