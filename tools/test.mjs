@@ -1,6 +1,6 @@
 // Engine smoke test — runs the card engine, economy, and economy-balance checks headlessly.
 import * as G from "../public/game.js";
-import { CARDS, CARD_MAP, cardValue, gradeForRoll, gradeFee } from "../public/cards.js";
+import { CARDS, CARD_MAP, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
 import { equipmentFor, BARS, POTIONS, MATERIALS } from "../public/items.js";
 
 let pass = 0, fail = 0;
@@ -54,6 +54,79 @@ check("grading succeeds and costs gold", gr.ok && s2.gold < before);
 check("graded card has a valid grade", gradeForRoll(ungraded.roll).name.length > 0);
 const sr = G.sellCard(s2, ungraded.uid);
 check("selling a graded card yields gold", sr.ok && sr.value > 0);
+
+// ---- 4.4 grade bands (regression: a forward find collapsed every roll to "Poor") ----
+check("roll 0 is grade 1", gradeForRoll(0).g === 1);
+check("roll 100 is grade 10", gradeForRoll(100).g === 10);
+check("roll 95 is Gem Mint slab", gradeForRoll(95).g === 10 && gradeForRoll(95).slab);
+check("roll 85 is Mint slab", gradeForRoll(85).g === 9 && gradeForRoll(85).slab);
+check("roll 55 is Excellent, not a slab", gradeForRoll(55).g === 6 && !gradeForRoll(55).slab);
+check("every band is reachable at its own min", GRADES.every(g => gradeForRoll(g.min).g === g.g));
+check("grade rises monotonically with roll", (()=>{
+  let last = 0;
+  for (let r=0;r<=100;r++){ const g = gradeForRoll(r).g; if (g < last) return false; last = g; }
+  return last === 10;
+})());
+check("a Gem Mint card is worth more than a Poor one", cardValue("fire_dragon",95) > cardValue("fire_dragon",5));
+// slabs are actually minted
+const sGrade = G.newGame(); sGrade.gold = 100000;
+sGrade.cards[0].roll = 95; sGrade.cards[0].graded = false;
+const slabRes = G.gradeCard(sGrade, sGrade.cards[0].uid);
+check("grading a 95-roll mints a slab with a serial", slabRes.ok && slabRes.grade.slab && sGrade.cards[0].serial > 0);
+check("countSlabs sees the slab", G.countSlabs(sGrade) === 1);
+
+// ---- 4.45 duel mechanics: drain, freeze, targeted spells, AoE ownership ----
+const flat = {hp:0,atk:0,def:0,pip:0};
+const deck20 = id => Array(20).fill(id);
+// drain heals the ATTACKER's wizard, not the defender's
+const bd = G.startDuel(deck20("ghoul"), flat, deck20("skeleton"), flat, 100);
+bd.you.hand = ["ghoul"]; bd.you.pips = 10;
+G.playCard(bd, bd.you, 0, null);
+bd.you.board[0].summoning = false;
+bd.you.hp = 50; const foeHpBefore = bd.enemy.hp;
+G.attack(bd, 0, "wiz", -1);
+check("drain heals the attacking wizard", bd.you.hp > 50);
+check("drain damages the defending wizard", bd.enemy.hp < foeHpBefore);
+
+// freeze stops an attack, and wears off after the frozen player's turn
+const bf = G.startDuel(deck20("fire_cat"), flat, deck20("fire_cat"), flat, 100);
+bf.you.hand = ["blizzard"]; bf.you.pips = 10;
+bf.enemy.hand = ["fire_cat"]; bf.enemy.pips = 10;
+G.playCard(bf, bf.enemy, 0, null);           // enemy has a hasted 2/2
+G.playCard(bf, bf.you, 0, null);             // Blizzard
+check("blizzard freezes the opposing board", bf.enemy.board.every(c=>c.freeze === 1));
+G.endTurn(bf);                               // -> enemy's turn
+const frozenAtk = G.attack(bf, 0, "wiz", -1);
+check("a frozen creature cannot attack", !frozenAtk.ok && frozenAtk.err === "frozen");
+G.endTurn(bf);                               // enemy ends their turn: freeze ticks down
+check("freeze wears off after the frozen turn", bf.enemy.board.every(c=>c.freeze === 0));
+
+// targeted damage spells actually hit the chosen creature
+const bt = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100);
+bt.enemy.hand = ["frost_giant"]; bt.enemy.pips = 10;
+G.playCard(bt, bt.enemy, 0, null);
+const targetHp = bt.enemy.board[0].hp;
+bt.you.hand = ["firebolt"]; bt.you.pips = 10;
+G.playCard(bt, bt.you, 0, {kind:"creature", idx:0});
+check("targeted spell damages the chosen creature", bt.enemy.board[0].hp === targetHp - 4);
+check("targeted spell leaves the enemy wizard alone", bt.enemy.hp === 100);
+
+// an untargeted damage spell hits the opposing wizard
+const bWiz = G.startDuel(deck20("firebolt"), flat, deck20("skeleton"), flat, 100);
+bWiz.you.hand = ["firebolt"]; bWiz.you.pips = 10;
+G.playCard(bWiz, bWiz.you, 0, {kind:"wiz"});
+check("wiz-targeted spell damages the enemy wizard", bWiz.enemy.hp === 96);
+
+// AoE resolves against the CASTER's opponent, whichever side casts it
+const ba = G.startDuel(deck20("fire_cat"), flat, deck20("meteor"), flat, 100);
+ba.you.hand = ["fire_cat","fire_cat"]; ba.you.pips = 10;
+G.playCard(ba, ba.you, 0, null);
+const youBoardHp = ba.you.board[0].hp, enemyHpBefore = ba.enemy.hp, youHpBefore = ba.you.hp;
+ba.enemy.hand = ["meteor"]; ba.enemy.pips = 10;
+G.playCard(ba, ba.enemy, 0, null);           // the ENEMY casts Meteor
+check("enemy AoE damages the player's board", ba.you.board.length === 0 || ba.you.board[0].hp < youBoardHp);
+check("enemy AoE damages the player's wizard", ba.you.hp === youHpBefore - 4);
+check("enemy AoE does not damage its own wizard", ba.enemy.hp === enemyHpBefore);
 
 // ---- 4.5 field & trap mechanics ----
 const s7 = G.newGame();

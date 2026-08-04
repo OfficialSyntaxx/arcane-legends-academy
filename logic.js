@@ -78,7 +78,7 @@ export function validateAction(state, playerId, action){
   if (state.phase === "deck"){
     if (action.type !== "setDeck") return { ok:false, error:"submit your deck first" };
     if (state.decks[playerId]) return { ok:false, error:"deck already submitted" };
-    if (!validateDeck(action.deck)) return { ok:false, error:"deck must be 30 cards, max 3 copies" };
+    if (!validateDeck(action.deck)) return { ok:false, error:"deck must be 20 cards, max 3 copies" };
     return { ok:true };
   }
   if (state.phase !== "play") return { ok:false, error:"game not in play" };
@@ -95,6 +95,7 @@ export function validateAction(state, playerId, action){
     const p = b.you.id === playerId ? b.you : b.enemy;
     const atk = p.board[action.attacker];
     if (!atk) return { ok:false, error:"no creature" };
+    if (atk.freeze > 0) return { ok:false, error:"creature is frozen" };
     if (atk.exhausted || atk.summoning || atk.attacks>=atk.multi) return { ok:false, error:"creature can't attack" };
     const enemy = b.you.id === playerId ? b.enemy : b.you;
     if (action.targetKind === "wiz" && enemy.board.some(c=>c.taunt && c.hp>0)) return { ok:false, error:"taunt creature blocks" };
@@ -135,20 +136,30 @@ function beginTurn(b,p){
   let pipBonus=0;
   if (p.field) for(const f of p.field){const def=CM[f.id]; for(const fx of def.fx){ if(fx.k==="fieldPip") pipBonus+=fx.n; if(fx.k==="fieldHeal") p.hp=Math.min(p.maxHp,p.hp+fx.n); }}
   p.pips=Math.min(10,p.maxPips+pipBonus);
-  if(p.deck.length) draw(p); else { p.fatigue=(p.fatigue||0)+1; p.hp-=p.fatigue; } for(const c of p.board){ c.exhausted=false; c.attacks=0; if(c.freeze>0)c.freeze--; }
+  if(p.deck.length) draw(p); else { p.fatigue=(p.fatigue||0)+1; p.hp-=p.fatigue; }
+  // freeze ticks down at the END of the frozen player's turn (see the endTurn branch of
+  // applyAction), so a frozen creature actually loses a turn.
+  for(const c of p.board){ c.exhausted=false; c.attacks=0; }
 }
 
+// The side opposing a given player — spell effects resolve against the CASTER's opponent,
+// never the fixed b.enemy slot (which would let player 2's AoE hit player 2's own board).
+function foeOf(b, owner){ return owner === b.you ? b.enemy : b.you; }
 function applyFx(b, owner, fx, target){
+  const foe = foeOf(b, owner);
   for (const f of fx){
     if (typeof f === "string") continue;
-    if (f.k==="dmg"){ const t = target ? target : b.enemy; damageWizard(t, f.n); }
-    else if (f.k==="dmgAll"){ for (const c of b.enemy.board) c.hp -= f.n; }
-    else if (f.k==="dmgWiz"){ damageWizard(b.enemy, f.n); }
+    if (f.k==="dmg"){
+      if (target && target !== foe) target.hp -= f.n;   // a creature: no shield
+      else damageWizard(foe, f.n);
+    }
+    else if (f.k==="dmgAll"){ for (const c of foe.board) c.hp -= f.n; }
+    else if (f.k==="dmgWiz"){ damageWizard(foe, f.n); }
     else if (f.k==="heal"){ owner.hp = Math.min(owner.maxHp, owner.hp+f.n); }
     else if (f.k==="shield"){ owner.shield += f.n; }
     else if (f.k==="buffAll"){ for (const c of owner.board) c.atk += f.n; }
     else if (f.k==="draw"){ for(let i=0;i<f.n;i++) draw(owner); }
-    else if (f.k==="freezeAll"){ for (const c of b.enemy.board) c.freeze=1; }
+    else if (f.k==="freezeAll"){ for (const c of foe.board) c.freeze=1; }
   }
   b.you.board=b.you.board.filter(c=>c.hp>0); b.enemy.board=b.enemy.board.filter(c=>c.hp>0);
 }
@@ -185,7 +196,8 @@ export function applyAction(state, playerId, action){
       p.traps = p.traps || [];
       p.traps.push({ fx: c.fx });
     } else {
-      const t = action.target ? (action.target.kind==="wiz" ? b.enemy : b.enemy.board[action.target.idx]) : null;
+      const foe = b.you.id === playerId ? b.enemy : b.you;
+      const t = action.target ? (action.target.kind==="wiz" ? foe : foe.board[action.target.idx]) : null;
       applyFx(b, p, c.fx, t);
     }
   } else if (action.type === "attack"){
@@ -196,12 +208,13 @@ export function applyAction(state, playerId, action){
       const t = enemy.board[action.targetIdx];
       dmg += SCHOOL_BONUS.some(([a,b])=>a===atk.school && b===t.school) ? 1 : 0;
       t.hp -= dmg;
-      if (atk.drain) enemy.hp = Math.min(enemy.maxHp, enemy.hp + dmg);
+      // Drain heals the ATTACKER's wizard for damage dealt (previously healed the defender).
+      if (atk.drain) p.hp = Math.min(p.maxHp, p.hp + dmg);
       enemy.board = enemy.board.filter(c=>c.hp>0);
-      if (t.hp > 0){ atk.hp -= t.atk; if (atk.drain) enemy.hp = Math.min(enemy.maxHp, enemy.hp + t.atk); }
+      if (t.hp > 0) atk.hp -= t.atk;   // retaliation: damage taken, never a drain heal
     } else {
       damageWizard(enemy, dmg);
-      if (atk.drain) enemy.hp = Math.min(enemy.maxHp, enemy.hp + dmg);
+      if (atk.drain) p.hp = Math.min(p.maxHp, p.hp + dmg);
     }
     atk.attacks++;
     if (atk.attacks >= atk.multi) atk.exhausted = true;
@@ -212,6 +225,8 @@ export function applyAction(state, playerId, action){
       for (const fx of t.fx) if (fx.k==="trapShield"){ enemy.shield += fx.n; b.log.push("Trap! +"+fx.n+" shield"); }
     }
   } else if (action.type === "endTurn"){
+    const outgoing = b.you.id === state.turn ? b.you : b.enemy;
+    for (const c of outgoing.board) if (c.freeze > 0) c.freeze--;
     const next = b.you.id === state.turn ? b.enemy : b.you;
     beginTurn(b, next);
     b.turn = next.id;

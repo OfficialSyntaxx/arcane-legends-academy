@@ -177,10 +177,18 @@ cd public && python3 -m http.server 8080   # then open http://localhost:8080
 
 ### Test
 ```bash
-node tools/test.mjs          # 35 engine checks
-node tools/logic-test.mjs    # 14 online-rules checks
+npm test                     # runs all three suites; fails the run on any failure
+```
+Individually:
+```bash
+node tools/test.mjs          # 56 engine checks
+node tools/logic-test.mjs    # 25 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
 ```
+CI runs `npm test` on every push (`.github/workflows/test.yml`). All three suites resolve
+paths relative to the repo — never hardcode an absolute sandbox path into a tool again; the
+old `ui-smoke.mjs` did, threw ENOENT before its `process.exit`, and reported a false pass for
+several commits.
 
 ### Deploy (the game platform)
 Use the `deploy_game` tool:
@@ -201,7 +209,22 @@ Use the `deploy_game` tool:
 
 **Working:** 3D world, camera, movement, in-world gathering/crafting, NPC dialogue, school system + elemental matrix, field/trap cards, grading/slabs + regrade, daily quests, academy rank, market/auctions, home/guild, all 8 quests, local AI PvP, online PvP, PWA manifest, all tests green.
 
-**Known issues / next steps:**
+**A full systems audit lives in `docs/NEXT-PHASE-PLAN.md`** — read it alongside this file. It
+lists verified defects and orders them into phases. **Phase A (correctness) is done:**
+
+- `gradeForRoll` used a forward `find` over an ascending table, so *every* roll graded "Poor" —
+  no slab had ever been minted. Now resolves descending, with 10 regression assertions.
+- `drain` healed the defending wizard; Death-school creatures were healing their victims.
+- `freezeAll` was inert (`freeze` was written and never read). Now enforced in both engines,
+  and the tick moved from `beginTurn` to `endTurn` so a frozen creature really loses a turn.
+- AoE effects hardcoded `b.enemy`, so the AI (and player 2 online) hit their own board and
+  wizard. Effects now resolve against the *caster's* opponent.
+- Targeted spells in local duels applied damage to the UI's `{kind, idx}` descriptor instead of
+  the creature — Firebolt, Fireball, Lightning, Storm Shift, Myth Blast, Dark Pact and Balance
+  Streak were all blank cards. Descriptors are now resolved to real entities.
+- `ui-smoke.mjs` read an absolute path from a dead sandbox and exited 0 on failure.
+
+**Known issues / next steps:** *(Phases B–D of the plan doc; the items below still stand)*
 1. **All character models are now generated 3D models.** The player wizard, professor, merchant, referee, trainer, librarian, and 4 wandering students are all 2D→3D generated GLBs (except the professor, which is a static text-to-3D mesh). They load at ~1.8 units and render correctly. The fix in `makeCharModel` (`world.js`): for **skinned Meshy GLBs** the object box is degenerate (0) and the raw mesh box is only the *bind pose* — the real size is the **skeleton node span** (bones sit far above the mesh), so height is computed from node world positions. For **static meshes** (e.g. professor.glb has no skeleton), the real size is the **geometry box**. The loader auto-detects skinned vs static. NPC GLB keys match their roles (`duel`, `trainer`, `librarian`, `wander0`–`wander3`) so the update loop uses the GLB mixer. **All models were texture-resized to 512px** (gltf-transform) to keep the deploy under the ~50MB upload limit — the models folder is now ~22MB total.
 2. **The 2D→3D pipeline** (generate a 2D character portrait → image-to-3D, ~40 credits/model: ~2 for the image + ~38 for the conversion) produces a much better, recognizable character than text-to-3D (~25 credits, generic blob). All character GLBs were generated this way.
 3. **GLB files are compressed to 512px textures** (gltf-transform resize) — down from 4–9MB to ~2–3MB each for mobile. True Draco compression is still a future mobile optimization.

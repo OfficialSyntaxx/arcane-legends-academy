@@ -3,8 +3,14 @@
 Full read-through of the repo at `b5b3d79` (latest: procedural walk animations on NPC GLBs).
 Everything below was verified against the actual code, not inferred from the docs.
 
-**Test status:** `tools/test.mjs` 35/35 pass, `tools/logic-test.mjs` 14/14 pass,
+**Test status at review time:** `tools/test.mjs` 35/35 pass, `tools/logic-test.mjs` 14/14 pass,
 `tools/ui-smoke.mjs` **is broken and silently reports success** (see P0-5).
+
+> **Update — Phase A is complete.** P0-1, P0-3, P0-4, P0-5 and P1-7 are fixed, each with a
+> regression test that fails against the old code. One extra defect (targeted spells doing
+> nothing in local duels) was found and fixed while repairing `applyFx`; it is recorded as
+> P1-7b below. Suites are now **56 / 25 / UI-smoke**, run together by `npm test`, with CI.
+> Everything below is left as written so the remaining phases keep their context.
 
 The CLAUDEREADME roadmap is all *content* work (buildings, Draco, sound, more schools).
 The findings below are mostly *systems* work — several core loops advertised in the design
@@ -112,6 +118,18 @@ both players through the same code.
 
 **Fix:** resolve the opposing side from `owner`, not from the fixed `b.enemy` slot.
 
+### P1-7b. Targeted damage spells did nothing at all in local duels *(found during the P1-7 fix)*
+The duel UI passes a *descriptor* — `{kind:"creature", idx}` or `{kind:"wiz"}`
+(`index.html:845,854`) — but `game.js applyFx` used it directly as if it were an entity:
+`damageWizard(t, f.n, t.defBonus)` on a plain `{kind, idx}` object wrote `hp: NaN` onto the
+descriptor and left the real board untouched. Every targeted spell in the game — Firebolt,
+Fireball, Lightning Bolt, Storm Shift, Myth Blast, Dark Pact, Balance Streak — was a 1–3 pip
+blank card in local play. `logic.js` resolved the descriptor correctly, so online was unaffected.
+
+**Fixed:** `resolveTarget()` in `game.js` converts the descriptor to a creature or wizard before
+damage is applied; creatures take raw damage (no shield/defBonus), wizards go through
+`damageWizard`.
+
 ### P1-8. Potions are craftable but unusable
 Alchemy brews 4 tiers of healing potion with a `heal` value. Nothing in `index.html` or the
 duel engine ever consumes one. The whole Alchemy skill currently exists only to be sold to a
@@ -173,12 +191,16 @@ relies on a `guard++ < 200` loop bound. A stalled online match has no terminatin
 
 ## Suggested order of work
 
-**Phase A — correctness (small, high value, ~1 sitting)**
-1. `gradeForRoll` descending fix + grade-band test *(P0-1)*
-2. `drain` target fix + test *(P0-3)*
-3. `freeze` enforcement in `attack` and `validateAction` *(P0-4)*
-4. AoE owner-relative targeting *(P1-7)*
-5. Repair `ui-smoke.mjs` paths, add `npm test`, add CI *(P0-5)*
+**Phase A — correctness — ✅ DONE**
+1. ✅ `gradeForRoll` descending fix + 10 grade-band/slab assertions *(P0-1)*
+2. ✅ `drain` heals the attacker in both engines + tests *(P0-3)*
+3. ✅ `freeze` enforced in `attack` / `validateAction`; the tick moved from `beginTurn` to
+   `endTurn` so a frozen creature actually loses a turn *(P0-4)*
+4. ✅ Owner-relative AoE + target resolution in both engines *(P1-7, P1-7b)*
+5. ✅ `ui-smoke.mjs` resolves paths from `import.meta.url` and exits non-zero;
+   `npm test` runs all three suites; GitHub Actions workflow added *(P0-5)*
+
+Also corrected the `logic.js` "deck must be 30 cards" message to 20 (part of P1-6).
 
 **Phase B — close the loops (~1 sitting)**
 6. Add tin / shark / magic-tree nodes + reachability test *(P0-2)*

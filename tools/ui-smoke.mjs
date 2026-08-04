@@ -1,6 +1,10 @@
 // Headless runtime smoke of the UI module script with stubbed browser globals.
 import fs from "fs";
-import { URLSearchParams } from "url";
+import path from "path";
+import { URLSearchParams, fileURLToPath } from "url";
+
+// Resolve everything relative to this file — never an absolute sandbox path.
+const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 
 // ---- minimal DOM stub ----
 function makeEl(id){
@@ -36,10 +40,12 @@ global.AudioContext = function(){ return {createOscillator:()=>({connect(){},sta
 global.URLSearchParams = URLSearchParams;
 
 let errors = 0;
-process.on("uncaughtException", e => { errors++; console.log("✗ uncaught:", e.message); });
+// A throw at top level must still fail the run — record it and exit non-zero.
+process.on("uncaughtException", e => { errors++; console.log("✗ uncaught:", e.message); process.exit(1); });
 
-const html = fs.readFileSync("/home/user/f2fba8f6-6be8-4d7e-9786-f8f6fba57d75/wizard-tcg/public/index.html","utf8");
+const html = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
 const m = html.match(/<script type="module">(.*?)<\/script>/s);
+if (!m){ console.log("✗ no inline module script found in index.html"); process.exit(1); }
 const src = m[1];
 
 // import the ES modules the inline script needs (rewrite bare imports to relative paths)
@@ -49,7 +55,8 @@ const rewritten = src
   .replace('from "./items.js"','from "./items.js"')
   .replace('from "./game.js"','from "./game.js"');
 
-const tmp = "/home/user/f2fba8f6-6be8-4d7e-9786-f8f6fba57d75/wizard-tcg/public/_uitest.mjs";
+// written inside public/ so the script's relative "./cards.js" imports resolve
+const tmp = path.join(PUBLIC_DIR, "_uitest.mjs");
 fs.writeFileSync(tmp, rewritten);
 
 try {
@@ -58,8 +65,9 @@ try {
 } catch (e) {
   errors++;
   console.log("✗ boot error:", e.message);
+} finally {
+  fs.unlinkSync(tmp);
 }
-fs.unlinkSync(tmp);
 
 // exercise the render dispatch for every screen via __EV routers
 const ev = global.window.__EV || {};

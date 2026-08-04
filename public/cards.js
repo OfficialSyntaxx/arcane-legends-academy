@@ -109,7 +109,10 @@ export const GRADES = [
   { name:"Mint",       min:80, x:3.0, icon:"💎", g:9,  slab:true  },
   { name:"Gem Mint",   min:90, x:5.0, icon:"💠", g:10, slab:true  },
 ];
-export function gradeForRoll(r){ return GRADES.find(g => r >= g.min); }
+// GRADES is authored ascending, so the band for a roll is the LAST entry whose min it clears.
+// (A forward `find` would match "Poor" (min 0) for every roll and collapse the whole grade table.)
+const GRADES_DESC = [...GRADES].reverse();
+export function gradeForRoll(r){ return GRADES_DESC.find(g => r >= g.min) || GRADES[0]; }
 
 export function cardValue(cardId, roll){
   const c = CARD_MAP[cardId];
