@@ -2,6 +2,7 @@
 // Rich procedural low-poly characters (animated wizards), themed buildings, a fountain, trees,
 // gathering nodes for every material, and NPCs that hand out quests and open the market.
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
+import { modelUrl } from "./cdn.js";
 export function createWorld(canvas, callbacks){
   const THREE = window.THREE;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
@@ -201,6 +202,7 @@ export function createWorld(canvas, callbacks){
 
   // GLB environment props (free CC0 assets imported via tools/import-asset.mjs)
   function loadProp(url, targetHeight, opts={}, cb){
+    url = modelUrl(url.split('/').pop());    // route large models to the CDN
     new THREE.GLTFLoader().load(url, gltf => {
       const m = gltf.scene;
       m.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
@@ -309,6 +311,7 @@ export function createWorld(canvas, callbacks){
   // ---------- load GLB character models (replace procedural wizards) ----------
   const chars = {}; // entityKey -> {model, mixer, walk, idle}
   function makeCharModel(key, url, group, onReady){
+    url = modelUrl(url.split('/').pop());   // route large models to the CDN
     const loader = new THREE.GLTFLoader();
     loader.load(url, gltf => {
       const model = gltf.scene;

@@ -85,6 +85,7 @@ The world is a walkable academy campus built in Three.js (procedural low-poly + 
 - **Gathering nodes:** ore crystals (copper/iron/gold/silver/mithril/runite), wood stumps (oak/willow), ponds (shrimp/salmon/lobster). Plus **CC0 KayKit forest trees/rocks** (imported via `tools/import-asset.mjs`) as additional woodcutting and mining nodes — see §4.1.
 - **NPCs:** Professor, Merchant, Referee, Trainer, Librarian, and wandering students — all with dialogue.
 - **Character models:** generated via Meshy 2D→3D (`.glb`). All 10 characters render at ~1.8 units; walk is added procedurally (see §9).
+- **CDN model loading:** large models (>1MB) are hosted on the Higgsfield CDN and loaded at runtime via `cdn.js` (`modelUrl()`), so the deployed `public/` stays ~6.5MB. Local copies live in `models_cdn/` (git, not deployed). See `ASSETS.md` §CDN.
 
 ### 4.1 Importing free 3D assets (itch.io / CraftPix / KayKit…)
 

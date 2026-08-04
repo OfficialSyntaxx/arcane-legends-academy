@@ -1,18 +1,19 @@
 // battle3d.js — 3D duel arena where card creatures come to life.
 // Renders the battlefield as animated 3D models that summon in and idle,
 // synced to the logic.js duel engine. Uses window.THREE (global).
+import { modelUrl } from "./cdn.js";
 const MAX_SLOTS = 5;
 const SCHOOL_COLORS = {
   fire: 0xff5a3c, ice: 0x6fc3ff, storm: 0xa06bff, myth: 0xffd766,
   life: 0x3ddc84, death: 0x9fb0c0, balance: 0xffc94d,
 };
 const MODELS = {
-  dragon: './assets/models/creature_Dragon.glb',
-  bat: './assets/models/creature_Bat.glb',
-  slime: './assets/models/creature_Slime.glb',
-  skeleton: './assets/models/creature_Skeleton.glb',
-  mage: './assets/models/npc_mage.glb',
-  default: './assets/models/creature_Skeleton.glb',
+  dragon: modelUrl('creature_Dragon.glb'),
+  bat: modelUrl('creature_Bat.glb'),
+  slime: modelUrl('creature_Slime.glb'),
+  skeleton: modelUrl('enemy_skeleton.glb'),
+  mage: modelUrl('npc_mage.glb'),
+  default: modelUrl('enemy_skeleton.glb'),
 };
 function modelFor(cardId, name) {
   const n = (name || cardId || '').toLowerCase();

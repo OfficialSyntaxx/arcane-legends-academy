@@ -64,6 +64,14 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 
 > **KayKit packs are NOT here** — they're on GitHub (KayKit-Game-Assets org), so I can fetch them directly. Done for: Medieval Hexagon, Dungeon, Skeletons, Adventures, Furniture, City Builder.
 
+## ☁️ CDN hosting (keeps the deploy small)
+Large models (>1MB) are hosted on the **Higgsfield CDN** and loaded at runtime by URL, so the deployed `public/` stays ~6.5MB (well under the ~50MB deploy limit) while the world can hold many more models.
+
+- **`cdn.js`** (`public/`) maps local filename → CDN url (`modelUrl(name)` routes to the CDN if present, else `./assets/models/`).
+- **`world.js`** `makeCharModel`/`loadProp` and **`battle3d.js`** route their loads through `modelUrl()`.
+- **`models_cdn/`** (repo root, git-tracked, NOT in `public/`) holds the local copies of the CDN-hosted GLBs: `player_wizard, merchant, referee, trainer, librarian, student_{emerald,violet,pink,gold}, enemy_skeleton, npc_mage, nat_CommonTree_1`.
+- To add a big model to the CDN: `higgsfield_upload` it → add the url to `cdn.js` → move the local file to `models_cdn/`.
+
 ---
 
 ## 🏰 Buildings / academy (top priority)
