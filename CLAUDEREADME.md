@@ -82,7 +82,7 @@ The world is a walkable academy campus built in Three.js (procedural low-poly + 
   - Duel Trainer → practice duel
   - Student Dorms → home
   - Librarian → daily challenge
-- **Gathering nodes:** ore crystals (copper/iron/gold/silver/mithril/runite), wood stumps (oak/willow), ponds (shrimp/salmon/lobster). Each grants a material + skill XP.
+- **Gathering nodes:** ore crystals (copper/iron/gold/silver/mithril/runite), wood stumps (oak/willow), ponds (shrimp/salmon/lobster). Plus **CC0 KayKit forest trees/rocks** (imported via `tools/import-asset.mjs`) as additional woodcutting and mining nodes — see §4.1.
 - **NPCs:** Professor, Merchant, Referee, Trainer, Librarian, and wandering students — all with dialogue.
 - **Character models:** generated via Meshy 2D→3D (`.glb`). All 10 characters render at ~1.8 units; walk is added procedurally (see §9).
 
@@ -107,6 +107,8 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 6. **Verify in-game** (walk to it, confirm scale + that it looks right), then commit + push.
 
 **Tools:** `@gltf-transform/core` + `@gltf-transform/functions` (read/resize/write GLB), `fbx2gltf` (binary FBX→GLB). Installed as npm dependencies (see `package.json`).
+
+**In use:** `kaykit_tree.glb` + `kaykit_rock.glb` (in `public/assets/models/`) are from the **KayKit Forest Nature Pack** by Kay Lousberg — **CC0** (free for commercial use, no attribution required; details in the pack's `License.txt`). Wired in via `loadProp()` in `world.js` as woodcutting + mining nodes.
 
 ## 5. The Card Systems (core gameplay)
 

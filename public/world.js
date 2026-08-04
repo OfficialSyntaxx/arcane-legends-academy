@@ -205,6 +205,40 @@ export function createWorld(canvas, callbacks){
   pond(17, 12, 'raw_salmon', 'Fish Salmon');
   pond(20, 8, 'raw_lobster', 'Fish Lobster');
 
+  // GLB environment props (free CC0 assets imported via tools/import-asset.mjs)
+  function loadProp(url, targetHeight, opts={}, cb){
+    new THREE.GLTFLoader().load(url, gltf => {
+      const m = gltf.scene;
+      m.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+      m.updateMatrixWorld(true);
+      let minY = Infinity, maxY = -Infinity;
+      m.traverse(o => { if (o.isMesh){ const b = new THREE.Box3().setFromObject(o); minY = Math.min(minY, b.min.y); maxY = Math.max(maxY, b.max.y); } });
+      const h = maxY - minY;
+      const s = (h > 0.001) ? (targetHeight / h) : 1;
+      m.scale.setScalar(s);
+      m.position.y -= minY * s;                    // rest on the ground
+      if (opts.rotY) m.rotation.y = opts.rotY;
+      if (opts.x !== undefined) m.position.x = opts.x;
+      if (opts.z !== undefined) m.position.z = opts.z;
+      scene.add(m);
+      if (cb) cb(m);
+    });
+  }
+  // a full tree woodcuting node (KayKit forest tree)
+  function treeNode(x, z, data, label){
+    loadProp('./assets/models/kaykit_tree.glb', 5.5, { x, z }, () => {});
+    register('gather', x, z, data, label, null, 3.4);
+  }
+  // a boulder mining node (KayKit rock)
+  function rockNode(x, z, data, label){
+    loadProp('./assets/models/kaykit_rock.glb', 1.4, { x, z }, () => {});
+    register('gather', x, z, data, label, null, 3.0);
+  }
+  treeNode(14, -1, 'oak_log', 'Chop Oak');
+  treeNode(17, -4, 'willow_log', 'Chop Willow');
+  rockNode(-11, -4, 'copper', 'Mine Copper');
+  rockNode(-13, -8, 'iron', 'Mine Iron');
+
   // ---------- stations ----------
   register('station', -16, -7, 'scribe', 'Scribing Hall', null);
   register('station', 16, -7, 'smith', 'Smithy & Forge', null);
