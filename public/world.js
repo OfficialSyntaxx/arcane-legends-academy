@@ -12,9 +12,43 @@ export function createWorld(canvas, callbacks){
   renderer.setSize(canvas.clientWidth, canvas.clientHeight);
   renderer.shadowMap.enabled = false;
   renderer.setClearColor(0x1a1440);
+  // COLOUR MANAGEMENT. Without this, glTF textures — which GLTFLoader correctly tags as sRGB —
+  // are rendered as if they were linear, which is why generated models looked rich in the
+  // Higgsfield/Tripo viewer and muddy here: the gold trim and saturated robes flattened out.
+  // three r128 has no automatic colour management, so the flip side is that plain material
+  // colours (our procedural buildings) must now be linearised by hand — see `mat()` below.
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  // Filmic tone mapping. The generated models are PBR and the scene's light rig is bright enough
+  // to blow their pale stone textures out to flat lavender once gamma is correct; ACES rolls the
+  // highlights off instead of clipping them, which is what keeps the carved detail readable.
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.Fog(0x2a1a4a, 95, 250);
+  // Generated models are PBR (metallic/roughness). With no environment to reflect, metal renders
+  // near-black and everything looks flat — this is the other half of why they lost their shine.
+  // A tiny procedural sky/ground gradient costs no assets and gives them something to catch.
+  (function buildEnvironment(){
+    try {
+      const c = document.createElement('canvas'); c.width = 16; c.height = 64;
+      const g = c.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, 0, 64);
+      // Deliberately DIM. This exists so PBR metal has something to reflect, not to light the
+      // scene — the directional/hemisphere rig already does that. A bright gradient here acts as
+      // a second full-strength ambient light and washes the generated models out to pale grey.
+      grad.addColorStop(0.00, '#2e3a63');   // sky
+      grad.addColorStop(0.45, '#4a4460');   // horizon
+      grad.addColorStop(1.00, '#161228');   // ground bounce
+      g.fillStyle = grad; g.fillRect(0, 0, 16, 64);
+      const tex = new THREE.CanvasTexture(c);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      pmrem.compileEquirectangularShader();
+      scene.environment = pmrem.fromEquirectangular(tex).texture;
+      pmrem.dispose(); tex.dispose();
+    } catch(e){ console.warn("environment map unavailable:", e && e.message); }
+  })();
 
   const camera = new THREE.PerspectiveCamera(62, canvas.clientWidth/canvas.clientHeight, 0.1, 420);
   camera.position.set(0, 8, 16);
@@ -23,17 +57,27 @@ export function createWorld(canvas, callbacks){
   renderer.setClearColor(0x1a1440);
 
   // lights
-  scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a1f4d, 0.75));
-  const sun = new THREE.DirectionalLight(0xffd9a0, 0.9);
+  // NOTE: these intensities were retuned when colour management went in. The old values were
+  // set against an uncorrected pipeline that rendered everything ~2 stops dark, so once gamma
+  // was right they blew the generated models' pale stone out to flat lavender.
+  scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a1f4d, 0.42));
+  const sun = new THREE.DirectionalLight(0xffd9a0, 0.55);
   sun.position.set(20, 40, 14);
   scene.add(sun);
-  const moon = new THREE.DirectionalLight(0x9fb4ff, 0.25);
+  const moon = new THREE.DirectionalLight(0x9fb4ff, 0.15);
   moon.position.set(-20, 30, -20); scene.add(moon);
   // warm courtyard glow
-  const glow = new THREE.PointLight(0xff8844, 0.9, 90);
+  const glow = new THREE.PointLight(0xff8844, 0.55, 90);
   glow.position.set(0, 12, 0); scene.add(glow);
 
-  const mat = c => new THREE.MeshLambertMaterial({ color: c });
+  // Procedural colours are authored as sRGB hex, so they must be converted to linear now that
+  // the renderer gamma-encodes its output. Without this the whole hand-built world washes out.
+  const mat = c => {
+    const m = new THREE.MeshLambertMaterial({ color: c });
+    m.color.convertSRGBToLinear();
+    return m;
+  };
+  const srgb = hex => new THREE.Color(hex).convertSRGBToLinear();
   const add = (geo, m, x, y, z, o={}) => {
     const mesh = new THREE.Mesh(geo, m);
     mesh.position.set(x, y, z);
@@ -97,7 +141,7 @@ export function createWorld(canvas, callbacks){
   function lamp(x,z){
     add(new THREE.CylinderGeometry(0.11,0.17,5.0,6), mat(0x3a3a46), x, 2.5, z);
     const l = add(new THREE.SphereGeometry(0.38,8,8), mat(0xffd98a), x, 5.0, z);
-    l.material.emissive = new THREE.Color(0xffaa44); l.material.emissiveIntensity = 1.5;
+    l.material.emissive = srgb(0xffaa44); l.material.emissiveIntensity = 1.5;
   }
   lamp(13,13); lamp(-13,13); lamp(13,-13); lamp(-13,-13); lamp(0,24); lamp(0,-24); lamp(26,0); lamp(-26,0);
   // central tower — procedural placeholder, replaced by the generated GLB once it loads
@@ -117,7 +161,7 @@ export function createWorld(canvas, callbacks){
     const a = (i/8)*Math.PI*2 + 0.3, r = 130 + (i%2)*12;
     add(new THREE.CylinderGeometry(0.7, 1.6, 12, 6), mat(0x9fb8ff), Math.cos(a)*r, 6, Math.sin(a)*r);
     const tip = add(new THREE.IcosahedronGeometry(1.6, 0), mat(0x7be0ff), Math.cos(a)*r, 13.6, Math.sin(a)*r);
-    tip.material.emissive = new THREE.Color(0x7be0ff); tip.material.emissiveIntensity = 0.7;
+    tip.material.emissive = srgb(0x7be0ff); tip.material.emissiveIntensity = 0.7;
   }
 
   // ---------- trees ----------
@@ -138,7 +182,7 @@ export function createWorld(canvas, callbacks){
   function torch(x,z){
     add(new THREE.CylinderGeometry(0.14, 0.18, 2.6, 6), mat(0x5a3a1a), x, 1.3, z);
     const flame = add(new THREE.SphereGeometry(0.28, 8, 8), mat(0xffb347), x, 2.8, z);
-    flame.material.emissive = new THREE.Color(0xff8833); flame.material.emissiveIntensity = 1.2;
+    flame.material.emissive = srgb(0xff8833); flame.material.emissiveIntensity = 1.2;
   }
 
   // ---------- rich procedural wizard ----------
@@ -224,7 +268,7 @@ export function createWorld(canvas, callbacks){
     add(new THREE.CylinderGeometry(0.9, 1.1, 1.3, 8), mat(magic?0x6a4a8a:0x8a5a2b), x, 0.65, z);
     add(new THREE.CylinderGeometry(0.5, 0.5, 2.4, 6), mat(magic?0x5a3a7a:0x6a4a2b), x+0.7, 0.6, z-0.5);
     const crown = add(new THREE.ConeGeometry(1.0, 1.4, 7), mat(magic?0x7be0ff:0x2f9e63), x+0.7, 2.2, z-0.5);
-    if (magic){ crown.material.emissive = new THREE.Color(0x4a9edd); crown.material.emissiveIntensity = 0.45; }
+    if (magic){ crown.material.emissive = srgb(0x4a9edd); crown.material.emissiveIntensity = 0.45; }
     torch(x, z);
     register('gather', x, z, data, label, null);
   }
