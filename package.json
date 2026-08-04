@@ -3,10 +3,15 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node tools/test.mjs && node tools/logic-test.mjs && node tools/ui-smoke.mjs",
+    "test": "node tools/sync-cards.mjs --check && node tools/test.mjs && node tools/logic-test.mjs && node tools/ui-smoke.mjs",
+    "sync": "node tools/sync-cards.mjs",
     "test:engine": "node tools/test.mjs",
     "test:logic": "node tools/logic-test.mjs",
     "test:ui": "node tools/ui-smoke.mjs",
-    "serve": "python3 -m http.server 8080 --directory public"
+    "serve": "python3 -m http.server 8080 --directory public",
+    "test:browser": "node tools/browser-test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.1"
   }
 }

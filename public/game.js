@@ -389,9 +389,11 @@ function makeCreature(cardId, p){
     drain: fx.includes("drain"), multi: fx.includes("multiAttack")?2:1, attacks:0, freeze:0, owner: p.id,
   };
 }
-function buildDeck(defs, gear){
+// Shuffles use the battle's own RNG so a duel is reproducible from its seed (the `gear` argument
+// was never used — the shuffle doesn't depend on equipment).
+function buildDeck(defs, rand){
   const d = [...defs];
-  for (let i=d.length-1;i>0;i--){ const j=Math.floor(rng()*(i+1)); [d[i],d[j]]=[d[j],d[i]]; }
+  for (let i=d.length-1;i>0;i--){ const j=Math.floor(rand()*(i+1)); [d[i],d[j]]=[d[j],d[i]]; }
   return d;
 }
 function schoolBonus(att, def){ return SCHOOL_BONUS.some(([a,b])=>a===att && b===def) ? 1 : 0; }
@@ -400,10 +402,16 @@ function damageWizard(p, dmg, defBonus){
   const absorb = Math.min(p.shield, dmg); p.shield -= absorb; dmg -= absorb;
   p.hp -= dmg;
 }
-export function startDuel(playerCardIds, playerGear, enemyDefs, enemyGear, enemyHp=100, playerSchool="balance", enemySchool="balance"){
-  const you = { id:"you", school:playerSchool, hp:100+playerGear.hp, maxHp:100+playerGear.hp, shield:0, maxPips:1+playerGear.pip, pips:1+playerGear.pip, hand:[], deck:buildDeck(playerCardIds, playerGear), board:[], field:[], traps:[], atkBonus:playerGear.atk, defBonus:playerGear.def, fatigue:0 };
-  const enemy = { id:"enemy", school:enemySchool, hp:enemyHp, maxHp:enemyHp, shield:0, maxPips:1+enemyGear.pip, pips:1+enemyGear.pip, hand:[], deck:buildDeck(enemyDefs, enemyGear), board:[], field:[], traps:[], atkBonus:enemyGear.atk, defBonus:enemyGear.def, fatigue:0 };
-  const b = { you, enemy, turn:"you", phase:"play", winner:null, log:[] };
+// A duel cannot run forever: after MAX_TURNS the higher-HP wizard takes it, equal HP is a draw.
+export const MAX_TURNS = 100;
+// Pass a `seed` to replay an exact duel (same shuffle, same draws) — used by the tests and
+// useful for reproducing a reported bug. Omit it and one is drawn for you.
+export function startDuel(playerCardIds, playerGear, enemyDefs, enemyGear, enemyHp=100, playerSchool="balance", enemySchool="balance", seed=null){
+  const s = seed == null ? (rng()*4294967296)>>>0 : seed>>>0;
+  const rand = mulberry32(s);
+  const you = { id:"you", school:playerSchool, hp:100+playerGear.hp, maxHp:100+playerGear.hp, shield:0, maxPips:1+playerGear.pip, pips:1+playerGear.pip, hand:[], deck:buildDeck(playerCardIds, rand), board:[], field:[], traps:[], atkBonus:playerGear.atk, defBonus:playerGear.def, fatigue:0 };
+  const enemy = { id:"enemy", school:enemySchool, hp:enemyHp, maxHp:enemyHp, shield:0, maxPips:1+enemyGear.pip, pips:1+enemyGear.pip, hand:[], deck:buildDeck(enemyDefs, rand), board:[], field:[], traps:[], atkBonus:enemyGear.atk, defBonus:enemyGear.def, fatigue:0 };
+  const b = { you, enemy, turn:"you", phase:"play", winner:null, log:[], seed:s, rand, turns:0 };
   for (let i=0;i<5;i++){ draw(you); draw(enemy); }  // 5-card opening hand
   return b;
 }
@@ -563,11 +571,18 @@ export function endTurn(b){
   if (outgoing) for (const c of outgoing.board) if (c.freeze > 0) c.freeze--;
   beginTurn(b, b.turn==="you" ? b.enemy : b.you);
   b.turn = b.turn==="you" ? "enemy" : "you";
+  b.turns = (b.turns || 0) + 1;
   return {ok:true};
 }
 export function isOver(b){
+  if (!b || !b.you || !b.enemy) return { over:false };
+  if (b.you.hp <= 0 && b.enemy.hp <= 0) return { over:true, winner:null, draw:true, reason:"double knockout" };
   if (b.you.hp <= 0) return { over:true, winner:"enemy" };
   if (b.enemy.hp <= 0) return { over:true, winner:"you" };
+  if ((b.turns || 0) >= MAX_TURNS){
+    if (b.you.hp === b.enemy.hp) return { over:true, winner:null, draw:true, reason:"turn limit" };
+    return { over:true, winner: b.you.hp > b.enemy.hp ? "you" : "enemy", reason:"turn limit" };
+  }
   return { over:false };
 }
 export function cleanDeaths(b){ b.you.board = b.you.board.filter(c=>c.hp>0); b.enemy.board = b.enemy.board.filter(c=>c.hp>0); }

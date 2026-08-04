@@ -1,63 +1,75 @@
 // Wizard TCG — online duel rules module (server-authoritative). No imports, no timers, pure functions.
 export const meta = { game: "Arcane Legends — Online Duel", minPlayers: 2, maxPlayers: 2 };
 
-// ---- embedded card catalog (mirrors public/cards.js; no imports allowed) ----
+// <<< GENERATED CARD CATALOG — do not edit by hand; run: node tools/sync-cards.mjs
+// Mirrors public/cards.js. Source of truth is cards.js — edit there, then re-run the script. >>>
 const C = [
-  {id:"fire_cat",school:"fire",type:"creature",cost:1,atk:2,hp:2,fx:["haste"]},
-  {id:"fire_elf",school:"fire",type:"creature",cost:2,atk:3,hp:3,fx:[]},
-  {id:"fire_dragon",school:"fire",type:"creature",cost:7,atk:8,hp:7,fx:["haste"]},
-  {id:"firebolt",school:"fire",type:"spell",cost:1,fx:[{k:"dmg",n:4}]},
-  {id:"fireball",school:"fire",type:"spell",cost:3,fx:[{k:"dmg",n:6}]},
-  {id:"meteor",school:"fire",type:"spell",cost:5,fx:[{k:"dmgAll",n:3},{k:"dmgWiz",n:4}]},
-  {id:"ice_golem",school:"ice",type:"creature",cost:2,atk:2,hp:4,fx:["taunt"]},
-  {id:"frost_giant",school:"ice",type:"creature",cost:4,atk:4,hp:6,fx:["taunt"]},
-  {id:"ice_wyrm",school:"ice",type:"creature",cost:6,atk:6,hp:7,fx:["taunt"]},
-  {id:"ice_armor",school:"ice",type:"spell",cost:2,fx:[{k:"shield",n:6}]},
-  {id:"frost_shield",school:"ice",type:"spell",cost:1,fx:[{k:"shield",n:3}]},
-  {id:"blizzard",school:"ice",type:"spell",cost:4,fx:[{k:"freezeAll"}]},
-  {id:"storm_bat",school:"storm",type:"creature",cost:1,atk:2,hp:1,fx:["haste"]},
-  {id:"storm_shark",school:"storm",type:"creature",cost:3,atk:4,hp:2,fx:["haste"]},
-  {id:"storm_titan",school:"storm",type:"creature",cost:8,atk:9,hp:8,fx:[]},
-  {id:"storm_shift",school:"storm",type:"spell",cost:1,fx:[{k:"dmg",n:3}]},
-  {id:"lightning",school:"storm",type:"spell",cost:2,fx:[{k:"dmg",n:5}]},
-  {id:"tempest",school:"storm",type:"spell",cost:6,fx:[{k:"dmgWiz",n:10}]},
-  {id:"myth_walker",school:"myth",type:"creature",cost:2,atk:3,hp:2,fx:[]},
-  {id:"minotaur",school:"myth",type:"creature",cost:4,atk:5,hp:4,fx:[]},
-  {id:"hydra",school:"myth",type:"creature",cost:7,atk:7,hp:7,fx:["multiAttack"]},
-  {id:"basilisk",school:"myth",type:"creature",cost:5,atk:5,hp:6,fx:["taunt"]},
-  {id:"myth_blast",school:"myth",type:"spell",cost:2,fx:[{k:"dmg",n:5}]},
-  {id:"pixie",school:"life",type:"creature",cost:1,atk:1,hp:2,fx:[{k:"healPlay",n:2}]},
-  {id:"unicorn",school:"life",type:"creature",cost:3,atk:3,hp:4,fx:[{k:"healPlay",n:3}]},
-  {id:"satyr",school:"life",type:"creature",cost:5,atk:4,hp:6,fx:[{k:"healPlay",n:5}]},
-  {id:"healing_wave",school:"life",type:"spell",cost:2,fx:[{k:"heal",n:5}]},
-  {id:"rebirth",school:"life",type:"spell",cost:6,fx:[{k:"heal",n:10}]},
-  {id:"skeleton",school:"death",type:"creature",cost:1,atk:2,hp:1,fx:[]},
-  {id:"ghoul",school:"death",type:"creature",cost:3,atk:3,hp:3,fx:["drain"]},
-  {id:"vampire",school:"death",type:"creature",cost:4,atk:4,hp:4,fx:["drain"]},
-  {id:"reaper",school:"death",type:"creature",cost:6,atk:6,hp:6,fx:["drain"]},
-  {id:"dark_pact",school:"death",type:"spell",cost:2,fx:[{k:"dmg",n:4},{k:"heal",n:4}]},
-  {id:"balance_blade",school:"balance",type:"spell",cost:1,fx:[{k:"buffAll",n:2}]},
-  {id:"novice",school:"balance",type:"creature",cost:2,atk:2,hp:3,fx:[]},
-  {id:"balance_streak",school:"balance",type:"spell",cost:3,fx:[{k:"dmg",n:4},{k:"draw",n:1}]},
-  {id:"sunbird",school:"balance",type:"creature",cost:4,atk:4,hp:5,fx:[]},
-  {id:"balance_dragon",school:"balance",type:"creature",cost:7,atk:7,hp:7,fx:[{k:"buffAll",n:1}]},
-  {id:"elixir",school:"balance",type:"spell",cost:1,fx:[{k:"heal",n:3}]},
-  {id:"golden_golem",school:"balance",type:"creature",cost:4,atk:5,hp:5,fx:["taunt"]},
-  {id:"master_wand",school:"balance",type:"spell",cost:3,fx:[{k:"buffAll",n:2}]},
-  {id:"arcane_guardian",school:"balance",type:"creature",cost:5,atk:5,hp:7,fx:["taunt"]},
-  {id:"arcane_nexus",school:"balance",type:"field",cost:4,fx:[{k:"fieldAtk",n:1}]},
-  {id:"radiant_aura",school:"life",type:"field",cost:3,fx:[{k:"fieldHeal",n:3}]},
-  {id:"storm_conduit",school:"storm",type:"field",cost:5,fx:[{k:"fieldPip",n:1}]},
-  {id:"fire_trap",school:"fire",type:"trap",cost:2,fx:[{k:"trapDmg",n:4}]},
-  {id:"mana_ward",school:"ice",type:"trap",cost:2,fx:[{k:"trapShield",n:4}]},
+  {id:"fire_cat",name:"Fire Cat",school:"fire",type:"creature",cost:1,atk:2,hp:2,fx:["haste"]},
+  {id:"fire_elf",name:"Fire Elf",school:"fire",type:"creature",cost:2,atk:3,hp:3,fx:[]},
+  {id:"fire_dragon",name:"Fire Dragon",school:"fire",type:"creature",cost:7,atk:8,hp:7,fx:["haste"]},
+  {id:"firebolt",name:"Firebolt",school:"fire",type:"spell",cost:1,fx:[{"k":"dmg","n":4}]},
+  {id:"fireball",name:"Fireball",school:"fire",type:"spell",cost:3,fx:[{"k":"dmg","n":6}]},
+  {id:"meteor",name:"Meteor Strike",school:"fire",type:"spell",cost:5,fx:[{"k":"dmgAll","n":3},{"k":"dmgWiz","n":4}]},
+  {id:"ice_golem",name:"Ice Golem",school:"ice",type:"creature",cost:2,atk:2,hp:4,fx:["taunt"]},
+  {id:"frost_giant",name:"Frost Giant",school:"ice",type:"creature",cost:4,atk:4,hp:6,fx:["taunt"]},
+  {id:"ice_wyrm",name:"Ice Wyrm",school:"ice",type:"creature",cost:6,atk:6,hp:7,fx:["taunt"]},
+  {id:"ice_armor",name:"Ice Armor",school:"ice",type:"spell",cost:2,fx:[{"k":"shield","n":6}]},
+  {id:"frost_shield",name:"Frost Shield",school:"ice",type:"spell",cost:1,fx:[{"k":"shield","n":3}]},
+  {id:"blizzard",name:"Blizzard",school:"ice",type:"spell",cost:4,fx:[{"k":"freezeAll"}]},
+  {id:"storm_bat",name:"Storm Bat",school:"storm",type:"creature",cost:1,atk:2,hp:1,fx:["haste"]},
+  {id:"storm_shark",name:"Storm Shark",school:"storm",type:"creature",cost:3,atk:4,hp:2,fx:["haste"]},
+  {id:"storm_titan",name:"Storm Titan",school:"storm",type:"creature",cost:8,atk:9,hp:8,fx:[]},
+  {id:"storm_shift",name:"Storm Shift",school:"storm",type:"spell",cost:1,fx:[{"k":"dmg","n":3}]},
+  {id:"lightning",name:"Lightning Bolt",school:"storm",type:"spell",cost:2,fx:[{"k":"dmg","n":5}]},
+  {id:"tempest",name:"Tempest",school:"storm",type:"spell",cost:6,fx:[{"k":"dmgWiz","n":10}]},
+  {id:"myth_walker",name:"Myth Walker",school:"myth",type:"creature",cost:2,atk:3,hp:2,fx:[]},
+  {id:"minotaur",name:"Minotaur",school:"myth",type:"creature",cost:4,atk:5,hp:4,fx:[]},
+  {id:"hydra",name:"Hydra",school:"myth",type:"creature",cost:7,atk:7,hp:7,fx:["multiAttack"]},
+  {id:"basilisk",name:"Basilisk",school:"myth",type:"creature",cost:5,atk:5,hp:6,fx:["taunt"]},
+  {id:"myth_blast",name:"Myth Blast",school:"myth",type:"spell",cost:2,fx:[{"k":"dmg","n":5}]},
+  {id:"pixie",name:"Pixie",school:"life",type:"creature",cost:1,atk:1,hp:2,fx:[{"k":"healPlay","n":2}]},
+  {id:"unicorn",name:"Unicorn",school:"life",type:"creature",cost:3,atk:3,hp:4,fx:[{"k":"healPlay","n":3}]},
+  {id:"satyr",name:"Satyr",school:"life",type:"creature",cost:5,atk:4,hp:6,fx:[{"k":"healPlay","n":5}]},
+  {id:"healing_wave",name:"Healing Wave",school:"life",type:"spell",cost:2,fx:[{"k":"heal","n":5}]},
+  {id:"rebirth",name:"Rebirth",school:"life",type:"spell",cost:6,fx:[{"k":"heal","n":10}]},
+  {id:"skeleton",name:"Skeleton",school:"death",type:"creature",cost:1,atk:2,hp:1,fx:[]},
+  {id:"ghoul",name:"Ghoul",school:"death",type:"creature",cost:3,atk:3,hp:3,fx:["drain"]},
+  {id:"vampire",name:"Vampire",school:"death",type:"creature",cost:4,atk:4,hp:4,fx:["drain"]},
+  {id:"reaper",name:"Death Reaper",school:"death",type:"creature",cost:6,atk:6,hp:6,fx:["drain"]},
+  {id:"dark_pact",name:"Dark Pact",school:"death",type:"spell",cost:2,fx:[{"k":"dmg","n":4},{"k":"heal","n":4}]},
+  {id:"balance_blade",name:"Balance Blade",school:"balance",type:"spell",cost:1,fx:[{"k":"buffAll","n":2}]},
+  {id:"novice",name:"Novice Assistant",school:"balance",type:"creature",cost:2,atk:2,hp:3,fx:[]},
+  {id:"balance_streak",name:"Balance Streak",school:"balance",type:"spell",cost:3,fx:[{"k":"dmg","n":4},{"k":"draw","n":1}]},
+  {id:"sunbird",name:"Sunbird",school:"balance",type:"creature",cost:4,atk:4,hp:5,fx:[]},
+  {id:"balance_dragon",name:"Balance Dragon",school:"balance",type:"creature",cost:7,atk:7,hp:7,fx:[{"k":"buffAll","n":1}]},
+  {id:"elixir",name:"Health Elixir",school:"balance",type:"spell",cost:1,fx:[{"k":"heal","n":3}]},
+  {id:"golden_golem",name:"Golden Golem",school:"balance",type:"creature",cost:4,atk:5,hp:5,fx:["taunt"]},
+  {id:"master_wand",name:"Master's Wand",school:"balance",type:"spell",cost:3,fx:[{"k":"buffAll","n":2}]},
+  {id:"arcane_guardian",name:"Arcane Guardian",school:"balance",type:"creature",cost:5,atk:5,hp:7,fx:["taunt"]},
+  {id:"arcane_nexus",name:"Arcane Nexus",school:"balance",type:"field",cost:4,fx:[{"k":"fieldAtk","n":1}]},
+  {id:"radiant_aura",name:"Radiant Aura",school:"life",type:"field",cost:3,fx:[{"k":"fieldHeal","n":3}]},
+  {id:"storm_conduit",name:"Storm Conduit",school:"storm",type:"field",cost:5,fx:[{"k":"fieldPip","n":1}]},
+  {id:"fire_trap",name:"Fire Trap",school:"fire",type:"trap",cost:2,fx:[{"k":"trapDmg","n":4}]},
+  {id:"mana_ward",name:"Mana Ward",school:"ice",type:"trap",cost:2,fx:[{"k":"trapShield","n":4}]},
 ];
+const SCHOOL_BONUS = [["fire","ice"],["ice","storm"],["storm","myth"],["myth","life"],["life","death"],["death","fire"]];
+// <<< END GENERATED >>>
 const CM = Object.fromEntries(C.map(c=>[c.id,c]));
-const SCHOOL_BONUS = [["fire","life"],["life","death"],["death","fire"]];
+
+// A match cannot run forever: after MAX_TURNS the higher-HP wizard takes it, equal HP is a draw.
+// Without this an online match had no terminating condition at all — two players who both
+// stopped attacking would sit in a room indefinitely. Fatigue normally ends things far sooner
+// (decks are 20 cards and fatigue escalates), so this is a backstop, not a balance lever.
+export const MAX_TURNS = 100;
 
 export function setup(players){
   return {
     players, phase:"deck", decks:{}, turn:null, battle:null,
     hands:{ [players[0]]:null, [players[1]]:null },
+    // Seeded once per match so the shuffle is reproducible from the state alone — a match can
+    // be replayed or a bug report re-run. Module-level RNG would be shared across every room.
+    seed: (Math.random()*4294967296)>>>0,
+    turns: 0,
     winner:null,
   };
 }
@@ -107,7 +119,6 @@ export function validateAction(state, playerId, action){
 }
 
 function mulberry32(seed){ let a=seed>>>0; return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
-let rng = mulberry32((Math.random()*1e9)>>>0);
 
 function draw(p){ if (p.hand.length>=10) return; if (p.deck.length) p.hand.push(p.deck.pop()); }
 function makeCreature(id, p){
@@ -116,13 +127,14 @@ function makeCreature(id, p){
     taunt:fx.includes("taunt"), haste:fx.includes("haste"), drain:fx.includes("drain"),
     multi:fx.includes("multiAttack")?2:1, attacks:0, freeze:0, owner:p.id };
 }
-function buildDeck(ids){ const d=[...ids]; for(let i=d.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[d[i],d[j]]=[d[j],d[i]];} return d; }
+function buildDeck(ids, rand){ const d=[...ids]; for(let i=d.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[d[i],d[j]]=[d[j],d[i]];} return d; }
 function damageWizard(p, dmg){ const absorb=Math.min(p.shield,dmg); p.shield-=absorb; dmg-=absorb; p.hp-=dmg; }
 
 function startBattle(state){
   const [p0,p1] = state.players;
-  const you = { id:p0, hp:100, maxHp:100, shield:0, maxPips:1, pips:1, hand:[], deck:buildDeck(state.decks[p0]), board:[], field:[], traps:[], fatigue:0 };
-  const enemy = { id:p1, hp:100, maxHp:100, shield:0, maxPips:1, pips:1, hand:[], deck:buildDeck(state.decks[p1]), board:[], field:[], traps:[], fatigue:0 };
+  const rand = mulberry32(state.seed >>> 0);
+  const you = { id:p0, hp:100, maxHp:100, shield:0, maxPips:1, pips:1, hand:[], deck:buildDeck(state.decks[p0], rand), board:[], field:[], traps:[], fatigue:0 };
+  const enemy = { id:p1, hp:100, maxHp:100, shield:0, maxPips:1, pips:1, hand:[], deck:buildDeck(state.decks[p1], rand), board:[], field:[], traps:[], fatigue:0 };
   const b = { you, enemy, turn:p0, log:[] };
   for (let i=0;i<5;i++){ draw(you); draw(enemy); }  // 5-card opening hand
   state.battle = b; state.phase="play"; state.turn=p0;
@@ -231,6 +243,7 @@ export function applyAction(state, playerId, action){
     beginTurn(b, next);
     b.turn = next.id;
     state.turn = next.id;
+    state.turns = (state.turns || 0) + 1;
   }
   return state;
 }
@@ -238,8 +251,15 @@ export function applyAction(state, playerId, action){
 export function isGameOver(state){
   if (state.phase !== "play" || !state.battle) return { over:false };
   const b = state.battle;
+  // Both at 0 in the same resolution (e.g. mutual combat) is a draw, not a win for whoever is
+  // checked first.
+  if (b.you.hp <= 0 && b.enemy.hp <= 0) return { over:true, winner:null, draw:true, reason:"double knockout" };
   if (b.you.hp <= 0) return { over:true, winner: b.enemy.id };
   if (b.enemy.hp <= 0) return { over:true, winner: b.you.id };
+  if ((state.turns || 0) >= MAX_TURNS){
+    if (b.you.hp === b.enemy.hp) return { over:true, winner:null, draw:true, reason:"turn limit" };
+    return { over:true, winner: b.you.hp > b.enemy.hp ? b.you.id : b.enemy.id, reason:"turn limit" };
+  }
   return { over:false };
 }
 
@@ -253,6 +273,7 @@ export function viewFor(state, playerId){
   return {
     phase: state.phase,
     turn: state.turn,
+    turns: state.turns || 0, maxTurns: MAX_TURNS,
     you: { hp:me.hp, maxHp:me.maxHp, shield:me.shield, pips:me.pips, hand:me.hand, deck:me.deck.length, board:me.board, field:me.field, traps:me.traps.length },
     opp: { hp:opp.hp, maxHp:opp.maxHp, shield:opp.shield, pips:opp.pips, hand:opp.hand.length, deck:opp.deck.length, board:opp.board, field:opp.field, traps:opp.traps.length },
     log: b.log.slice(-6),

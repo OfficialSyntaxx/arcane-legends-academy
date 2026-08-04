@@ -60,9 +60,11 @@ wizard-tcg/                 (the repo root)
 │   ├── vendor/             pinned libs (three.min.js, GLTFLoader.js)
 │   └── assets/             generated art + GLB character models (models/)
 ├── tools/                  headless test suites
-│   ├── test.mjs            engine tests (79 checks)
-│   ├── logic-test.mjs      online-rules tests (25 checks)
-│   └── ui-smoke.mjs        UI boot smoke + engine/string binding checks
+│   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
+│   ├── test.mjs            engine tests (87 checks)
+│   ├── logic-test.mjs      online-rules tests (34 checks)
+│   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
+│   └── browser-test.mjs    real-Chromium responsive + input-gesture suite
 └── design/                 design docs (plan, thresholds, asset manifest)
 ```
 
@@ -161,10 +163,10 @@ The world is a walkable academy campus built in Three.js (procedural low-poly + 
 3. **All asset/module references are RELATIVE paths** (the game is served under a subpath). Never root-absolute.
 4. **The STYLE_FORMULA** (approved storybook fantasy) is embedded in every generated asset prompt. Keep the look consistent.
 5. **Third-party libs are vendored** into `public/vendor/` (pinned). No CDN hotlinks.
-6. **`logic.js` must stay pure** — no imports, no timers, six exports (`meta`, `setup`, `validateAction`, `applyAction`, `isGameOver`, `viewFor`). It mirrors the card catalog from `cards.js` (keep them in sync).
+6. **`logic.js` must stay pure** — no imports, no timers. Its card catalog is **generated**: edit `public/cards.js`, then run `npm run sync`. The block between the `<<< GENERATED CARD CATALOG` markers is machine-written and `npm test` fails if it is stale — never hand-edit it. (It also exports `MAX_TURNS` alongside the six rules functions.)
 7. **Hidden info is masked server-side** in `viewFor` (opponent hand, deck, traps) — never in the client.
-8. **Mobile-first** — touch controls, big targets, responsive layout. Everything must work touch-only.
-9. **Deterministic duel logic** — fixed timestep, seeded RNG where it matters.
+8. **Mobile-first** — touch controls, 44px minimum tap targets, responsive layout, safe-area insets. Everything must work touch-only, in portrait *and* landscape. World input goes through **Pointer Events with per-pointer tracking** (never touch/mouse events separately) — that is what keeps drag-to-rotate, tap-to-move and pinch-to-zoom from interfering. Verify changes with `npm run test:browser`.
+9. **Deterministic duel logic** — pass a seed to `startDuel(...)` (or set `state.seed` online) and a duel replays exactly. Do not reintroduce module-level shared RNG in `logic.js`: it is one sandbox across every room.
 
 ---
 
@@ -182,10 +184,14 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 79 engine checks
-node tools/logic-test.mjs    # 25 online-rules checks
+node tools/test.mjs          # 87 engine checks
+node tools/logic-test.mjs    # 34 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
+npm run test:browser         # 8 viewports + 15 input gestures in real Chromium
 ```
+`npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
+Chromium download (`npx playwright install chromium`) and runs as its own CI job — it is the
+only thing that exercises the 3D world's input layer, because `createWorld()` needs WebGL.
 CI runs `npm test` on every push (`.github/workflows/test.yml`). All three suites resolve
 paths relative to the repo — never hardcode an absolute sandbox path into a tool again; the
 old `ui-smoke.mjs` did, threw ENOENT before its `process.exit`, and reported a false pass for
@@ -242,7 +248,22 @@ lists verified defects and orders them into phases. **Phase A (correctness) is d
 When adding a gatherable material, add it to **both** `items.js` and `nodes.js` — the test
 suite will fail the build if a recipe input has no node.
 
-**Known issues / next steps:** *(Phases C–D of the plan doc; the items below still stand)*
+**Phase C (de-risking the online path) and a full mobile/input pass are also done:**
+
+- **The two engines can no longer diverge.** `logic.js`'s catalog is generated from `cards.js`
+  by `npm run sync`; `npm test` fails if it is stale. Online duels had been using a *different*
+  elemental matrix (an old 3-link ring vs the 6-link one) — they now match.
+- **Matches always terminate** — `MAX_TURNS = 100` in both engines, higher HP wins at the cap,
+  equal HP (and double knockouts) are explicit draws, rendered as draws in both duel UIs.
+- **Duels are reproducible** from a seed, in both engines.
+- **Mobile layout:** `dvh` sizing, safe-area insets, fluid `clamp()` cards, and breakpoints for
+  phones, small phones (≤380px), landscape phones and tablets. Locally generated PWA icons
+  replace the CloudFront hotlink (which broke the installable PWA offline).
+- **World input rewritten onto Pointer Events.** A two-finger pinch used to keep rotating the
+  camera, a drag ending off-canvas left the drag stuck, and a drag could fire tap-to-move on
+  release. All three are fixed and covered by `npm run test:browser`.
+
+**Known issues / next steps:** *(Phase D of the plan doc; the items below still stand)*
 1. **All character models are now generated 3D models.** The player wizard, professor, merchant, referee, trainer, librarian, and 4 wandering students are all 2D→3D generated GLBs (except the professor, which is a static text-to-3D mesh). They load at ~1.8 units and render correctly. The fix in `makeCharModel` (`world.js`): for **skinned Meshy GLBs** the object box is degenerate (0) and the raw mesh box is only the *bind pose* — the real size is the **skeleton node span** (bones sit far above the mesh), so height is computed from node world positions. For **static meshes** (e.g. professor.glb has no skeleton), the real size is the **geometry box**. The loader auto-detects skinned vs static. NPC GLB keys match their roles (`duel`, `trainer`, `librarian`, `wander0`–`wander3`) so the update loop uses the GLB mixer. **All models were texture-resized to 512px** (gltf-transform) to keep the deploy under the ~50MB upload limit — the models folder is now ~22MB total.
 2. **The 2D→3D pipeline** (generate a 2D character portrait → image-to-3D, ~40 credits/model: ~2 for the image + ~38 for the conversion) produces a much better, recognizable character than text-to-3D (~25 credits, generic blob). All character GLBs were generated this way.
 3. **GLB files are compressed to 512px textures** (gltf-transform resize) — down from 4–9MB to ~2–3MB each for mobile. True Draco compression is still a future mobile optimization.

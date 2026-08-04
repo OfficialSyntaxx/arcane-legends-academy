@@ -130,6 +130,41 @@ stg = L.applyAction(stg, "p1", {type:"play", handIndex:0, target:{kind:"creature
 check("online targeted spell hits the chosen creature", tP2.board[0].hp === tHp - 4);
 check("online targeted spell spares the enemy wizard", tP2.hp === 100);
 
+// ---- turn cap: a match always terminates ----
+let sCap = started(twenty("elixir"), twenty("elixir"));   // heals only: neither side can ever win
+let capGuard = 0;
+while (!L.isGameOver(sCap).over && capGuard++ < L.MAX_TURNS + 50){
+  sCap = L.applyAction(sCap, sCap.turn, {type:"endTurn"});
+}
+const capEnd = L.isGameOver(sCap);
+check("a passive match ends at the turn cap", capEnd.over && capGuard <= L.MAX_TURNS + 1);
+check("the turn cap decides on HP or declares a draw", capEnd.winner !== undefined);
+// equal HP at the cap is an explicit draw, not an arbitrary win
+let sDraw = started(twenty("elixir"), twenty("elixir"));
+sDraw.turns = L.MAX_TURNS;
+sDraw.battle.you.hp = 40; sDraw.battle.enemy.hp = 40;
+const drawRes = L.isGameOver(sDraw);
+check("equal HP at the cap is a draw", drawRes.over && drawRes.draw === true && drawRes.winner === null);
+sDraw.battle.you.hp = 55;
+check("higher HP at the cap wins", L.isGameOver(sDraw).winner === sDraw.battle.you.id);
+// a double knockout is a draw rather than a win for whichever side is checked first
+let sKo = started(twenty("elixir"), twenty("elixir"));
+sKo.battle.you.hp = 0; sKo.battle.enemy.hp = 0;
+check("a double knockout is a draw", L.isGameOver(sKo).draw === true);
+check("viewFor exposes the turn budget", (()=>{ const v = L.viewFor(sCap, "p1"); return typeof v.turns === "number" && v.maxTurns === L.MAX_TURNS; })());
+
+// ---- seeded shuffle: a match is reproducible from its state ----
+const seedDeck = ["fire_cat","ice_golem","pixie","novice","elixir","fire_elf","firebolt","lightning","fire_dragon","storm_titan"].flatMap(id=>[id,id]);
+function handsForSeed(seed){
+  let st = L.setup(players); st.seed = seed;
+  st = L.applyAction(st, "p1", {type:"setDeck", deck:seedDeck});
+  st = L.applyAction(st, "p2", {type:"setDeck", deck:seedDeck});
+  return JSON.stringify([st.battle.you.hand, st.battle.enemy.hand]);
+}
+check("the same seed deals the same opening hands", handsForSeed(12345) === handsForSeed(12345));
+check("a different seed deals a different shuffle", handsForSeed(12345) !== handsForSeed(99999));
+check("setup assigns a seed", Number.isInteger(L.setup(players).seed));
+
 // deck-size error text matches the rule it enforces
 const badLen = L.validateAction(L.setup(players), "p1", {type:"setDeck", deck:twenty("fire_cat").slice(0,19)});
 check("deck error text says 20 cards", badLen.ok===false && badLen.error.includes("20 cards"));

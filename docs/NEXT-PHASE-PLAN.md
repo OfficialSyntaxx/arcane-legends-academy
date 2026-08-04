@@ -6,12 +6,13 @@ Everything below was verified against the actual code, not inferred from the doc
 **Test status at review time:** `tools/test.mjs` 35/35 pass, `tools/logic-test.mjs` 14/14 pass,
 `tools/ui-smoke.mjs` **is broken and silently reports success** (see P0-5).
 
-> **Update — Phases A and B are complete.** P0-1, P0-2, P0-3, P0-4, P0-5, P1-7, P1-8, P1-9 and
-> P1-10 are fixed, each with a regression test that fails against the old code. Two extra
-> defects were found while fixing neighbours — targeted spells doing nothing in local duels
-> (P1-7b) and the runite node sitting inside the iron node's interaction radius (P0-2b).
-> Suites are now **79 / 25 / UI-smoke**, run together by `npm test`, with CI.
-> Everything below is left as written so the remaining phases keep their context.
+> **Update — Phases A, B, C and the mobile/input pass are complete.** P0-1, P0-2, P0-3, P0-4, P0-5, P1-7, P1-8, P1-9 and
+> P1-10, P1-6, P1-11 and the seeded-RNG item are fixed, each with a regression test that fails
+> against the old code. Extra defects found while fixing neighbours: targeted spells doing
+> nothing in local duels (P1-7b), the runite node sitting inside the iron node's interaction
+> radius (P0-2b), and the PWA icon/favicon hotlinked to a CDN (P2-b).
+> Suites are now **87 engine / 34 online / UI-smoke**, plus a new **real-browser suite**
+> (8 viewports + 15 input-gesture checks). Everything below is left as written for context.
 
 The CLAUDEREADME roadmap is all *content* work (buildings, Draco, sound, more schools).
 The findings below are mostly *systems* work — several core loops advertised in the design
@@ -112,8 +113,12 @@ boots `index.html` again.
   `"Trap! undefined takes 4"` — the embedded catalog carries no `name` field.
 - **Wrong error text.** `logic.js:81` says "deck must be 30 cards" while validating 20.
 
-**Fix:** generate the `logic.js` catalog from `cards.js` with a small `tools/sync-cards.mjs`
-build step and assert equality in `logic-test.mjs`, so this can't drift again.
+**Fixed:** `tools/sync-cards.mjs` generates the embedded catalog from `cards.js` into a marked
+block in `logic.js`; `npm test` runs it with `--check` and fails if the block is stale. Online
+duels now use the same 6-link elemental ring as local duels (they were resolving elemental
+damage differently), embedded cards carry `name` (so trap logs no longer read
+"Trap! undefined"), and the deck-size error text says 20. School affinity remains deliberately
+absent online — online duels are gear- and school-neutral by design.
 
 ### P1-7. AoE spells hit the caster's own board when the AI casts them
 `game.js:412-413` and `logic.js:145-146` hardcode `b.enemy`:
@@ -172,10 +177,15 @@ quits during character creation never sees the school picker again and is silent
 **Fixed:** the check is `s.flags.schoolPicked === undefined` — only a save that predates the
 school system (flag absent) skips the picker; an explicit `false` is respected.
 
-### P1-11. Fatigue is applied but the duel can't end on it
+### P1-11. Fatigue is applied but the duel can't end on it *(fixed)*
 `beginTurn` subtracts escalating fatigue damage, and `isOver` checks `hp <= 0`, so that part
 works — but neither `game.js` nor `logic.js` has a turn cap or draw condition, and `runSelfTest`
 relies on a `guard++ < 200` loop bound. A stalled online match has no terminating condition.
+
+**Fixed:** `MAX_TURNS = 100` in both engines. At the cap the higher-HP wizard wins and equal HP
+is an explicit draw; a double knockout is also a draw rather than a win for whichever side
+`isOver` happened to check first. `viewFor` exposes `turns`/`maxTurns`, and the duel UI renders
+a draw result instead of showing "you lose".
 
 ---
 
@@ -202,11 +212,15 @@ relies on a `guard++ < 200` loop bound. A stalled online match has no terminatin
 - **`buildDeck(defs, gear)` ignores `gear`**; `collectAuction` returns `{ok:true}` and does
   nothing; `game.js:431` has a dead `typeof f === "string"` branch checking for `"healPlay"`,
   which is only ever an object.
-- **Shared module-level `rng`** seeded from `Date.now()` — §7.9 claims "deterministic duel
-  logic, seeded RNG". It isn't reproducible; there's no way to seed a duel for a replay or a
-  regression test.
-- **`package.json` has no scripts.** Add `"test": "node tools/test.mjs && node tools/logic-test.mjs && node tools/ui-smoke.mjs"` so a single command covers all three (and actually fails).
-- **No CI.** A GitHub Actions workflow running `npm test` on push would have caught P0-5.
+- ~~**Shared module-level `rng`**~~ **fixed** — `startDuel(..., seed)` and `state.seed` in
+  `logic.js` give each duel its own RNG, so a duel replays exactly from its seed. `logic.js`
+  no longer keeps mutable module-level RNG shared across every room.
+- ~~**`package.json` has no scripts.**~~ **fixed** — Add `"test": "node tools/test.mjs && node tools/logic-test.mjs && node tools/ui-smoke.mjs"` so a single command covers all three (and actually fails).
+- ~~**No CI.**~~ **fixed** — two jobs: the headless suites, and the browser suite.
+- ~~**PWA icon hotlinked to a CDN**~~ **fixed (P2-b)** — the favicon and the single manifest
+  icon both pointed at a CloudFront URL, breaking the installable PWA offline and violating the
+  "no CDN hotlinks" rule in §7.5. Replaced with locally generated 192/512 icons (plus a
+  maskable entry), and `orientation` relaxed from `portrait` to `any` now that landscape works.
 
 ---
 
@@ -234,10 +248,28 @@ Also added to `ui-smoke.mjs`: a static binding check that every `G.x()` and `STR
 references actually exists (55 engine and 33 string bindings today). That catches the class of
 break where a screen renders fine until the one code path touching a renamed export runs.
 
-**Phase C — de-risk the online path**
-10. `tools/sync-cards.mjs` generating the `logic.js` catalog, asserted in `logic-test.mjs` *(P1-6)*
-11. Turn cap / draw condition for online matches *(P1-11)*
-12. Seeded, reproducible duel RNG
+**Phase C — de-risk the online path — ✅ DONE**
+10. ✅ `tools/sync-cards.mjs` generates the `logic.js` catalog; `npm test` fails on drift *(P1-6)*
+11. ✅ Turn cap, draw conditions, and draw handling in both duel UIs *(P1-11)*
+12. ✅ Seeded, reproducible duel RNG in both engines
+
+**Mobile & input pass — ✅ DONE** (verified in Chromium, not by inspection)
+- **Layout:** `dvh` sizing, full safe-area insets (notch + home indicator), fluid `clamp()` card
+  sizing with `aspect-ratio` art, breakpoints for phones / small phones (≤380px) /
+  **landscape phones** / tablets, 44px minimum tap targets, hover effects gated behind
+  `@media (hover:hover)` so they don't stick on touch, and `prefers-reduced-motion` support.
+  The viewport meta no longer blocks pinch-zoom (`user-scalable=no` was an accessibility
+  problem, and it wasn't what stopped the canvas gestures — `touch-action` is).
+- **Input:** the whole world-input layer was rewritten onto Pointer Events with per-pointer
+  tracking. Previously a two-finger pinch *also* rotated the camera, a drag that ended off the
+  canvas left the drag stuck, and a drag could fire tap-to-move on release. Now: pointer
+  capture, an explicit tap test (slop + duration), pinch suppresses rotation and hands the drag
+  back cleanly when one finger lifts, an analogue joystick knob with a dead zone and circular
+  (not square) clamping, mouse-wheel zoom, and on-screen zoom buttons for one-handed play.
+- **Verification:** `npm run test:browser` (`tools/browser-test.mjs`) serves `public/` and drives
+  a real Chromium: 8 viewports asserted for horizontal overflow, collapsed content, chrome
+  height budget and tap-target size, plus 15 gesture checks including
+  *"dragging does not also tap-to-move"* and *"player stops when the joystick is released"*.
 
 **Phase D — then the existing roadmap**
 World collision + GLB fallback/loading state first (they make the new building models actually

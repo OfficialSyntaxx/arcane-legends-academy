@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1440">
 <link rel="manifest" href="./manifest.json">
-<link rel="icon" type="image/png" href="https://d8j0ntlcm91z4.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/hf_20260803_135222_906df834-35d2-428a-bfaf-747f586d60d2.png">
+<link rel="icon" type="image/png" href="./assets/icon-192.png">
+<link rel="apple-touch-icon" href="./assets/icon-192.png">
 <title>Arcane Legends — Wizard TCG</title>
 <style>
 :root{
@@ -18,28 +19,39 @@
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;background:#0d0a1f;color:var(--ink);
-  font-family:"Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden;}
+  font-family:"Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden;
+  overscroll-behavior:none;text-size-adjust:100%;-webkit-text-size-adjust:100%;}
+/* safe-area insets, so nothing hides under a notch or the home indicator */
+:root{--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);}
 #bg{position:fixed;inset:0;background:center/cover url(./assets/title_bg.jpg);filter:brightness(.45) saturate(1.1);z-index:0;}
-#app{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;max-width:1200px;margin:0 auto;}
+#app{position:relative;z-index:1;display:flex;flex-direction:column;height:100%;max-width:1200px;margin:0 auto;
+  padding-left:var(--sal);padding-right:var(--sar);}
+/* dvh tracks the collapsing mobile browser chrome; % does not */
+@supports (height:100dvh){ #app{height:100dvh;} }
 
 /* top bar */
-#topbar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(180deg,rgba(20,14,40,.95),rgba(20,14,40,.7));
-  border-bottom:1px solid var(--line);flex-wrap:wrap;z-index:5;}
+#topbar{display:flex;align-items:center;gap:8px;padding:calc(10px + var(--sat)) 14px 10px;
+  background:linear-gradient(180deg,rgba(20,14,40,.95),rgba(20,14,40,.7));
+  border-bottom:1px solid var(--line);z-index:5;flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
+#topbar::-webkit-scrollbar{display:none;}
 #topbar .logo{font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--gold);
   text-shadow:0 0 12px rgba(255,201,77,.5);letter-spacing:1px;margin-right:auto;}
-.stat{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:14px;}
+.stat{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:14px;white-space:nowrap;flex:0 0 auto;}
 .stat b{color:var(--gold);font-weight:700;}
 
 /* nav */
-#nav{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;background:rgba(20,14,40,.9);border-bottom:1px solid var(--line);z-index:5;}
-.navbtn{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 12px;border-radius:10px;
-  border:1px solid transparent;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;min-width:64px;}
+#nav{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;background:rgba(20,14,40,.9);border-bottom:1px solid var(--line);
+  z-index:5;flex-shrink:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+#nav::-webkit-scrollbar{display:none;}
+.navbtn{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 12px;border-radius:10px;
+  border:1px solid transparent;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;min-width:64px;min-height:48px;}
 .navbtn .ic{font-size:20px;}
-.navbtn:hover{background:var(--panel2);color:var(--ink);}
+@media (hover:hover){ .navbtn:hover{background:var(--panel2);color:var(--ink);} }
 .navbtn.on{background:var(--panel2);color:var(--gold);border-color:var(--line);}
 
 /* screens */
-#screen{padding:14px;overflow-y:auto;flex:1;padding-bottom:40px;}
+#screen{padding:14px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;padding-bottom:calc(40px + var(--sab));-webkit-overflow-scrolling:touch;}
 .screen{display:none;animation:fade .25s ease;}
 .screen.on{display:block;}
 @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;}}
@@ -51,21 +63,23 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 
 /* buttons */
 .btn{background:linear-gradient(180deg,#3a2d6e,#241c44);color:var(--ink);border:1px solid var(--line);border-radius:10px;
-  padding:10px 16px;font-size:14px;cursor:pointer;font-weight:600;}
-.btn:hover{filter:brightness(1.15);}
+  padding:10px 16px;font-size:14px;cursor:pointer;font-weight:600;min-height:44px;touch-action:manipulation;}
+@media (hover:hover){ .btn:hover{filter:brightness(1.15);} }
 .btn.gold{background:linear-gradient(180deg,#e8a33d,#b97a1e);color:#24170a;border-color:#ffd98a;}
 .btn.ok{background:linear-gradient(180deg,#2f9e63,#1f6b42);border-color:#6ee7a0;}
 .btn.danger{background:linear-gradient(180deg,#b33,#6e1f1f);border-color:#ff6b6b;}
 .btn:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.4);}
-.btn.sm{padding:6px 10px;font-size:12px;border-radius:8px;}
+.btn.sm{padding:6px 10px;font-size:12px;border-radius:8px;min-height:34px;}
 
 /* cards */
-.card{width:108px;border-radius:10px;overflow:hidden;position:relative;border:2px solid #fff;cursor:pointer;
-  background:#0c0a1c;box-shadow:0 4px 12px rgba(0,0,0,.5);transition:transform .1s;}
-.card.wide{width:150px;}
-.card:hover{transform:translateY(-4px);}
-.card .art{height:74px;background:center/cover;position:relative;}
-.card.wide .art{height:104px;}
+/* fluid so a 320px phone and a 1200px desktop both get a sensible card */
+.card{width:clamp(84px,23vw,108px);border-radius:10px;overflow:hidden;position:relative;border:2px solid #fff;cursor:pointer;
+  background:#0c0a1c;box-shadow:0 4px 12px rgba(0,0,0,.5);transition:transform .1s;flex:0 0 auto;}
+.card.wide{width:clamp(112px,30vw,150px);}
+@media (hover:hover){ .card:hover{transform:translateY(-4px);} }
+/* aspect-ratio keeps the art proportional as the card width flexes */
+.card .art{aspect-ratio:1.46;height:auto;background:center/cover;position:relative;}
+.card.wide .art{aspect-ratio:1.44;height:auto;}
 .card .cost{position:absolute;top:4px;left:4px;background:radial-gradient(circle,#6a8cff,#2c3f8a);color:#fff;font-weight:800;
   width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;border:1px solid #9db4ff;}
 .card .atk,.card .hp{position:absolute;bottom:4px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
@@ -99,11 +113,12 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .duelzone.bg{background:center/cover url(./assets/duel_bg.jpg);min-height:150px;}
 .zonecap{position:absolute;top:6px;left:10px;font-size:12px;color:var(--muted);z-index:2;}
 .wizbar{position:absolute;top:6px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:2px;z-index:2;}
-.wizbar .bar{width:150px;height:12px;background:#00000066;border:1px solid #fff3;border-radius:6px;overflow:hidden;}
+.wizbar .bar{width:clamp(90px,32vw,150px);height:12px;background:#00000066;border:1px solid #fff3;border-radius:6px;overflow:hidden;}
 .wizbar .bar>div{height:100%;background:linear-gradient(90deg,#ff6b6b,#ff9a5a);}
 .wizbar .bar.o>div{background:linear-gradient(90deg,#54a0ff,#7aa8ff);}
 .board{display:flex;gap:8px;padding:40px 10px 10px;flex-wrap:wrap;justify-content:center;min-height:120px;}
-.hand{display:flex;gap:8px;padding:8px;overflow-x:auto;justify-content:center;flex-wrap:wrap;}
+.hand{display:flex;gap:8px;padding:8px;overflow-x:auto;justify-content:center;flex-wrap:wrap;scrollbar-width:none;}
+.hand::-webkit-scrollbar{display:none;}
 .pipbar{display:flex;gap:4px;align-items:center;padding:6px 10px;}
 .pip{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,#6a8cff,#2c3f8a);border:1px solid #9db4ff;}
 .pip.full{background:radial-gradient(circle,#ffd94a,#c8860a);border-color:#fff0a0;}
@@ -125,12 +140,105 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
   border:1px solid var(--gold);padding:10px 18px;border-radius:10px;font-weight:700;z-index:99;display:none;box-shadow:0 6px 20px #000;}
 #err{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#3a0f0f;color:#ffb3b3;border:1px solid #ff6b6b;padding:10px 18px;border-radius:10px;font-weight:700;z-index:99;display:none;}
 
-/* responsive */
+/* ---------------- 3D world HUD ---------------- */
+#world{position:absolute;inset:0;width:100%;height:100%;display:block;
+  /* the canvas handles its own gestures: never let the browser pan/zoom the page on it */
+  touch-action:none;}
+#worldHud{position:absolute;top:calc(10px + var(--sat));left:50%;transform:translateX(-50%);
+  background:rgba(20,14,40,.8);border:1px solid var(--line);border-radius:12px;padding:6px 14px;
+  font-size:13px;font-weight:700;color:var(--gold);display:none;pointer-events:none;z-index:3;
+  max-width:min(92%,520px);text-align:center;}
+#joy{position:absolute;left:calc(20px + var(--sal));bottom:calc(24px + var(--sab));
+  width:min(124px,30vw);height:min(124px,30vw);z-index:4;display:none;touch-action:none;
+  border-radius:50%;border:1px solid rgba(255,201,77,.28);background:rgba(20,14,40,.30);
+  box-shadow:inset 0 0 24px rgba(0,0,0,.35);transition:background .12s,border-color .12s;}
+#joy.active{background:rgba(20,14,40,.5);border-color:rgba(255,201,77,.55);}
+#joyKnob{position:absolute;left:50%;top:50%;width:42%;height:42%;border-radius:50%;
+  transform:translate(-50%,-50%);pointer-events:none;
+  background:radial-gradient(circle at 35% 30%,#ffe6a8,#e8a33d 60%,#b97a1e);
+  border:1px solid rgba(255,255,255,.55);box-shadow:0 3px 10px rgba(0,0,0,.5);}
+#prompt{position:absolute;left:50%;bottom:calc(26px + var(--sab));transform:translateX(-50%);
+  z-index:4;display:none;max-width:calc(100% - 32px);}
+#prompt .btn{white-space:nowrap;box-shadow:0 6px 18px rgba(0,0,0,.5);}
+.worldbtn{position:absolute;right:calc(16px + var(--sar));width:44px;height:44px;border-radius:50%;
+  z-index:4;display:none;align-items:center;justify-content:center;font-size:22px;font-weight:800;
+  background:rgba(20,14,40,.72);color:var(--gold);border:1px solid var(--line);cursor:pointer;
+  touch-action:manipulation;line-height:1;padding:0;}
+#zoomIn{bottom:calc(94px + var(--sab));}
+#zoomOut{bottom:calc(42px + var(--sab));}
+/* the zoom buttons are a desktop/one-handed affordance; pinch covers multi-touch */
+body.has-touch .worldbtn{display:flex;}
+
+/* ---------------- responsive ----------------
+   Card sizes are fluid (clamp) above, so these breakpoints only handle chrome density and
+   the vertical budget — which is what actually breaks on a phone, especially in landscape. */
+
+/* modals: keep them inside the safe area and off the screen edges on small phones */
+#schoolPicker>div,#overlay>div{margin-top:max(4vh,var(--sat));margin-bottom:calc(16px + var(--sab));}
 @media (max-width:640px){
-  .card{width:96px;} .card.wide{width:128px;}
-  .card .art{height:64px;} .card.wide .art{height:88px;}
+  #schoolPicker>div{padding:20px 14px;width:auto;margin-left:10px;margin-right:10px;border-radius:18px;}
+  #schoolPicker>div>div:first-child{font-size:21px;}
+  #overlay>div{margin-left:10px;margin-right:10px;padding:16px 14px;}
+  #dialogue>div{padding:18px 16px;}
+}
+
+/* phones */
+@media (max-width:640px){
+  #topbar{gap:6px;padding-left:10px;padding-right:10px;}
   #topbar .logo{font-size:16px;}
-  .navbtn{min-width:54px;font-size:11px;}
+  .stat{font-size:13px;padding:4px 10px;}
+  .navbtn{min-width:56px;font-size:11px;padding:6px 9px;}
+  .navbtn .ic{font-size:18px;}
+  #screen{padding:12px 10px calc(36px + var(--sab));}
+  .panel{padding:12px;border-radius:12px;}
+  h2{font-size:20px;}
+  .board{padding:36px 6px 8px;gap:6px;min-height:104px;}
+  .duelzone{min-height:104px;}
+  .duelzone.bg{min-height:128px;}
+  .skillgrid{grid-template-columns:repeat(auto-fill,minmax(128px,1fr));}
+}
+
+/* small phones (iPhone SE / 320-380px) — the logo is the first thing to go */
+@media (max-width:380px){
+  #topbar .logo{font-size:0;margin-right:auto;}
+  #topbar .logo::before{content:"✦";font-size:20px;}
+  .stat{font-size:12px;padding:3px 8px;gap:4px;}
+  .navbtn{min-width:50px;font-size:10px;padding:5px 7px;}
+  #screen{padding:10px 8px calc(32px + var(--sab));}
+  .row{gap:8px;}
+  .btn{padding:9px 12px;font-size:13px;}
+  .zonecap{font-size:11px;}
+}
+
+/* landscape phones: height is the scarce resource, so collapse the chrome hard */
+@media (max-height:520px) and (orientation:landscape){
+  #topbar{padding-top:calc(4px + var(--sat));padding-bottom:4px;}
+  #topbar .logo{font-size:15px;}
+  .stat{padding:2px 9px;font-size:12px;}
+  #nav{padding:4px 8px;}
+  .navbtn{flex-direction:row;gap:6px;min-height:36px;min-width:auto;padding:4px 10px;font-size:11px;}
+  .navbtn .ic{font-size:15px;}
+  #screen{padding:8px 10px calc(16px + var(--sab));}
+  h2{font-size:17px;margin-bottom:8px;}
+  h3{font-size:15px;margin:8px 0 6px;}
+  .panel{padding:10px;margin-bottom:10px;}
+  .board{padding:28px 6px 6px;min-height:88px;}
+  .duelzone,.duelzone.bg{min-height:88px;}
+  .card{width:clamp(72px,13vw,96px);}
+  /* the joystick sits higher so it clears the home indicator in landscape */
+  #joy{bottom:calc(12px + var(--sab)) !important;}
+}
+
+/* tablets and up: roomier cards, two-up panels where it helps */
+@media (min-width:900px){
+  .card{width:116px;}
+  .card.wide{width:158px;}
+  .skillgrid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr));}
+}
+
+/* respect reduced-motion */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;}
 }
 </style>
 </head>
@@ -146,10 +254,12 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
   <div id="nav"></div>
   <div id="screen"></div>
   <div id="worldWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#1a1440">
-    <canvas id="world" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
-    <div id="worldHud" style="position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(20,14,40,.8);border:1px solid var(--line);border-radius:12px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--gold);display:none;pointer-events:none;z-index:3"></div>
-    <div id="joy" style="position:absolute;left:20px;bottom:24px;width:110px;height:110px;z-index:4;display:none;touch-action:none"></div>
-    <div id="prompt" style="position:absolute;left:50%;bottom:26px;transform:translateX(-50%);z-index:4;display:none"></div>
+    <canvas id="world"></canvas>
+    <div id="worldHud"></div>
+    <div id="joy"><div id="joyKnob"></div></div>
+    <div id="prompt"></div>
+    <button id="zoomIn" class="worldbtn" aria-label="Zoom in">+</button>
+    <button id="zoomOut" class="worldbtn" aria-label="Zoom out">−</button>
   </div>
 </div>
 <div id="toast"></div>
@@ -769,7 +879,9 @@ function renderDuel(el){
   const you = battle.you, enemy = battle.enemy;
   const myTurn = battle.turn==="you";
   let h = `<h2>⚔️ ${battle.enemyName||"Duel"}</h2>`;
-  h += `<div id="duelStatus">${over.over ? (over.winner==="you"?STR.you_win:STR.you_lose) : (myTurn?STR.your_turn:STR.enemy_turn)}</div>`;
+  const resultText = over.draw ? STR.you_draw : (over.winner==="you" ? STR.you_win : STR.you_lose);
+  h += `<div id="duelStatus">${over.over ? resultText : (myTurn?STR.your_turn:STR.enemy_turn)}</div>`;
+  if (over.over && over.reason === "turn limit") h += `<div style="text-align:center;font-size:12px;color:var(--muted)">${STR.turn_limit}</div>`;
   h += `<div id="duelTimer" style="text-align:center;font-size:20px;font-weight:800;color:${duelTimeLeft<=10?"var(--danger)":"var(--gold)"}">${myTurn&&!over.over?duelTimeLeft+"s":"—"}</div>`;
   h += `<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:6px">You: ${(you.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${(you.traps||[]).length?`· 🪤${you.traps.length}`:""} &nbsp;|&nbsp; Enemy: ${(enemy.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${(enemy.traps||[]).length?`· 🪤${enemy.traps.length}`:""}</div>`;
   h += `<div style="text-align:center;font-size:12px;color:var(--gold);margin-bottom:6px">🎓 ${SCHOOLS[you.school].name} School vs ${SCHOOLS[enemy.school].name} School</div>`;
@@ -962,8 +1074,10 @@ function renderOnline(el){
     }
   } else if (o.state.status==="over"){
     const r = o.state.result;
+    const drew = !r.winner;
     const won = r.winner === o.state.you;
-    h += `<div class="panel"><div class="t" style="font-size:20px;font-weight:800;color:${won?"var(--ok)":"var(--danger)"}">${won?STR.you_win:STR.you_lose}</div>
+    const tone = drew ? "var(--muted)" : (won ? "var(--ok)" : "var(--danger)");
+    h += `<div class="panel"><div class="t" style="font-size:20px;font-weight:800;color:${tone}">${drew?STR.you_draw:(won?STR.you_win:STR.you_lose)}</div>
       <div class="row" style="margin-top:10px"><button class="btn ok" onclick="window.__ev('oReset')">${STR.play_again}</button>
       <button class="btn" onclick="window.__ev('toPvp')">Exit</button></div></div>`;
   }
@@ -1041,54 +1155,140 @@ function initWorld(){
     },
   });
   } catch(e){ console.warn("3D world unavailable:", e); return; }
-  // joystick
-  const joy = $("joy");
-  let joyActive = false, joyBase = null;
+  // ---------------- world input ----------------
+  // Unified on Pointer Events so mouse, touch and pen all take the same path. Every gesture is
+  // tracked by pointerId, which is what makes "drag to rotate" and "pinch to zoom" coexist:
+  // the old code tracked a single drag and kept rotating the camera during a two-finger pinch.
+  const isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints||0) > 0;
+  if (isTouch) document.body.classList.add("has-touch");
+
+  // ---- joystick ----
+  const joy = $("joy"), knob = $("joyKnob");
+  let joyId = null, joyBase = null, joyRadius = 46;
+  function joySet(dx, dy){
+    world.setTouchMove(dx, dy);
+    // the knob follows the finger, clamped to the ring, so the control reads as analogue
+    knob.style.transform = `translate(calc(-50% + ${dx*joyRadius}px), calc(-50% + ${dy*joyRadius}px))`;
+  }
   function joyStart(e){
-    joyActive = true;
+    if (joyId !== null) return;
+    joyId = e.pointerId;
     const r = joy.getBoundingClientRect();
-    joyBase = { x: r.left+r.width/2, y: r.top+r.height/2 };
-    joy.style.background = "radial-gradient(circle, rgba(255,255,255,.25), transparent 70%)";
+    joyBase = { x:r.left+r.width/2, y:r.top+r.height/2 };
+    joyRadius = r.width * 0.29;            // how far the knob may travel from centre
+    joy.classList.add("active");
+    try { joy.setPointerCapture(e.pointerId); } catch(_){}
     joyMove(e);
+    e.preventDefault();
   }
   function joyMove(e){
-    if (!joyActive) return;
-    const t = e.touches ? e.touches[0] : e;
-    let dx = (t.clientX-joyBase.x)/55, dy = (t.clientY-joyBase.y)/55;
-    dx = Math.max(-1, Math.min(1, dx)); dy = Math.max(-1, Math.min(1, dy));
-    world.setTouchMove(dx, dy);
+    if (joyId !== e.pointerId || !joyBase) return;
+    // normalise against the ring radius, then clamp to the unit circle (not a square) so
+    // diagonal input isn't faster than cardinal input
+    let dx = (e.clientX-joyBase.x)/(joyRadius*1.6);
+    let dy = (e.clientY-joyBase.y)/(joyRadius*1.6);
+    const len = Math.hypot(dx, dy);
+    if (len > 1){ dx/=len; dy/=len; }
+    if (len < 0.12){ dx = 0; dy = 0; }     // small dead zone stops drift on a resting thumb
+    joySet(dx, dy);
+    e.preventDefault();
   }
-  function joyEnd(){ joyActive=false; joy.style.background=""; world.setTouchMove(0,0); }
-  joy.addEventListener("touchstart", joyStart, {passive:false});
-  joy.addEventListener("touchmove", joyMove, {passive:false});
-  joy.addEventListener("touchend", joyEnd);
-  joy.addEventListener("touchcancel", joyEnd);
-  joy.addEventListener("mousedown", joyStart);
-  joy.addEventListener("mousemove", joyMove);
-  joy.addEventListener("mouseup", joyEnd);
-  // tap-to-move (short tap) vs drag-to-rotate camera (right side) + pinch-to-zoom
-  let camDrag = null;
-  canvas.addEventListener("pointerdown", e=>{ if (e.target !== canvas) return; camDrag = { x:e.clientX, y:e.clientY, moved:false }; });
-  canvas.addEventListener("pointermove", e=>{
-    if (!camDrag) return;
-    const dx = e.clientX - camDrag.x, dy = e.clientY - camDrag.y;
-    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) camDrag.moved = true;
-    if (camDrag.moved && world) world.rotateCam(dx);
-    camDrag.x = e.clientX; camDrag.y = e.clientY;
+  function joyEnd(e){
+    if (joyId !== null && e && e.pointerId !== joyId) return;
+    joyId = null; joyBase = null;
+    joy.classList.remove("active");
+    joySet(0, 0);
+  }
+  joy.addEventListener("pointerdown", joyStart);
+  joy.addEventListener("pointermove", joyMove);
+  joy.addEventListener("pointerup", joyEnd);
+  joy.addEventListener("pointercancel", joyEnd);
+  joy.addEventListener("lostpointercapture", joyEnd);
+
+  // ---- camera drag / pinch / tap-to-move ----
+  const pointers = new Map();            // active pointers on the canvas, by id
+  let dragId = null, dragMoved = false, lastX = 0, lastY = 0, startX = 0, startY = 0, pinchDist = 0, downAt = 0;
+  const TAP_SLOP = 8, TAP_MS = 350;      // a tap is a short press that barely moves
+
+  canvas.addEventListener("pointerdown", e=>{
+    pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    if (pointers.size === 1){
+      dragId = e.pointerId; dragMoved = false; downAt = performance.now();
+      lastX = startX = e.clientX; lastY = startY = e.clientY;
+      try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+    } else if (pointers.size === 2){
+      // a second finger turns the gesture into a pinch: stop rotating and never fire a tap
+      dragId = null; dragMoved = true;
+      pinchDist = spread();
+    }
+    e.preventDefault();
   });
-  const endDrag = e=>{ if (camDrag && !camDrag.moved && world) world.tapAt(e.clientX, e.clientY); camDrag = null; };
-  canvas.addEventListener("pointerup", endDrag);
-  canvas.addEventListener("pointercancel", ()=>{ camDrag = null; });
-  let pinch = null;
-  canvas.addEventListener("touchstart", e=>{ if (e.touches.length === 2) pinch = { d: Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY) }; }, {passive:true});
-  canvas.addEventListener("touchmove", e=>{
-    if (e.touches.length === 2 && pinch && world){ const d = Math.hypot(e.touches[0].clientX-e.touches[1].clientX, e.touches[0].clientY-e.touches[1].clientY); world.zoomCam(d - pinch.d); pinch.d = d; }
-  }, {passive:true});
-  canvas.addEventListener("touchend", ()=>{ pinch = null; });
-  if ("ontouchstart" in window) joy.style.display = "block";
+
+  function spread(){
+    const [a,b] = [...pointers.values()];
+    return Math.hypot(a.x-b.x, a.y-b.y);
+  }
+
+  canvas.addEventListener("pointermove", e=>{
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+    if (pointers.size === 2){
+      const d = spread();
+      if (pinchDist) world.zoomCam(pinchDist - d);   // pinch in = zoom out
+      pinchDist = d;
+      return;
+    }
+    if (e.pointerId !== dragId) return;
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    // once the press has travelled past the tap slop it becomes a rotate and stays one
+    if (!dragMoved && Math.hypot(e.clientX-startX, e.clientY-startY) > TAP_SLOP) dragMoved = true;
+    if (dragMoved && world) world.rotateCam(dx);
+    lastX = e.clientX; lastY = e.clientY;
+  });
+
+  function pointerDone(e){
+    const wasDrag = e.pointerId === dragId;
+    const quick = performance.now() - downAt < TAP_MS;
+    pointers.delete(e.pointerId);
+    if (wasDrag && !dragMoved && quick && e.type === "pointerup" && world){
+      world.tapAt(e.clientX, e.clientY);            // tap-to-move
+    }
+    if (wasDrag) dragId = null;
+    if (pointers.size < 2) pinchDist = 0;
+    // one finger lifted from a pinch: hand the drag to the finger still down, without
+    // treating the transition as a tap
+    if (pointers.size === 1 && dragId === null){
+      const [id, pt] = [...pointers.entries()][0];
+      dragId = id; dragMoved = true; lastX = startX = pt.x; lastY = startY = pt.y;
+    }
+  }
+  canvas.addEventListener("pointerup", pointerDone);
+  canvas.addEventListener("pointercancel", pointerDone);
+
+  // desktop: wheel to zoom
+  canvas.addEventListener("wheel", e=>{ if (world){ world.zoomCam(e.deltaY * 0.6); e.preventDefault(); } }, {passive:false});
+  // on-screen zoom buttons (one-handed / no-wheel fallback)
+  const holdZoom = (el, dir) => {
+    let t = null;
+    const go = e => { e.preventDefault(); world && world.zoomCam(dir*18); t = setInterval(()=>world && world.zoomCam(dir*8), 90); };
+    const stop = () => { clearInterval(t); t = null; };
+    el.addEventListener("pointerdown", go);
+    el.addEventListener("pointerup", stop);
+    el.addEventListener("pointercancel", stop);
+    el.addEventListener("pointerleave", stop);
+  };
+  holdZoom($("zoomIn"), -1); holdZoom($("zoomOut"), 1);
+
+  // keep the renderer matched to the element, including on orientation change / chrome collapse
+  const resizeWorld = () => world && world.resize();
+  window.addEventListener("orientationchange", ()=>setTimeout(resizeWorld, 250));
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", resizeWorld);
+
+  if (isTouch) joy.style.display = "block";
   const hud = $("worldHud");
-  hud.textContent = "Walk to a node to gather · enter a hall to open it";
+  hud.textContent = isTouch ? STR.world_hint_touch : STR.world_hint_desktop;
   hud.style.display = "block";
+  setTimeout(()=>{ hud.style.transition = "opacity .6s"; hud.style.opacity = "0"; }, 6000);
 }
 window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
 

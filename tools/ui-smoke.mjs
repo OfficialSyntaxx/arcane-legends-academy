@@ -95,5 +95,15 @@ if (STR){
   else console.log(`string bindings ok (${usedStr.length} used)`);
 } else console.log("! could not resolve the strings export — skipping string binding check");
 
+// ---- static integration: every $("id") the script grabs must exist in the markup ----
+// (the DOM stub auto-creates elements, so a typo'd id would otherwise boot cleanly and only
+//  fail in a real browser — exactly the class of bug that hides in the world/HUD wiring)
+const markupIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
+const dynamicIds = new Set(["scr_", "_uitest"]);   // ids built at render time
+const usedIds = [...new Set([...src.matchAll(/\$\("([^"]+)"\)/g)].map(m=>m[1]))];
+const missingIds = usedIds.filter(id => !markupIds.has(id) && ![...dynamicIds].some(d=>id.startsWith(d)));
+if (missingIds.length){ errors++; console.log("✗ UI grabs ids that are not in the markup:", missingIds.join(", ")); }
+else console.log(`element ids ok (${usedIds.length} used)`);
+
 console.log(errors ? `\n${errors} ERRORS` : "\nUI SMOKE PASS");
 process.exit(errors?1:0);

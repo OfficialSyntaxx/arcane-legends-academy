@@ -160,6 +160,30 @@ check("enemy AoE damages the player's board", ba.you.board.length === 0 || ba.yo
 check("enemy AoE damages the player's wizard", ba.you.hp === youHpBefore - 4);
 check("enemy AoE does not damage its own wizard", ba.enemy.hp === enemyHpBefore);
 
+// ---- 4.48 seeded duels + turn cap ----
+const seedA = G.startDuel(deck20("fire_cat"), flat, deck20("skeleton"), flat, 100, "balance", "balance", 4242);
+const seedB = G.startDuel(deck20("fire_cat"), flat, deck20("skeleton"), flat, 100, "balance", "balance", 4242);
+check("the same seed reproduces a duel exactly", JSON.stringify(seedA.you.deck) === JSON.stringify(seedB.you.deck));
+check("a duel records its seed", Number.isInteger(seedA.seed));
+const mixed = ["fire_cat","ice_golem","pixie","novice","elixir","fire_elf","firebolt","lightning","fire_dragon","storm_titan"].flatMap(id=>[id,id]);
+const seedC = G.startDuel(mixed, flat, deck20("skeleton"), flat, 100, "balance", "balance", 1);
+const seedD = G.startDuel(mixed, flat, deck20("skeleton"), flat, 100, "balance", "balance", 2);
+check("different seeds shuffle differently", JSON.stringify(seedC.you.hand) !== JSON.stringify(seedD.you.hand));
+// a duel where nobody can win still terminates
+const bCap = G.startDuel(deck20("elixir"), flat, deck20("elixir"), flat, 100);
+let capG = 0;
+while (!G.isOver(bCap).over && capG++ < G.MAX_TURNS + 50) G.endTurn(bCap);
+check("a passive duel ends at the turn cap", G.isOver(bCap).over && capG <= G.MAX_TURNS + 1);
+const bTie = G.startDuel(deck20("elixir"), flat, deck20("elixir"), flat, 100);
+bTie.turns = G.MAX_TURNS; bTie.you.hp = 30; bTie.enemy.hp = 30;
+check("equal HP at the cap is a draw", G.isOver(bTie).draw === true && G.isOver(bTie).winner === null);
+bTie.you.hp = 44;
+check("higher HP at the cap wins", G.isOver(bTie).winner === "you");
+const bKo = G.startDuel(deck20("elixir"), flat, deck20("elixir"), flat, 100);
+bKo.you.hp = 0; bKo.enemy.hp = 0;
+check("a double knockout is a draw", G.isOver(bKo).draw === true);
+check("isOver tolerates a missing battle", G.isOver(null).over === false && G.isOver({}).over === false);
+
 // ---- 4.5 field & trap mechanics ----
 const s7 = G.newGame();
 const b7 = G.startDuel(s7.deck, G.equipStats(s7), ["fire_cat","fire_cat","fire_elf","firebolt","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat"], {hp:0,atk:0,def:0,pip:0}, 40);
