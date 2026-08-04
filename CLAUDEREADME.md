@@ -69,6 +69,8 @@ wizard-tcg/                 (the repo root)
 
 ## 4. The 3D World
 
+> **World expansion blueprint:** see [`WORLDSPEC.md`](WORLDSPEC.md) — zone-based architecture, zone config schema, chunk streaming, procedural terrain, and dungeon instancing. This is the roadmap to move from the single campus to a large roamable world.
+
 The world is a walkable academy campus built in Three.js (procedural low-poly + generated GLB characters). Key facts:
 
 - **Camera:** auto-follow, **drag-to-rotate** (orbit), **pinch-to-zoom**, camera-relative movement. Touch joystick on the left, drag on the right, tap-to-move.
