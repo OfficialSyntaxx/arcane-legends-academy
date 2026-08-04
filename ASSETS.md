@@ -9,12 +9,21 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 ---
 
 ## ✅ Already in use
+*Characters:* all 10 NPC/player GLBs (Meshy 2D→3D) — see `CLAUDEREADME` §9.
+
 | File | Source | License | Used as |
 |---|---|---|---|
 | `kaykit_tree.glb` | KayKit – Forest Nature Pack | CC0 | Woodcutting node (Chop Oak/Willow) |
 | `kaykit_rock.glb` | KayKit – Forest Nature Pack | CC0 | Mining node (Mine Copper/Iron) |
+| `hex_castle.glb` | KayKit – Medieval Hexagon | CC0 | Central academy hall (0,0) |
+| `hex_blacksmith.glb` | KayKit – Medieval Hexagon | CC0 | Smithy & Forge (16,-7) |
+| `hex_church.glb` | KayKit – Medieval Hexagon | CC0 | Scribing Hall (-16,-7) |
+| `hex_market.glb` | KayKit – Medieval Hexagon | CC0 | Merchant stall (16,6) |
+| `hex_tavern.glb` | KayKit – Medieval Hexagon | CC0 | Social hangout (-7,12) |
+| `hex_tower_A.glb` | KayKit – Medieval Hexagon | CC0 | Academy tower (-16,-16) |
+| `hex_home_A.glb` | KayKit – Medieval Hexagon | CC0 | Student Dorms (0,16) |
 
-*Characters:* all 10 NPC/player GLBs (Meshy 2D→3D) — see `CLAUDEREADME` §9.
+**Downloaded (on disk in `/tmp/kaykit_packs`, not yet imported):** KayKit Dungeon-Remastered, Character Pack Skeletons, Character Pack Adventures, Furniture Bits, City Builder Bits. All **CC0**, ship `.glb`/`.gltf` natively (no FBX conversion needed).
 
 ---
 

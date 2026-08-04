@@ -65,14 +65,11 @@ export function createWorld(canvas, callbacks){
     }
     return base;
   }
-  // Scribing Hall (left)
-  stucco(-16, -7, 7, 5, 5.5, 0.3, 0x6a5b9e, 0x2a1f4d);
+  // Scribing Hall (left) — replaced by KayKit church GLB (see GLB buildings below)
   // Library (left-front)
   stucco(-16, 6, 6, 5, 4.5, -0.3, 0x5a4a8a, 0x2a1f4d);
-  // Smithy (right)
-  stucco(16, -7, 7, 5, 4.5, -0.3, 0x7a5a6a, 0x8a3a2a);
-  // Merchant stall (right-front)
-  stucco(16, 6, 6, 4, 3.5, 0.3, 0x8a6a3a, 0x2f6f4f);
+  // Smithy (right) — replaced by KayKit blacksmith GLB
+  // Merchant stall (right-front) — replaced by KayKit market GLB
   // Duel Arena (center-back) — round
   const arena = add(new THREE.CylinderGeometry(6, 6.5, 2.5, 24), mat(0x4a3a7a), 0, 1.25, -16);
   add(new THREE.ConeGeometry(6.8, 2.2, 24), mat(0x2a1f4d), 0, 3.6, -16);
@@ -87,10 +84,7 @@ export function createWorld(canvas, callbacks){
     l.material.emissive = new THREE.Color(0xffaa44); l.material.emissiveIntensity = 1.5;
   }
   lamp(6,6); lamp(-6,6); lamp(6,-6); lamp(-6,-6); lamp(0,12); lamp(0,-12);
-  // central tower
-  add(new THREE.CylinderGeometry(2.4, 3.2, 13, 8), mat(0x5a4a8a), 0, 6.5, 0);
-  add(new THREE.ConeGeometry(3.6, 4.5, 8), mat(0x2a1f4d), 0, 15.3, 0);
-  add(new THREE.SphereGeometry(0.8, 12, 12), mat(GOLD), 0, 17.9, 0);
+  // central tower — replaced by the KayKit castle GLB (main academy hall, see below)
   // floating crystal spires (blue diamond tips caused visual glitch in some GPUs) — moved far outside view
   for (let i=0;i<8;i++){
     const a = (i/8)*Math.PI*2 + 0.3, r = 70 + (i%2)*6;
@@ -238,6 +232,15 @@ export function createWorld(canvas, callbacks){
   treeNode(17, -4, 'willow_log', 'Chop Willow');
   rockNode(-11, -4, 'copper', 'Mine Copper');
   rockNode(-13, -8, 'iron', 'Mine Iron');
+
+  // KayKit medieval buildings (CC0) replacing the procedural academy structures
+  loadProp('./assets/models/hex_castle.glb', 11,   { x: 0,  z: 0  });   // central academy hall
+  loadProp('./assets/models/hex_blacksmith.glb', 4.5, { x: 16, z: -7 });  // Smithy & Forge
+  loadProp('./assets/models/hex_church.glb', 5,    { x: -16, z: -7 });   // Scribing Hall
+  loadProp('./assets/models/hex_market.glb', 3.5,  { x: 16, z: 6  });   // Merchant stall
+  loadProp('./assets/models/hex_tavern.glb', 4,    { x: -7, z: 12 });   // social hangout
+  loadProp('./assets/models/hex_tower_A.glb', 8,   { x: -16, z: -16 });  // academy tower
+  loadProp('./assets/models/hex_home_A.glb', 4.5, { x: 0,  z: 16 });   // Student Dorms
 
   // ---------- stations ----------
   register('station', -16, -7, 'scribe', 'Scribing Hall', null);
