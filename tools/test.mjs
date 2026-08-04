@@ -6,6 +6,8 @@ import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
 import * as ST from "../public/structures.js";
 import { SFX as AUDIO_SFX } from "../public/audio.js";
 import { CDN } from "../public/cdn.js";
+import * as TER from "../public/terrain.js";
+import * as WC from "../public/worldconfig.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -199,6 +201,182 @@ check("every cue the UI plays exists in the SFX table", (()=>{
   const html = fsReadIndex();
   const used = [...new Set([...html.matchAll(/AUDIO\.play\("([a-zA-Z]+)"\)/g)].map(m=>m[1]))];
   return used.length > 0 && used.every(n => n in AUDIO_SFX);
+})());
+
+// ---- 4.37 WORLDSPEC step 1: zone config data model ----
+const zonesDoc = JSON.parse(fs.readFileSync(path.join(ROOT_PUBLIC, "world", "zones.json"), "utf8"));
+const WORLD = WC.buildWorld(zonesDoc);
+check("world config loads at least two zones", WORLD.zoneIds.length >= 2);
+check("a hub zone is identified", WORLD.hub === "academy");
+check("defaults fill in for unspecified fields", (()=>{
+  const w = WC.buildWorld({ zones:[{ id:"bare", name:"Bare", spawn:{x:0,z:0} }] });
+  const z = w.get("bare");
+  return z.chunkSize === WC.ZONE_DEFAULTS.chunkSize && z.terrain.biome === "plains" && Array.isArray(z.props);
+})());
+check("partial terrain config keeps the other defaults", (()=>{
+  const z = WC.buildWorld({ zones:[{ id:"p", spawn:{x:0,z:0}, terrain:{ seed:9 } }] }).get("p");
+  return z.terrain.seed === 9 && z.terrain.scale === WC.ZONE_DEFAULTS.terrain.scale;
+})());
+// every authored zone must validate, with models resolved against what actually exists
+const knownModels = new Set([
+  ...fs.readdirSync(path.join(ROOT_PUBLIC, "assets", "models")).filter(f=>f.endsWith(".glb")),
+  ...(fs.existsSync(path.join(ROOT_PUBLIC, "assets", "buildings"))
+      ? fs.readdirSync(path.join(ROOT_PUBLIC, "assets", "buildings")).filter(f=>f.endsWith(".glb")) : []),
+  ...Object.keys(CDN),
+]);
+const zoneProblems = [];
+for (const id of WORLD.zoneIds){
+  zoneProblems.push(...WC.validateZone(WORLD.get(id), { knownModels:[...knownModels], zoneIds: WORLD.zoneIds }));
+}
+if (zoneProblems.length) console.log("   zone problems:", zoneProblems.slice(0,6).join(" | "));
+check("every authored zone validates", zoneProblems.length === 0);
+check("validation catches an inverted-bounds zone", WC.validateZone(
+  WC.buildWorld({zones:[{id:"bad", name:"B", spawn:{x:0,z:0}, bounds:{minX:10,maxX:-10,minZ:0,maxZ:1}}]}).get("bad")
+).some(p => /inverted bounds/.test(p)));
+check("validation catches load/unload thrash", WC.validateZone(
+  WC.buildWorld({zones:[{id:"t", name:"T", spawn:{x:0,z:0}, loadRadius:100, unloadRadius:70}]}).get("t")
+).some(p => /thrash/.test(p)));
+check("validation catches an exit to a missing zone", WC.validateZone(
+  WC.buildWorld({zones:[{id:"a", name:"A", spawn:{x:0,z:0}, exits:[{toZone:"nowhere"}]}]}).get("a"), { zoneIds:["a"] }
+).some(p => /unknown zone/.test(p)));
+check("validation catches out-of-bounds placement", WC.validateZone(
+  WC.buildWorld({zones:[{id:"o", name:"O", spawn:{x:0,z:0}, bounds:{minX:-10,maxX:10,minZ:-10,maxZ:10},
+    npcs:[{key:"far", x:500, z:0, model:"x.glb"}]}]}).get("o")
+).some(p => /outside zone bounds/.test(p)));
+check("every zone exit is mutually reachable", (()=>{
+  for (const id of WORLD.zoneIds){
+    for (const e of WORLD.get(id).exits){
+      const back = WORLD.get(e.toZone);
+      if (!back || !back.exits.some(x => x.toZone === id)) return false;   // one-way exit strands the player
+    }
+  }
+  return true;
+})());
+// chunk helpers (the coordinate convention step 3 will build on)
+check("chunk coords are stable across the origin", WC.chunkCoord(-1, 32) === -1 && WC.chunkCoord(0, 32) === 0 && WC.chunkCoord(33, 32) === 1);
+check("chunk centre is inside its own chunk", (()=>{
+  const c = WC.chunkCenter(3, -2, 32);
+  return WC.chunkCoord(c.x, 32) === 3 && WC.chunkCoord(c.z, 32) === -2;
+})());
+check("chunksInRadius covers the player's own chunk", (()=>{
+  const got = WC.chunksInRadius(5, 5, 32, 70);
+  return got.some(c => c.key === WC.chunkKey(0, 0)) && got.length > 4;
+})());
+check("chunksInRadius grows with radius", WC.chunksInRadius(0,0,32,120).length > WC.chunksInRadius(0,0,32,70).length);
+
+// ---- 4.38 WORLDSPEC step 2: procedural terrain ----
+const acad = WORLD.get("academy"), forest = WORLD.get("whispering_forest");
+const acadFlats = TER.flatsForZone(acad), forestFlats = TER.flatsForZone(forest);
+check("terrain is deterministic for a given seed", (()=>{
+  const a = TER.heightAt(12.3, -47.9, forest.terrain, forestFlats);
+  const b = TER.heightAt(12.3, -47.9, forest.terrain, forestFlats);
+  return a === b;
+})());
+check("a different seed gives different terrain", (()=>{
+  const t2 = { ...forest.terrain, seed: forest.terrain.seed + 1 };
+  let diff = 0;
+  for (let i = 0; i < 40; i++){
+    const x = i * 7.3, z = i * -5.1;
+    if (Math.abs(TER.heightAt(x,z,forest.terrain,[]) - TER.heightAt(x,z,t2,[])) > 1e-6) diff++;
+  }
+  return diff > 30;
+})());
+check("terrain stays within its amplitude budget", (()=>{
+  const biome = TER.BIOMES[forest.terrain.biome];
+  const max = forest.terrain.amplitude * biome.rough + 1e-6;
+  for (let i = 0; i < 400; i++){
+    const x = (i % 20) * 15 - 150, z = Math.floor(i / 20) * 15 - 150;
+    if (Math.abs(TER.heightAt(x, z, forest.terrain, [])) > max) return false;
+  }
+  return true;
+})());
+check("terrain is continuous (no cliffs between adjacent samples)", (()=>{
+  let worst = 0;
+  for (let i = 0; i < 300; i++){
+    const x = (i % 30) * 5 - 75, z = Math.floor(i / 30) * 5 - 75;
+    worst = Math.max(worst, Math.abs(TER.heightAt(x+0.5,z,forest.terrain,forestFlats) - TER.heightAt(x,z,forest.terrain,forestFlats)));
+  }
+  return worst < 1.5;
+})());
+// the constraint that actually matters: landmarks must not float or clip
+check("every academy building sits on flat ground", (()=>{
+  const bad = [];
+  for (const b of acad.buildings){
+    for (const [dx,dz] of [[0,0],[b.w/2,0],[-b.w/2,0],[0,b.d/2],[0,-b.d/2]]){
+      const h = TER.heightAt(b.x+dx, b.z+dz, acad.terrain, acadFlats);
+      if (Math.abs(h) > 0.5) bad.push(`${b.id}@${h.toFixed(2)}`);
+    }
+  }
+  if (bad.length) console.log("   not flat:", bad.slice(0,4).join(", "));
+  return bad.length === 0;
+})());
+check("landmarks, NPCs and the spawn sit on flat ground", (()=>{
+  const pts = [[acad.spawn.x, acad.spawn.z], ...acad.landmarks.map(l=>[l.x,l.z]), ...acad.npcs.map(n=>[n.x,n.z])];
+  return pts.every(([x,z]) => Math.abs(TER.heightAt(x, z, acad.terrain, acadFlats)) <= 0.5);
+})());
+check("flattening eases out rather than stepping", (()=>{
+  const f = [{x:0, z:0, r:10}];
+  let prev = TER.flatteningFactor(0, 0, f), maxJump = 0;
+  for (let d = 0; d <= 30; d += 0.5){
+    const cur = TER.flatteningFactor(d, 0, f);
+    maxJump = Math.max(maxJump, Math.abs(cur - prev)); prev = cur;
+  }
+  return maxJump < 0.15;
+})());
+check("flattening is fully off far from any landmark", TER.flatteningFactor(500, 500, acadFlats) === 1);
+check("the academy hub is gentle terrain", acad.terrain.amplitude * TER.BIOMES[acad.terrain.biome].rough <= 2);
+check("water only exists where a zone declares a water level", (()=>{
+  if (TER.isWater(0, 0, acad.terrain, acadFlats)) return false;      // academy has no waterLevel
+  let anyWater = false;
+  for (let i = 0; i < 400; i++){
+    const x = (i % 20) * 16 - 160, z = Math.floor(i / 20) * 16 - 160;
+    if (TER.isWater(x, z, forest.terrain, forestFlats)) { anyWater = true; break; }
+  }
+  return anyWater;                                                    // forest declares one, so some exists
+})());
+check("slope is finite and sane everywhere sampled", (()=>{
+  for (let i = 0; i < 200; i++){
+    const x = (i % 20) * 15 - 150, z = Math.floor(i / 20) * 15 - 150;
+    const sl = TER.slopeAt(x, z, forest.terrain, forestFlats);
+    if (!Number.isFinite(sl) || sl > 4) return false;
+  }
+  return true;
+})());
+// REGRESSION: the first hash multiplied the seed by a 64-bit constant, past MAX_SAFE_INTEGER.
+// The product lost its low bits, the hash returned a constant, and every zone came out perfectly
+// flat — while every other terrain assertion (determinism, amplitude, continuity, slope) still
+// passed, because a constant satisfies all of them. Terrain must actually VARY.
+check("terrain actually varies across a zone", (()=>{
+  for (const z of [acad, forest]){
+    const flats = TER.flatsForZone(z), hs = [];
+    for (let i = 0; i < 200; i++){
+      const x = (i % 20) * 14 - 140, zz = Math.floor(i / 20) * 14 - 140;
+      hs.push(TER.heightAt(x, zz, z.terrain, flats));
+    }
+    const spread = Math.max(...hs) - Math.min(...hs);
+    const distinct = new Set(hs.map(v => v.toFixed(3))).size;
+    if (spread < 0.2 || distinct < 20){
+      console.log(`   ${z.id} is flat: spread=${spread.toFixed(3)} distinct=${distinct}`);
+      return false;
+    }
+  }
+  return true;
+})());
+check("the noise hash is well distributed (not collapsing to a constant)", (()=>{
+  // sample across seeds too — the old bug was seed-dependent
+  for (const seed of [1, 999, 20260804, 77123, 2147480000]){
+    const vals = new Set();
+    for (let i = 0; i < 120; i++) vals.add(TER.fbm(i * 0.31, i * 0.77, seed).toFixed(4));
+    if (vals.size < 40) { console.log(`   seed ${seed} collapsed to ${vals.size} distinct values`); return false; }
+  }
+  return true;
+})());
+check("fbm stays in -1..1", (()=>{
+  for (let i = 0; i < 500; i++){
+    const v = TER.fbm(i * 0.37, i * -0.19, 42);
+    if (!(v >= -1.0001 && v <= 1.0001)) return false;
+  }
+  return true;
 })());
 
 // ---- 4.4 grade bands (regression: a forward find collapsed every roll to "Poor") ----

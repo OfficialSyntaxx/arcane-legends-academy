@@ -12,7 +12,10 @@ The blueprint for moving from a single campus spawn point to a large, roamable, 
 3. **Dungeons & boss rooms are instanced interior zones.** They are NOT crammed into the outdoor terrain. Entering a door/cave loads a self-contained interior scene.
 4. **Chunk streaming keeps it fast.** Only nearby chunks load; far ones unload. This is what permits a genuinely large map.
 5. **Deploy stays small (<50MB).** Big models stay on the CDN; `public/` ships only code + light assets (currently ~6.5MB).
-6. **Mobile-first.** Low poly, texture-resized (512px), reasonable draw calls per chunk.
+6. **Mobile-first.** Low poly, reasonable draw calls per chunk. **Textures stay at source
+   resolution (2048px)** — the old 512px cap was a 16x loss of texel density and the reason
+   imported models looked soft; **Draco** (`npm run compress`) is what keeps the deploy small,
+   not texture downsizing. See `ASSETS.md`.
 
 ---
 
@@ -187,7 +190,7 @@ Dungeons and boss rooms are **interior instances** — separate scenes, not part
 
 - **Deploy:** keep `public/` < ~50MB. Big models → CDN (`models_cdn/` + `cdn.js`). (Current: ~6.5MB.)
 - **Per chunk:** cap instanced props (~60) and draw calls; reuse `InstancedMesh` for repeated props (trees/rocks).
-- **Model budget:** characters ≤ ~2.6MB, props ≤ ~1.5MB, textures 512px. Use `tools/import-asset.mjs` to resize/verify.
+- **Model budget:** characters ≤ ~2.6MB, props ≤ ~1.5MB, textures **2048px**. Use `tools/import-asset.mjs` to import and `npm run compress` (Draco + WebP@92) to shrink.
 - **Streaming:** never load a chunk > UNLOAD_RADIUS; cache CDN models in memory (Map) so revisits are instant.
 - **Mobile:** target 30–60fps; LOD = swap far chunks to a low-poly terrain-only mesh.
 
@@ -195,12 +198,61 @@ Dungeons and boss rooms are **interior instances** — separate scenes, not part
 
 ## 9. Implementation order (for Claude Code)
 
-1. **World config + data model** — `world/*.json` + a `loadWorldConfig()` that reads them; expose `createWorld` to accept a zone config instead of the hardcoded campus. *(Foundation.)*
-2. **Zone terrain** — procedural heightmap per zone (§5), player height sampling + collision, water.
+1. ✅ **World config + data model** — `public/world/zones.json` + `public/worldconfig.js`
+   (`loadWorldConfig`, `buildWorld`, `validateZone`, defaults, chunk helpers). `createWorld(canvas,
+   callbacks, zone)` now accepts a zone; omitting it falls back to the built-in academy tables so
+   the hub keeps working. Two zones ship: `academy` (migrated from `structures.js`/`nodes.js`) and
+   `whispering_forest` (**authored as pure JSON — no engine change**, which is the proof this works).
+2. ✅ **Zone terrain** — `public/terrain.js`: seeded value-noise fBm, biomes, flat zones, slope and
+   water. The ground is a displaced heightmap; the player, NPCs, buildings, landmarks and props all
+   sit on the surface. Water renders only where a zone declares `waterLevel`.
 3. **Chunk streaming** — chunk grid, load/unload by distance (§4), CDN-backed prop instantiation (reuse `loadProp`/`makeCharModel`).
 4. **Zone transitions** — walkable `exits` that switch the active zone (spawn at the target zone's entry).
 5. **Dungeon instancing** — entrance → suspend zone → load interior → rooms/corridors → boss room → exit restores zone (§6).
 6. **Content pass** — author the first 2–3 zones (Academy, Whispering Forest, Cinderhollow) + one dungeon, using imported CC0 models.
+
+---
+
+## 9b. Additions from implementing steps 1–2
+
+These were missing from the original blueprint and are now part of it.
+
+**a. Terrain must compose with the existing 2D collision, not replace it.**
+`structures.js` already resolves collision against buildings/props in X/Z. Terrain adds the Y
+axis only: movement resolves in X/Z as before, *then* Y is sampled from the heightmap. There is
+no 3D physics and none is needed.
+
+**b. Landmarks flatten the terrain, not the other way round.**
+Rather than nudging buildings to fit the ground, each landmark/NPC/node/spawn declares a flat
+zone and the terrain blends back to base height across it (`terrain.js flatteningFactor`, eased
+over `r → 2r` so there is no step at the edge). Flat zones are **derived from the zone's own
+content** (`flatsForZone`) so an author never maintains a second list. Tests assert every
+building corner, landmark, NPC and the spawn sits within ±0.5 of base height.
+
+**c. Colour management applies to terrain too.**
+Any hex colour in a zone/biome config must go through `convertSRGBToLinear()` (see §3 of
+`CLAUDEREADME`), or the ground washes out relative to the models standing on it.
+
+**d. Everything spatial must be pure and headlessly testable.**
+`terrain.js` and `worldconfig.js` contain **no THREE and no DOM**, matching `structures.js` /
+`nodes.js`. This is what lets `tools/test.mjs` validate zones, bounds, flatness, determinism and
+chunk maths without a browser. **Do not put spatial maths in `world.js`.**
+
+**e. Camera collision is a prerequisite, not a nice-to-have.**
+The follow camera has no collision today; with terrain it will also clip *through hills*. Fix
+before step 3 (see `docs/DESIGN-DECISIONS.md` §3).
+
+**f. Zone exits must be mutually reachable.**
+A one-way exit strands the player. Tested.
+
+**g. Chunk budget sanity.** `chunkSize 32` + `LOAD_RADIUS 70` loads ~25 chunks; at the §8 cap of
+60 props/chunk that is 1,500 instances. Either raise `chunkSize` (fewer, bigger chunks) or lower
+the per-chunk cap for mobile. **Revisit these numbers when step 3 lands** — they are untested.
+
+**h. Known gap: content authored as `count` is not yet scattered.**
+`whispering_forest` declares `props`/`resourceNodes`/`enemies` with `count`. The deterministic
+scatter that turns a count into positions belongs to **step 3** (it is per-chunk). Until then
+those entries validate but do not render.
 
 ---
 

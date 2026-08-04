@@ -55,6 +55,9 @@ wizard-tcg/                 (the repo root)
 │   ├── items.js            skills, materials, equipment, recipes, home upgrades
 │   ├── nodes.js            gathering-node table (data; world.js builds the meshes from it)
 │   ├── structures.js       buildings, NPC positions, obstacles + the collision resolver (data)
+│   ├── terrain.js          procedural heightmap maths — PURE, no THREE (WORLDSPEC §5)
+│   ├── worldconfig.js      zone loading/validation/defaults + chunk helpers — PURE
+│   ├── world/zones.json    the zone catalog (academy + whispering_forest)
 │   ├── audio.js            procedural WebAudio: SFX, ambience, music (no asset files)
 │   ├── game.js             engine: skills, economy, market, auctions, housing, duels, AI
 │   ├── world.js            the 3D academy world (Three.js scene, movement, camera, NPCs, GLB loading)
@@ -64,7 +67,7 @@ wizard-tcg/                 (the repo root)
 │   └── assets/             generated art, character GLBs (models/), landmarks (buildings/)
 ├── tools/                  headless test suites
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
-│   ├── test.mjs            engine tests (102 checks)
+│   ├── test.mjs            engine tests (135 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
 │   ├── browser-test.mjs    real-Chromium responsive + input-gesture suite

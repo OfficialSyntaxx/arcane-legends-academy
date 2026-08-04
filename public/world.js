@@ -5,8 +5,24 @@
 import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
 import { BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
+import { heightAt, isWater, flatsForZone, BIOMES } from "./terrain.js";
 
-export function createWorld(canvas, callbacks){
+// `zone` is an optional normalised zone config (see worldconfig.js). Omitted, the world falls
+// back to the academy tables in structures.js/nodes.js — the migration state described in
+// WORLDSPEC §10, so the hub keeps working while zones.json becomes the runtime contract.
+export function createWorld(canvas, callbacks, zone){
+  const ZONE = zone || {
+    id: "academy",
+    spawn: PLAYER_SPAWN,
+    bounds: { minX:-WORLD_BOUND, maxX:WORLD_BOUND, minZ:-WORLD_BOUND, maxZ:WORLD_BOUND },
+    terrain: { seed: 20260804, scale: 55, amplitude: 1.4, baseHeight: 0, biome: "plains" },
+    buildings: BUILDINGS, landmarks: LANDMARKS, props: PROPS,
+    npcs: NPCS, resourceNodes: WORLD_NODES,
+  };
+  // Flat zones are derived from the zone's own content, so a landmark that exists is a landmark
+  // that gets level ground — no separate list to keep in sync.
+  const FLATS = flatsForZone(ZONE);
+  const groundY = (x, z) => heightAt(x, z, ZONE.terrain, FLATS);
   const THREE = window.THREE;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.5));
@@ -89,9 +105,32 @@ export function createWorld(canvas, callbacks){
     return mesh;
   };
 
-  // ---------- ground ----------
-  const ground = add(new THREE.PlaneGeometry(300, 300), mat(0x2f7d4f), 0, 0, 0, {receive:true});
+  // ---------- ground: procedural heightmap (WORLDSPEC §5) ----------
+  // One displaced plane for the whole zone for now; step 3 (chunk streaming) subdivides this.
+  const biome = BIOMES[ZONE.terrain.biome] || BIOMES.plains;
+  const groundSpan = Math.max(
+    ZONE.bounds.maxX - ZONE.bounds.minX, ZONE.bounds.maxZ - ZONE.bounds.minZ) + 80;
+  const GROUND_SEGS = 96;                       // ~1.5m per quad at 150m span — smooth on mobile
+  const groundGeo = new THREE.PlaneGeometry(groundSpan, groundSpan, GROUND_SEGS, GROUND_SEGS);
+  {
+    const pos = groundGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++){
+      // the plane is built in XY then rotated onto XZ, so its local y IS world -z
+      const wx = pos.getX(i), wz = -pos.getY(i);
+      pos.setZ(i, groundY(wx, wz));
+    }
+    pos.needsUpdate = true;
+    groundGeo.computeVertexNormals();
+  }
+  const ground = add(groundGeo, mat(biome.ground), 0, 0, 0, {receive:true});
   ground.rotation.x = -Math.PI/2;
+  // water, only where the zone declares a level
+  if (ZONE.terrain.waterLevel != null){
+    const wm = new THREE.MeshLambertMaterial({ color: biome.water, transparent:true, opacity:0.72 });
+    wm.color.convertSRGBToLinear();
+    const water = add(new THREE.PlaneGeometry(groundSpan, groundSpan), wm, 0, ZONE.terrain.waterLevel, 0, {receive:true, cast:false});
+    water.rotation.x = -Math.PI/2;
+  }
   // courtyard platform — removed (large flat disc reads as an edge-on artifact at this camera angle)
   // paths radiating from center
   for (let i=0;i<4;i++){
@@ -220,7 +259,9 @@ export function createWorld(canvas, callbacks){
     g.userData.armL.rotation.x = r; g.userData.armR.rotation.x = -r;
     g.userData.legL.rotation.x = -r; g.userData.legR.rotation.x = r;
     g.userData.staff.rotation.x = 0;
-    g.position.y = Math.abs(Math.sin(t*9))*0.09*speed;
+    // bob relative to whatever ground this character is standing on (terrain, not y=0)
+    const base = g.userData.groundY || 0;
+    g.position.y = base + Math.abs(Math.sin(t*9))*0.09*speed;
   }
 
   // ---------- player ----------
@@ -247,7 +288,7 @@ export function createWorld(canvas, callbacks){
     }
   }
   const player = makeWizard(0x3a6bd8, 0x2a1f4d);
-  player.position.set(PLAYER_SPAWN.x, 0, PLAYER_SPAWN.z);
+  player.position.set(ZONE.spawn.x, groundY(ZONE.spawn.x, ZONE.spawn.z), ZONE.spawn.z);
   scene.add(player);
   const playerSpeed = 14;
 
@@ -321,6 +362,7 @@ export function createWorld(canvas, callbacks){
   const npcByKey = {};
   for (const n of NPCS){
     const g = makeNpc(n.x, n.z, n.main, n.hat, { role:n.role, orb:n.orb, key:n.key });
+    g.position.y = groundY(n.x, n.z);
     npcByKey[n.key] = g;
     register('station', n.x, n.z, n.station, n.label, g, 5.5);
   }
@@ -454,7 +496,8 @@ export function createWorld(canvas, callbacks){
       model.updateMatrixWorld(true);
       // centre on X/Z and sit the base on the ground, then move to the world position
       const cx = (box.min.x + box.max.x) / 2 * scale, cz = (box.min.z + box.max.z) / 2 * scale;
-      model.position.set(x - cx, -box.min.y * scale, z - cz);
+      // sit on the terrain surface, not on y=0 — flat zones keep landmarks level (terrain.js)
+      model.position.set(x - cx, groundY(x, z) - box.min.y * scale, z - cz);
       const placeholder = group.children.slice();
       group.add(model);
       for (const c of placeholder) group.remove(c);
@@ -562,6 +605,7 @@ export function createWorld(canvas, callbacks){
       // depenetrate rather than block, so the player slides along a wall instead of sticking
       const hit = resolveCollisions(nx, nz, PLAYER_RADIUS, OBSTACLES);
       player.position.x = hit.x; player.position.z = hit.z;
+      player.position.y = groundY(hit.x, hit.z);      // walk the heightmap (WORLDSPEC §5)
       // a tap-to-move target inside a building is unreachable — drop it instead of grinding
       if (tapSet && Math.hypot(hit.x-nx, hit.z-nz) > 0.001){
         stuckT += dt;
@@ -572,6 +616,7 @@ export function createWorld(canvas, callbacks){
       while (diff>Math.PI) diff-=Math.PI*2; while (diff<-Math.PI) diff+=Math.PI*2;
       player.rotation.y += diff*Math.min(1, dt*10);
       walkT += dt;
+      player.userData.groundY = groundY(player.position.x, player.position.z);
       if (!chars.player) animateWizard(player, walkT, Math.min(1, ml));
     } else {
       if (chars.player){
@@ -579,7 +624,7 @@ export function createWorld(canvas, callbacks){
       } else {
         player.userData.armL.rotation.x = Math.sin(walkT*0.5)*0.05;
         player.userData.armR.rotation.x = -Math.sin(walkT*0.5)*0.05;
-        player.position.y = 0;
+        player.position.y = groundY(player.position.x, player.position.z);
       }
     }
   }
@@ -595,6 +640,7 @@ export function createWorld(canvas, callbacks){
           const wnx = n.mesh.position.x + (dx/d)*4.0*dt, wnz = n.mesh.position.z + (dz/d)*4.0*dt;
           const wh = resolveCollisions(wnx, wnz, PLAYER_RADIUS, OBSTACLES);
           n.mesh.position.x = wh.x; n.mesh.position.z = wh.z;
+          n.mesh.position.y = groundY(wh.x, wh.z);
           n.mesh.rotation.y = Math.atan2(dx,dz);
           // walked into a wall: pick a fresh destination rather than grinding against it
           if (Math.hypot(wh.x-wnx, wh.z-wnz) > 0.001){
@@ -602,7 +648,7 @@ export function createWorld(canvas, callbacks){
             if (n.stuck > 0.8){ n.stuck = 0; n.t = 0; n.pause = 0.4; const a2=Math.random()*Math.PI*2, r2=26+Math.random()*22; n.tx=Math.cos(a2)*r2; n.tz=Math.sin(a2)*r2; }
           } else n.stuck = 0;
           if (c){ c.walking = true; c.walkSpeed = Math.min(1, 0.4 + d*0.2); }
-          else animateWizard(n.mesh, now*0.001, 1);
+          else { n.mesh.userData.groundY = groundY(n.mesh.position.x, n.mesh.position.z); animateWizard(n.mesh, now*0.001, 1); }
         } else {
           n.t += dt;
           if (n.t>2){
@@ -743,8 +789,9 @@ export function createWorld(canvas, callbacks){
         Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, z)),
         PLAYER_RADIUS, OBSTACLES);
       player.position.x = p.x; player.position.z = p.z;
+      player.position.y = groundY(p.x, p.z);   // land on the surface, not at y=0
       tapTarget = null; tapSet = false;
-      return { x:p.x, z:p.z };
+      return { x:p.x, y:player.position.y, z:p.z };
     },
     resize(){ onResize(); },
     dispose(){ window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); cancelAnimationFrame(raf); renderer.dispose(); },

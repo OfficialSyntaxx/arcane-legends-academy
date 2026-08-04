@@ -306,6 +306,7 @@ import * as G from "./game.js";
 import { createWorld } from "./world.js";
 import { createAudio, SFX } from "./audio.js";
 import { createBattle3d } from "./battle3d.js";
+import { loadWorldConfig } from "./worldconfig.js";
 
 // ================= state =================
 let S = G.load();
@@ -1169,8 +1170,17 @@ const NPC_DIALOGUE = {
   librarian: { name:"Librarian Ossa", role:"Keeper of the Library of Echoes", lines:["The Library of Echoes holds every lesson and challenge record of the Arcanum.","Take on the day's challenge when you're ready, young spellwright."], buttons:[{label:"📜 Daily Challenge", primary:true, action:()=>{screen="quests";render();}}] },
 };
 const isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints||0) > 0;
-function initWorld(){
+// The active zone config (WORLDSPEC step 1). Loaded before the world is built; if the fetch
+// fails the world falls back to its built-in academy tables rather than not booting at all.
+let worldCfg = null, activeZone = null;
+async function initWorld(){
   const canvas = $("world");
+  try {
+    worldCfg = await loadWorldConfig();
+    activeZone = worldCfg.get(worldCfg.hub);
+  } catch(e){
+    console.warn("world config unavailable, using built-in academy:", e && e.message);
+  }
   try {
     world = createWorld(canvas, {
     onNearby(target){
@@ -1213,7 +1223,7 @@ function initWorld(){
       if (dlg){ showDialogue(dlg.name, dlg.role, dlg.lines, dlg.buttons); }
       else { screen = stationTarget(station); render(); }
     },
-  });
+  }, activeZone);
   } catch(e){ console.warn("3D world unavailable:", e); return; }
   // Exposed for tools/browser-test.mjs, which drives the real input/collision paths that the
   // headless smoke test cannot reach (createWorld needs WebGL).
@@ -1363,9 +1373,9 @@ window.__EV.toggleMute = ()=>{
 };
 
 // ================= boot =================
-function boot(){
+async function boot(){
   $("muteBtn").textContent = AUDIO.isMuted() ? "🔇" : "🔊";
-  initWorld();
+  await initWorld();
   if (world) world.setPlayerColor(SCHOOLS[S.school].color);
   if (!S.flags.schoolPicked) showSchoolPicker();
   // online room from URL
