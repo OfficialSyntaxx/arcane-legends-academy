@@ -68,7 +68,7 @@ wizard-tcg/                 (the repo root)
 ├── tools/                  headless test suites
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
 │   ├── sync-zones.mjs      regenerates the academy zone in zones.json (--check in CI)
-│   ├── test.mjs            engine tests (148 checks)
+│   ├── test.mjs            engine tests (164 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
 │   ├── browser-test.mjs    real-Chromium responsive + input-gesture suite

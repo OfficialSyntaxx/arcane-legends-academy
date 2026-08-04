@@ -6,6 +6,7 @@ import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
 import { BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
 import { heightAt, isWater, flatsForZone, BIOMES } from "./terrain.js";
+import { scatterZone, bucketByChunk, chunkDelta } from "./worldconfig.js";
 
 // `zone` is an optional normalised zone config (see worldconfig.js). Omitted, the world falls
 // back to the academy tables in structures.js/nodes.js — the migration state described in
@@ -17,7 +18,10 @@ export function createWorld(canvas, callbacks, zone){
     bounds: { minX:-WORLD_BOUND, maxX:WORLD_BOUND, minZ:-WORLD_BOUND, maxZ:WORLD_BOUND },
     terrain: { seed: 20260804, scale: 55, amplitude: 1.4, baseHeight: 0, biome: "plains" },
     buildings: BUILDINGS, landmarks: LANDMARKS, props: PROPS,
-    npcs: NPCS, resourceNodes: WORLD_NODES,
+    npcs: NPCS, wanderers: WANDERERS, resourceNodes: WORLD_NODES,
+    nodeModels: NODE_MODELS, treeRing: TREE_RING, obstacles: OBSTACLES,
+    decor: { paths:true, spires:true, fountain:[0,-18],
+             lamps:[[13,13],[-13,13],[13,-13],[-13,-13],[0,24],[0,-24],[26,0],[-26,0]] },
   };
   // Flat zones are derived from the zone's own content, so a landmark that exists is a landmark
   // that gets level ground — no separate list to keep in sync.
@@ -140,11 +144,15 @@ export function createWorld(canvas, callbacks, zone){
     water.rotation.x = -Math.PI/2;
   }
   // courtyard platform — removed (large flat disc reads as an edge-on artifact at this camera angle)
-  // paths radiating from center
-  for (let i=0;i<4;i++){
-    const a = (i/4)*Math.PI*2 + Math.PI/4;
-    const p = add(new THREE.PlaneGeometry(4.6, 52), mat(0xc9b877), Math.cos(a)*16, 0.06, Math.sin(a)*16, {receive:true, cast:false});
-    p.rotation.x = -Math.PI/2; p.rotation.z = a;
+  // Zone decor (paths, lamps, fountain, distant spires) is academy dressing. It used to be
+  // unconditional, so every zone inherited the hub's paths and lamps on top of its own content.
+  const DECOR = ZONE.decor || {};
+  if (DECOR.paths){
+    for (let i=0;i<4;i++){
+      const a = (i/4)*Math.PI*2 + Math.PI/4;
+      const p = add(new THREE.PlaneGeometry(4.6, 52), mat(0xc9b877), Math.cos(a)*16, 0.06, Math.sin(a)*16, {receive:true, cast:false});
+      p.rotation.x = -Math.PI/2; p.rotation.z = a;
+    }
   }
 
   // ---------- building generator ----------
@@ -169,7 +177,7 @@ export function createWorld(canvas, callbacks, zone){
   // Each building's procedural box goes in its own Group so a generated GLB can replace it
   // in-place once loaded (and stays as the visible fallback if the load fails).
   const buildingGroups = {};
-  for (const b of BUILDINGS){
+  for (const b of ZONE.buildings){
     const g = new THREE.Group(); scene.add(g);
     buildingGroups[b.id] = g;
     for (const m of stucco(b.x, b.z, b.w, b.d, b.h, b.ry, b.wall, b.roof)) g.add(m);
@@ -191,7 +199,7 @@ export function createWorld(canvas, callbacks, zone){
     const l = add(new THREE.SphereGeometry(0.38,8,8), mat(0xffd98a), x, 5.0, z);
     l.material.emissive = srgb(0xffaa44); l.material.emissiveIntensity = 1.5;
   }
-  lamp(13,13); lamp(-13,13); lamp(13,-13); lamp(-13,-13); lamp(0,24); lamp(0,-24); lamp(26,0); lamp(-26,0);
+  for (const [lx, lz] of (DECOR.lamps || [])) lamp(lx, lz);
   // central tower — procedural placeholder, replaced by the generated GLB once it loads
   // (see loadLandmarkModel below). Grouped so the swap is a clean children-replace, the same
   // idiom makeCharModel uses for the wizard/NPC placeholders.
@@ -205,7 +213,7 @@ export function createWorld(canvas, callbacks, zone){
     orb.position.set(0, 41, 0); towerGroup.add(orb);
   })();
   // floating crystal spires (blue diamond tips caused visual glitch in some GPUs) — moved far outside view
-  for (let i=0;i<8;i++){
+  if (DECOR.spires) for (let i=0;i<8;i++){
     const a = (i/8)*Math.PI*2 + 0.3, r = 130 + (i%2)*12;
     add(new THREE.CylinderGeometry(0.7, 1.6, 12, 6), mat(0x9fb8ff), Math.cos(a)*r, 6, Math.sin(a)*r);
     const tip = add(new THREE.IcosahedronGeometry(1.6, 0), mat(0x7be0ff), Math.cos(a)*r, 13.6, Math.sin(a)*r);
@@ -218,13 +226,16 @@ export function createWorld(canvas, callbacks, zone){
     add(new THREE.ConeGeometry(1.1*s, 1.6*s, 7), mat(0x2f9e63), x, 2.4*s, z);
     add(new THREE.ConeGeometry(0.8*s, 1.2*s, 7), mat(0x3ab878), x, 3.4*s, z);
   }
-  for (const t of TREE_RING) tree(t.x, t.z, t.s);
+  for (const t of (ZONE.treeRing || [])) tree(t.x, t.z, t.s);
 
   // ---------- fountain (moved off the central tower) ----------
-  add(new THREE.CylinderGeometry(4.8, 5.5, 1.1, 22), mat(0x9aa0b8), 0, 0.55, -18);
-  add(new THREE.CylinderGeometry(0.75, 0.95, 3.0, 8), mat(0x9aa0b8), 0, 2.6, -18);
-  add(new THREE.SphereGeometry(0.95, 10, 10), mat(0x7be0ff), 0, 4.5, -18);
-  add(new THREE.CylinderGeometry(0.55, 0.55, 0.18, 20), mat(0x3a86c8), 0, 1.15, -18, {receive:true});
+  if (DECOR.fountain){
+    const [fx, fz] = DECOR.fountain;
+    add(new THREE.CylinderGeometry(4.8, 5.5, 1.1, 22), mat(0x9aa0b8), fx, 0.55, fz);
+    add(new THREE.CylinderGeometry(0.75, 0.95, 3.0, 8), mat(0x9aa0b8), fx, 2.6, fz);
+    add(new THREE.SphereGeometry(0.95, 10, 10), mat(0x7be0ff), fx, 4.5, fz);
+    add(new THREE.CylinderGeometry(0.55, 0.55, 0.18, 20), mat(0x3a86c8), fx, 1.15, fz, {receive:true});
+  }
 
   // ---------- torches at nodes ----------
   function torch(x,z){
@@ -335,7 +346,8 @@ export function createWorld(canvas, callbacks, zone){
   // Built from the shared node table (public/nodes.js) so the world and the recipe data in
   // items.js can't drift apart — tools/test.mjs asserts every recipe input has a node here.
   const nodeGroups = {};
-  for (const n of WORLD_NODES){
+  for (const n of ZONE.resourceNodes){
+    if (n.x == null) continue;          // count-based: placed by the chunk streamer instead
     let parts = null;
     if (n.kind === 'crystal') parts = crystalNode(n.x, n.z, n.color, n.id, n.label);
     else if (n.kind === 'wood') parts = woodNode(n.x, n.z, n.id, n.label, n.magic);
@@ -350,7 +362,7 @@ export function createWorld(canvas, callbacks, zone){
   // ---------- stations ----------
   // Placed at each building's door (just outside the wall) rather than at its centre — with
   // collision on, a prompt at the centre would be sealed inside the building.
-  for (const b of BUILDINGS){
+  for (const b of ZONE.buildings){
     if (b.noStation) continue;
     const d = doorPos(b);
     register('station', d.x, d.z, b.id, b.label, null, 5.5);
@@ -368,7 +380,7 @@ export function createWorld(canvas, callbacks, zone){
   // Named NPCs come from structures.js so their positions are covered by the walkability test
   // (before collision existed, the professor and merchant were standing inside their buildings).
   const npcByKey = {};
-  for (const n of NPCS){
+  for (const n of ZONE.npcs){
     const g = makeNpc(n.x, n.z, n.main, n.hat, { role:n.role, orb:n.orb, key:n.key });
     g.position.y = groundY(n.x, n.z);
     npcByKey[n.key] = g;
@@ -376,9 +388,10 @@ export function createWorld(canvas, callbacks, zone){
   }
   // wandering students
   const wanderers = [];
-  for (let i=0;i<WANDERERS.length;i++){
-    const a = (i/WANDERERS.length)*Math.PI*2 + 0.5;
-    const w = WANDERERS[i];
+  const ZWANDER = ZONE.wanderers || [];
+  for (let i=0;i<ZWANDER.length;i++){
+    const a = (i/ZWANDER.length)*Math.PI*2 + 0.5;
+    const w = ZWANDER[i];
     const g = makeNpc(Math.cos(a)*34, Math.sin(a)*34, w.main, w.hat, { role:'wander', key:w.key });
     wanderers.push(g);
   }
@@ -477,8 +490,8 @@ export function createWorld(canvas, callbacks, zone){
   }
   // Generated GLB character models — keys match NPC roles so the update loop uses the GLB mixer.
   makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>applyPlayerColor());
-  for (const n of NPCS) makeCharModel(n.key, './assets/models/' + n.model, npcByKey[n.key]);
-  for (let i=0;i<WANDERERS.length;i++) makeCharModel(WANDERERS[i].key, './assets/models/' + WANDERERS[i].model, wanderers[i]);
+  for (const n of ZONE.npcs) makeCharModel(n.key, './assets/models/' + n.model, npcByKey[n.key]);
+  for (let i=0;i<ZWANDER.length;i++) makeCharModel(ZWANDER[i].key, './assets/models/' + ZWANDER[i].model, wanderers[i]);
 
   // ---------- static landmark/building models (unlike characters, no fixed 1.8 target height —
   // each is scaled to its own footprint, and stays centered on X/Z with its base at y=0) ----------
@@ -486,8 +499,9 @@ export function createWorld(canvas, callbacks, zone){
   // width when the FOOTPRINT is the gameplay-relevant dimension (the arena floor is the duel
   // space, so its diameter must be right and the height follows from the model's proportions).
   function loadLandmarkModel(key, url, group, opts){
-    const { size, fit = "height", x = 0, z = 0, ry = 0, onReady } = opts;
-    loadState.total++;
+    const { size, fit = "height", x = 0, z = 0, ry = 0, onReady, quiet = false } = opts;
+    // streamed chunk content loads continuously, so it must not drive the boot progress HUD
+    if (!quiet) loadState.total++;
     url = CDN[url.split('/').pop()] || url;   // CDN if hosted there, else the caller's path
     const loader = new THREE.GLTFLoader();
     const d = getDraco();
@@ -510,40 +524,110 @@ export function createWorld(canvas, callbacks, zone){
       group.add(model);
       for (const c of placeholder) group.remove(c);
       chars[key] = { model, mixer:null, walk:null, idle:null, rawSize:basis, computedScale:scale };
-      loadState.done++; loadProgress();
+      if (!quiet){ loadState.done++; loadProgress(); }
       if (onReady) onReady();
     },
     undefined,
     err => {
       // Keep the procedural placeholder rather than an empty patch of ground.
       console.warn("landmark model failed to load:", url, err && err.message);
-      loadState.done++; loadState.failed.push(key); loadProgress();
+      if (!quiet){ loadState.done++; loadState.failed.push(key); loadProgress(); }
     });
   }
   // Standalone landmarks (tower, arena) — generated via Tripo (2D->3D). Their collision shapes
   // in structures.js are sized to these models' real footprints, not the old procedural ones.
   const landmarkGroups = { tower: towerGroup, arena: arenaGroup };
-  for (const L of LANDMARKS){
+  // a zone without these landmarks should not show their procedural placeholders either
+  for (const [k, g] of Object.entries(landmarkGroups))
+    if (!ZONE.landmarks.some(l => l.key === k)) scene.remove(g);
+  for (const L of ZONE.landmarks){
     const g = landmarkGroups[L.key];
     if (g) loadLandmarkModel(L.key, L.url, g, { size:L.size, fit:L.fit, x:L.x, z:L.z, ry:L.ry });
   }
   // CC0 world dressing (KayKit / Quaternius — see ASSETS.md). Each goes in its own Group so a
   // failed load leaves nothing behind rather than a half-placed object.
-  for (let i = 0; i < PROPS.length; i++){
-    const pr = PROPS[i];
+  const ZPROPS = ZONE.props.filter(p => p.x != null);   // count-based props are streamed
+  for (let i = 0; i < ZPROPS.length; i++){
+    const pr = ZPROPS[i];
     const g = new THREE.Group(); scene.add(g);
     loadLandmarkModel('prop' + i, pr.url, g, { size:pr.h, fit:"height", x:pr.x, z:pr.z, ry:pr.ry || 0 });
   }
   // Gathering nodes swap their procedural mesh for the CC0 model, keeping the procedural one as
   // the fallback (the node's interaction prompt is registered either way).
-  for (const n of WORLD_NODES){
-    const spec = NODE_MODELS[n.kind];
+  for (const n of ZONE.resourceNodes){
+    if (n.x == null) continue;
+    const spec = (ZONE.nodeModels && ZONE.nodeModels[n.kind]) || NODE_MODELS[n.kind];
     if (!spec || !nodeGroups[n.id]) continue;
     loadLandmarkModel('node_' + n.id, spec.url, nodeGroups[n.id],
       { size: spec.h, fit:"height", x:n.x, z:n.z, ry:(n.x * 0.7) % 3 });
   }
+  // ---------- chunk streaming (WORLDSPEC §4) ----------
+  // Scatter once, bucket once, then only ever apply deltas. A chunk therefore contains exactly
+  // the same things every time it reloads, which is what §4 requires for a stable world.
+  const CHUNKS = (() => {
+    if (!ZONE.props.some(p => p.count) && !ZONE.resourceNodes.some(n => n.count) &&
+        !(ZONE.enemies || []).some(e => e.count)) return null;   // hand-placed zone (the academy)
+    const scattered = scatterZone(ZONE);
+    return { buckets: bucketByChunk(ZONE, scattered), loaded: new Map(), available: null };
+  })();
+  if (CHUNKS) CHUNKS.available = new Set(CHUNKS.buckets.keys());
+
+  function loadChunk(key){
+    const bucket = CHUNKS.buckets.get(key);
+    if (!bucket) return;
+    const group = new THREE.Group();
+    scene.add(group);
+    CHUNKS.loaded.set(key, group);
+    for (const p of bucket.props){
+      const g = new THREE.Group(); group.add(g);
+      loadLandmarkModel("chunk:" + key + ":" + p.url, p.url, g,
+        { size:p.h || 2, fit:"height", x:p.x, z:p.z, ry:p.ry || 0, quiet:true });
+    }
+    for (const n of bucket.resourceNodes){
+      const spec = ZONE.nodeModels[n.kind];
+      const g = new THREE.Group(); group.add(g);
+      if (spec) loadLandmarkModel("chunk:" + key + ":" + n.id, spec.url, g,
+        { size:spec.h, fit:"height", x:n.x, z:n.z, ry:(n.x * 0.7) % 3, quiet:true });
+      register("gather", n.x, n.z, n.id, n.label, null, 4.6);
+    }
+    for (const e of bucket.enemies){
+      const g = new THREE.Group(); group.add(g);
+      loadLandmarkModel("chunk:" + key + ":enemy", "./assets/models/" + e.model, g,
+        { size:e.h || 1.9, fit:"height", x:e.x, z:e.z, ry:(e.x) % 3, quiet:true });
+    }
+  }
+  function unloadChunk(key){
+    const group = CHUNKS.loaded.get(key);
+    if (!group) return;
+    // free GPU memory rather than just detaching — a long session would otherwise leak every
+    // chunk the player has ever walked through
+    group.traverse(o => {
+      if (o.isMesh){
+        if (o.geometry) o.geometry.dispose();
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) if (m && m.dispose) m.dispose();
+      }
+    });
+    scene.remove(group);
+    CHUNKS.loaded.delete(key);
+  }
+  let lastChunkX = null, lastChunkZ = null;
+  function updateChunks(force){
+    if (!CHUNKS) return;
+    const size = ZONE.chunkSize;
+    const cx = Math.floor(player.position.x / size), cz = Math.floor(player.position.z / size);
+    // only recompute when the player crosses a chunk boundary — §4 "no full reload, just delta"
+    if (!force && cx === lastChunkX && cz === lastChunkZ) return;
+    lastChunkX = cx; lastChunkZ = cz;
+    const keys = new Set(CHUNKS.loaded.keys());
+    const { load, unload } = chunkDelta(ZONE, player.position.x, player.position.z, keys, CHUNKS.available);
+    for (const k of unload) unloadChunk(k);
+    for (const k of load) loadChunk(k);
+  }
+  updateChunks(true);
+
   // Buildings that have a generated model replace their procedural box in place.
-  for (const b of BUILDINGS){
+  for (const b of ZONE.buildings){
     if (!b.model) continue;
     loadLandmarkModel('bld_' + b.id, b.model, buildingGroups[b.id],
       { size:b.h, fit:"height", x:b.x, z:b.z, ry:b.ry + (b.modelRy || 0) });
@@ -614,6 +698,7 @@ export function createWorld(canvas, callbacks, zone){
       const hit = resolveCollisions(nx, nz, PLAYER_RADIUS, ZONE_OBSTACLES);
       player.position.x = hit.x; player.position.z = hit.z;
       player.position.y = groundY(hit.x, hit.z);      // walk the heightmap (WORLDSPEC §5)
+      updateChunks(false);
       // a tap-to-move target inside a building is unreachable — drop it instead of grinding
       if (tapSet && Math.hypot(hit.x-nx, hit.z-nz) > 0.001){
         stuckT += dt;
@@ -784,6 +869,7 @@ export function createWorld(canvas, callbacks, zone){
       camDist, camYaw,          // the requested zoom level, before collision clamps it
       near: out.slice(0,8),
       chars: Object.fromEntries(Object.entries(chars).map(([k,c])=>[k,{loaded:!!c.model, scale: c.model?+c.model.scale.x.toFixed(3):null, rawSize: c.rawSize?+c.rawSize.toFixed(3):null, meshWorldScale: c.meshWorldScale?+c.meshWorldScale.toFixed(4):null, computed: c.computedScale?+c.computedScale.toFixed(2):null, mixer: !!c.mixer, walk: !!c.walk, idle: !!c.idle}])),
+      chunks: CHUNKS ? { loaded: CHUNKS.loaded.size, total: CHUNKS.buckets.size } : null,
       playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };
   };
   return {

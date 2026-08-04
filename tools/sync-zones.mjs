@@ -38,6 +38,12 @@ export function buildAcademyZone(){
     resourceNodes: WORLD_NODES,
     nodeModels: NODE_MODELS,
     treeRing: ST.TREE_RING,
+    // Hub dressing — paths, lamps, the fountain and the distant spires. Zone-scoped so other
+    // zones do not inherit the academy's furniture.
+    decor: {
+      paths: true, spires: true, fountain: [0, -18],
+      lamps: [[13,13],[-13,13],[13,-13],[-13,-13],[0,24],[0,-24],[26,0],[-26,0]],
+    },
     // The collision shapes are hand-tuned (the tower/arena radii were measured from their
     // models), so they ship with the zone rather than being re-derived at runtime.
     obstacles: ST.OBSTACLES,

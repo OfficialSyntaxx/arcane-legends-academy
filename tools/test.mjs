@@ -449,6 +449,75 @@ check("fbm stays in -1..1", (()=>{
   return true;
 })());
 
+// ---- 4.385 WORLDSPEC step 3: chunk streaming ----
+const fscat = WC.scatterZone(forest);
+const fbuckets = WC.bucketByChunk(forest, fscat);
+const favail = new Set(fbuckets.keys());
+check("scattered content buckets into chunks", fbuckets.size > 10);
+check("bucketing loses nothing", (()=>{
+  let n = 0;
+  for (const b of fbuckets.values()) n += b.props.length + b.resourceNodes.length + b.enemies.length;
+  return n === fscat.props.length + fscat.resourceNodes.length + fscat.enemies.length;
+})());
+check("every item lands in the chunk its coordinates say it should", (()=>{
+  for (const [key, b] of fbuckets){
+    for (const item of [...b.props, ...b.resourceNodes, ...b.enemies]){
+      const want = WC.chunkKey(WC.chunkCoord(item.x, forest.chunkSize), WC.chunkCoord(item.z, forest.chunkSize));
+      if (want !== key) return false;
+    }
+  }
+  return true;
+})());
+check("bucketing is stable across runs (a chunk reloads identically)", (()=>
+  JSON.stringify([...WC.bucketByChunk(forest, WC.scatterZone(forest))].sort())
+  === JSON.stringify([...fbuckets].sort()))());
+// the delta rules
+check("standing still produces no load/unload churn", (()=>{
+  const loaded = new Set();
+  const first = WC.chunkDelta(forest, forest.spawn.x, forest.spawn.z, loaded, favail);
+  first.load.forEach(k => loaded.add(k));
+  const again = WC.chunkDelta(forest, forest.spawn.x, forest.spawn.z, loaded, favail);
+  return first.load.length > 0 && again.load.length === 0 && again.unload.length === 0;
+})());
+check("hysteresis stops boundary thrash", (()=>{
+  // a chunk between loadRadius and unloadRadius must stay loaded rather than flapping
+  const loaded = new Set();
+  WC.chunkDelta(forest, 0, 0, loaded, favail).load.forEach(k => loaded.add(k));
+  const before = loaded.size;
+  // nudge just past loadRadius but well inside unloadRadius
+  const d = WC.chunkDelta(forest, forest.loadRadius * 0.4, 0, loaded, favail);
+  return d.unload.length === 0 && before > 0;
+})());
+check("walking away unloads what is now distant", (()=>{
+  const loaded = new Set();
+  WC.chunkDelta(forest, 0, 0, loaded, favail).load.forEach(k => loaded.add(k));
+  const d = WC.chunkDelta(forest, 150, -150, loaded, favail);
+  return d.unload.length > 0 && d.load.length > 0;
+})());
+check("nothing is ever both loaded and unloaded in one delta", (()=>{
+  const loaded = new Set();
+  WC.chunkDelta(forest, 0, 0, loaded, favail).load.forEach(k => loaded.add(k));
+  for (const [x, z] of [[20,20],[60,-30],[-90,10],[140,140]]){
+    const d = WC.chunkDelta(forest, x, z, loaded, favail);
+    if (d.load.some(k => d.unload.includes(k))) return false;
+    d.unload.forEach(k => loaded.delete(k)); d.load.forEach(k => loaded.add(k));
+  }
+  return true;
+})());
+check("a full walk across the zone keeps the loaded set bounded", (()=>{
+  const loaded = new Set();
+  let peak = 0;
+  for (let x = -150; x <= 150; x += 8){
+    const d = WC.chunkDelta(forest, x, x * 0.3, loaded, favail);
+    d.unload.forEach(k => loaded.delete(k)); d.load.forEach(k => loaded.add(k));
+    peak = Math.max(peak, loaded.size);
+  }
+  if (peak > 40) console.log("   peak loaded chunks:", peak);
+  return peak > 0 && peak <= 40;               // §8 budget sanity
+})());
+check("the hand-placed academy needs no streaming", (()=>
+  !acad.props.some(p=>p.count) && !acad.resourceNodes.some(n=>n.count))());
+
 // ---- 4.39 camera collision (pure maths; the browser suite checks it in the running game) ----
 check("the camera keeps its full distance in the open", (()=>{
   return ST.cameraDistanceLimit(55, 55, 0, 10.5) === 10.5 && ST.cameraDistanceLimit(-48, -48, 1.2, 10.5) === 10.5;

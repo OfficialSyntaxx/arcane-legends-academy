@@ -196,6 +196,52 @@ export const chunkKey = (cx, cz) => cx + "," + cz;
 export function chunkCenter(cx, cz, chunkSize){
   return { x: cx * chunkSize + chunkSize / 2, z: cz * chunkSize + chunkSize / 2 };
 }
+/**
+ * Bucket scattered content into chunks (WORLDSPEC §4). Done ONCE per zone from the seeded
+ * scatter, never re-rolled per chunk — that is what makes a chunk look identical every time it
+ * reloads, which §4 requires.
+ * @returns {Map<string, {props:[], resourceNodes:[], enemies:[]}>}
+ */
+export function bucketByChunk(zone, scattered){
+  const size = zone.chunkSize;
+  const map = new Map();
+  const put = (kind, item) => {
+    const key = chunkKey(chunkCoord(item.x, size), chunkCoord(item.z, size));
+    let c = map.get(key);
+    if (!c) map.set(key, c = { props:[], resourceNodes:[], enemies:[] });
+    c[kind].push(item);
+  };
+  for (const p of scattered.props) put("props", p);
+  for (const n of scattered.resourceNodes) put("resourceNodes", n);
+  for (const e of scattered.enemies) put("enemies", e);
+  return map;
+}
+
+/**
+ * Which chunks should be loaded and which unloaded, given where the player is.
+ * Hysteresis (loadRadius < unloadRadius) is what stops a player standing on a boundary from
+ * thrashing load/unload every frame — validateZone enforces the gap.
+ * @param {Set<string>} loaded  keys currently in the scene
+ * @returns {{load:string[], unload:string[]}} deltas only — never a full rebuild
+ */
+export function chunkDelta(zone, px, pz, loaded, available){
+  const size = zone.chunkSize;
+  const wanted = new Set();
+  for (const c of chunksInRadius(px, pz, size, zone.loadRadius)){
+    if (!available || available.has(c.key)) wanted.add(c.key);
+  }
+  const load = [];
+  for (const k of wanted) if (!loaded.has(k)) load.push(k);
+  const unload = [];
+  for (const k of loaded){
+    if (wanted.has(k)) continue;
+    const [cx, cz] = k.split(",").map(Number);
+    const c = chunkCenter(cx, cz, size);
+    if (Math.hypot(c.x - px, c.z - pz) > zone.unloadRadius) unload.push(k);
+  }
+  return { load, unload };
+}
+
 export function chunksInRadius(px, pz, chunkSize, radius){
   const out = [];
   const r = Math.ceil(radius / chunkSize) + 1;

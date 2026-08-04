@@ -1177,7 +1177,11 @@ async function initWorld(){
   const canvas = $("world");
   try {
     worldCfg = await loadWorldConfig();
-    activeZone = worldCfg.get(worldCfg.hub);
+    // ?zone=<id> picks a starting zone — used to test zones before step 4 wires up walkable
+    // exits, and it stays useful afterwards for jumping straight to one.
+    const wanted = new URLSearchParams(location.search).get("zone");
+    activeZone = (wanted && worldCfg.get(wanted)) || worldCfg.get(worldCfg.hub);
+    if (wanted && !worldCfg.get(wanted)) console.warn("unknown zone \"" + wanted + "\", using the hub");
   } catch(e){
     console.warn("world config unavailable, using built-in academy:", e && e.message);
   }

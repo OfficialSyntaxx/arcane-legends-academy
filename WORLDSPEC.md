@@ -206,7 +206,11 @@ Dungeons and boss rooms are **interior instances** — separate scenes, not part
 2. ✅ **Zone terrain** — `public/terrain.js`: seeded value-noise fBm, biomes, flat zones, slope and
    water. The ground is a displaced heightmap; the player, NPCs, buildings, landmarks and props all
    sit on the surface. Water renders only where a zone declares `waterLevel`.
-3. **Chunk streaming** — chunk grid, load/unload by distance (§4), CDN-backed prop instantiation (reuse `loadProp`/`makeCharModel`).
+3. ✅ **Chunk streaming** — `bucketByChunk` + `chunkDelta` in `worldconfig.js` (pure, tested) and
+   the runtime loader in `world.js`. Content is scattered and bucketed **once**, then only deltas
+   are applied, so a chunk reloads identically. Unloading disposes geometry and materials rather
+   than just detaching, or a long session leaks every chunk walked through. Streamed loads are
+   `quiet` so they do not drive the boot progress HUD. `?zone=<id>` picks a starting zone.
 4. **Zone transitions** — walkable `exits` that switch the active zone (spawn at the target zone's entry).
 5. **Dungeon instancing** — entrance → suspend zone → load interior → rooms/corridors → boss room → exit restores zone (§6).
 6. **Content pass** — author the first 2–3 zones (Academy, Whispering Forest, Cinderhollow) + one dungeon, using imported CC0 models.
@@ -265,8 +269,17 @@ fails if it is stale. Two copies of the same data is exactly how the `logic.js` 
 silently drifted from `cards.js`, so it gets the same guard. **Other zones are hand-authored in
 `zones.json` and are never touched by the generator.**
 
-**k. Still open for step 3:** water is rendered but not yet *gameplay* — the player can walk
-across it. Blocking or swimming belongs with chunk streaming, when water bodies become real.
+**k. Still open:** water is rendered but not yet *gameplay* — the player can walk across it.
+Blocking or swimming should land with step 4 (zone transitions), when a zone is a place you
+actually traverse end to end.
+
+**l. Zone content must come from the zone, not module constants.** Found in step 3: `world.js`
+built its buildings, NPCs, nodes, tree ring, paths, lamps, fountain and spires from the imported
+`structures.js`/`nodes.js` tables, so **every zone rendered the academy on top of its own
+content**. All of it now reads from the active zone, and hub dressing lives in `zone.decor`.
+
+**m. Streamed content is `quiet`.** Chunk loads must not increment the boot loading counter, or
+the "Summoning the academy… n/m" HUD never finishes.
 
 ---
 
