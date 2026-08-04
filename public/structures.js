@@ -181,6 +181,39 @@ export function resolveCollisions(x, z, radius = PLAYER_RADIUS, obstacles = OBST
   return { x, z };
 }
 
+// ---------------------------------------------------------------- camera
+// How far the follow camera may sit behind the player before something solid gets between them.
+// The camera had no collision at all: standing near a large building and rotating put it INSIDE
+// the geometry — the black interior of the arena canopy, the backfaces of a hall. Survivable when
+// everything was small procedural boxes; easy to trigger with 22-40m models, and terrain makes it
+// worse because hills occlude too.
+//
+// Pure, so tools/test.mjs can assert it without a browser. March out along the camera ray and
+// stop at the first blocked sample.
+// The check radius is the PLAYER's, not a larger camera radius: the guarantee we need is that a
+// fully pulled-in camera is somewhere the player could stand. With a bigger radius the minimum
+// fallback could still be inside geometry — which it was, next to the fountain.
+export const CAMERA_RADIUS = PLAYER_RADIUS;
+export const CAMERA_MIN_DIST = 1.2;
+
+export function cameraDistanceLimit(px, pz, yaw, desired, obstacles = OBSTACLES, radius = CAMERA_RADIUS){
+  const ox = Math.sin(yaw), oz = Math.cos(yaw);
+  const STEP = 0.4;
+  let last = 0;
+  for (let d = STEP; d <= desired; d += STEP){
+    if (!isClear(px + ox * d, pz + oz * d, radius, obstacles)){
+      const pulled = last - 0.25;
+      // If even the minimum is blocked, sit ON the player — that spot is clear by construction,
+      // because the player's own movement is collision-resolved. world.js lifts the camera as it
+      // pulls in, so this reads as rising over the obstruction rather than clipping through it.
+      if (pulled < CAMERA_MIN_DIST) return isClear(px + ox * CAMERA_MIN_DIST, pz + oz * CAMERA_MIN_DIST, radius, obstacles) ? CAMERA_MIN_DIST : 0;
+      return pulled;
+    }
+    last = d;
+  }
+  return desired;
+}
+
 // Is a point clear of every obstacle? Used by the tests to prove the world is walkable.
 export function isClear(x, z, radius = PLAYER_RADIUS, obstacles = OBSTACLES){
   const r = resolveCollisions(x, z, radius, obstacles);

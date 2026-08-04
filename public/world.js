@@ -3,7 +3,7 @@
 // gathering nodes for every material, and NPCs that hand out quests and open the market.
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
 import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
-import { BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions } from "./structures.js";
+import { BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
 import { heightAt, isWater, flatsForZone, BIOMES } from "./terrain.js";
 
@@ -725,10 +725,26 @@ export function createWorld(canvas, callbacks, zone){
   // ---------- camera ----------
   const _camTarget = new THREE.Vector3();     // hoisted: this runs every frame
   function updateCamera(){
-    const ox = Math.sin(camYaw)*camDist, oz = Math.cos(camYaw)*camDist;
-    _camTarget.set(player.position.x+ox, camHeight, player.position.z+oz);
-    camera.position.lerp(_camTarget, 0.12);
-    camera.lookAt(player.position.x, 2.2, player.position.z);
+    const px = player.position.x, pz = player.position.z, py = player.position.y;
+    // CAMERA COLLISION. Without this the camera sits inside whatever is behind the player —
+    // the arena canopy's black interior, a hall's backfaces — which is trivial to hit now that
+    // buildings are 8-40m. Pull in to the first blocker along the ray.
+    const want = cameraDistanceLimit(px, pz, camYaw, camDist, ZONE_OBSTACLES, CAMERA_RADIUS);
+    const ox = Math.sin(camYaw)*want, oz = Math.cos(camYaw)*want;
+    const cx = px + ox, cz = pz + oz;
+    // Height is relative to the player's own ground, not absolute — on a slope an absolute Y
+    // lets the player climb above the camera. Also stay clear of the terrain under the camera,
+    // so it does not sink into a hillside behind them.
+    // The more the camera is forced in, the higher it rises — so a blocked shot becomes a
+    // look-down over the obstruction instead of a face full of wall.
+    const pulled = Math.max(0, camDist - want) / Math.max(1, camDist);
+    const y = Math.max(py + camHeight + pulled * camDist * 0.75, groundY(cx, cz) + 1.8);
+    _camTarget.set(cx, y, cz);
+    // Pull IN instantly, ease back OUT. Easing both ways means the camera spends a moment
+    // travelling through whatever it is avoiding, which is exactly the artefact this fixes.
+    const curDist = Math.hypot(camera.position.x - px, camera.position.z - pz);
+    camera.position.lerp(_camTarget, want < curDist - 0.05 ? 1 : 0.12);
+    camera.lookAt(px, py + 2.2, pz);
   }
 
   // ---------- loop ----------
@@ -764,6 +780,8 @@ export function createWorld(canvas, callbacks, zone){
       // exact, unrounded — the rounded `player` above is for eyeballing, and rounding a position
       // by up to half a unit is enough to make a collision check report a false overlap
       playerExact: [player.position.x, player.position.y, player.position.z],
+      camExact: [cam.x, cam.y, cam.z],
+      camDist, camYaw,          // the requested zoom level, before collision clamps it
       near: out.slice(0,8),
       chars: Object.fromEntries(Object.entries(chars).map(([k,c])=>[k,{loaded:!!c.model, scale: c.model?+c.model.scale.x.toFixed(3):null, rawSize: c.rawSize?+c.rawSize.toFixed(3):null, meshWorldScale: c.meshWorldScale?+c.meshWorldScale.toFixed(4):null, computed: c.computedScale?+c.computedScale.toFixed(2):null, mixer: !!c.mixer, walk: !!c.walk, idle: !!c.idle}])),
       playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };

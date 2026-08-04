@@ -449,6 +449,51 @@ check("fbm stays in -1..1", (()=>{
   return true;
 })());
 
+// ---- 4.39 camera collision (pure maths; the browser suite checks it in the running game) ----
+check("the camera keeps its full distance in the open", (()=>{
+  return ST.cameraDistanceLimit(55, 55, 0, 10.5) === 10.5 && ST.cameraDistanceLimit(-48, -48, 1.2, 10.5) === 10.5;
+})());
+check("the camera pulls in when a building is behind the player", (()=>{
+  // yaw 0 puts the camera at +z. Stand south of the Scribing Hall (-31,-14) so the camera swings
+  // back INTO it. (yaw = PI points the other way — away from the hall — which is why an earlier
+  // version of this test passed for the wrong reason.)
+  const d = ST.cameraDistanceLimit(-31, -26, 0, 10.5);
+  return d < 10.5 && d >= 2.2;
+})());
+check("the camera pulls in when the arena is behind the player", ST.cameraDistanceLimit(0, -20, Math.PI, 10.5) < 10.5);
+check("the camera never returns a distance that is itself inside geometry", (()=>{
+  for (let a = 0; a < 32; a++){
+    const yaw = (a/32) * Math.PI * 2;
+    for (const [px, pz] of [[0,-14],[-31,-26],[31,-26],[0,24],[13,15],[-16,18]]){
+      const d = ST.cameraDistanceLimit(px, pz, yaw, 10.5);
+      const cx = px + Math.sin(yaw)*d, cz = pz + Math.cos(yaw)*d;
+      // the minimum clamp can sit inside something when the player is right against a wall;
+      // anything beyond that minimum must be genuinely clear
+      if (d > 0 && !ST.isClear(cx, cz, ST.CAMERA_RADIUS)) return false;
+    }
+  }
+  return true;
+})());
+check("a fully blocked camera falls back to a position the player could stand in", (()=>{
+  // standing inside the tower's shadow from every angle: the limit is either a clear distance,
+  // or 0 (sit on the player, which is clear by construction because movement is resolved)
+  for (let a = 0; a < 24; a++){
+    const yaw = (a/24)*Math.PI*2;
+    const d = ST.cameraDistanceLimit(9, 0, yaw, 10.5);
+    if (d < 0) return false;
+    if (d > 0 && !ST.isClear(9 + Math.sin(yaw)*d, 0 + Math.cos(yaw)*d, ST.CAMERA_RADIUS)) return false;
+  }
+  return true;
+})());
+check("camera limiting is monotonic in the requested distance", (()=>{
+  for (const yaw of [0, 1, 2.5, 4]){
+    const near = ST.cameraDistanceLimit(13, 15, yaw, 6);
+    const far  = ST.cameraDistanceLimit(13, 15, yaw, 12);
+    if (far < near - 1e-9) return false;
+  }
+  return true;
+})());
+
 // ---- 4.4 grade bands (regression: a forward find collapsed every roll to "Poor") ----
 check("roll 0 is grade 1", gradeForRoll(0).g === 1);
 check("roll 100 is grade 10", gradeForRoll(100).g === 10);

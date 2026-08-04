@@ -143,6 +143,13 @@ page.on("pageerror", e => { if (!/Failed to fetch|NetworkError|ERR_/.test(e.mess
 await page.goto(BASE + "/index.html", { waitUntil:"load" });
 await page.waitForTimeout(1500);
 
+// Dismiss the character-creation overlay before driving gestures. It is position:fixed with
+// inset:0, so it swallows every real pointer/wheel event — the dispatchEvent-based checks below
+// bypassed hit-testing and never noticed, but page.mouse.wheel did, and "wheel zooms the camera"
+// was passing only because the follow-lerp happened to move the camera for other reasons.
+await page.evaluate(() => { const e = document.getElementById("schoolPicker"); if (e) e.style.display = "none"; });
+await page.waitForTimeout(200);
+
 const hasWorld = await page.evaluate(() => !!window.__worldDebug);
 console.log(`\n3D world booted: ${hasWorld}`);
 check("the 3D world initialises (WebGL)", hasWorld);
@@ -232,21 +239,23 @@ if (hasWorld){
   check("W key walks the player", kMoved > 0.5, `moved ${kMoved.toFixed(2)}`);
 
   // --- wheel zoom ---
-  const wBefore = (await dbg()).cam;
+  // Assert the zoom LEVEL changes, not the camera position: with camera collision the position
+  // is legitimately pinned when something is behind the player, so position was the wrong proxy.
+  const wBefore = (await dbg()).camDist;
   await page.mouse.move(195, 500);
   await page.mouse.wheel(0, 400);
-  await page.waitForTimeout(500);
-  const wAfter = (await dbg()).cam;
-  check("wheel zooms the camera", JSON.stringify(wBefore) !== JSON.stringify(wAfter));
+  await page.waitForTimeout(400);
+  const wAfter = (await dbg()).camDist;
+  check("wheel zooms the camera", wAfter !== wBefore, `camDist ${wBefore} -> ${wAfter}`);
 
   // --- zoom buttons ---
-  const bBefore = (await dbg()).cam;
+  const bBefore = (await dbg()).camDist;
   await page.locator("#zoomOut").dispatchEvent("pointerdown", { pointerId:20, isPrimary:true });
   await page.waitForTimeout(120);
   await page.locator("#zoomOut").dispatchEvent("pointerup", { pointerId:20, isPrimary:true });
   await page.waitForTimeout(400);
-  const bAfter = (await dbg()).cam;
-  check("on-screen zoom button works", JSON.stringify(bBefore) !== JSON.stringify(bAfter));
+  const bAfter = (await dbg()).camDist;
+  check("on-screen zoom button works", bAfter !== bBefore, `camDist ${bBefore} -> ${bAfter}`);
 
   // --- collision: walking into the tower must not put the player inside it ---
   const solid = await page.evaluate(async () => {
@@ -293,6 +302,27 @@ if (hasWorld){
         JSON.stringify(terr.out));
   check("terrain is not flat where it should not be", terr.out.some(o => Math.abs(o.got) > 0.05),
         JSON.stringify(terr.out.map(o=>o.got)));
+
+  // --- camera collision: rotating next to a big building must not put the camera inside it ---
+  // REGRESSION: this was hit repeatedly while photographing the arena — the camera ended up in
+  // the black interior of its canopy.
+  const cam = await page.evaluate(async () => {
+    const ST = await import("./structures.js");
+    window.__world.teleport(0, -14);                 // just south of the Duel Arena
+    await new Promise(r => setTimeout(r, 200));
+    const bad = [];
+    for (let a = 0; a < 16; a++){
+      window.__world.rotateCam((Math.PI * 2 / 16) / 0.006);
+      await new Promise(r => setTimeout(r, 320));      // let the follow lerp settle
+      const d = window.__worldDebug();
+      // exact, not the rounded `cam` — rounding by half a unit invents overlaps that aren't real
+      if (!ST.isClear(d.camExact[0], d.camExact[2], ST.CAMERA_RADIUS))
+        bad.push([+d.camExact[0].toFixed(2), +d.camExact[2].toFixed(2)]);
+    }
+    return { bad, total: 16 };
+  });
+  check("the camera never ends up inside geometry while orbiting", cam.bad.length === 0,
+        `${cam.bad.length}/${cam.total} positions inside: ${JSON.stringify(cam.bad.slice(0,3))}`);
 
   // --- character models loaded ---
   const chars = (await dbg()).chars;
