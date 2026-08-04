@@ -218,7 +218,7 @@ export function createWorld(canvas, callbacks){
     const g = makeWizard(main, hat, opts.skin||0xf0c8a0, opts);
     g.position.set(x, 0, z);
     scene.add(g);
-    npcs.push({ mesh:g, tx:x, tz:z, t:0, pause:0, role:opts.role||'wander' });
+    npcs.push({ mesh:g, tx:x, tz:z, t:0, pause:0, role:opts.role||'wander', key:opts.key });
     return g;
   }
   // a professor (quest giver) near the library
@@ -241,7 +241,7 @@ export function createWorld(canvas, callbacks){
   const wanderers = [];
   for (let i=0;i<4;i++){
     const a = (i/4)*Math.PI*2 + 0.5;
-    const g = makeNpc(Math.cos(a)*18, Math.sin(a)*18, wanderColors[i][0], wanderColors[i][1], { role:'wander' });
+    const g = makeNpc(Math.cos(a)*18, Math.sin(a)*18, wanderColors[i][0], wanderColors[i][1], { role:'wander', key:'wander'+i });
     wanderers.push(g);
   }
 
@@ -286,7 +286,9 @@ export function createWorld(canvas, callbacks){
       const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
       model.position.x -= cx * scale; model.position.z -= cz * scale;
       model.position.y -= minY * scale;
-      const entry = { model, mixer: null, walk: null, idle: null, rawSize: height, meshWorldScale: 1, computedScale: scale };
+      const entry = { model, mixer: null, walk: null, idle: null, rawSize: height, meshWorldScale: 1, computedScale: scale, bones: {}, baseRot: {}, walking: false, walkT: 0, walkSpeed: 1 };
+      // collect the skeleton bones (standard biped names) so we can add a procedural walk cycle
+      model.traverse(o => { if (o.isBone){ entry.bones[o.name] = o; entry.baseRot[o.name] = o.quaternion.clone(); } });
       if (group){ while (group.children.length) group.remove(group.children[0]); group.add(model); }
       if (gltf.animations && gltf.animations.length){
         entry.mixer = new THREE.AnimationMixer(model);
@@ -395,16 +397,19 @@ export function createWorld(canvas, callbacks){
   // ---------- NPC update ----------
   function npcUpdate(dt, now){
     for (const n of npcs){
+      const c = n.key ? chars[n.key] : null;   // GLB char entry for this NPC (if loaded)
       if (n.role === 'wander'){
-        if (n.pause > 0){ n.pause -= dt; animateWizard(n.mesh, now*0.001, 0); continue; }
+        if (n.pause > 0){ n.pause -= dt; if (c) c.walking = false; else animateWizard(n.mesh, now*0.001, 0); continue; }
         const dx=n.tx-n.mesh.position.x, dz=n.tz-n.mesh.position.z, d=Math.hypot(dx,dz);
         if (d>0.4){
           n.mesh.position.x += (dx/d)*2.2*dt; n.mesh.position.z += (dz/d)*2.2*dt;
           n.mesh.rotation.y = Math.atan2(dx,dz);
-          animateWizard(n.mesh, now*0.001, 1);
+          if (c){ c.walking = true; c.walkSpeed = Math.min(1, 0.4 + d*0.2); }
+          else animateWizard(n.mesh, now*0.001, 1);
         } else {
           n.t += dt;
           if (n.t>2){ n.t=0; n.pause=0.8+Math.random()*1.6; const a=Math.random()*Math.PI*2, r=14+Math.random()*12; n.tx=Math.cos(a)*r; n.tz=Math.sin(a)*r; }
+          if (c) c.walking = false;
         }
       } else {
         // stationary NPCs: GLB models animate via mixer; procedural ones sway
@@ -412,16 +417,47 @@ export function createWorld(canvas, callbacks){
       }
     }
   }
-  // advance GLB character mixers (player walk/idle, NPC idle)
+  // procedural walk cycle for the NPC skeleton bones (no extra credits, no walk clip needed)
+  function setBone(c, name, rx, ry, rz){
+    const b = c.bones[name]; if (!b) return;
+    b.quaternion.copy(c.baseRot[name] || new THREE.Quaternion());
+    b.rotateX(rx); b.rotateY(ry); b.rotateZ(rz);
+  }
+  function applyWalkCycle(c){
+    const t = c.walkT, s = c.walkSpeed;
+    const sw = Math.sin(t*9)*0.7*s;      // leg swing (forward/back)
+    const sw2 = Math.sin(t*9+Math.PI)*0.5*s; // arms swing opposite
+    setBone(c,'LeftLeg', sw, 0, 0);
+    setBone(c,'RightLeg', -sw, 0, 0);
+    setBone(c,'LeftUpLeg', sw*0.35, 0, 0);
+    setBone(c,'RightUpLeg', -sw*0.35, 0, 0);
+    setBone(c,'LeftArm', sw2, 0, 0);
+    setBone(c,'RightArm', -sw2, 0, 0);
+    setBone(c,'LeftForeArm', sw2*0.3, 0, 0);
+    setBone(c,'RightForeArm', -sw2*0.3, 0, 0);
+    setBone(c,'Spine', Math.sin(t*9)*0.05*s, 0, 0);
+  }
+  // advance GLB character mixers (player walk/idle, NPC idle/walk)
   function updateChars(dt){
     for (const key in chars){
       const c = chars[key];
-      if (!c.mixer) continue;
-      if (key === 'player'){
-        if (playerMoving){ if (c.walk && !c.walk.isRunning()){ c.idle && c.idle.stop(); c.walk.play(); } }
-        else { if (c.idle && !c.idle.isRunning()){ c.walk && c.walk.stop(); c.idle.play(); } }
+      if (!c.model) continue;
+      if (c.walking){
+        // procedural walk cycle (NPCs moving around the world)
+        if (c.mixer && c.idle && c.idle.isRunning()) c.mixer.stopAllAction();
+        applyWalkCycle(c);
+        c.walkT += dt;
+      } else {
+        if (c.mixer){
+          if (key === 'player'){
+            if (playerMoving){ if (c.walk && !c.walk.isRunning()){ c.idle && c.idle.stop(); c.walk.play(); } }
+            else { if (c.idle && !c.idle.isRunning()){ c.walk && c.walk.stop(); c.idle.play(); } }
+          } else if (c.idle && !c.idle.isRunning()){
+            c.walk && c.walk.stop(); c.idle.play();
+          }
+          c.mixer.update(dt);
+        }
       }
-      c.mixer.update(dt);
     }
   }
 
