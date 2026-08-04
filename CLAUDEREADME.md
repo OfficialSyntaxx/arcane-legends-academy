@@ -205,9 +205,10 @@ Use the `deploy_game` tool:
 1. **All character models are now generated 3D models.** The player wizard, professor, merchant, referee, trainer, librarian, and 4 wandering students are all 2D→3D generated GLBs (except the professor, which is a static text-to-3D mesh). They load at ~1.8 units and render correctly. The fix in `makeCharModel` (`world.js`): for **skinned Meshy GLBs** the object box is degenerate (0) and the raw mesh box is only the *bind pose* — the real size is the **skeleton node span** (bones sit far above the mesh), so height is computed from node world positions. For **static meshes** (e.g. professor.glb has no skeleton), the real size is the **geometry box**. The loader auto-detects skinned vs static. NPC GLB keys match their roles (`duel`, `trainer`, `librarian`, `wander0`–`wander3`) so the update loop uses the GLB mixer. **All models were texture-resized to 512px** (gltf-transform) to keep the deploy under the ~50MB upload limit — the models folder is now ~22MB total.
 2. **The 2D→3D pipeline** (generate a 2D character portrait → image-to-3D, ~40 credits/model: ~2 for the image + ~38 for the conversion) produces a much better, recognizable character than text-to-3D (~25 credits, generic blob). All character GLBs were generated this way.
 3. **GLB files are compressed to 512px textures** (gltf-transform resize) — down from 4–9MB to ~2–3MB each for mobile. True Draco compression is still a future mobile optimization.
-4. **Buildings, nodes, and props are still procedural** primitives — these are next to generate as 3D models.
-5. **Sound** is not yet implemented (procedural WebAudio SFX only in a few places).
-6. **Models/animations** need rigging verification once quality models are in.
+4. **Procedural walk animation.** The Meshy GLBs only carry ONE animation clip each (idle). Rather than regenerate (which would cost credits and drop the idle), `makeCharModel` collects the skeleton bones (standard biped names: LeftLeg, RightLeg, LeftArm, RightArm, Spine…) and `world.js` applies a procedural walk cycle (bones swing via quaternion on top of the base pose) whenever a wanderer NPC is moving; it falls back to the idle clip when stationary. The stationary NPCs (referee, trainer, librarian) keep their idle. Same technique can add swing/attack/emote poses to any GLB character without extra generation.
+5. **Buildings, nodes, and props are still procedural** primitives — these are next to generate as 3D models.
+6. **Sound** is not yet implemented (procedural WebAudio SFX only in a few places).
+7. **Models/animations** need rigging verification once quality models are in.
 
 ## 10. Roadmap (in priority order)
 
