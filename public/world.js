@@ -2,6 +2,8 @@
 // Rich procedural low-poly characters (animated wizards), themed buildings, a fountain, trees,
 // gathering nodes for every material, and NPCs that hand out quests and open the market.
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
+import { WORLD_NODES } from "./nodes.js";
+
 export function createWorld(canvas, callbacks){
   const THREE = window.THREE;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
@@ -179,31 +181,30 @@ export function createWorld(canvas, callbacks){
     torch(x, z);
     register('gather', x, z, data, label, c);
   }
-  crystalNode(-6, -4, 0xcd7f32, 'copper', 'Mine Copper');
-  crystalNode(-4, -8, 0xb0b0b0, 'iron', 'Mine Iron');
-  crystalNode(6, -4, 0xffd766, 'gold', 'Mine Gold');
-  crystalNode(-8, 1, 0xc9c9e0, 'silver', 'Mine Silver');
-  crystalNode(8, 1, 0x4a90d9, 'mithril', 'Mine Mithril');
-  crystalNode(-3, -9, 0xffb3c9, 'runite', 'Mine Runite');
-  torch(6, -4);
-  function woodNode(x,z,data,label){
-    add(new THREE.CylinderGeometry(0.9, 1.1, 1.3, 8), mat(0x8a5a2b), x, 0.65, z);
-    add(new THREE.CylinderGeometry(0.5, 0.5, 2.4, 6), mat(0x6a4a2b), x+0.7, 0.6, z-0.5);
-    add(new THREE.ConeGeometry(1.0, 1.4, 7), mat(0x2f9e63), x+0.7, 2.2, z-0.5);
+  function woodNode(x,z,data,label,magic){
+    // magic trees glow faintly so the level-50 tier reads as special from a distance
+    add(new THREE.CylinderGeometry(0.9, 1.1, 1.3, 8), mat(magic?0x6a4a8a:0x8a5a2b), x, 0.65, z);
+    add(new THREE.CylinderGeometry(0.5, 0.5, 2.4, 6), mat(magic?0x5a3a7a:0x6a4a2b), x+0.7, 0.6, z-0.5);
+    const crown = add(new THREE.ConeGeometry(1.0, 1.4, 7), mat(magic?0x7be0ff:0x2f9e63), x+0.7, 2.2, z-0.5);
+    if (magic){ crown.material.emissive = new THREE.Color(0x4a9edd); crown.material.emissiveIntensity = 0.45; }
     torch(x, z);
     register('gather', x, z, data, label, null);
   }
-  woodNode(9, -5, 'oak_log', 'Chop Oak');
-  woodNode(11, -8, 'willow_log', 'Chop Willow');
-  function pond(x,z,data,label){
-    add(new THREE.CylinderGeometry(2.8, 2.8, 0.12, 24), mat(0x3a86c8), x, 0.06, z, {receive:true});
+  function pond(x,z,data,label,deep){
+    // deep water (shark) is darker and wider than the shallow shrimp/salmon pools
+    const r = deep ? 3.4 : 2.8;
+    add(new THREE.CylinderGeometry(r, r, 0.12, 24), mat(deep?0x1f5a8a:0x3a86c8), x, 0.06, z, {receive:true});
     add(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 8), mat(0x9fd8ff), x-0.6, 0.14, z+0.4);
     add(new THREE.CylinderGeometry(0.4, 0.4, 0.06, 8), mat(0x9fd8ff), x+0.5, 0.14, z-0.5);
     register('gather', x, z, data, label, null);
   }
-  pond(12, 18, 'raw_shrimp', 'Fish Shrimp');
-  pond(17, 12, 'raw_salmon', 'Fish Salmon');
-  pond(20, 8, 'raw_lobster', 'Fish Lobster');
+  // Built from the shared node table (public/nodes.js) so the world and the recipe data in
+  // items.js can't drift apart — tools/test.mjs asserts every recipe input has a node here.
+  for (const n of WORLD_NODES){
+    if (n.kind === 'crystal') crystalNode(n.x, n.z, n.color, n.id, n.label);
+    else if (n.kind === 'wood') woodNode(n.x, n.z, n.id, n.label, n.magic);
+    else if (n.kind === 'pond') pond(n.x, n.z, n.id, n.label, n.deep);
+  }
 
   // ---------- stations ----------
   register('station', -16, -7, 'scribe', 'Scribing Hall', null);

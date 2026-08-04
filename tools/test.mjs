@@ -1,10 +1,17 @@
 // Engine smoke test — runs the card engine, economy, and economy-balance checks headlessly.
 import * as G from "../public/game.js";
 import { CARDS, CARD_MAP, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
-import { equipmentFor, BARS, POTIONS, MATERIALS } from "../public/items.js";
+import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS } from "../public/items.js";
+import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
 
 let pass = 0, fail = 0;
 function check(name, cond){ if(cond) pass++; else { fail++; console.log("  ✗ FAIL:", name); } }
+
+// Minimal localStorage so save/load/migrate can be exercised headlessly.
+// game.js only touches it inside load()/save(), so installing it here is soon enough.
+let _store = null;
+globalThis.localStorage = { getItem(){ return _store; }, setItem(k,v){ _store = v; }, removeItem(){ _store = null; } };
+function localStorage_stub(json){ _store = json; }
 
 // ---- 1. deck validity ----
 const s = G.newGame();
@@ -54,6 +61,31 @@ check("grading succeeds and costs gold", gr.ok && s2.gold < before);
 check("graded card has a valid grade", gradeForRoll(ungraded.roll).name.length > 0);
 const sr = G.sellCard(s2, ungraded.uid);
 check("selling a graded card yields gold", sr.ok && sr.value > 0);
+
+// ---- 4.3 world nodes: every recipe input must actually be obtainable ----
+// (regression: tin, raw_shark and magic_log had recipes but no node, so Bronze Bars —
+//  the first rung of the Smithing ladder — could never be smelted)
+const missingNodes = [];
+for (const b of BARS) for (const id of Object.keys(b.req)) if (!GATHERABLE.includes(id)) missingNodes.push(`${b.id} needs ${id}`);
+for (const p of POTIONS) for (const id of Object.keys(p.req)) if (!GATHERABLE.includes(id)) missingNodes.push(`${p.id} needs ${id}`);
+for (const cm of CARD_MATERIALS) for (const id of cm.from) if (!GATHERABLE.includes(id)) missingNodes.push(`${cm.id} needs ${id}`);
+if (missingNodes.length) console.log("   unreachable:", missingNodes.join(", "));
+check("every recipe input has a world node", missingNodes.length === 0);
+check("every world node is a real material", WORLD_NODES.every(n => MATERIALS.some(m=>m.id===n.id)));
+check("bronze bar (the first forge rung) is craftable from gathered ore", (()=>{
+  const sb = G.newGame();
+  const bronze = BARS.find(x=>x.id==="bar_bronze");
+  for (const id of Object.keys(bronze.req)) G.gather(sb, MATERIALS.find(m=>m.id===id));
+  return G.smelt(sb, bronze).ok;
+})());
+check("node positions are inside the world bounds", WORLD_NODES.every(n => Math.abs(n.x)<=40 && Math.abs(n.z)<=40));
+check("no two nodes overlap within interaction range", (()=>{
+  for (let i=0;i<WORLD_NODES.length;i++) for (let j=i+1;j<WORLD_NODES.length;j++){
+    const a = WORLD_NODES[i], b2 = WORLD_NODES[j];
+    if (Math.hypot(a.x-b2.x, a.z-b2.z) < 2.6) return false;   // 2.6 = the register() radius
+  }
+  return true;
+})());
 
 // ---- 4.4 grade bands (regression: a forward find collapsed every roll to "Poor") ----
 check("roll 0 is grade 1", gradeForRoll(0).g === 1);
@@ -212,6 +244,72 @@ const c0 = s5.cards[0];
 const la = G.listAuction(s5, c0.uid, 50);
 check("list auction removes card", la.ok && s5.cards.length === 29);
 check("auction pending", s5.auctions.length === 1);
+
+// ---- 8.5 auctions use wall-clock time and settle on load ----
+const sAuc = G.newGame();
+G.listAuction(sAuc, sAuc.cards[0].uid, 50);
+check("auction deadline is a wall-clock timestamp", sAuc.auctions[0].ends > Date.now() + 1000);
+check("a fresh auction does not settle immediately", G.auctionTick(sAuc).length === 0 && sAuc.auctions.length === 1);
+// a listing whose deadline has passed pays the seller out
+const sExp = G.newGame();
+G.listAuction(sExp, sExp.cards[0].uid, 50);
+sExp.auctions[0].ends = Date.now() - 1;
+const goldBefore = sExp.gold;
+const settled = G.auctionTick(sExp);
+check("an expired auction settles once", settled.length === 1 && sExp.auctions.length === 0);
+check("an expired auction pays at least the reserve", sExp.gold >= goldBefore + 50);
+// a save carrying a legacy performance.now() deadline is settled rather than stranded
+const sLegacy = G.newGame();
+G.listAuction(sLegacy, sLegacy.cards[0].uid, 40);
+sLegacy.auctions[0].ends = 60000;            // what performance.now()+60s used to produce
+const legacyGold = sLegacy.gold;
+G.settleAuctions(sLegacy);
+check("a legacy performance.now() auction is settled, not stranded", sLegacy.auctions.length === 0 && sLegacy.gold > legacyGold);
+
+// ---- 8.6 school picker survives a quit during character creation ----
+const freshSave = G.newGame();
+check("a new game has not picked a school yet", freshSave.flags.schoolPicked === false);
+localStorage_stub(JSON.stringify(freshSave));
+check("quitting mid-creation still shows the picker", G.load().flags.schoolPicked === false);
+const legacySave = G.newGame();
+delete legacySave.flags.schoolPicked;         // a save from before the school system existed
+localStorage_stub(JSON.stringify(legacySave));
+check("a pre-school-system save skips the picker", G.load().flags.schoolPicked === true);
+
+// ---- 8.7 potions are usable in a duel ----
+const sPot = G.newGame();
+sPot.inventory.potion_medium = 2;
+check("heldPotions lists what the player carries", G.heldPotions(sPot).some(p=>p.id==="potion_medium" && p.count===2));
+const bp = G.startDuel(sPot.deck, G.equipStats(sPot), deck20("skeleton"), flat, 100);
+bp.you.hp = 40; bp.you.pips = 5;
+const drank = G.usePotion(sPot, bp, bp.you, "potion_medium");
+check("drinking a potion heals the wizard", drank.ok && bp.you.hp === 75 && drank.healed === 35);
+check("drinking a potion consumes it", sPot.inventory.potion_medium === 1);
+check("drinking a potion costs a pip", bp.you.pips === 4);
+const twice = G.usePotion(sPot, bp, bp.you, "potion_medium");
+check("only one potion per turn", !twice.ok && twice.err === "used");
+G.endTurn(bp); G.endTurn(bp);                  // back round to the player
+check("the potion limit resets next turn", bp.you.potionUsed === false);
+check("healing is capped at max HP", (()=>{
+  const s2p = G.newGame(); s2p.inventory.potion_large = 1;
+  const b2p = G.startDuel(s2p.deck, G.equipStats(s2p), deck20("skeleton"), flat, 100);
+  b2p.you.hp = b2p.you.maxHp - 5; b2p.you.pips = 5;
+  const r = G.usePotion(s2p, b2p, b2p.you, "potion_large");
+  return r.ok && b2p.you.hp === b2p.you.maxHp && r.healed === 5;
+})());
+check("cannot drink a potion you do not have", (()=>{
+  const s3p = G.newGame();
+  const b3p = G.startDuel(s3p.deck, G.equipStats(s3p), deck20("skeleton"), flat, 100);
+  b3p.you.pips = 5;
+  return G.usePotion(s3p, b3p, b3p.you, "potion_small").err === "resources";
+})());
+check("cannot drink on the opponent's turn", (()=>{
+  const s4p = G.newGame(); s4p.inventory.potion_small = 1;
+  const b4p = G.startDuel(s4p.deck, G.equipStats(s4p), deck20("skeleton"), flat, 100);
+  b4p.turn = "enemy";
+  return G.usePotion(s4p, b4p, b4p.you, "potion_small").err === "turn";
+})());
+check("every brewable potion actually heals", POTIONS.every(p => p.heal > 0));
 
 // ---- 9. home ----
 const s6 = G.newGame();

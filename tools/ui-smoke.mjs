@@ -80,5 +80,20 @@ try {
   console.log("handlers present:", Object.keys(ev).length);
 } catch(e){ errors++; console.log("✗ handler err:", e.message); }
 
+// ---- static integration: every G.x() / STR.x the UI uses must actually exist ----
+const G = await import("file://" + path.join(PUBLIC_DIR, "game.js"));
+const { STR } = await import("file://" + path.join(PUBLIC_DIR, "strings.js"));
+const usedEngine = [...new Set([...src.matchAll(/\bG\.([A-Za-z_$][\w$]*)/g)].map(m=>m[1]))];
+const missingEngine = usedEngine.filter(n => !(n in G));
+if (missingEngine.length){ errors++; console.log("✗ UI calls missing engine exports:", missingEngine.join(", ")); }
+else console.log(`engine bindings ok (${usedEngine.length} used)`);
+
+if (STR){
+  const usedStr = [...new Set([...src.matchAll(/\bSTR\.([A-Za-z_$][\w$]*)/g)].map(m=>m[1]))];
+  const missingStr = usedStr.filter(n => !(n in STR));
+  if (missingStr.length){ errors++; console.log("✗ UI references missing strings:", missingStr.join(", ")); }
+  else console.log(`string bindings ok (${usedStr.length} used)`);
+} else console.log("! could not resolve the strings export — skipping string binding check");
+
 console.log(errors ? `\n${errors} ERRORS` : "\nUI SMOKE PASS");
 process.exit(errors?1:0);

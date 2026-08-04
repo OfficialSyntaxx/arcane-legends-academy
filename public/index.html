@@ -302,7 +302,7 @@ function buildForge(){
 // simple WebAudio SFX
 let AC=null;
 function sfx(freq,dur,type="sine",vol=.12){ try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(),g=AC.createGain(); o.type=type;o.frequency.value=freq;g.gain.value=vol;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+dur);o.stop(AC.currentTime+dur);}catch(e){} }
-const playSfx=()=>sfx(520,.08); const dmgSfx=()=>sfx(140,.12,"sawtooth"); const winSfx=()=>{sfx(523,.15);sfx(659,.15);sfx(784,.25);}; const loseSfx=()=>{sfx(330,.2);sfx(220,.3);};
+const playSfx=()=>sfx(520,.08); const dmgSfx=()=>sfx(140,.12,"sawtooth"); const healSfx=()=>{sfx(660,.1);sfx(880,.14);}; const winSfx=()=>{sfx(523,.15);sfx(659,.15);sfx(784,.25);}; const loseSfx=()=>{sfx(330,.2);sfx(220,.3);};
 
 // ================= card renderer =================
 function cardFace(c, opts={}){
@@ -807,6 +807,17 @@ function renderDuel(el){
       disabled: !playable, onclick: playable ? (isTargeted?`cast|${i}`:`play|${i}`) : "" });
   }
   h += `</div></div>`;
+  // potions (brewed via Alchemy — 1 pip, one per turn)
+  const potions = G.heldPotions(S);
+  if (potions.length){
+    h += `<div class="row" style="justify-content:center;flex-wrap:wrap;gap:6px">`;
+    for (const p of potions){
+      const usable = myTurn && !over.over && !you.potionUsed && you.pips >= 1;
+      h += `<button class="btn ${usable?"ok":""}" ${usable?"":"disabled"} onclick="window.__ev('drink|${p.id}')">${p.icon} ${p.name.replace(" Healing Potion","")} +${p.heal} ×${p.count}</button>`;
+    }
+    h += `</div>`;
+    if (you.potionUsed) h += `<div style="text-align:center;font-size:11px;color:var(--muted)">${STR.potion_used}</div>`;
+  }
   // actions
   h += `<div class="row" style="justify-content:center">
     <button class="btn gold" ${myTurn&&!over.over?"":"disabled"} onclick="window.__ev('endTurn')">${STR.end_turn}</button></div>`;
@@ -867,6 +878,11 @@ window.__EV.atkFrom = (idx)=>{
 };
 window.__EV.atkWiz = ()=>{
   if (pendingTarget && pendingTarget.kind==="attack"){ const r=G.attack(battle, pendingTarget.idx, "wiz", -1); pendingTarget=null; if(r.ok) sfx(dmgSfx); render(); }
+};
+window.__EV.drink = (potionId)=>{
+  const r = G.usePotion(S, battle, battle.you, potionId);
+  if (r.ok){ healSfx(); toast(STR.potion_drunk.replace("{n}", r.healed)); G.save(S); }
+  render();
 };
 window.__EV.endTurn = ()=>{ const r=G.endTurn(battle); render(); };
 window.__EV.duelAgain = ()=>{

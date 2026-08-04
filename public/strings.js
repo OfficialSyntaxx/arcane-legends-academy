@@ -92,6 +92,8 @@ export const STR = {
   shield: "Shield",
   hand: "Hand",
   end_turn: "End Turn",
+  potion_used: "Already drank a potion this turn",
+  potion_drunk: "Restored {n} health",
   attack: "Choose target",
   play_card: "Play",
   deck_empty: "No cards left",

@@ -30,7 +30,13 @@ export function newGame(){
     auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false },
   };
 }
-export function load(){ try{ const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if(s && s.version) return migrate(s); }catch(e){} return newGame(); }
+export function load(){
+  try{
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s && s.version){ const m = migrate(s); settleAuctions(m); return m; }
+  }catch(e){}
+  return newGame();
+}
 export function save(s){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(s)); }catch(e){} }
 function migrate(s){
   // v1 -> aligned: add scribing skill, slab fields, trim deck to 20-card format
@@ -41,7 +47,10 @@ function migrate(s){
   if (!s.daily) s.daily = { date:"", type:"win", progress:0, target:3, claimed:false };
   if (!s.school) s.school = "balance";
   if (!s.flags) s.flags = {};
-  if (!s.flags.schoolPicked) s.flags.schoolPicked = true; // existing saves skip the picker
+  // Only a save that predates the school system (flag ABSENT) skips the picker. The old check
+  // was `if (!s.flags.schoolPicked)`, which also fired on an explicit false — so a player who
+  // quit during character creation never saw the picker again and was silently stuck on Balance.
+  if (s.flags.schoolPicked === undefined) s.flags.schoolPicked = true;
   if (!s.auctions) s.auctions = [];
   if (s.deck && s.deck.length > MAX_DECK) s.deck = s.deck.slice(0, MAX_DECK);
   return s;
@@ -281,15 +290,21 @@ export function addToDeck(s, id){
 export function removeFromDeck(s, id){ const i = s.deck.lastIndexOf(id); if (i>=0) s.deck.splice(i,1); return {ok:true}; }
 
 // ---------- Auctions (simulated) ----------
+export const AUCTION_MS = 60000;
+// Auctions are persisted to localStorage, so their deadline must be a wall-clock timestamp.
+// They used to store performance.now() + 60s — but performance.now() restarts at 0 on every
+// page load, so after any reload every listing was already "expired" and paid out instantly at
+// the base price with no bidding.
 export function listAuction(s, uidC, price){
   const i = s.cards.findIndex(c=>c.uid===uidC); if (i<0) return {ok:false};
   const c = s.cards[i];
-  s.auctions.push({ id:uid(), card: c, price, bid:0, bidder:null, ends: performance.now() + 60000, t: 0 });
+  s.auctions.push({ id:uid(), card: c, price, bid:0, bidder:null, ends: Date.now() + AUCTION_MS, t: 0 });
   s.cards.splice(i,1);
   return { ok:true };
 }
 export function auctionTick(s){
-  const now = performance.now();
+  const now = Date.now();
+  const settled = [];
   for (const a of s.auctions){
     // NPCs occasionally bid up over time
     a.t += 1;
@@ -300,11 +315,24 @@ export function auctionTick(s){
   }
   s.auctions = s.auctions.filter(a => {
     if (now < a.ends) return true;
-    // expired: payout to seller
+    // expired: pay the seller the winning bid (or the reserve if nobody bid)
     const pay = a.bid || a.price;
-    s.gold += pay; s.stats.won = s.stats.won;
+    s.gold += pay;
+    settled.push({ id:a.id, card:a.card, pay, bidder:a.bidder });
     return false;
   });
+  return settled;
+}
+// Settle any auctions that ran out while the game was closed. Called once on load: without it,
+// a listing left running across a session would sit in the list forever until the market screen
+// happened to tick.
+export function settleAuctions(s){
+  if (!s.auctions || !s.auctions.length) return [];
+  const now = Date.now();
+  // A save from before the Date.now() switch carries a tiny performance.now()-based deadline;
+  // treat those as due now rather than leaving them stuck in the past forever.
+  for (const a of s.auctions) if (a.ends < 1e12) a.ends = now;
+  return auctionTick(s);
 }
 export function collectAuction(s, id){ return {ok:true}; } // payout handled on expiry
 
@@ -393,6 +421,7 @@ export function beginTurn(b, p){
   p.pips = Math.min(10, p.maxPips + pipBonus);
   if (p.deck.length) draw(p);
   else { p.fatigue = (p.fatigue||0) + 1; p.hp -= p.fatigue; b.log.push(p.id+" takes "+p.fatigue+" fatigue"); }
+  p.potionUsed = false;   // one potion per turn (see usePotion)
   // NB: freeze is NOT cleared here — it ticks down at the END of the frozen player's turn
   // (see endTurn), so a creature frozen on the opponent's turn actually misses one turn.
   for (const c of p.board){ c.exhausted = false; c.attacks = 0; }
@@ -504,6 +533,30 @@ export function attack(b, attackerIdx, targetKind, targetIdx){
   }
   b.log.push(p.id+" attacks "+targetKind);
   return {ok:true};
+}
+// Drink a brewed potion mid-duel. Costs 1 pip and is limited to one per turn, so Alchemy is a
+// real comeback option without letting a stack of potions stall the game out.
+// This is what makes the Alchemy skill worth levelling — potions were previously craftable but
+// had no use at all except vendoring them below the value of the raw fish.
+export function usePotion(s, b, p, potionId){
+  const pot = POTIONS.find(x => x.id === potionId);
+  if (!pot) return { ok:false };
+  if (isOver(b).over) return { ok:false, err:"over" };
+  if (b.turn !== p.id) return { ok:false, err:"turn" };
+  if (p.potionUsed) return { ok:false, err:"used" };
+  if (p.pips < 1) return { ok:false, err:"pips" };
+  if ((s.inventory[potionId]||0) < 1) return { ok:false, err:"resources" };
+  s.inventory[potionId]--;
+  p.pips -= 1;
+  p.potionUsed = true;
+  const before = p.hp;
+  p.hp = Math.min(p.maxHp, p.hp + pot.heal);
+  b.log.push(p.id + " drinks " + pot.name);
+  return { ok:true, healed: p.hp - before, potion: pot };
+}
+// Potions the player currently holds, for the duel UI.
+export function heldPotions(s){
+  return POTIONS.filter(p => (s.inventory[p.id]||0) > 0).map(p => ({ ...p, count: s.inventory[p.id] }));
 }
 export function endTurn(b){
   const outgoing = b[b.turn];

@@ -52,6 +52,7 @@ wizard-tcg/                 (the repo root)
 │   ├── index.html          the game page (all UI + boot)
 │   ├── cards.js            card catalog + grading + elemental matrix
 │   ├── items.js            skills, materials, equipment, recipes, home upgrades
+│   ├── nodes.js            gathering-node table (data; world.js builds the meshes from it)
 │   ├── game.js             engine: skills, economy, market, auctions, housing, duels, AI
 │   ├── world.js            the 3D academy world (Three.js scene, movement, camera, NPCs, GLB loading)
 │   ├── strings.js          ALL player-visible text (external on purpose)
@@ -59,9 +60,9 @@ wizard-tcg/                 (the repo root)
 │   ├── vendor/             pinned libs (three.min.js, GLTFLoader.js)
 │   └── assets/             generated art + GLB character models (models/)
 ├── tools/                  headless test suites
-│   ├── test.mjs            engine tests (35 checks)
-│   ├── logic-test.mjs      online-rules tests (14 checks)
-│   └── ui-smoke.mjs        UI boot smoke test (stubs DOM/THREE)
+│   ├── test.mjs            engine tests (79 checks)
+│   ├── logic-test.mjs      online-rules tests (25 checks)
+│   └── ui-smoke.mjs        UI boot smoke + engine/string binding checks
 └── design/                 design docs (plan, thresholds, asset manifest)
 ```
 
@@ -82,9 +83,9 @@ The world is a walkable academy campus built in Three.js (procedural low-poly + 
   - Duel Trainer → practice duel
   - Student Dorms → home
   - Librarian → daily challenge
-- **Gathering nodes:** ore crystals (copper/iron/gold/silver/mithril/runite), wood stumps (oak/willow), ponds (shrimp/salmon/lobster). Each grants a material + skill XP.
+- **Gathering nodes** (defined as data in `public/nodes.js`): ore crystals (copper/tin/iron/silver/gold/mithril/runite), wood stumps (oak/willow/magic), ponds (shrimp/salmon/lobster/shark). Each grants a material + skill XP.
 - **NPCs:** Professor, Merchant, Referee, Trainer, Librarian, and wandering students — all with dialogue.
-- **Character models:** generated via Meshy text-to-3D (`.glb`). The player model loads; NPC models are currently disabled in `world.js` (see §9 Known Issues).
+- **Character models:** generated via Meshy 2D→3D (`.glb`). The player and all 9 NPCs load (see §9).
 
 ---
 
@@ -181,7 +182,7 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 56 engine checks
+node tools/test.mjs          # 79 engine checks
 node tools/logic-test.mjs    # 25 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
 ```
@@ -224,7 +225,24 @@ lists verified defects and orders them into phases. **Phase A (correctness) is d
   Streak were all blank cards. Descriptors are now resolved to real entities.
 - `ui-smoke.mjs` read an absolute path from a dead sandbox and exited 0 on failure.
 
-**Known issues / next steps:** *(Phases B–D of the plan doc; the items below still stand)*
+**Phase B (closing the loops) is also done:**
+
+- **Gathering nodes are data now** (`public/nodes.js`); `world.js` builds meshes from that
+  table. `tin`, `raw_shark` and `magic_log` had recipes but no node anywhere, so Bronze Bars —
+  the first rung of the entire Smithing ladder — could not be crafted. Nodes added, and the
+  test suite asserts every recipe input is reachable. Runite also sat 1.4 units from iron,
+  inside the 2.6-unit interaction radius; it moved out to `(-14,-14)`.
+- **Potions work in duels** — `usePotion()`, 1 pip, one per turn, surfaced as a row in the duel
+  UI. Alchemy previously produced items with no use whatsoever.
+- **Auctions use `Date.now()`** and settle on load. They stored `performance.now() + 60s`
+  against a persisted save, so every listing was already expired after any reload.
+- **The school picker survives a mid-creation quit** (`migrate` only skips it when the flag is
+  absent, not when it is explicitly `false`).
+
+When adding a gatherable material, add it to **both** `items.js` and `nodes.js` — the test
+suite will fail the build if a recipe input has no node.
+
+**Known issues / next steps:** *(Phases C–D of the plan doc; the items below still stand)*
 1. **All character models are now generated 3D models.** The player wizard, professor, merchant, referee, trainer, librarian, and 4 wandering students are all 2D→3D generated GLBs (except the professor, which is a static text-to-3D mesh). They load at ~1.8 units and render correctly. The fix in `makeCharModel` (`world.js`): for **skinned Meshy GLBs** the object box is degenerate (0) and the raw mesh box is only the *bind pose* — the real size is the **skeleton node span** (bones sit far above the mesh), so height is computed from node world positions. For **static meshes** (e.g. professor.glb has no skeleton), the real size is the **geometry box**. The loader auto-detects skinned vs static. NPC GLB keys match their roles (`duel`, `trainer`, `librarian`, `wander0`–`wander3`) so the update loop uses the GLB mixer. **All models were texture-resized to 512px** (gltf-transform) to keep the deploy under the ~50MB upload limit — the models folder is now ~22MB total.
 2. **The 2D→3D pipeline** (generate a 2D character portrait → image-to-3D, ~40 credits/model: ~2 for the image + ~38 for the conversion) produces a much better, recognizable character than text-to-3D (~25 credits, generic blob). All character GLBs were generated this way.
 3. **GLB files are compressed to 512px textures** (gltf-transform resize) — down from 4–9MB to ~2–3MB each for mobile. True Draco compression is still a future mobile optimization.

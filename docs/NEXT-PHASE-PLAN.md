@@ -6,10 +6,11 @@ Everything below was verified against the actual code, not inferred from the doc
 **Test status at review time:** `tools/test.mjs` 35/35 pass, `tools/logic-test.mjs` 14/14 pass,
 `tools/ui-smoke.mjs` **is broken and silently reports success** (see P0-5).
 
-> **Update — Phase A is complete.** P0-1, P0-3, P0-4, P0-5 and P1-7 are fixed, each with a
-> regression test that fails against the old code. One extra defect (targeted spells doing
-> nothing in local duels) was found and fixed while repairing `applyFx`; it is recorded as
-> P1-7b below. Suites are now **56 / 25 / UI-smoke**, run together by `npm test`, with CI.
+> **Update — Phases A and B are complete.** P0-1, P0-2, P0-3, P0-4, P0-5, P1-7, P1-8, P1-9 and
+> P1-10 are fixed, each with a regression test that fails against the old code. Two extra
+> defects were found while fixing neighbours — targeted spells doing nothing in local duels
+> (P1-7b) and the runite node sitting inside the iron node's interaction radius (P0-2b).
+> Suites are now **79 / 25 / UI-smoke**, run together by `npm test`, with CI.
 > Everything below is left as written so the remaining phases keep their context.
 
 The CLAUDEREADME roadmap is all *content* work (buildings, Draco, sound, more schools).
@@ -54,9 +55,18 @@ node anywhere in `world.js`** and no other source. Same problem for `raw_shark` 
 So a new player cannot forge a single piece of equipment, which gates the entire
 Smithing → equipment → duel-power chain.
 
-**Fix:** add a tin crystal node next to copper, a shark pond, and a magic tree — or drop `tin`
-from the bronze recipe. Add a test that asserts every `req` id across `BARS`/`POTIONS`/
-`CARD_MATERIALS` is reachable from some registered world node.
+**Fixed:** the gathering-node table moved out of `world.js` into `public/nodes.js` (world.js
+needs THREE and a canvas, so its node list could never be checked headlessly — which is exactly
+how the drift went unnoticed). A tin node, a magic tree and a deep-water shark pond were added,
+and `tools/test.mjs` now asserts every `req` id across `BARS`/`POTIONS`/`CARD_MATERIALS` has a
+node, that every node is a real material, and that a Bronze Bar can be smelted purely from
+gathered ore.
+
+### P0-2b. Runite and iron nodes overlapped *(found by the new spacing assertion)*
+Runite sat at `(-3,-9)`, **1.4 units** from the iron node at `(-4,-8)` — well inside the 2.6-unit
+interaction radius, so the two nodes competed for the same prompt and whichever lost was
+effectively unmineable. Runite moved to `(-14,-14)`, which also reads better as the level-70
+tier. A test now asserts no two nodes are within interaction range of each other.
 
 ### P0-3. `drain` heals the wrong wizard
 `public/game.js:468,471,474` and `logic.js:199,201,204`:
@@ -135,7 +145,10 @@ Alchemy brews 4 tiers of healing potion with a `heal` value. Nothing in `index.h
 duel engine ever consumes one. The whole Alchemy skill currently exists only to be sold to a
 vendor at a loss relative to the raw fish.
 
-**Fix:** a "use potion" action in the duel UI (costs the turn, or 1 pip), or cut the skill.
+**Fixed:** `usePotion(s, b, p, potionId)` in `game.js`, surfaced as a potion row in the duel UI.
+Costs **1 pip, one per turn** — enough to be a real comeback option without letting a stack of
+potions stall a duel out. The limit resets in `beginTurn`, and the save is written on use so a
+drunk potion can't be duplicated by reloading.
 
 ### P1-9. Auctions are built on `performance.now()`
 `game.js:287` sets `ends: performance.now() + 60000`, but `performance.now()` restarts at 0 on
@@ -143,13 +156,21 @@ every page load while `ends` is persisted to `localStorage`. After a reload ever
 instantly "expired" and pays out at the base price with no bidding. Also `collectAuction()` is
 a no-op stub, and `auctionTick` contains the no-op line `s.stats.won = s.stats.won;`.
 
-**Fix:** store `Date.now()` timestamps; settle elapsed auctions on load.
+**Fixed:** deadlines are `Date.now()`-based, `auctionTick` returns what it settled, and a new
+`settleAuctions()` runs once from `load()` so listings that expired while the game was closed
+pay out instead of waiting for the market screen to tick. Saves carrying a legacy
+`performance.now()` deadline are detected (`ends < 1e12`) and settled rather than stranded.
+The no-op `s.stats.won = s.stats.won;` line is gone. `collectAuction()` is still a stub — payout
+happens on expiry, so it has nothing to do; left for whenever bidding becomes player-facing.
 
 ### P1-10. `migrate()` always flips `schoolPicked` to true
 `game.js:44`: `if (!s.flags.schoolPicked) s.flags.schoolPicked = true;` — the guard and the
 assignment are the same condition, so the flag can never be false after a load. A player who
 quits during character creation never sees the school picker again and is silently locked to
 `balance`. (Intentional for *legacy* saves, but it now applies to every save.)
+
+**Fixed:** the check is `s.flags.schoolPicked === undefined` — only a save that predates the
+school system (flag absent) skips the picker; an explicit `false` is respected.
 
 ### P1-11. Fatigue is applied but the duel can't end on it
 `beginTurn` subtracts escalating fatigue damage, and `isOver` checks `hp <= 0`, so that part
@@ -202,11 +223,16 @@ relies on a `guard++ < 200` loop bound. A stalled online match has no terminatin
 
 Also corrected the `logic.js` "deck must be 30 cards" message to 20 (part of P1-6).
 
-**Phase B — close the loops (~1 sitting)**
-6. Add tin / shark / magic-tree nodes + reachability test *(P0-2)*
-7. Potion use in duels *(P1-8)*
-8. `Date.now()` auctions + settle-on-load *(P1-9)*
-9. `schoolPicked` migrate fix *(P1-10)*
+**Phase B — close the loops — ✅ DONE**
+6. ✅ Node table extracted to `public/nodes.js`; tin / shark / magic-tree nodes added;
+   reachability, spacing and bounds assertions *(P0-2, P0-2b)*
+7. ✅ Potion use in duels — 1 pip, one per turn *(P1-8)*
+8. ✅ `Date.now()` auctions, `settleAuctions()` on load, legacy-deadline recovery *(P1-9)*
+9. ✅ `schoolPicked` migrate fix *(P1-10)*
+
+Also added to `ui-smoke.mjs`: a static binding check that every `G.x()` and `STR.x` the UI
+references actually exists (55 engine and 33 string bindings today). That catches the class of
+break where a screen renders fine until the one code path touching a renamed export runs.
 
 **Phase C — de-risk the online path**
 10. `tools/sync-cards.mjs` generating the `logic.js` catalog, asserted in `logic-test.mjs` *(P1-6)*
