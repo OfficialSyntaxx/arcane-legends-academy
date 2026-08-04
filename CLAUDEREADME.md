@@ -110,6 +110,8 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 
 **In use:** `kaykit_tree.glb` + `kaykit_rock.glb` (in `public/assets/models/`) are from the **KayKit Forest Nature Pack** by Kay Lousberg — **CC0** (free for commercial use, no attribution required; details in the pack's `License.txt`). Wired in via `loadProp()` in `world.js` as woodcutting + mining nodes.
 
+**Free-asset backlog:** see [`ASSETS.md`](ASSETS.md) — the curated list of recommended CC0/free packs (buildings, terrain, dungeons, characters, animations, crafting props) plus the pipeline reminder. Bring them in one at a time through `tools/import-asset.mjs`.
+
 ## 5. The Card Systems (core gameplay)
 
 ### 5.1 Schools & elemental identity
