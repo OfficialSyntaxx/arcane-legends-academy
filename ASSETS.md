@@ -56,6 +56,12 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 - **Spell-cast animations:** already have **Universal Animation Library 2** (Quaternius) — includes casting/attack anims to retarget to our rigged NPCs.
 - **Character creation:** this is a UI screen — build in code with the wizard GLB models (not an imported asset), see CLAUDEREADME roadmap.
 
+## 🐲 Creature / monster assets for duels (recommended; itch-session-protected)
+- **Quaternius Ultimate Monsters** — 50 fully animated monsters (CC0, FBX/OBJ) — https://quaternius.com/packs/ultimatemonsters.html — *we already imported 4 of the "Animated Monsters" set (Dragon/Slime/Bat/Skeleton) as 3D duel summons.*
+- **Quaternius 3D Card Kit – Fantasy** — 50 fully modeled fantasy scenes (heroes, elements, enemies) ideal for "cards come to life" — CC0, glTF — https://quaternius.com/packs/3dcardkitfantasy.html
+- **Quaternius Ultimate Fantasy RTS / Medieval Village / RPG packs** — more units/props for creature variety (CC0).
+- **KayKit Dungeon Pack** (already imported) — dungeon props for PvE arenas.
+
 > **KayKit packs are NOT here** — they're on GitHub (KayKit-Game-Assets org), so I can fetch them directly. Done for: Medieval Hexagon, Dungeon, Skeletons, Adventures, Furniture, City Builder.
 
 ---
