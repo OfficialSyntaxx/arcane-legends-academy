@@ -28,6 +28,14 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 | `nat_CommonTree_1.glb` | Stylized Nature MegaKit (Quaternius) | CC0 | Decorative trees (22,10),(24,-6) |
 | `nat_Mushroom_Common.glb` | Stylized Nature MegaKit (Quaternius) | CC0 | Decorative mushrooms |
 | `nat_Flower_3_Single.glb` | Stylized Nature MegaKit (Quaternius) | CC0 | Decorative flower |
+| `fur_book_set.glb` | KayKit – Furniture Bits | CC0 | Library bookshelf (-14,8) |
+| `fur_armchair.glb` | KayKit – Furniture Bits | CC0 | Library armchair (-13.5,8.5) |
+| `fur_lamp_standing.glb` | KayKit – Furniture Bits | CC0 | Standing lamp (-13,9) |
+| `fur_bed_single_A.glb` | KayKit – Furniture Bits | CC0 | Dorms bed (1,17) |
+| `fur_chair_A.glb` | KayKit – Furniture Bits | CC0 | Dorms chair (0.5,16.5) |
+| `npc_mage.glb` | KayKit – Character Pack Adventures | CC0 | Spell-tutor wizard NPC (76 anims), (-16,8) |
+
+**Skipped (off-theme):** KayKit **City Builder Bits** — modern city (cars, traffic lights, dumpsters) doesn't fit the medieval wizard academy.
 
 **Downloaded (on disk, not yet imported):** KayKit Dungeon-Remastered, Character Pack Skeletons, Character Pack Adventures, Furniture Bits, City Builder Bits (all CC0, `.glb`/`.gltf`); **Universal Animation Library 2** by Quaternius (CC0, 130+ animations on a universal humanoid rig, `UAL2_Standard.glb` — for retargeting to our NPC skeletons later).
 
@@ -36,6 +44,13 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 - **Ghibli-inspired nature pack** ("110+ unique nature models") — on the itch [3D tag](https://itch.io/game-assets/free/tag-3d) — needs manual download.
 - **"300+ models… fully textured medieval town"** — on the itch 3D tag — needs manual download.
 - **Modular Character Outfits – Fantasy** — on the itch 3D tag — needs manual download.
+
+## ⚔️ Combat assets — recommended (need your download; itch-session-protected)
+- **KayKit: Fantasy Weapons Bits** — CC0, 25+ low-poly weapons incl. **staves, wands** (wizard on-theme!), swords, bows, shields — https://kaylousberg.itch.io/fantasy-weapons-bits
+- **FlexUnit Medieval Fantasy Weapon Collection** — CC0, 14 weapons (sword, axe, mace, spear…) — https://flexunit.itch.io/medieval-fantasy-weapon-collection
+- **Binbun RPG Weapons** — CC0, 70 weapons (incl. pickaxes) — https://binbun3d.itch.io/rpg-weapons
+- **Spell-cast animations:** already have **Universal Animation Library 2** (Quaternius) — includes casting/attack anims to retarget to our rigged NPCs.
+- **Character creation:** this is a UI screen — build in code with the wizard GLB models (not an imported asset), see CLAUDEREADME roadmap.
 
 > **KayKit packs are NOT here** — they're on GitHub (KayKit-Game-Assets org), so I can fetch them directly. Done for: Medieval Hexagon, Dungeon, Skeletons, Adventures, Furniture, City Builder.
 

@@ -255,6 +255,17 @@ export function createWorld(canvas, callbacks){
   loadProp('./assets/models/nat_Mushroom_Common.glb', 0.8, { x: -9, z: 14 });
   loadProp('./assets/models/nat_Flower_3_Single.glb', 0.6, { x: 12, z: 2 });
 
+  // KayKit Furniture (CC0) — library study nook + dorms decor
+  loadProp('./assets/models/fur_book_set.glb', 1.2, { x: -14, z: 8 });
+  loadProp('./assets/models/fur_armchair.glb', 1.0, { x: -13.5, z: 8.5 });
+  loadProp('./assets/models/fur_lamp_standing.glb', 1.5, { x: -13, z: 9 });
+  loadProp('./assets/models/fur_bed_single_A.glb', 0.9, { x: 1, z: 17 });
+  loadProp('./assets/models/fur_chair_A.glb', 1.0, { x: 0.5, z: 16.5 });
+
+  // KayKit Adventures Mage (CC0) — an extra wizard, a "spell tutor" near the library
+  const mageGroup = new THREE.Group(); mageGroup.position.set(-16, 0, 8); scene.add(mageGroup);
+  makeCharModel('mage', './assets/models/npc_mage.glb', mageGroup);
+
   // ---------- stations ----------
   register('station', -16, -7, 'scribe', 'Scribing Hall', null);
   register('station', 16, -7, 'smith', 'Smithy & Forge', null);
