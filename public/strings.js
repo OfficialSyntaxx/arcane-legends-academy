@@ -92,6 +92,8 @@ export const STR = {
   shield: "Shield",
   hand: "Hand",
   end_turn: "End Turn",
+  sound_on: "Sound on",
+  sound_off: "Sound muted",
   world_loading: "Summoning the academy… {d}/{t}",
   world_load_partial: "{n} character model(s) unavailable — using stand-ins",
   world_hint_touch: "Joystick to walk · drag to look · pinch to zoom · tap the ground to move",

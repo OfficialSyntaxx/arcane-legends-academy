@@ -39,6 +39,9 @@ html,body{margin:0;height:100%;background:#0d0a1f;color:var(--ink);
   text-shadow:0 0 12px rgba(255,201,77,.5);letter-spacing:1px;margin-right:auto;}
 .stat{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:14px;white-space:nowrap;flex:0 0 auto;}
 .stat b{color:var(--gold);font-weight:700;}
+/* a stat pill that is also a control still needs a real tap target */
+.statbtn{cursor:pointer;font-family:inherit;color:var(--ink);min-height:34px;min-width:44px;
+  justify-content:center;font-size:17px;line-height:1;touch-action:manipulation;}
 
 /* nav */
 #nav{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;background:rgba(20,14,40,.9);border-bottom:1px solid var(--line);
@@ -250,6 +253,7 @@ body.has-touch .worldbtn{display:flex;}
     <div class="stat">🪙 <b id="sGold">0</b></div>
     <div class="stat">⭐ <b id="sLvl">1</b></div>
     <div class="stat">🧙 <b id="sXp">0</b></div>
+    <button id="muteBtn" class="stat statbtn" aria-label="Toggle sound" onclick="window.__ev('toggleMute')">🔊</button>
   </div>
   <div id="nav"></div>
   <div id="screen"></div>
@@ -290,12 +294,14 @@ body.has-touch .worldbtn{display:flex;}
 </div>
 <script src="./vendor/three.min.js"></script>
 <script src="./vendor/GLTFLoader.js"></script>
+<script src="./vendor/DRACOLoader.js"></script>
 <script type="module">
 import { STR } from "./strings.js";
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
 import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS } from "./items.js";
 import * as G from "./game.js";
 import { createWorld } from "./world.js";
+import { createAudio, SFX } from "./audio.js";
 
 // ================= state =================
 let S = G.load();
@@ -411,8 +417,15 @@ function buildForge(){
 
 // simple WebAudio SFX
 let AC=null;
-function sfx(freq,dur,type="sine",vol=.12){ try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)(); const o=AC.createOscillator(),g=AC.createGain(); o.type=type;o.frequency.value=freq;g.gain.value=vol;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+dur);o.stop(AC.currentTime+dur);}catch(e){} }
-const playSfx=()=>sfx(520,.08); const dmgSfx=()=>sfx(140,.12,"sawtooth"); const healSfx=()=>{sfx(660,.1);sfx(880,.14);}; const winSfx=()=>{sfx(523,.15);sfx(659,.15);sfx(784,.25);}; const loseSfx=()=>{sfx(330,.2);sfx(220,.3);};
+const AUDIO = createAudio();
+// Thin shims so existing call sites keep working; every cue now routes through audio.js,
+// which also carries the music/ambience layers and the mute preference.
+function sfx(freq, dur, type, vol){ AUDIO.play("ui"); }          // legacy numeric calls
+const playSfx=()=>AUDIO.play("card"); const dmgSfx=()=>AUDIO.play("damage");
+const winSfx=()=>AUDIO.play("win"); const loseSfx=()=>AUDIO.play("lose");
+const healSfx=()=>AUDIO.play("heal"); const coinSfx=()=>AUDIO.play("coin");
+// Browsers refuse to start audio before a gesture, so unlock on the first real interaction.
+for (const ev of ["pointerdown","keydown","touchstart"]) window.addEventListener(ev, ()=>AUDIO.unlock(), { once:false, passive:true });
 
 // ================= card renderer =================
 function cardFace(c, opts={}){
@@ -478,6 +491,7 @@ function buildNav(){
   document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>{ screen=b.dataset.screen; render(); });
 }
 function render(){
+  AUDIO.setContext(screen === "world" ? "world" : (screen === "duel" || screen === "online") ? "duel" : "menu");
   buildNav();
   const scr = $("screen");
   const worldWrap = $("worldWrap");
@@ -651,7 +665,7 @@ window.__EV.gather = (id)=>{
   if (gatherCooldown>0) return;
   const m = MATERIALS.find(x=>x.id===id);
   const r = G.gather(S,m);
-  if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); sfx(400,.06); gatherCooldown = 1.4; }
+  if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); AUDIO.play("gather"); gatherCooldown = 1.4; }
   else err(LTL);
   render();
 };
@@ -957,7 +971,7 @@ function renderDuel(el){
     setTimeout(()=>{ if (battle && battle.turn==="enemy"){ G.aiTurn(battle); render(); } }, 500);
   }
 }
-window.__EV.play = (idx)=>{ const r=G.playCard(battle, battle.you, idx, null); if(r.ok) sfx(playSfx); render(); };
+window.__EV.play = (idx)=>{ const r=G.playCard(battle, battle.you, idx, null); if(r.ok) AUDIO.play("card"); render(); };
 window.__EV.cast = (idx)=>{
   const c = CARD_MAP[battle.you.hand[idx]];
   if (c.fx.some(f=>f.k==="dmg")){ pendingTarget = {kind:"spell", idx}; render(); }
@@ -993,7 +1007,7 @@ window.__EV.atkWiz = ()=>{
 };
 window.__EV.drink = (potionId)=>{
   const r = G.usePotion(S, battle, battle.you, potionId);
-  if (r.ok){ healSfx(); toast(STR.potion_drunk.replace("{n}", r.healed)); G.save(S); }
+  if (r.ok){ AUDIO.play("heal"); toast(STR.potion_drunk.replace("{n}", r.healed)); G.save(S); }
   render();
 };
 window.__EV.endTurn = ()=>{ const r=G.endTurn(battle); render(); };
@@ -1145,7 +1159,7 @@ function initWorld(){
       const m = MATERIALS.find(x=>x.id===matId);
       if (!m) return;
       const r = G.gather(S, m);
-      if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); sfx(400,.06); gatherCooldown = 1.4; }
+      if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); AUDIO.play("gather"); gatherCooldown = 1.4; }
       else err(LTL);
       save();
     },
@@ -1308,9 +1322,18 @@ function initWorld(){
   hud.style.display = "block";
 }
 window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
+window.__EV.toggleMute = ()=>{
+  AUDIO.unlock();
+  AUDIO.setMuted(!AUDIO.isMuted());
+  const b = $("muteBtn");
+  b.textContent = AUDIO.isMuted() ? "🔇" : "🔊";
+  if (!AUDIO.isMuted()) AUDIO.play("ui");
+  toast(AUDIO.isMuted() ? STR.sound_off : STR.sound_on);
+};
 
 // ================= boot =================
 function boot(){
+  $("muteBtn").textContent = AUDIO.isMuted() ? "🔇" : "🔊";
   initWorld();
   if (world) world.setPlayerColor(SCHOOLS[S.school].color);
   if (!S.flags.schoolPicked) showSchoolPicker();

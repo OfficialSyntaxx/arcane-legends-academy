@@ -54,18 +54,20 @@ wizard-tcg/                 (the repo root)
 │   ├── items.js            skills, materials, equipment, recipes, home upgrades
 │   ├── nodes.js            gathering-node table (data; world.js builds the meshes from it)
 │   ├── structures.js       buildings, NPC positions, obstacles + the collision resolver (data)
+│   ├── audio.js            procedural WebAudio: SFX, ambience, music (no asset files)
 │   ├── game.js             engine: skills, economy, market, auctions, housing, duels, AI
 │   ├── world.js            the 3D academy world (Three.js scene, movement, camera, NPCs, GLB loading)
 │   ├── strings.js          ALL player-visible text (external on purpose)
 │   ├── manifest.json       PWA manifest
-│   ├── vendor/             pinned libs (three.min.js, GLTFLoader.js)
+│   ├── vendor/             pinned libs (three.min.js, GLTFLoader.js, DRACOLoader.js, draco/)
 │   └── assets/             generated art + GLB character models (models/)
 ├── tools/                  headless test suites
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
 │   ├── test.mjs            engine tests (87 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
-│   └── browser-test.mjs    real-Chromium responsive + input-gesture suite
+│   ├── browser-test.mjs    real-Chromium responsive + input-gesture suite
+│   └── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
 └── design/                 design docs (plan, thresholds, asset manifest)
 ```
 
@@ -264,6 +266,13 @@ suite will fail the build if a recipe input has no node.
   camera, a drag ending off-canvas left the drag stuck, and a drag could fire tap-to-move on
   release. All three are fixed and covered by `npm run test:browser`.
 
+**SCALE: 1 world unit = 1 metre.** A character is 1.8. Buildings used to be 3.5–5.5 units tall
+against them — a "hall" barely 2.5 people high — which is what made the campus read as a model
+village. Halls are now 7–10.5m tall and 13–15m wide, the tower is 40m, the arena 25m across, and
+the layout is spread to match (`WORLD_BOUND` 72). The camera sits at height 4.6 / distance 10.5 /
+62° FOV. **Keep new geometry on this scale**, and author generated building models to the exact
+`w`/`d`/`h` footprints in `structures.js` — a mismatch will float or clip its collision box.
+
 **Phase D part 1 is done: the world is solid.** `public/structures.js` holds the buildings, NPC
 positions, obstacle shapes and a pure collision resolver, so the layout is testable headlessly.
 Making the world solid immediately revealed that the professor and merchant were standing inside
@@ -274,13 +283,20 @@ HUD. **When adding a building or moving an NPC, edit `structures.js`** — the m
 boxes and door prompts are all generated from it, and the tests will fail if something ends up
 sealed inside geometry.
 
+**Draco compression and sound are done** (see items 3 and 6 below). The deploy is now ~6MB total,
+down from ~24MB.
+
+**Costed plan for the remaining generated assets: `docs/ASSET-BUDGET.md`** — rates confirmed from
+the account's transaction history (2D→3D = 40 cr, text-to-3D = 25 cr), with tiers and a
+recommendation. Nothing has been spent.
+
 **Known issues / next steps:** *(Phase D part 2; the items below still stand)*
 1. **All character models are now generated 3D models.** The player wizard, professor, merchant, referee, trainer, librarian, and 4 wandering students are all 2D→3D generated GLBs (except the professor, which is a static text-to-3D mesh). They load at ~1.8 units and render correctly. The fix in `makeCharModel` (`world.js`): for **skinned Meshy GLBs** the object box is degenerate (0) and the raw mesh box is only the *bind pose* — the real size is the **skeleton node span** (bones sit far above the mesh), so height is computed from node world positions. For **static meshes** (e.g. professor.glb has no skeleton), the real size is the **geometry box**. The loader auto-detects skinned vs static. NPC GLB keys match their roles (`duel`, `trainer`, `librarian`, `wander0`–`wander3`) so the update loop uses the GLB mixer. **All models were texture-resized to 512px** (gltf-transform) to keep the deploy under the ~50MB upload limit — the models folder is now ~22MB total.
 2. **The 2D→3D pipeline** (generate a 2D character portrait → image-to-3D, ~40 credits/model: ~2 for the image + ~38 for the conversion) produces a much better, recognizable character than text-to-3D (~25 credits, generic blob). All character GLBs were generated this way.
-3. **GLB files are compressed to 512px textures** (gltf-transform resize) — down from 4–9MB to ~2–3MB each for mobile. True Draco compression is still a future mobile optimization.
+3. **GLB files are Draco-compressed with WebP 512px textures** — the character set went **22MB → 3.4MB** (textures-only compression only reached 17MB, so the geometry was the bulk). The decoder is vendored at `public/vendor/draco/` and wired up in `world.js`; an uncompressed GLB still loads fine, so `npm run compress` is safe to re-run. **Run it after generating any new model.**
 4. **Procedural walk animation.** The Meshy GLBs only carry ONE animation clip each (idle). Rather than regenerate (which would cost credits and drop the idle), `makeCharModel` collects the skeleton bones (standard biped names: LeftLeg, RightLeg, LeftArm, RightArm, Spine…) and `world.js` applies a procedural walk cycle (bones swing via quaternion on top of the base pose) whenever a wanderer NPC is moving; it falls back to the idle clip when stationary. The stationary NPCs (referee, trainer, librarian) keep their idle. Same technique can add swing/attack/emote poses to any GLB character without extra generation.
 5. **Buildings, nodes, and props are still procedural** primitives — these are next to generate as 3D models. `structures.js` is the seam: each building carries an id, position, size and rotation, so a generated mesh can replace the primitive per id without touching collision or station wiring.
-6. **Sound** is not yet implemented (procedural WebAudio SFX only in a few places).
+6. **Sound is implemented** in `public/audio.js` — fully procedural WebAudio (SFX, an ambient pad for the world, and a self-generating arpeggio that changes mode per screen), so it adds **zero bytes** to the deploy. Audio starts suspended until the first user gesture (browser policy) and degrades to silence with no AudioContext. Mute + volumes persist separately from the game save. **Add new cues to the `SFX` table in `audio.js`** — a test asserts every `AUDIO.play("x")` in the UI has a matching entry.
 7. **Models/animations** need rigging verification once quality models are in.
 
 ## 10. Roadmap (in priority order)

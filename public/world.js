@@ -3,7 +3,7 @@
 // gathering nodes for every material, and NPCs that hand out quests and open the market.
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
 import { WORLD_NODES } from "./nodes.js";
-import { BUILDINGS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, PLAYER_RADIUS, doorPos, resolveCollisions } from "./structures.js";
+import { BUILDINGS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions } from "./structures.js";
 
 export function createWorld(canvas, callbacks){
   const THREE = window.THREE;
@@ -14,10 +14,10 @@ export function createWorld(canvas, callbacks){
   renderer.setClearColor(0x1a1440);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x2a1a4a, 50, 130);
+  scene.fog = new THREE.Fog(0x2a1a4a, 95, 250);
 
-  const camera = new THREE.PerspectiveCamera(58, canvas.clientWidth/canvas.clientHeight, 0.1, 250);
-  camera.position.set(0, 12, 18);
+  const camera = new THREE.PerspectiveCamera(62, canvas.clientWidth/canvas.clientHeight, 0.1, 420);
+  camera.position.set(0, 8, 16);
 
   // ---- sky: solid clear color (reliable) ----
   renderer.setClearColor(0x1a1440);
@@ -30,8 +30,8 @@ export function createWorld(canvas, callbacks){
   const moon = new THREE.DirectionalLight(0x9fb4ff, 0.25);
   moon.position.set(-20, 30, -20); scene.add(moon);
   // warm courtyard glow
-  const glow = new THREE.PointLight(0xff8844, 0.8, 45);
-  glow.position.set(0, 6, 0); scene.add(glow);
+  const glow = new THREE.PointLight(0xff8844, 0.9, 90);
+  glow.position.set(0, 12, 0); scene.add(glow);
 
   const mat = c => new THREE.MeshLambertMaterial({ color: c });
   const add = (geo, m, x, y, z, o={}) => {
@@ -45,13 +45,13 @@ export function createWorld(canvas, callbacks){
   };
 
   // ---------- ground ----------
-  const ground = add(new THREE.PlaneGeometry(160, 160), mat(0x2f7d4f), 0, 0, 0, {receive:true});
+  const ground = add(new THREE.PlaneGeometry(300, 300), mat(0x2f7d4f), 0, 0, 0, {receive:true});
   ground.rotation.x = -Math.PI/2;
   // courtyard platform — removed (large flat disc reads as an edge-on artifact at this camera angle)
   // paths radiating from center
   for (let i=0;i<4;i++){
     const a = (i/4)*Math.PI*2 + Math.PI/4;
-    const p = add(new THREE.PlaneGeometry(2.4, 26), mat(0xc9b877), Math.cos(a)*8, 0.06, Math.sin(a)*8, {receive:true, cast:false});
+    const p = add(new THREE.PlaneGeometry(4.6, 52), mat(0xc9b877), Math.cos(a)*16, 0.06, Math.sin(a)*16, {receive:true, cast:false});
     p.rotation.x = -Math.PI/2; p.rotation.z = a;
   }
 
@@ -75,26 +75,26 @@ export function createWorld(canvas, callbacks){
   // in another, and its station prompt is always reachable from outside.
   for (const b of BUILDINGS) stucco(b.x, b.z, b.w, b.d, b.h, b.ry, b.wall, b.roof);
   // Duel Arena (center-back) — round
-  const arena = add(new THREE.CylinderGeometry(6, 6.5, 2.5, 24), mat(0x4a3a7a), 0, 1.25, -16);
-  add(new THREE.ConeGeometry(6.8, 2.2, 24), mat(0x2a1f4d), 0, 3.6, -16);
-  add(new THREE.TorusGeometry(4.5, 0.3, 8, 24), mat(GOLD), 0, 3.9, -16);
+  const arena = add(new THREE.CylinderGeometry(11.6, 12.5, 3.4, 28), mat(0x4a3a7a), 0, 1.7, -32);
+  add(new THREE.ConeGeometry(13.2, 4.2, 28), mat(0x2a1f4d), 0, 5.5, -32);
+  add(new THREE.TorusGeometry(8.6, 0.55, 8, 28), mat(GOLD), 0, 6.0, -32);
   // banners on buildings — removed (flat planes read as artifacts at this camera angle)
   // street lamps along paths
   function lamp(x,z){
-    add(new THREE.CylinderGeometry(0.06,0.09,2.6,6), mat(0x3a3a46), x, 1.3, z);
-    const l = add(new THREE.SphereGeometry(0.2,8,8), mat(0xffd98a), x, 2.6, z);
+    add(new THREE.CylinderGeometry(0.11,0.17,5.0,6), mat(0x3a3a46), x, 2.5, z);
+    const l = add(new THREE.SphereGeometry(0.38,8,8), mat(0xffd98a), x, 5.0, z);
     l.material.emissive = new THREE.Color(0xffaa44); l.material.emissiveIntensity = 1.5;
   }
-  lamp(6,6); lamp(-6,6); lamp(6,-6); lamp(-6,-6); lamp(0,12); lamp(0,-12);
+  lamp(13,13); lamp(-13,13); lamp(13,-13); lamp(-13,-13); lamp(0,24); lamp(0,-24); lamp(26,0); lamp(-26,0);
   // central tower
-  add(new THREE.CylinderGeometry(2.4, 3.2, 13, 8), mat(0x5a4a8a), 0, 6.5, 0);
-  add(new THREE.ConeGeometry(3.6, 4.5, 8), mat(0x2a1f4d), 0, 15.3, 0);
-  add(new THREE.SphereGeometry(0.8, 12, 12), mat(GOLD), 0, 17.9, 0);
+  add(new THREE.CylinderGeometry(4.7, 6.3, 30, 10), mat(0x5a4a8a), 0, 15, 0);
+  add(new THREE.ConeGeometry(7.1, 9.5, 10), mat(0x2a1f4d), 0, 34.8, 0);
+  add(new THREE.SphereGeometry(1.6, 12, 12), mat(GOLD), 0, 41, 0);
   // floating crystal spires (blue diamond tips caused visual glitch in some GPUs) — moved far outside view
   for (let i=0;i<8;i++){
-    const a = (i/8)*Math.PI*2 + 0.3, r = 70 + (i%2)*6;
-    add(new THREE.CylinderGeometry(0.35, 0.8, 6, 6), mat(0x9fb8ff), Math.cos(a)*r, 3, Math.sin(a)*r);
-    const tip = add(new THREE.IcosahedronGeometry(0.8, 0), mat(0x7be0ff), Math.cos(a)*r, 6.8, Math.sin(a)*r);
+    const a = (i/8)*Math.PI*2 + 0.3, r = 130 + (i%2)*12;
+    add(new THREE.CylinderGeometry(0.7, 1.6, 12, 6), mat(0x9fb8ff), Math.cos(a)*r, 6, Math.sin(a)*r);
+    const tip = add(new THREE.IcosahedronGeometry(1.6, 0), mat(0x7be0ff), Math.cos(a)*r, 13.6, Math.sin(a)*r);
     tip.material.emissive = new THREE.Color(0x7be0ff); tip.material.emissiveIntensity = 0.7;
   }
 
@@ -104,21 +104,18 @@ export function createWorld(canvas, callbacks){
     add(new THREE.ConeGeometry(1.1*s, 1.6*s, 7), mat(0x2f9e63), x, 2.4*s, z);
     add(new THREE.ConeGeometry(0.8*s, 1.2*s, 7), mat(0x3ab878), x, 3.4*s, z);
   }
-  for (let i=0;i<14;i++){
-    const a = (i/14)*Math.PI*2, r = 33 + (i%3)*2;
-    tree(Math.cos(a)*r, Math.sin(a)*r, 0.8 + (i%4)*0.3);
-  }
+  for (const t of TREE_RING) tree(t.x, t.z, t.s);
 
   // ---------- fountain (moved off the central tower) ----------
-  add(new THREE.CylinderGeometry(2.6, 3.0, 0.6, 20), mat(0x9aa0b8), 0, 0.3, -9);
-  add(new THREE.CylinderGeometry(0.4, 0.5, 1.6, 8), mat(0x9aa0b8), 0, 1.4, -9);
-  add(new THREE.SphereGeometry(0.5, 10, 10), mat(0x7be0ff), 0, 2.4, -9);
-  add(new THREE.CylinderGeometry(0.3, 0.3, 0.1, 20), mat(0x3a86c8), 0, 0.62, -9, {receive:true});
+  add(new THREE.CylinderGeometry(4.8, 5.5, 1.1, 22), mat(0x9aa0b8), 0, 0.55, -18);
+  add(new THREE.CylinderGeometry(0.75, 0.95, 3.0, 8), mat(0x9aa0b8), 0, 2.6, -18);
+  add(new THREE.SphereGeometry(0.95, 10, 10), mat(0x7be0ff), 0, 4.5, -18);
+  add(new THREE.CylinderGeometry(0.55, 0.55, 0.18, 20), mat(0x3a86c8), 0, 1.15, -18, {receive:true});
 
   // ---------- torches at nodes ----------
   function torch(x,z){
-    add(new THREE.CylinderGeometry(0.08, 0.1, 1.4, 6), mat(0x5a3a1a), x, 0.7, z);
-    const flame = add(new THREE.SphereGeometry(0.16, 8, 8), mat(0xffb347), x, 1.5, z);
+    add(new THREE.CylinderGeometry(0.14, 0.18, 2.6, 6), mat(0x5a3a1a), x, 1.3, z);
+    const flame = add(new THREE.SphereGeometry(0.28, 8, 8), mat(0xffb347), x, 2.8, z);
     flame.material.emissive = new THREE.Color(0xff8833); flame.material.emissiveIntensity = 1.2;
   }
 
@@ -185,11 +182,11 @@ export function createWorld(canvas, callbacks){
   const player = makeWizard(0x3a6bd8, 0x2a1f4d);
   player.position.set(PLAYER_SPAWN.x, 0, PLAYER_SPAWN.z);
   scene.add(player);
-  const playerSpeed = 8;
+  const playerSpeed = 14;
 
   // ---------- gathering nodes (all materials) ----------
   const interactives = [];
-  function register(kind, x, z, data, label, mesh, radius=2.6){
+  function register(kind, x, z, data, label, mesh, radius=4.6){
     interactives.push({ kind, x, z, data, label, mesh, radius });
   }
   function crystalNode(x,z,color,data,label){
@@ -231,7 +228,7 @@ export function createWorld(canvas, callbacks){
   for (const b of BUILDINGS){
     if (b.noStation) continue;
     const d = doorPos(b);
-    register('station', d.x, d.z, b.id, b.label, null, 3.0);
+    register('station', d.x, d.z, b.id, b.label, null, 5.5);
   }
 
   // ---------- NPCs (living academy) ----------
@@ -249,14 +246,14 @@ export function createWorld(canvas, callbacks){
   for (const n of NPCS){
     const g = makeNpc(n.x, n.z, n.main, n.hat, { role:n.role, orb:n.orb, key:n.key });
     npcByKey[n.key] = g;
-    register('station', n.x, n.z, n.station, n.label, g, 3.2);
+    register('station', n.x, n.z, n.station, n.label, g, 5.5);
   }
   // wandering students
   const wanderers = [];
   for (let i=0;i<WANDERERS.length;i++){
     const a = (i/WANDERERS.length)*Math.PI*2 + 0.5;
     const w = WANDERERS[i];
-    const g = makeNpc(Math.cos(a)*18, Math.sin(a)*18, w.main, w.hat, { role:'wander', key:w.key });
+    const g = makeNpc(Math.cos(a)*34, Math.sin(a)*34, w.main, w.hat, { role:'wander', key:w.key });
     wanderers.push(g);
   }
 
@@ -267,9 +264,21 @@ export function createWorld(canvas, callbacks){
   function loadProgress(){
     if (callbacks.onLoadProgress) callbacks.onLoadProgress({ ...loadState, models:{ ...chars } });
   }
+  // Draco decoder, shared by every model load. The GLBs are Draco-compressed (22MB -> 3.4MB
+  // across the character set), which the loader cannot read without this.
+  let dracoLoader = null;
+  function getDraco(){
+    if (dracoLoader || !THREE.DRACOLoader) return dracoLoader;
+    dracoLoader = new THREE.DRACOLoader();
+    dracoLoader.setDecoderPath('./vendor/draco/');   // relative: the game is served under a subpath
+    dracoLoader.setDecoderConfig({ type: 'js' });
+    return dracoLoader;
+  }
   function makeCharModel(key, url, group, onReady){
     loadState.total++;
     const loader = new THREE.GLTFLoader();
+    const d = getDraco();
+    if (d) loader.setDRACOLoader(d);
     loader.load(url, gltf => {
       const model = gltf.scene;
       // Determine whether this is a skinned character (skeleton spans the real size) or a
@@ -353,7 +362,9 @@ export function createWorld(canvas, callbacks){
   let joy = { x:0, y:0 };
   let tapTarget = null, tapSet = false;
   // camera orbit (drag to rotate, pinch to zoom) — mobile open-world feel
-  let camYaw = 0, camDist = 15, camHeight = 9;
+  // Tuned against the rescaled campus: close/low enough that the 1.8m player reads clearly,
+  // far enough back that the 9-10m halls and the 40m tower still tower over them.
+  let camYaw = 0, camDist = 10.5, camHeight = 4.6;
   let playerMoving = false;
 
   // ---------- nearby ----------
@@ -391,7 +402,7 @@ export function createWorld(canvas, callbacks){
     if (ml>1){ mx/=ml; mz/=ml; }
     if (tapSet && tapTarget){
       const dx=tapTarget.x-player.position.x, dz=tapTarget.z-player.position.z, d=Math.hypot(dx,dz);
-      if (d>0.6){ mx=dx/d; mz=dz/d; } else { tapTarget=null; tapSet=false; }
+      if (d>1.0){ mx=dx/d; mz=dz/d; } else { tapTarget=null; tapSet=false; }
     }
     const moving = ml>0.02 || tapSet;
     playerMoving = moving;
@@ -401,8 +412,8 @@ export function createWorld(canvas, callbacks){
       const rx = Math.cos(camYaw), rz = Math.sin(camYaw);
       const wx = fx*mz + rx*mx;
       const wz = fz*mz + rz*mx;
-      const nx = Math.max(-40, Math.min(40, player.position.x + wx*playerSpeed*dt));
-      const nz = Math.max(-40, Math.min(40, player.position.z + wz*playerSpeed*dt));
+      const nx = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, player.position.x + wx*playerSpeed*dt));
+      const nz = Math.max(-WORLD_BOUND, Math.min(WORLD_BOUND, player.position.z + wz*playerSpeed*dt));
       // depenetrate rather than block, so the player slides along a wall instead of sticking
       const hit = resolveCollisions(nx, nz, PLAYER_RADIUS, OBSTACLES);
       player.position.x = hit.x; player.position.z = hit.z;
@@ -435,15 +446,15 @@ export function createWorld(canvas, callbacks){
       if (n.role === 'wander'){
         if (n.pause > 0){ n.pause -= dt; if (c) c.walking = false; else animateWizard(n.mesh, now*0.001, 0); continue; }
         const dx=n.tx-n.mesh.position.x, dz=n.tz-n.mesh.position.z, d=Math.hypot(dx,dz);
-        if (d>0.4){
-          const wnx = n.mesh.position.x + (dx/d)*2.2*dt, wnz = n.mesh.position.z + (dz/d)*2.2*dt;
+        if (d>0.8){
+          const wnx = n.mesh.position.x + (dx/d)*4.0*dt, wnz = n.mesh.position.z + (dz/d)*4.0*dt;
           const wh = resolveCollisions(wnx, wnz, PLAYER_RADIUS, OBSTACLES);
           n.mesh.position.x = wh.x; n.mesh.position.z = wh.z;
           n.mesh.rotation.y = Math.atan2(dx,dz);
           // walked into a wall: pick a fresh destination rather than grinding against it
           if (Math.hypot(wh.x-wnx, wh.z-wnz) > 0.001){
             n.stuck = (n.stuck||0) + dt;
-            if (n.stuck > 0.8){ n.stuck = 0; n.t = 0; n.pause = 0.4; const a2=Math.random()*Math.PI*2, r2=14+Math.random()*12; n.tx=Math.cos(a2)*r2; n.tz=Math.sin(a2)*r2; }
+            if (n.stuck > 0.8){ n.stuck = 0; n.t = 0; n.pause = 0.4; const a2=Math.random()*Math.PI*2, r2=26+Math.random()*22; n.tx=Math.cos(a2)*r2; n.tz=Math.sin(a2)*r2; }
           } else n.stuck = 0;
           if (c){ c.walking = true; c.walkSpeed = Math.min(1, 0.4 + d*0.2); }
           else animateWizard(n.mesh, now*0.001, 1);
@@ -453,7 +464,7 @@ export function createWorld(canvas, callbacks){
             n.t=0; n.pause=0.8+Math.random()*1.6;
             // try a few spots and keep the first that isn't inside something solid
             for (let k=0;k<6;k++){
-              const a=Math.random()*Math.PI*2, r=14+Math.random()*12;
+              const a=Math.random()*Math.PI*2, r=26+Math.random()*22;
               const cx=Math.cos(a)*r, cz=Math.sin(a)*r;
               const c2=resolveCollisions(cx, cz, PLAYER_RADIUS, OBSTACLES);
               if (Math.hypot(c2.x-cx, c2.z-cz) < 0.001 || k===5){ n.tx=c2.x; n.tz=c2.z; break; }
@@ -518,7 +529,7 @@ export function createWorld(canvas, callbacks){
     const ox = Math.sin(camYaw)*camDist, oz = Math.cos(camYaw)*camDist;
     _camTarget.set(player.position.x+ox, camHeight, player.position.z+oz);
     camera.position.lerp(_camTarget, 0.12);
-    camera.lookAt(player.position.x, 1.8, player.position.z);
+    camera.lookAt(player.position.x, 2.2, player.position.z);
   }
 
   // ---------- loop ----------
@@ -567,7 +578,7 @@ export function createWorld(canvas, callbacks){
       applyPlayerColor();
     },
     rotateCam(dx){ camYaw += dx * 0.006; },
-    zoomCam(dy){ camDist = Math.max(6, Math.min(30, camDist + dy * 0.05)); },
+    zoomCam(dy){ camDist = Math.max(6, Math.min(40, camDist + dy * 0.05)); },
     tapAt(clientX, clientY){
       const rect = canvas.getBoundingClientRect();
       const nx = ((clientX-rect.left)/rect.width)*2-1;

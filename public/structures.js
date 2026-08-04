@@ -11,16 +11,22 @@
 // ---------------------------------------------------------------- buildings
 // `face` is the direction the door points; the station prompt sits just outside that face so
 // the player can actually reach it once the building is solid.
+// SCALE: 1 world unit = 1 metre, anchored on the character height in world.js (1.8 = an adult).
+// Buildings were 3.5-5.5 units tall against 1.8-unit wizards — a "hall" barely 2.5 people high,
+// which is what made the campus read as a model village. Halls are now 7-10m tall and 12-16m
+// wide (4-5 people tall, the proportion a real hall has), and the layout is spread to match so
+// the buildings have room to feel big. Any generated building model should be authored to these
+// footprints.
 export const BUILDINGS = [
-  { id:"scribe",  label:"Scribing Hall",   x:-16, z:-7, w:7, d:5, h:5.5, ry:0.3,  wall:0x6a5b9e, roof:0x2a1f4d, face:"z+" },
-  { id:"library", label:"Library",         x:-16, z:6,  w:6, d:5, h:4.5, ry:-0.3, wall:0x5a4a8a, roof:0x2a1f4d, face:"z+", noStation:true },
-  { id:"smith",   label:"Smithy & Forge",  x:16,  z:-7, w:7, d:5, h:4.5, ry:-0.3, wall:0x7a5a6a, roof:0x8a3a2a, face:"z+" },
-  { id:"market",  label:"Merchant Stall",  x:16,  z:6,  w:6, d:4, h:3.5, ry:0.3,  wall:0x8a6a3a, roof:0x2f6f4f, face:"z-" },
-  { id:"home",    label:"Student Dorms",   x:0,   z:16, w:7, d:5, h:4.5, ry:0,    wall:0x6a5b9e, roof:0x2f4f8a, face:"z-" },
+  { id:"scribe",  label:"Scribing Hall",   x:-31, z:-14, w:15, d:11, h:10.5, ry:0.3,  wall:0x6a5b9e, roof:0x2a1f4d, face:"z+" },
+  { id:"library", label:"Library",         x:-31, z:12,  w:13, d:11, h:9,    ry:-0.3, wall:0x5a4a8a, roof:0x2a1f4d, face:"z+", noStation:true },
+  { id:"smith",   label:"Smithy & Forge",  x:31,  z:-14, w:15, d:11, h:9,    ry:-0.3, wall:0x7a5a6a, roof:0x8a3a2a, face:"z+" },
+  { id:"market",  label:"Merchant Stall",  x:31,  z:12,  w:13, d:9,  h:7,    ry:0.3,  wall:0x8a6a3a, roof:0x2f6f4f, face:"z-" },
+  { id:"home",    label:"Student Dorms",   x:0,   z:32,  w:15, d:11, h:9,    ry:0,    wall:0x6a5b9e, roof:0x2f4f8a, face:"z-" },
 ];
 
 // How far outside a building's face its station prompt sits.
-export const DOOR_OFFSET = 1.6;
+export const DOOR_OFFSET = 3.0;
 export function doorPos(b){
   const half = (b.face === "z+" || b.face === "z-") ? b.d/2 : b.w/2;
   const out = half + DOOR_OFFSET;
@@ -36,11 +42,11 @@ export function doorPos(b){
 // Positions live here so tools/test.mjs can prove none of them is standing inside a wall —
 // which, before collision existed, several of them were.
 export const NPCS = [
-  { key:"quest",     role:"quest",     station:"quests",    label:"Professor — Quests",   x:-11.5, z:8.5,  main:0x9aa0b8, hat:0x2a1f4d, orb:0xffc94d, model:"professor.glb" },
-  { key:"market",    role:"market",    station:"market",    label:"Merchant",             x:11.5,  z:9.5,  main:0x8a6a3a, hat:0x8a3a2a, orb:0xffd766, model:"merchant.glb" },
-  { key:"duel",      role:"duel",      station:"duel",      label:"Referee — Duel",       x:4.5,   z:-10.5,main:0x4a3a7a, hat:0x2a1f4d, orb:0xff6b6b, model:"referee.glb" },
-  { key:"trainer",   role:"trainer",   station:"trainer",   label:"Trainer — Practice",   x:8.5,   z:12,   main:0x3a6bd8, hat:0x8a3a2a, orb:0xffd766, model:"trainer.glb" },
-  { key:"librarian", role:"librarian", station:"librarian", label:"Librarian — Lore",     x:-16,   z:11,   main:0x6a5b9e, hat:0x2a1f4d, orb:0x7be0ff, model:"librarian.glb" },
+  { key:"quest",     role:"quest",     station:"quests",    label:"Professor — Quests",   x:-22,   z:17,    main:0x9aa0b8, hat:0x2a1f4d, orb:0xffc94d, model:"professor.glb" },
+  { key:"market",    role:"market",    station:"market",    label:"Merchant",             x:22,    z:19,    main:0x8a6a3a, hat:0x8a3a2a, orb:0xffd766, model:"merchant.glb" },
+  { key:"duel",      role:"duel",      station:"duel",      label:"Referee — Duel",       x:9,     z:-21, main:0x4a3a7a, hat:0x2a1f4d, orb:0xff6b6b, model:"referee.glb" },
+  { key:"trainer",   role:"trainer",   station:"trainer",   label:"Trainer — Practice",   x:17,    z:24,    main:0x3a6bd8, hat:0x8a3a2a, orb:0xffd766, model:"trainer.glb" },
+  { key:"librarian", role:"librarian", station:"librarian", label:"Librarian — Lore",     x:-31,   z:22,    main:0x6a5b9e, hat:0x2a1f4d, orb:0x7be0ff, model:"librarian.glb" },
 ];
 export const WANDERERS = [
   { key:"wander0", main:0x3ddc84, hat:0xff6b6b, model:"student_emerald.glb" },
@@ -53,23 +59,26 @@ export const WANDERERS = [
 //  - the follow camera starts behind the player at +z, and anything on the z axis south of the
 //    dorms means the camera looks straight through that building on the first frame.
 // Also kept clear of the Trainer's 3.2-unit prompt radius.
-export const PLAYER_SPAWN = { x:7, z:8 };
+export const PLAYER_SPAWN = { x:13, z:15 };
 
 // ---------------------------------------------------------------- obstacles
 // box: axis-aligned half-extents in the box's own frame, rotated by ry about its centre.
 // circle: a plain radius. Ponds are deliberately NOT solid — you stand in the shallows to fish.
-export const PLAYER_RADIUS = 0.45;
+export const PLAYER_RADIUS = 0.5;
+export const WORLD_BOUND = 72;      // half-extent of the walkable area
 
 export const OBSTACLES = [
   ...BUILDINGS.map(b => ({ kind:"box", x:b.x, z:b.z, w:b.w, d:b.d, ry:b.ry, id:b.id })),
-  { kind:"circle", x:0,  z:-16, r:6.6, id:"arena" },
-  { kind:"circle", x:0,  z:0,   r:3.3, id:"tower" },
-  { kind:"circle", x:0,  z:-9,  r:3.1, id:"fountain" },
+  { kind:"circle", x:0,  z:-32, r:12.6, id:"arena" },
+  { kind:"circle", x:0,  z:0,   r:6.4,  id:"tower" },
+  { kind:"circle", x:0,  z:-18, r:5.6,  id:"fountain" },
 ];
 // the tree ring — generated to match the meshes world.js places
-for (let i=0;i<14;i++){
-  const a = (i/14)*Math.PI*2, r = 33 + (i%3)*2, s = 0.8 + (i%4)*0.3;
-  OBSTACLES.push({ kind:"circle", x:Math.cos(a)*r, z:Math.sin(a)*r, r:0.4*s, id:"tree"+i });
+export const TREE_RING = [];
+for (let i=0;i<18;i++){
+  const a = (i/18)*Math.PI*2, r = 60 + (i%3)*4, sc = 1.6 + (i%4)*0.6;
+  TREE_RING.push({ x:Math.cos(a)*r, z:Math.sin(a)*r, s:sc });
+  OBSTACLES.push({ kind:"circle", x:Math.cos(a)*r, z:Math.sin(a)*r, r:0.45*sc, id:"tree"+i });
 }
 
 // ---------------------------------------------------------------- resolver

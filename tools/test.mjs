@@ -4,6 +4,10 @@ import { CARDS, CARD_MAP, cardValue, gradeForRoll, gradeFee, GRADES } from "../p
 import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS } from "../public/items.js";
 import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
 import * as ST from "../public/structures.js";
+import { SFX as AUDIO_SFX } from "../public/audio.js";
+import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
+const fsReadIndex = () => fs.readFileSync(
+  path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
 
 let pass = 0, fail = 0;
 function check(name, cond){ if(cond) pass++; else { fail++; console.log("  ✗ FAIL:", name); } }
@@ -79,26 +83,26 @@ check("bronze bar (the first forge rung) is craftable from gathered ore", (()=>{
   for (const id of Object.keys(bronze.req)) G.gather(sb, MATERIALS.find(m=>m.id===id));
   return G.smelt(sb, bronze).ok;
 })());
-check("node positions are inside the world bounds", WORLD_NODES.every(n => Math.abs(n.x)<=40 && Math.abs(n.z)<=40));
+check("node positions are inside the world bounds", WORLD_NODES.every(n => Math.abs(n.x)<=ST.WORLD_BOUND && Math.abs(n.z)<=ST.WORLD_BOUND));
 check("no two nodes overlap within interaction range", (()=>{
   for (let i=0;i<WORLD_NODES.length;i++) for (let j=i+1;j<WORLD_NODES.length;j++){
     const a = WORLD_NODES[i], b2 = WORLD_NODES[j];
-    if (Math.hypot(a.x-b2.x, a.z-b2.z) < 2.6) return false;   // 2.6 = the register() radius
+    if (Math.hypot(a.x-b2.x, a.z-b2.z) < 4.6) return false;   // 4.6 = the register() radius
   }
   return true;
 })());
 
 // ---- 4.35 world collision: the academy must be solid AND walkable ----
 const insideTower = ST.resolveCollisions(0, 0);
-check("the central tower pushes the player out", Math.hypot(insideTower.x, insideTower.z) >= 3.3);
-const insideHall = ST.resolveCollisions(-16, -7);
-check("a building pushes the player out", !ST.isClear(-16, -7) && ST.isClear(insideHall.x, insideHall.z));
+check("the central tower pushes the player out", Math.hypot(insideTower.x, insideTower.z) >= 6.4);
+const insideHall = ST.resolveCollisions(-31, -14);
+check("a building pushes the player out", !ST.isClear(-31, -14) && ST.isClear(insideHall.x, insideHall.z));
 check("resolving is idempotent (no jitter loop)", (()=>{
-  const a = ST.resolveCollisions(-16, -7);
+  const a = ST.resolveCollisions(-31, -14);
   const b = ST.resolveCollisions(a.x, a.z);
   return Math.hypot(a.x-b.x, a.z-b.z) < 1e-9;
 })());
-check("open ground is left alone", ST.isClear(6, 20) && ST.isClear(-25, -25));
+check("open ground is left alone", ST.isClear(13, 40) && ST.isClear(-48, -48));
 check("ponds are not solid (you fish from the shallows)",
   WORLD_NODES.filter(n=>n.kind==="pond").every(n => ST.isClear(n.x, n.z)));
 // everything the player must reach has to be reachable
@@ -135,12 +139,31 @@ check("a swept path across the map stays out of every obstacle", (()=>{
     const ang = (a/24)*Math.PI*2;
     let x = 0.01, z = 0.01;
     for (let step=0; step<300; step++){
-      const r = ST.resolveCollisions(x + Math.cos(ang)*0.25, z + Math.sin(ang)*0.25);
+      const r = ST.resolveCollisions(x + Math.cos(ang)*0.4, z + Math.sin(ang)*0.4);
       x = r.x; z = r.z;
       if (!ST.isClear(x, z)) return false;
     }
   }
   return true;
+})());
+
+check("buildings are believably sized next to a 1.8m wizard", (()=>{
+  const CH = 1.8;
+  return ST.BUILDINGS.every(b => b.h >= CH*3.5 && b.w >= CH*6 && b.d >= CH*4);
+})());
+check("the tree ring sits outside the walkable campus", ST.TREE_RING.every(t => Math.hypot(t.x,t.z) > 45));
+
+// ---- 4.36 audio config sanity (the synth itself needs a browser; the table does not) ----
+check("every SFX cue has a kind and a gain", Object.values(AUDIO_SFX).every(s => s.kind && s.gain > 0));
+check("SFX gains stay in a sane range", Object.values(AUDIO_SFX).every(s => s.gain <= 0.4));
+check("note-based cues carry notes, tone cues carry a frequency", Object.values(AUDIO_SFX).every(s =>
+  (s.kind === "chord" || s.kind === "arp") ? Array.isArray(s.notes) && s.notes.length > 0
+  : s.kind === "noise" ? s.dur > 0
+  : typeof s.freq === "number"));
+check("every cue the UI plays exists in the SFX table", (()=>{
+  const html = fsReadIndex();
+  const used = [...new Set([...html.matchAll(/AUDIO\.play\("([a-zA-Z]+)"\)/g)].map(m=>m[1]))];
+  return used.length > 0 && used.every(n => n in AUDIO_SFX);
 })());
 
 // ---- 4.4 grade bands (regression: a forward find collapsed every roll to "Poor") ----

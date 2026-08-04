@@ -306,6 +306,14 @@ Two visual bugs surfaced while checking the result in a browser:
   the halls, arena, dorms, tower and props). `structures.js` is already the seam: each building
   has an id, position, size and rotation, so a generated mesh can be dropped in per id without
   touching collision or station wiring. **Say the word and how many credits to spend.**
-- **Draco compression.** The models folder is ~22MB. Worth doing with `gltf-transform` before
-  adding building models, since they will add to it.
-- **Sound.** Still only a few procedural WebAudio beeps. Needs no asset spend — music would.
+- ✅ **Draco compression — DONE.** `npm run compress` (`tools/compress-models.mjs`) runs Draco +
+  WebP/512px over every GLB: **22MB → 3.4MB**. Textures-only compression only reached 17MB, so the
+  geometry was the bulk and Draco was worth the vendored decoder (`public/vendor/draco/`, ~250KB).
+  Whole deploy is now ~6MB, down from ~24MB.
+- ✅ **Sound — DONE.** `public/audio.js`: fully procedural WebAudio, zero asset bytes. One-shot SFX
+  bound to game events, an ambient pad for the 3D world, and a self-generating arpeggio whose mode
+  changes per screen (campus / duel / menu). Starts suspended until the first gesture, degrades to
+  silence without an AudioContext, mute + volumes persisted, mute toggle in the top bar.
+- ✅ **World scale — DONE.** 1 unit = 1 metre. Halls went from 4.5m to 7–10.5m tall against 1.8m
+  wizards, the tower from 13m to 40m, and the layout spread to match. This is what fixes the
+  "miniature" feel; the camera was re-tuned to match (height 4.6, distance 10.5, 62° FOV).
