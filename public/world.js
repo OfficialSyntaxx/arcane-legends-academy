@@ -3,6 +3,7 @@
 // gathering nodes for every material, and NPCs that hand out quests and open the market.
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
 import { WORLD_NODES } from "./nodes.js";
+import { BUILDINGS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, PLAYER_RADIUS, doorPos, resolveCollisions } from "./structures.js";
 
 export function createWorld(canvas, callbacks){
   const THREE = window.THREE;
@@ -58,7 +59,9 @@ export function createWorld(canvas, callbacks){
   const HOLLOW = 0x6a5b9e, VIO = 0x3a2d6e, GOLD = 0xffc94d, WOOD = 0x8a5a2b, ROOFB = 0x2f4f8a;
   function stucco(x,z,w,d,h,ry=0,wall=HOLLOW,roof=ROOFB){
     const base = add(new THREE.BoxGeometry(w,h,d), mat(wall), x, h/2, z, {ry});
-    const p4 = add(new THREE.ConeGeometry(Math.max(w,d)*0.78, h*0.6, 4), mat(roof), x, h + h*0.3, z, {ry});
+    // 0.78 of the LONGEST side as a radius made every roof ~1.56x the building wide — the dorm
+    // roof alone was an 11-unit disc over a 7-unit building, big enough to fill the camera.
+    const p4 = add(new THREE.ConeGeometry(Math.max(w,d)*0.62, h*0.6, 4), mat(roof), x, h + h*0.3, z, {ry});
     const door = add(new THREE.BoxGeometry(w*0.28, h*0.5, 0.25), mat(WOOD), x, h*0.25, z + d/2 + 0.05, {ry});
     // windows
     for (const sx of [-0.3, 0.3]){
@@ -67,20 +70,14 @@ export function createWorld(canvas, callbacks){
     }
     return base;
   }
-  // Scribing Hall (left)
-  stucco(-16, -7, 7, 5, 5.5, 0.3, 0x6a5b9e, 0x2a1f4d);
-  // Library (left-front)
-  stucco(-16, 6, 6, 5, 4.5, -0.3, 0x5a4a8a, 0x2a1f4d);
-  // Smithy (right)
-  stucco(16, -7, 7, 5, 4.5, -0.3, 0x7a5a6a, 0x8a3a2a);
-  // Merchant stall (right-front)
-  stucco(16, 6, 6, 4, 3.5, 0.3, 0x8a6a3a, 0x2f6f4f);
+  // Buildings come from the shared table in structures.js, which also supplies their collision
+  // boxes and door positions — so a building can never be solid in one place and walk-through
+  // in another, and its station prompt is always reachable from outside.
+  for (const b of BUILDINGS) stucco(b.x, b.z, b.w, b.d, b.h, b.ry, b.wall, b.roof);
   // Duel Arena (center-back) — round
   const arena = add(new THREE.CylinderGeometry(6, 6.5, 2.5, 24), mat(0x4a3a7a), 0, 1.25, -16);
   add(new THREE.ConeGeometry(6.8, 2.2, 24), mat(0x2a1f4d), 0, 3.6, -16);
   add(new THREE.TorusGeometry(4.5, 0.3, 8, 24), mat(GOLD), 0, 3.9, -16);
-  // Student dorms (center-front) — home
-  stucco(0, 16, 7, 5, 4.5, 0, 0x6a5b9e, 0x2f4f8a);
   // banners on buildings — removed (flat planes read as artifacts at this camera angle)
   // street lamps along paths
   function lamp(x,z){
@@ -163,8 +160,30 @@ export function createWorld(canvas, callbacks){
   }
 
   // ---------- player ----------
+  let schoolColor = null;
+  function applyPlayerColor(){
+    if (schoolColor == null) return;
+    const ud = player.userData;
+    if (ud && ud.robe && ud.robe.parent){ ud.robe.material.color.set(schoolColor); ud.chest.material.color.set(schoolColor); }
+    const pc = chars.player;
+    if (pc && pc.model){
+      // tint the loaded model with the school colour without flattening its texture
+      pc.model.traverse(o => {
+        if (o.isMesh && o.material && o.material.color && !o.userData._tintBase){
+          o.userData._tintBase = o.material.color.clone();
+        }
+      });
+      pc.model.traverse(o => {
+        if (o.isMesh && o.material && o.material.color){
+          const base = o.userData._tintBase;
+          o.material = o.material.clone();
+          o.material.color.copy(base).lerp(new THREE.Color(schoolColor), 0.45);
+        }
+      });
+    }
+  }
   const player = makeWizard(0x3a6bd8, 0x2a1f4d);
-  player.position.set(0, 0, 12);
+  player.position.set(PLAYER_SPAWN.x, 0, PLAYER_SPAWN.z);
   scene.add(player);
   const playerSpeed = 8;
 
@@ -207,11 +226,13 @@ export function createWorld(canvas, callbacks){
   }
 
   // ---------- stations ----------
-  register('station', -16, -7, 'scribe', 'Scribing Hall', null);
-  register('station', 16, -7, 'smith', 'Smithy & Forge', null);
-  register('station', 16, 6, 'market', 'Merchant Stall', null);
-  register('station', 0, -16, 'duel', 'Duel Arena', null);
-  register('station', 0, 16, 'home', 'Student Dorms', null);
+  // Placed at each building's door (just outside the wall) rather than at its centre — with
+  // collision on, a prompt at the centre would be sealed inside the building.
+  for (const b of BUILDINGS){
+    if (b.noStation) continue;
+    const d = doorPos(b);
+    register('station', d.x, d.z, b.id, b.label, null, 3.0);
+  }
 
   // ---------- NPCs (living academy) ----------
   const npcs = [];
@@ -222,33 +243,32 @@ export function createWorld(canvas, callbacks){
     npcs.push({ mesh:g, tx:x, tz:z, t:0, pause:0, role:opts.role||'wander', key:opts.key });
     return g;
   }
-  // a professor (quest giver) near the library
-  const prof = makeNpc(-14, 6, 0x9aa0b8, 0x2a1f4d, { role:'quest', orb:0xffc94d });
-  register('station', -14, 6, 'quests', 'Professor — Quests', prof, 3.2);
-  // a merchant near the stall
-  const merch = makeNpc(14, 6, 0x8a6a3a, 0x8a3a2a, { role:'market', orb:0xffd766 });
-  register('station', 14, 6, 'market', 'Merchant', merch, 3.2);
-  // a duel referee near the arena
-  const ref = makeNpc(0, -14, 0x4a3a7a, 0x2a1f4d, { role:'duel', orb:0xff6b6b });
-  register('station', 0, -14, 'duel', 'Referee — Duel', ref, 3.2);
-  // a duel trainer (practice sparring)
-  const trainer = makeNpc(12, 8, 0x3a6bd8, 0x8a3a2a, { role:'trainer', orb:0xffd766 });
-  register('station', 12, 8, 'trainer', 'Trainer — Practice', trainer, 3.2);
-  // a librarian near the library
-  const librarian = makeNpc(-16, 10, 0x6a5b9e, 0x2a1f4d, { role:'librarian', orb:0x7be0ff });
-  register('station', -16, 10, 'librarian', 'Librarian — Lore', librarian, 3.2);
+  // Named NPCs come from structures.js so their positions are covered by the walkability test
+  // (before collision existed, the professor and merchant were standing inside their buildings).
+  const npcByKey = {};
+  for (const n of NPCS){
+    const g = makeNpc(n.x, n.z, n.main, n.hat, { role:n.role, orb:n.orb, key:n.key });
+    npcByKey[n.key] = g;
+    register('station', n.x, n.z, n.station, n.label, g, 3.2);
+  }
   // wandering students
-  const wanderColors = [[0x3ddc84,0xff6b6b],[0xa06bff,0x2a1f4d],[0xff9ecb,0x8a3a2a],[0xffc94d,0x2a1f4d]];
   const wanderers = [];
-  for (let i=0;i<4;i++){
-    const a = (i/4)*Math.PI*2 + 0.5;
-    const g = makeNpc(Math.cos(a)*18, Math.sin(a)*18, wanderColors[i][0], wanderColors[i][1], { role:'wander', key:'wander'+i });
+  for (let i=0;i<WANDERERS.length;i++){
+    const a = (i/WANDERERS.length)*Math.PI*2 + 0.5;
+    const w = WANDERERS[i];
+    const g = makeNpc(Math.cos(a)*18, Math.sin(a)*18, w.main, w.hat, { role:'wander', key:w.key });
     wanderers.push(g);
   }
 
   // ---------- load GLB character models (replace procedural wizards) ----------
   const chars = {}; // entityKey -> {model, mixer, walk, idle}
+  // Loading progress, so the UI can show a state instead of a silently-empty world.
+  const loadState = { total:0, done:0, failed:[] };
+  function loadProgress(){
+    if (callbacks.onLoadProgress) callbacks.onLoadProgress({ ...loadState, models:{ ...chars } });
+  }
   function makeCharModel(key, url, group, onReady){
+    loadState.total++;
     const loader = new THREE.GLTFLoader();
     loader.load(url, gltf => {
       const model = gltf.scene;
@@ -290,7 +310,14 @@ export function createWorld(canvas, callbacks){
       const entry = { model, mixer: null, walk: null, idle: null, rawSize: height, meshWorldScale: 1, computedScale: scale, bones: {}, baseRot: {}, walking: false, walkT: 0, walkSpeed: 1 };
       // collect the skeleton bones (standard biped names) so we can add a procedural walk cycle
       model.traverse(o => { if (o.isBone){ entry.bones[o.name] = o; entry.baseRot[o.name] = o.quaternion.clone(); } });
-      if (group){ while (group.children.length) group.remove(group.children[0]); group.add(model); }
+      // Only now remove the procedural stand-in. It used to be cleared before the model was
+      // ready in some paths, which left an empty Group — an invisible character — if the GLB
+      // was slow or missing.
+      if (group){
+        const placeholder = group.children.slice();
+        group.add(model);
+        for (const c of placeholder) group.remove(c);
+      }
       if (gltf.animations && gltf.animations.length){
         entry.mixer = new THREE.AnimationMixer(model);
         for (const clip of gltf.animations){
@@ -302,20 +329,20 @@ export function createWorld(canvas, callbacks){
         if (entry.idle) entry.idle.play();
       }
       chars[key] = entry;
+      loadState.done++; loadProgress();
       if (onReady) onReady(entry);
+    },
+    undefined,
+    err => {
+      // Keep the procedural wizard rather than leaving a hole in the world, and say so.
+      console.warn("character model failed to load:", url, err && err.message);
+      loadState.done++; loadState.failed.push(key); loadProgress();
     });
   }
   // Generated GLB character models — keys match NPC roles so the update loop uses the GLB mixer.
-  makeCharModel('player', './assets/models/player_wizard.glb', player);
-  makeCharModel('quest', './assets/models/professor.glb', prof);
-  makeCharModel('market', './assets/models/merchant.glb', merch);
-  makeCharModel('duel', './assets/models/referee.glb', ref);
-  makeCharModel('trainer', './assets/models/trainer.glb', trainer);
-  makeCharModel('librarian', './assets/models/librarian.glb', librarian);
-  makeCharModel('wander0', './assets/models/student_emerald.glb', wanderers[0]);
-  makeCharModel('wander1', './assets/models/student_violet.glb', wanderers[1]);
-  makeCharModel('wander2', './assets/models/student_pink.glb', wanderers[2]);
-  makeCharModel('wander3', './assets/models/student_gold.glb', wanderers[3]);
+  makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>applyPlayerColor());
+  for (const n of NPCS) makeCharModel(n.key, './assets/models/' + n.model, npcByKey[n.key]);
+  for (let i=0;i<WANDERERS.length;i++) makeCharModel(WANDERERS[i].key, './assets/models/' + WANDERERS[i].model, wanderers[i]);
 
   // ---------- input ----------
   const keys = new Set();
@@ -350,7 +377,7 @@ export function createWorld(canvas, callbacks){
   }
 
   // ---------- step each frame ----------
-  let walkT = 0;
+  let walkT = 0, stuckT = 0;
   function input(dt){
     let mx=0, mz=0;
     if (keys.has('f')) mz -= 1;
@@ -374,10 +401,16 @@ export function createWorld(canvas, callbacks){
       const rx = Math.cos(camYaw), rz = Math.sin(camYaw);
       const wx = fx*mz + rx*mx;
       const wz = fz*mz + rz*mx;
-      player.position.x += wx*playerSpeed*dt;
-      player.position.z += wz*playerSpeed*dt;
-      player.position.x = Math.max(-40, Math.min(40, player.position.x));
-      player.position.z = Math.max(-40, Math.min(40, player.position.z));
+      const nx = Math.max(-40, Math.min(40, player.position.x + wx*playerSpeed*dt));
+      const nz = Math.max(-40, Math.min(40, player.position.z + wz*playerSpeed*dt));
+      // depenetrate rather than block, so the player slides along a wall instead of sticking
+      const hit = resolveCollisions(nx, nz, PLAYER_RADIUS, OBSTACLES);
+      player.position.x = hit.x; player.position.z = hit.z;
+      // a tap-to-move target inside a building is unreachable — drop it instead of grinding
+      if (tapSet && Math.hypot(hit.x-nx, hit.z-nz) > 0.001){
+        stuckT += dt;
+        if (stuckT > 0.5){ tapTarget = null; tapSet = false; stuckT = 0; }
+      } else stuckT = 0;
       const t = Math.atan2(wx, wz);
       let diff = t - player.rotation.y;
       while (diff>Math.PI) diff-=Math.PI*2; while (diff<-Math.PI) diff+=Math.PI*2;
@@ -403,13 +436,29 @@ export function createWorld(canvas, callbacks){
         if (n.pause > 0){ n.pause -= dt; if (c) c.walking = false; else animateWizard(n.mesh, now*0.001, 0); continue; }
         const dx=n.tx-n.mesh.position.x, dz=n.tz-n.mesh.position.z, d=Math.hypot(dx,dz);
         if (d>0.4){
-          n.mesh.position.x += (dx/d)*2.2*dt; n.mesh.position.z += (dz/d)*2.2*dt;
+          const wnx = n.mesh.position.x + (dx/d)*2.2*dt, wnz = n.mesh.position.z + (dz/d)*2.2*dt;
+          const wh = resolveCollisions(wnx, wnz, PLAYER_RADIUS, OBSTACLES);
+          n.mesh.position.x = wh.x; n.mesh.position.z = wh.z;
           n.mesh.rotation.y = Math.atan2(dx,dz);
+          // walked into a wall: pick a fresh destination rather than grinding against it
+          if (Math.hypot(wh.x-wnx, wh.z-wnz) > 0.001){
+            n.stuck = (n.stuck||0) + dt;
+            if (n.stuck > 0.8){ n.stuck = 0; n.t = 0; n.pause = 0.4; const a2=Math.random()*Math.PI*2, r2=14+Math.random()*12; n.tx=Math.cos(a2)*r2; n.tz=Math.sin(a2)*r2; }
+          } else n.stuck = 0;
           if (c){ c.walking = true; c.walkSpeed = Math.min(1, 0.4 + d*0.2); }
           else animateWizard(n.mesh, now*0.001, 1);
         } else {
           n.t += dt;
-          if (n.t>2){ n.t=0; n.pause=0.8+Math.random()*1.6; const a=Math.random()*Math.PI*2, r=14+Math.random()*12; n.tx=Math.cos(a)*r; n.tz=Math.sin(a)*r; }
+          if (n.t>2){
+            n.t=0; n.pause=0.8+Math.random()*1.6;
+            // try a few spots and keep the first that isn't inside something solid
+            for (let k=0;k<6;k++){
+              const a=Math.random()*Math.PI*2, r=14+Math.random()*12;
+              const cx=Math.cos(a)*r, cz=Math.sin(a)*r;
+              const c2=resolveCollisions(cx, cz, PLAYER_RADIUS, OBSTACLES);
+              if (Math.hypot(c2.x-cx, c2.z-cz) < 0.001 || k===5){ n.tx=c2.x; n.tz=c2.z; break; }
+            }
+          }
           if (c) c.walking = false;
         }
       } else {
@@ -419,9 +468,10 @@ export function createWorld(canvas, callbacks){
     }
   }
   // procedural walk cycle for the NPC skeleton bones (no extra credits, no walk clip needed)
+  const _identQ = new THREE.Quaternion();     // hoisted: allocated per bone per frame before
   function setBone(c, name, rx, ry, rz){
     const b = c.bones[name]; if (!b) return;
-    b.quaternion.copy(c.baseRot[name] || new THREE.Quaternion());
+    b.quaternion.copy(c.baseRot[name] || _identQ);
     b.rotateX(rx); b.rotateY(ry); b.rotateZ(rz);
   }
   function applyWalkCycle(c){
@@ -463,10 +513,11 @@ export function createWorld(canvas, callbacks){
   }
 
   // ---------- camera ----------
+  const _camTarget = new THREE.Vector3();     // hoisted: this runs every frame
   function updateCamera(){
     const ox = Math.sin(camYaw)*camDist, oz = Math.cos(camYaw)*camDist;
-    const cam = new THREE.Vector3(player.position.x+ox, camHeight, player.position.z+oz);
-    camera.position.lerp(cam, 0.12);
+    _camTarget.set(player.position.x+ox, camHeight, player.position.z+oz);
+    camera.position.lerp(_camTarget, 0.12);
     camera.lookAt(player.position.x, 1.8, player.position.z);
   }
 
@@ -499,15 +550,21 @@ export function createWorld(canvas, callbacks){
     const out = [];
     scene.traverse(o => { if (o.isMesh){ const b = new THREE.Box3().setFromObject(o); const s = b.getSize(new THREE.Vector3()); const c = b.getCenter(new THREE.Vector3()); const d = Math.round(c.distanceTo(cam)); out.push({ t: o.geometry.type, s: [Math.round(s.x),Math.round(s.y),Math.round(s.z)], p: [Math.round(o.position.x),Math.round(o.position.y),Math.round(o.position.z)], d }); } });
     out.sort((a,b)=> a.d - b.d);
-    return { cam: [Math.round(cam.x),Math.round(cam.y),Math.round(cam.z)], player: [Math.round(player.position.x),Math.round(player.position.y),Math.round(player.position.z)], near: out.slice(0,8),
+    return { cam: [Math.round(cam.x),Math.round(cam.y),Math.round(cam.z)], player: [Math.round(player.position.x),Math.round(player.position.y),Math.round(player.position.z)],
+      // exact, unrounded — the rounded `player` above is for eyeballing, and rounding a position
+      // by up to half a unit is enough to make a collision check report a false overlap
+      playerExact: [player.position.x, player.position.y, player.position.z],
+      near: out.slice(0,8),
       chars: Object.fromEntries(Object.entries(chars).map(([k,c])=>[k,{loaded:!!c.model, scale: c.model?+c.model.scale.x.toFixed(3):null, rawSize: c.rawSize?+c.rawSize.toFixed(3):null, meshWorldScale: c.meshWorldScale?+c.meshWorldScale.toFixed(4):null, computed: c.computedScale?+c.computedScale.toFixed(2):null, mixer: !!c.mixer, walk: !!c.walk, idle: !!c.idle}])),
       playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };
   };
   return {
     setTouchMove(x, y){ joy.x = x; joy.y = y; },
     setPlayerColor(color){
-      const ud = player.userData;
-      if (ud && ud.robe){ ud.robe.material.color.set(color); ud.chest.material.color.set(color); }
+      // Remembered, because this is usually called before the GLB finishes loading — and once
+      // it loads, userData.robe is no longer in the scene, so writing only there was a no-op.
+      schoolColor = color;
+      applyPlayerColor();
     },
     rotateCam(dx){ camYaw += dx * 0.006; },
     zoomCam(dy){ camDist = Math.max(6, Math.min(30, camDist + dy * 0.05)); },

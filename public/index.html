@@ -1126,6 +1126,7 @@ const NPC_DIALOGUE = {
   trainer: { name:"Trainer Lyra", role:"Duel Coach", lines:["Want to warm up? I'll spar with you right here.","Drop your deck and let's see what you've got — a quick practice duel is the best way to test a new build."], buttons:[{label:"⚔️ Practice Duel", primary:true, action:()=>{ startPracticeDuel(); }}] },
   librarian: { name:"Librarian Ossa", role:"Keeper of the Library of Echoes", lines:["The Library of Echoes holds every lesson and challenge record of the Arcanum.","Take on the day's challenge when you're ready, young spellwright."], buttons:[{label:"📜 Daily Challenge", primary:true, action:()=>{screen="quests";render();}}] },
 };
+const isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints||0) > 0;
 function initWorld(){
   const canvas = $("world");
   try {
@@ -1148,6 +1149,23 @@ function initWorld(){
       else err(LTL);
       save();
     },
+    onLoadProgress(st){
+      // Say what the world is doing instead of showing placeholder wizards with no explanation.
+      const hud = $("worldHud");
+      if (st.done < st.total){
+        hud.textContent = STR.world_loading.replace("{d}", st.done).replace("{t}", st.total);
+        hud.style.opacity = "1"; hud.style.display = "block";
+      } else {
+        if (st.failed.length){
+          hud.textContent = STR.world_load_partial.replace("{n}", st.failed.length);
+          console.warn("character models that failed to load:", st.failed.join(", "));
+        } else {
+          hud.textContent = isTouchDevice ? STR.world_hint_touch : STR.world_hint_desktop;
+        }
+        hud.style.opacity = "1";
+        setTimeout(()=>{ hud.style.transition = "opacity .6s"; hud.style.opacity = "0"; }, 4000);
+      }
+    },
     onStation(station){
       const dlg = NPC_DIALOGUE[station];
       if (dlg){ showDialogue(dlg.name, dlg.role, dlg.lines, dlg.buttons); }
@@ -1159,7 +1177,7 @@ function initWorld(){
   // Unified on Pointer Events so mouse, touch and pen all take the same path. Every gesture is
   // tracked by pointerId, which is what makes "drag to rotate" and "pinch to zoom" coexist:
   // the old code tracked a single drag and kept rotating the camera during a two-finger pinch.
-  const isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints||0) > 0;
+  const isTouch = isTouchDevice;
   if (isTouch) document.body.classList.add("has-touch");
 
   // ---- joystick ----
@@ -1286,9 +1304,8 @@ function initWorld(){
 
   if (isTouch) joy.style.display = "block";
   const hud = $("worldHud");
-  hud.textContent = isTouch ? STR.world_hint_touch : STR.world_hint_desktop;
+  if (!hud.textContent) hud.textContent = isTouch ? STR.world_hint_touch : STR.world_hint_desktop;
   hud.style.display = "block";
-  setTimeout(()=>{ hud.style.transition = "opacity .6s"; hud.style.opacity = "0"; }, 6000);
 }
 window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
 

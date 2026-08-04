@@ -3,6 +3,7 @@ import * as G from "../public/game.js";
 import { CARDS, CARD_MAP, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
 import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS } from "../public/items.js";
 import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
+import * as ST from "../public/structures.js";
 
 let pass = 0, fail = 0;
 function check(name, cond){ if(cond) pass++; else { fail++; console.log("  ✗ FAIL:", name); } }
@@ -83,6 +84,61 @@ check("no two nodes overlap within interaction range", (()=>{
   for (let i=0;i<WORLD_NODES.length;i++) for (let j=i+1;j<WORLD_NODES.length;j++){
     const a = WORLD_NODES[i], b2 = WORLD_NODES[j];
     if (Math.hypot(a.x-b2.x, a.z-b2.z) < 2.6) return false;   // 2.6 = the register() radius
+  }
+  return true;
+})());
+
+// ---- 4.35 world collision: the academy must be solid AND walkable ----
+const insideTower = ST.resolveCollisions(0, 0);
+check("the central tower pushes the player out", Math.hypot(insideTower.x, insideTower.z) >= 3.3);
+const insideHall = ST.resolveCollisions(-16, -7);
+check("a building pushes the player out", !ST.isClear(-16, -7) && ST.isClear(insideHall.x, insideHall.z));
+check("resolving is idempotent (no jitter loop)", (()=>{
+  const a = ST.resolveCollisions(-16, -7);
+  const b = ST.resolveCollisions(a.x, a.z);
+  return Math.hypot(a.x-b.x, a.z-b.z) < 1e-9;
+})());
+check("open ground is left alone", ST.isClear(6, 20) && ST.isClear(-25, -25));
+check("ponds are not solid (you fish from the shallows)",
+  WORLD_NODES.filter(n=>n.kind==="pond").every(n => ST.isClear(n.x, n.z)));
+// everything the player must reach has to be reachable
+const unreachable = [];
+for (const n of ST.NPCS) if (!ST.isClear(n.x, n.z)) unreachable.push("npc:"+n.key);
+for (const b of ST.BUILDINGS){ if (b.noStation) continue; const d = ST.doorPos(b); if (!ST.isClear(d.x, d.z)) unreachable.push("door:"+b.id); }
+for (const n of WORLD_NODES) if (!ST.isClear(n.x, n.z)) unreachable.push("node:"+n.id);
+if (!ST.isClear(ST.PLAYER_SPAWN.x, ST.PLAYER_SPAWN.z)) unreachable.push("spawn");
+if (unreachable.length) console.log("   sealed inside geometry:", unreachable.join(", "));
+check("every NPC, door, node and the spawn point is standing clear", unreachable.length === 0);
+// walking straight into a wall must never leave the player inside it — sliding around the
+// building is fine and expected, so the assertion is "never inside", not "never past".
+check("walking into a building never leaves the player inside it", (()=>{
+  for (const b of ST.BUILDINGS){
+    for (const dir of [[0,1],[0,-1],[1,0],[-1,0]]){
+      let x = b.x - dir[0]*(b.w/2 + 4), z = b.z - dir[1]*(b.d/2 + 4);
+      for (let step=0; step<200; step++){
+        const r = ST.resolveCollisions(x + dir[0]*0.2, z + dir[1]*0.2, ST.PLAYER_RADIUS);
+        x = r.x; z = r.z;
+        if (!ST.isClear(x, z)) return false;
+      }
+    }
+  }
+  return true;
+})());
+// a big single step (a lag spike, or tap-to-move across the map) must not jump a wall
+check("a large step still resolves out of a building", (()=>{
+  const b = ST.BUILDINGS[0];
+  const r = ST.resolveCollisions(b.x + 0.2, b.z + 0.2, ST.PLAYER_RADIUS);
+  return ST.isClear(r.x, r.z);
+})());
+check("a swept path across the map stays out of every obstacle", (()=>{
+  for (let a=0; a<24; a++){
+    const ang = (a/24)*Math.PI*2;
+    let x = 0.01, z = 0.01;
+    for (let step=0; step<300; step++){
+      const r = ST.resolveCollisions(x + Math.cos(ang)*0.25, z + Math.sin(ang)*0.25);
+      x = r.x; z = r.z;
+      if (!ST.isClear(x, z)) return false;
+    }
   }
   return true;
 })());

@@ -271,6 +271,41 @@ break where a screen renders fine until the one code path touching a renamed exp
   height budget and tap-target size, plus 15 gesture checks including
   *"dragging does not also tap-to-move"* and *"player stops when the joystick is released"*.
 
-**Phase D — then the existing roadmap**
-World collision + GLB fallback/loading state first (they make the new building models actually
-feel solid), then buildings, Draco compression, sound.
+**Phase D — part 1 (collision + GLB robustness) — ✅ DONE**
+- **World collision.** `public/structures.js` holds buildings, NPC positions, obstacle shapes and
+  a pure resolver. The player and the wandering NPCs now collide with buildings, the tower, the
+  arena and the fountain; ponds are deliberately *not* solid so you can still fish. The resolver
+  depenetrates rather than blocking, so you slide along a wall instead of sticking to it.
+- **Placements are asserted, not assumed.** Making the world solid immediately sealed several
+  things inside it — the professor and the merchant were standing *inside* their own buildings,
+  and every building's station prompt was at its centre, i.e. behind a wall. Station prompts now
+  sit at each building's door, and a test proves every NPC, door, node and the spawn point is
+  standing clear, that a walk into a wall never ends up inside it, and that 24 swept paths
+  across the map never enter geometry.
+- **GLB loading state + fallback.** `makeCharModel` now has an error handler and reports progress
+  through an `onLoadProgress` callback; the procedural wizard stays visible until the real model
+  is in the scene, and a failed model leaves the stand-in rather than an invisible character.
+  The HUD shows "Summoning the academy… n/m" and names how many models fell back.
+- **`setPlayerColor` works again** — it wrote to `userData.robe`, which `makeCharModel` removes
+  from the group, so school colour silently stopped applying once the GLB loaded. The colour is
+  remembered and re-applied as a tint when the model lands.
+- **Per-frame allocations hoisted** (`Vector3` in `updateCamera`, `Quaternion` per bone in
+  `setBone`) ahead of the mobile-perf work.
+
+Two visual bugs surfaced while checking the result in a browser:
+- **Roofs were 1.56× their building's width** (`0.78 × longest side` used as a *radius*). The
+  dorm roof was an 11-unit disc over a 7-unit building, big enough to fill the camera. Now 0.62.
+- **The default camera looked straight through the Student Dorms.** The follow camera sits behind
+  the player at +z and the spawn was on the z axis south of the dorms, so the first frame of a
+  new game was the inside of a building. Spawn moved into the open courtyard lane at (7, 8),
+  clear of the tower, the dorm door prompt and the Trainer's prompt radius.
+
+**Phase D — part 2 (remaining, needs a decision)**
+- **Buildings & world props as generated 3D models.** This is the big one, and it needs asset
+  generation (~40 credits per model via the 2D→3D pipeline, per §9.2 — call it 10+ models for
+  the halls, arena, dorms, tower and props). `structures.js` is already the seam: each building
+  has an id, position, size and rotation, so a generated mesh can be dropped in per id without
+  touching collision or station wiring. **Say the word and how many credits to spend.**
+- **Draco compression.** The models folder is ~22MB. Worth doing with `gltf-transform` before
+  adding building models, since they will add to it.
+- **Sound.** Still only a few procedural WebAudio beeps. Needs no asset spend — music would.

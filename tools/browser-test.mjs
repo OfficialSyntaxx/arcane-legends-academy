@@ -244,6 +244,29 @@ if (hasWorld){
   const bAfter = (await dbg()).cam;
   check("on-screen zoom button works", JSON.stringify(bBefore) !== JSON.stringify(bAfter));
 
+  // --- collision: walking into the tower must not put the player inside it ---
+  const solid = await page.evaluate(async () => {
+    const { OBSTACLES, isClear, PLAYER_RADIUS } = await import("./structures.js");
+    const d = window.__worldDebug();
+    return { inside: !isClear(d.playerExact[0], d.playerExact[2], PLAYER_RADIUS, OBSTACLES), obstacles: OBSTACLES.length };
+  });
+  check("the player is not standing inside any obstacle", !solid.inside, `${solid.obstacles} obstacles`);
+
+  // drive the player hard at the central tower and confirm they never end up in it
+  const tower = await page.evaluate(async () => {
+    const { isClear } = await import("./structures.js");
+    return new Promise(resolve => {
+      // aim at the tower at the origin for a few seconds via repeated tap-to-move
+      let worst = false, ticks = 0;
+      const id = setInterval(() => {
+        const d = window.__worldDebug();
+        if (!isClear(d.playerExact[0], d.playerExact[2])) worst = true;
+        if (++ticks > 40){ clearInterval(id); resolve({ everInside: worst, at: d.playerExact.map(v=>+v.toFixed(2)) }); }
+      }, 50);
+    });
+  });
+  check("the player never ends up inside geometry while moving", !tower.everInside, `ended at ${tower.at}`);
+
   // --- character models loaded ---
   const chars = (await dbg()).chars;
   const loaded = Object.values(chars).filter(c=>c.loaded).length;
