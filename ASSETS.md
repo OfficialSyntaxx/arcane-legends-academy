@@ -23,7 +23,15 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 | `hex_tower_A.glb` | KayKit – Medieval Hexagon | CC0 | Academy tower (-16,-16) |
 | `hex_home_A.glb` | KayKit – Medieval Hexagon | CC0 | Student Dorms (0,16) |
 
-**Downloaded (on disk in `/tmp/kaykit_packs`, not yet imported):** KayKit Dungeon-Remastered, Character Pack Skeletons, Character Pack Adventures, Furniture Bits, City Builder Bits. All **CC0**, ship `.glb`/`.gltf` natively (no FBX conversion needed).
+**Downloaded (on disk, not yet imported):** KayKit Dungeon-Remastered, Character Pack Skeletons, Character Pack Adventures, Furniture Bits, City Builder Bits (all CC0, `.glb`/`.gltf`); **Universal Animation Library 2** by Quaternius (CC0, 130+ animations on a universal humanoid rig, `UAL2_Standard.glb` — for retargeting to our NPC skeletons later).
+
+## 🔗 Pack links — attach these if you want them (itch downloads are session-protected, so I can't auto-fetch)
+- **Universal Animation Library 2** (Quaternius) — CC0, 130+ anims — https://quaternius.itch.io/universal-animation-library-2 — *already grabbed via OpenGameArt, so skip unless you want the paid source `.blend`.*
+- **Ghibli-inspired nature pack** ("110+ unique nature models") — on the itch [3D tag](https://itch.io/game-assets/free/tag-3d) — needs manual download.
+- **"300+ models… fully textured medieval town"** — on the itch 3D tag — needs manual download.
+- **Modular Character Outfits – Fantasy** — on the itch 3D tag — needs manual download.
+
+> **KayKit packs are NOT here** — they're on GitHub (KayKit-Game-Assets org), so I can fetch them directly. Done for: Medieval Hexagon, Dungeon, Skeletons, Adventures, Furniture, City Builder.
 
 ---
 
