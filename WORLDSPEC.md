@@ -211,7 +211,8 @@ Dungeons and boss rooms are **interior instances** — separate scenes, not part
    are applied, so a chunk reloads identically. Unloading disposes geometry and materials rather
    than just detaching, or a long session leaks every chunk walked through. Streamed loads are
    `quiet` so they do not drive the boot progress HUD. `?zone=<id>` picks a starting zone.
-4. **Zone transitions** — walkable `exits` that switch the active zone (spawn at the target zone's entry).
+4. ✅ **Zone transitions** — walkable `exits` that switch the active zone, arriving at the
+   target's *reciprocal* exit so the two zones join up geographically.
 5. **Dungeon instancing** — entrance → suspend zone → load interior → rooms/corridors → boss room → exit restores zone (§6).
 6. **Content pass** — author the first 2–3 zones (Academy, Whispering Forest, Cinderhollow) + one dungeon, using imported CC0 models.
 
@@ -269,9 +270,10 @@ fails if it is stale. Two copies of the same data is exactly how the `logic.js` 
 silently drifted from `cards.js`, so it gets the same guard. **Other zones are hand-authored in
 `zones.json` and are never touched by the generator.**
 
-**k. Still open:** water is rendered but not yet *gameplay* — the player can walk across it.
-Blocking or swimming should land with step 4 (zone transitions), when a zone is a place you
-actually traverse end to end.
+**k. ✅ Water is solid** (landed with step 4). Movement retries each axis alone when the
+destination is submerged, so the player slides along a shoreline instead of stopping dead, and
+`teleport` refuses to drop anyone mid-lake. Swimming/boats remain future work. Tested: no exit
+and no arrival point may sit in water, or the transition would be unusable.
 
 **l. Zone content must come from the zone, not module constants.** Found in step 3: `world.js`
 built its buildings, NPCs, nodes, tree ring, paths, lamps, fountain and spires from the imported
@@ -290,3 +292,21 @@ the "Summoning the academy… n/m" HUD never finishes.
 - Duel arena, market, scribing hall, etc. stay as `academy` zone interactables; dungeons add PvE content on top.
 - Save system (`game.js` / `S` state) gains `worldState` (unlocked zones, dungeon progress, boss kills).
 - All tests (`tools/test.mjs`, `logic-test.mjs`, `ui-smoke.mjs`) must stay green after each phase.
+
+**n. Zone transitions rebuild the world; they do not mutate it.** `changeZone` disposes the old
+`createWorld` and stands up a new one. Two live worlds would each hold a WebGL context on the
+same canvas and both would keep running their rAF loops. The input handlers survive because they
+close over the module-level `world`, so rebinding it is enough — but **DOM that outlives the
+scene must be reset by hand**: the interaction prompt persisted across a transition, so arriving
+in the forest still offered the academy gateway's button.
+
+**o. Arriving must not bounce.** Landing on the reciprocal exit puts the player inside its own
+trigger, which sends them straight back. Two guards, both needed: `entryPointFor` offsets the
+arrival inward, and the trigger arrives *disarmed* and only re-arms once the player has walked
+clear of every exit. `validateExits` fails the build if any arrival point lands in a trigger.
+
+**p. Camera collision needs a post-step correction.** Clamping the camera's *target* is not
+enough. While easing back out the camera sits between its old and new positions, and orbiting a
+building can sweep that arc through a corner even when both endpoints are clear — an
+intermittent failure that predates step 4. The camera is now re-clamped along its own bearing
+after the lerp.

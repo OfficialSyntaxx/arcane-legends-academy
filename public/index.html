@@ -306,7 +306,7 @@ import * as G from "./game.js";
 import { createWorld } from "./world.js";
 import { createAudio, SFX } from "./audio.js";
 import { createBattle3d } from "./battle3d.js";
-import { loadWorldConfig } from "./worldconfig.js";
+import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
 
 // ================= state =================
 let S = G.load();
@@ -1173,20 +1173,12 @@ const isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints||0
 // The active zone config (WORLDSPEC step 1). Loaded before the world is built; if the fetch
 // fails the world falls back to its built-in academy tables rather than not booting at all.
 let worldCfg = null, activeZone = null;
-async function initWorld(){
-  const canvas = $("world");
-  try {
-    worldCfg = await loadWorldConfig();
-    // ?zone=<id> picks a starting zone — used to test zones before step 4 wires up walkable
-    // exits, and it stays useful afterwards for jumping straight to one.
-    const wanted = new URLSearchParams(location.search).get("zone");
-    activeZone = (wanted && worldCfg.get(wanted)) || worldCfg.get(worldCfg.hub);
-    if (wanted && !worldCfg.get(wanted)) console.warn("unknown zone \"" + wanted + "\", using the hub");
-  } catch(e){
-    console.warn("world config unavailable, using built-in academy:", e && e.message);
-  }
-  try {
-    world = createWorld(canvas, {
+// Build (or REBUILD) the 3D world for a zone. Extracted from initWorld so a zone transition can
+// tear the scene down and stand a new one up without duplicating the callback wiring — and,
+// importantly, without re-attaching the input listeners: every handler below closes over the
+// module-level `world`, so rebinding it is enough.
+function spawnWorld(canvas, zone, spawnAt){
+  return createWorld(canvas, {
     onNearby(target){
       worldPrompt = target;
       const p = $("prompt");
@@ -1227,7 +1219,61 @@ async function initWorld(){
       if (dlg){ showDialogue(dlg.name, dlg.role, dlg.lines, dlg.buttons); }
       else { screen = stationTarget(station); render(); }
     },
-  }, activeZone);
+    onZoneExit(e){ changeZone(e.toZone, e.fromZone); },
+  }, zone, {
+    spawnAt,
+    zoneNames: worldCfg ? Object.fromEntries(worldCfg.zoneIds.map(id => [id, worldCfg.get(id).name])) : {},
+  });
+}
+
+// WORLDSPEC step 4. Tears the current zone's scene down and builds the target zone, dropping the
+// player at the reciprocal exit so the two zones join up. Guarded by `zoning` because the world
+// keeps running (and can fire the trigger again) during the rebuild.
+let zoning = false;
+function changeZone(toZoneId, fromZoneId){
+  if (zoning || !worldCfg) return;
+  const target = worldCfg.get(toZoneId);
+  if (!target){ console.warn("exit to unknown zone", toZoneId); return; }
+  zoning = true;
+  const canvas = $("world");
+  const spawnAt = entryPointFor(worldCfg, toZoneId, fromZoneId);
+  try {
+    // Dispose FIRST: two live worlds would each hold a WebGL context on the same canvas and
+    // both would keep running their rAF loops.
+    if (world) world.dispose();
+    // Clear the interaction prompt by hand. It is DOM that outlives the scene, so without this
+    // the new zone opens showing the OLD zone's prompt — arriving in the forest still offered
+    // "To Whispering Forest" from the academy gateway we just walked through.
+    worldPrompt = null;
+    $("prompt").style.display = "none";
+    activeZone = target;
+    world = spawnWorld(canvas, target, spawnAt);
+    window.__world = world;
+    world.setPlayerColor(SCHOOLS[S.school].color);
+    world.resize();
+    S.worldState.zone = toZoneId;
+    if (!S.worldState.visited.includes(toZoneId)) S.worldState.visited.push(toZoneId);
+    save();
+    toast("🚪 " + target.name);
+    AUDIO.play("zone");
+  } catch(err){
+    console.warn("zone transition failed:", err);
+  } finally { zoning = false; }
+}
+
+async function initWorld(){
+  const canvas = $("world");
+  try {
+    worldCfg = await loadWorldConfig();
+    // ?zone= wins, then wherever the player last logged out, then the hub.
+    const wanted = new URLSearchParams(location.search).get("zone") || (S.worldState && S.worldState.zone);
+    activeZone = (wanted && worldCfg.get(wanted)) || worldCfg.get(worldCfg.hub);
+    if (wanted && !worldCfg.get(wanted)) console.warn("unknown zone \"" + wanted + "\", using the hub");
+  } catch(e){
+    console.warn("world config unavailable, using built-in academy:", e && e.message);
+  }
+  try {
+    world = spawnWorld(canvas, activeZone, null);
   } catch(e){ console.warn("3D world unavailable:", e); return; }
   // Exposed for tools/browser-test.mjs, which drives the real input/collision paths that the
   // headless smoke test cannot reach (createWorld needs WebGL).

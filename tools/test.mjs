@@ -254,15 +254,82 @@ check("validation catches out-of-bounds placement", WC.validateZone(
   WC.buildWorld({zones:[{id:"o", name:"O", spawn:{x:0,z:0}, bounds:{minX:-10,maxX:10,minZ:-10,maxZ:10},
     npcs:[{key:"far", x:500, z:0, model:"x.glb"}]}]}).get("o")
 ).some(p => /outside zone bounds/.test(p)));
-check("every zone exit is mutually reachable", (()=>{
+// ---- zone exits / transitions (WORLDSPEC step 4) ----
+// validateExits covers mutual reachability (§9b f), exits inside their own bounds, arrival
+// points inside the target, ping-pong arrivals and overlapping triggers.
+check("the shipped world has no exit problems", (()=>{
+  const problems = WC.validateExits(WORLD);
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("a one-way exit is caught", WC.validateExits(WC.buildWorld({zones:[
+  {id:"a", name:"A", spawn:{x:0,z:0}, exits:[{toZone:"b", x:10, z:0}]},
+  {id:"b", name:"B", spawn:{x:0,z:0}},
+]})).some(p => /one-way/.test(p)));
+check("an exit outside its own zone's bounds is caught", WC.validateExits(WC.buildWorld({zones:[
+  {id:"a", name:"A", spawn:{x:0,z:0}, bounds:{minX:-10,maxX:10,minZ:-10,maxZ:10}, exits:[{toZone:"b", x:99, z:0}]},
+  {id:"b", name:"B", spawn:{x:0,z:0}, exits:[{toZone:"a", x:0, z:0}]},
+]})).some(p => /outside/.test(p)));
+check("exitNear only fires inside the trigger radius", (()=>{
+  const z = { exits:[{toZone:"b", x:10, z:0}] };
+  return !!WC.exitNear(z, 10, 0) && !!WC.exitNear(z, 10 + WC.EXIT_RADIUS - 0.1, 0)
+      && WC.exitNear(z, 10 + WC.EXIT_RADIUS + 0.5, 0) === null;
+})());
+check("exitNear picks the closer of two exits", (()=>{
+  const z = { exits:[{toZone:"far", x:2, z:0}, {toZone:"near", x:0.2, z:0}] };
+  const hit = WC.exitNear(z, 0, 0);
+  return hit && hit.toZone === "near";
+})());
+// The ping-pong bug: arriving ON the reciprocal exit re-triggers it and bounces the player back.
+check("arrival lands clear of the return exit's trigger", (()=>{
   for (const id of WORLD.zoneIds){
     for (const e of WORLD.get(id).exits){
-      const back = WORLD.get(e.toZone);
-      if (!back || !back.exits.some(x => x.toZone === id)) return false;   // one-way exit strands the player
+      const entry = WC.entryPointFor(WORLD, e.toZone, id);
+      if (WC.exitNear(WORLD.get(e.toZone), entry.x, entry.z)) return false;
     }
   }
   return true;
 })());
+check("arrival uses the reciprocal exit, not the target's spawn", (()=>{
+  const entry = WC.entryPointFor(WORLD, "whispering_forest", "academy");
+  const back = WORLD.get("whispering_forest").exits.find(e => e.toZone === "academy");
+  const spawn = WORLD.get("whispering_forest").spawn;
+  return entry.viaExit
+      && Math.hypot(entry.x - back.x, entry.z - back.z) < WC.EXIT_RADIUS * 2
+      && Math.hypot(entry.x - spawn.x, entry.z - spawn.z) > WC.EXIT_RADIUS;
+})());
+check("arrival falls back to the spawn when there is no way back", (()=>{
+  const w = WC.buildWorld({zones:[
+    {id:"a", name:"A", spawn:{x:0,z:0}, exits:[{toZone:"b", x:5, z:0}]},
+    {id:"b", name:"B", spawn:{x:7, z:8}},
+  ]});
+  const e = WC.entryPointFor(w, "b", "a");
+  return e.viaExit === false && e.x === 7 && e.z === 8;
+})());
+check("arrival is inside the target zone's bounds", WORLD.zoneIds.every(id =>
+  WORLD.get(id).exits.every(e => {
+    const t = WORLD.get(e.toZone), p = WC.entryPointFor(WORLD, e.toZone, id);
+    return p.x >= t.bounds.minX && p.x <= t.bounds.maxX && p.z >= t.bounds.minZ && p.z <= t.bounds.maxZ;
+  })));
+check("every zone is reachable from the hub", (()=>{
+  const seen = new Set([WORLD.hub]), queue = [WORLD.hub];
+  while (queue.length){
+    for (const e of WORLD.get(queue.pop()).exits) if (!seen.has(e.toZone)){ seen.add(e.toZone); queue.push(e.toZone); }
+  }
+  const orphans = WORLD.zoneIds.filter(id => !seen.has(id));
+  if (orphans.length) console.log("   unreachable from the hub:", orphans.join(", "));
+  return orphans.length === 0;
+})());
+// Water became solid with step 4 (§9b k), so an exit standing in water would be unusable.
+check("no exit sits in water", WORLD.zoneIds.every(id => {
+  const z = WORLD.get(id), flats = TER.flatsForZone(z);
+  return z.exits.every(e => !TER.isWater(e.x, e.z, z.terrain, flats));
+}));
+check("no arrival point sits in water", WORLD.zoneIds.every(id =>
+  WORLD.get(id).exits.every(e => {
+    const t = WORLD.get(e.toZone), p = WC.entryPointFor(WORLD, e.toZone, id);
+    return !TER.isWater(p.x, p.z, t.terrain, TER.flatsForZone(t));
+  })));
 // chunk helpers (the coordinate convention step 3 will build on)
 check("chunk coords are stable across the origin", WC.chunkCoord(-1, 32) === -1 && WC.chunkCoord(0, 32) === 0 && WC.chunkCoord(33, 32) === 1);
 check("chunk centre is inside its own chunk", (()=>{

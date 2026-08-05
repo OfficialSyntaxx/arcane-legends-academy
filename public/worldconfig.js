@@ -84,6 +84,81 @@ export function validateZone(z, opts = {}){
   return problems;
 }
 
+// ---------------------------------------------------------------- zone exits (WORLDSPEC step 4)
+// An exit is a walkable trigger at (x,z). Standing within EXIT_RADIUS of one moves the player to
+// `toZone`. Pure, because "where does the player land" is spatial maths and must be testable
+// headlessly (§9b d) — world.js only reports proximity and rebuilds the scene.
+
+/** How close the player must get to an exit before it fires. */
+export const EXIT_RADIUS = 3.0;
+
+/** The exit in `zone` that the player at (x,z) is standing on, or null. */
+export function exitNear(zone, x, z, radius = EXIT_RADIUS){
+  let best = null, bestD = Infinity;
+  for (const e of zone.exits || []){
+    const d = Math.hypot(x - e.x, z - e.z);
+    if (d <= radius && d < bestD){ best = e; bestD = d; }
+  }
+  return best;
+}
+
+/**
+ * Where a player arriving in `toZone` from `fromZoneId` should be placed.
+ *
+ * Uses the RECIPROCAL exit (the one in the target zone pointing back where we came from) so the
+ * two zones join up geographically, and falls back to the target's spawn if there isn't one.
+ *
+ * The arrival point is pushed `EXIT_RADIUS * 1.6` *inward* — toward the zone centre — because
+ * landing exactly on the reciprocal exit puts the player inside its trigger radius, which sends
+ * them straight back. That ping-pong is the classic bug in this feature. The offset alone is not
+ * enough on its own (the player can still be nudged back in by collision), so world.js also
+ * disarms the trigger until they have left the radius; this is the first of the two guards.
+ */
+export function entryPointFor(world, toZoneId, fromZoneId){
+  const to = world.get(toZoneId);
+  if (!to) return null;
+  const back = (to.exits || []).find(e => e.toZone === fromZoneId);
+  if (!back) return { x: to.spawn.x, z: to.spawn.z, viaExit: false };
+  const cx = (to.bounds.minX + to.bounds.maxX) / 2, cz = (to.bounds.minZ + to.bounds.maxZ) / 2;
+  const dx = cx - back.x, dz = cz - back.z;
+  const len = Math.hypot(dx, dz) || 1;
+  const push = EXIT_RADIUS * 1.6;
+  return { x: back.x + (dx / len) * push, z: back.z + (dz / len) * push, viaExit: true };
+}
+
+/**
+ * Whole-world exit check (WORLDSPEC §9b f: "a one-way exit strands the player").
+ * Returns human-readable problems, same contract as validateZone.
+ */
+export function validateExits(world){
+  const problems = [];
+  for (const id of world.zoneIds){
+    const z = world.get(id);
+    for (const e of z.exits){
+      const t = world.get(e.toZone);
+      if (!t){ problems.push(`${id}: exit to unknown zone "${e.toZone}"`); continue; }
+      if (e.x < z.bounds.minX || e.x > z.bounds.maxX || e.z < z.bounds.minZ || e.z > z.bounds.maxZ)
+        problems.push(`${id}: exit to ${e.toZone} is outside ${id}'s own bounds`);
+      // mutual reachability — the target must have a way back, or the player is stranded
+      if (!t.exits.some(b => b.toZone === id))
+        problems.push(`${id} -> ${e.toZone} is one-way: ${e.toZone} has no exit back to ${id}`);
+      // and the arrival point must itself be legal
+      const entry = entryPointFor(world, e.toZone, id);
+      if (entry.x < t.bounds.minX || entry.x > t.bounds.maxX || entry.z < t.bounds.minZ || entry.z > t.bounds.maxZ)
+        problems.push(`${id} -> ${e.toZone} arrives outside ${e.toZone}'s bounds`);
+      // arriving inside the return trigger would bounce the player straight back
+      if (entry.viaExit && exitNear(t, entry.x, entry.z))
+        problems.push(`${id} -> ${e.toZone} arrives inside the return exit's trigger (ping-pong)`);
+    }
+    // two exits sharing a trigger radius are ambiguous — the player gets whichever wins the sort
+    for (let i = 0; i < z.exits.length; i++) for (let j = i + 1; j < z.exits.length; j++){
+      if (Math.hypot(z.exits[i].x - z.exits[j].x, z.exits[i].z - z.exits[j].z) < EXIT_RADIUS * 2)
+        problems.push(`${id}: exits to ${z.exits[i].toZone} and ${z.exits[j].toZone} overlap`);
+    }
+  }
+  return problems;
+}
+
 /** Normalise a raw {zones:[...]} document into a lookup, applying defaults. */
 export function buildWorld(doc){
   const zones = {};

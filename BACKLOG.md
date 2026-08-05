@@ -42,11 +42,11 @@
 ## 3. Open World
 
 - [ ] Expand beyond the Academy
-- [~] Whispering Forest — authored in `world/zones.json` and rendering via chunk streaming; needs its own quests/enemies and a way in (step 4)
+- [~] Whispering Forest — streams, and is now reachable through the academy's north gateway; needs its own quests/enemies/NPCs
 - [ ] Lake Arcanum
 - [ ] Ashen Mountains
 - [ ] Cinderhollow Caverns
-- [ ] Zone transitions — WORLDSPEC step 4 (**next**)
+- [x] Zone transitions — walkable gateways, reciprocal arrival, world state persisted in the save
 - [x] Chunk streaming — scatter-once/bucket-once with load/unload hysteresis and GPU disposal
 - [ ] Fast travel
 - [ ] Hidden areas / treasure

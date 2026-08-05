@@ -39,6 +39,8 @@ export const SFX = {
   win:       { kind:"arp",   notes:[60, 64, 67, 72, 76], step: 0.11, dur: 0.55, type:"triangle", gain: 0.18 },
   lose:      { kind:"arp",   notes:[60, 56, 53, 48], step: 0.14, dur: 0.55, type:"sawtooth", gain: 0.13 },
   slab:      { kind:"arp",   notes:[76, 83, 88, 95], step: 0.06, dur: 0.7,  type:"sine",     gain: 0.15 },
+  // zone transition — a rising, airy arpeggio so stepping through a gateway is audible
+  zone:      { kind:"arp",   notes:[64, 71, 76, 83], step: 0.08, dur: 0.5, type:"sine",     gain: 0.14 },
   ui:        { kind:"pluck", freq: 660, dur: 0.05, type:"sine",     gain: 0.08, sweep: 1.0 },
   error:     { kind:"pluck", freq: 180, dur: 0.14, type:"square",   gain: 0.12, sweep: 0.7 },
 };

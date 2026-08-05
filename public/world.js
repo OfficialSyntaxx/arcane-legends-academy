@@ -6,12 +6,12 @@ import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
 import { BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
 import { heightAt, isWater, flatsForZone, BIOMES } from "./terrain.js";
-import { scatterZone, bucketByChunk, chunkDelta } from "./worldconfig.js";
+import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS } from "./worldconfig.js";
 
 // `zone` is an optional normalised zone config (see worldconfig.js). Omitted, the world falls
 // back to the academy tables in structures.js/nodes.js — the migration state described in
 // WORLDSPEC §10, so the hub keeps working while zones.json becomes the runtime contract.
-export function createWorld(canvas, callbacks, zone){
+export function createWorld(canvas, callbacks, zone, opts = {}){
   const ZONE = zone || {
     id: "academy",
     spawn: PLAYER_SPAWN,
@@ -27,6 +27,7 @@ export function createWorld(canvas, callbacks, zone){
   // that gets level ground — no separate list to keep in sync.
   const FLATS = flatsForZone(ZONE);
   const groundY = (x, z) => heightAt(x, z, ZONE.terrain, FLATS);
+  const wet = (x, z) => isWater(x, z, ZONE.terrain, FLATS);
   // Clamp to the ACTIVE ZONE's bounds, not a global constant — a zone with different bounds
   // would otherwise trap the player early or let them walk off the edge of its terrain.
   const B = ZONE.bounds;
@@ -307,7 +308,12 @@ export function createWorld(canvas, callbacks, zone){
     }
   }
   const player = makeWizard(0x3a6bd8, 0x2a1f4d);
-  player.position.set(ZONE.spawn.x, groundY(ZONE.spawn.x, ZONE.spawn.z), ZONE.spawn.z);
+  // `opts.spawnAt` is where a zone TRANSITION drops the player (the reciprocal exit, computed by
+  // worldconfig.entryPointFor). Without it every arrival would land on the zone's own spawn, so
+  // walking north out of the academy would put you in the middle of the forest rather than at
+  // its southern edge, and the two zones would not read as adjacent.
+  const START = opts.spawnAt || ZONE.spawn;
+  player.position.set(clampX(START.x), groundY(START.x, START.z), clampZ(START.z));
   scene.add(player);
   const playerSpeed = 14;
 
@@ -647,6 +653,39 @@ export function createWorld(canvas, callbacks, zone){
       { size:b.h, fit:"height", x:b.x, z:b.z, ry:b.ry + (b.modelRy || 0) });
   }
 
+  // ---------- zone exits (WORLDSPEC step 4) ----------
+  // A gateway arch marks each exit so the boundary is visible rather than an invisible trigger
+  // the player falls through. The pad is emissive so it reads at distance in the forest's gloom.
+  for (const e of ZONE.exits || []){
+    const gy = groundY(e.x, e.z);
+    const name = (opts.zoneNames && opts.zoneNames[e.toZone]) || e.toZone;
+    const stone = mat(0x6b5f8a);
+    const pad = add(new THREE.CylinderGeometry(EXIT_RADIUS, EXIT_RADIUS, 0.25, 24), mat(0x8f7ad6), e.x, gy + 0.12, e.z, {cast:false});
+    pad.material.emissive = srgb(0x6a4fd0); pad.material.emissiveIntensity = 0.5;
+    // face the arch across the shortest way out of the zone, so you walk THROUGH it, not past it
+    const towardEdge = Math.abs(e.x - groundCX) > Math.abs(e.z - groundCZ) ? Math.PI/2 : 0;
+    const half = 2.6;
+    add(new THREE.CylinderGeometry(0.34, 0.42, 5.2, 8), stone, e.x + Math.cos(towardEdge)*half, gy + 2.6, e.z + Math.sin(towardEdge)*half);
+    add(new THREE.CylinderGeometry(0.34, 0.42, 5.2, 8), stone, e.x - Math.cos(towardEdge)*half, gy + 2.6, e.z - Math.sin(towardEdge)*half);
+    const lintel = add(new THREE.BoxGeometry(half*2 + 0.9, 0.7, 0.8), stone, e.x, gy + 5.4, e.z);
+    lintel.rotation.y = -towardEdge;
+    // Registered as an interactable purely so the HUD names the destination on approach. The
+    // transition itself is automatic (below) — the prompt is a signpost, not a required press.
+    register('exit', e.x, e.z, e.toZone, "To " + name, pad, EXIT_RADIUS + 1.5);
+  }
+  // Fire at most once per approach. `exitArmed` goes false the moment a transition is requested
+  // and only re-arms once the player has walked clear of every exit — the second half of the
+  // anti-ping-pong guard (the first is the inward offset in worldconfig.entryPointFor). Arriving
+  // in a zone starts DISARMED, because the arrival point is deliberately near the return exit.
+  let exitArmed = !opts.spawnAt;
+  function updateExits(){
+    const hit = exitNear(ZONE, player.position.x, player.position.z);
+    if (!hit){ exitArmed = true; return; }
+    if (!exitArmed) return;
+    exitArmed = false;
+    callbacks.onZoneExit && callbacks.onZoneExit({ toZone: hit.toZone, fromZone: ZONE.id });
+  }
+
   // ---------- input ----------
   const keys = new Set();
   const BIND = { KeyW:'f', KeyS:'b', KeyA:'l', KeyD:'r', ArrowUp:'f', ArrowDown:'b', ArrowLeft:'l', ArrowRight:'r' };
@@ -709,7 +748,17 @@ export function createWorld(canvas, callbacks, zone){
       const nx = clampX(player.position.x + wx*playerSpeed*dt);
       const nz = clampZ(player.position.z + wz*playerSpeed*dt);
       // depenetrate rather than block, so the player slides along a wall instead of sticking
-      const hit = resolveCollisions(nx, nz, PLAYER_RADIUS, ZONE_OBSTACLES);
+      let hit = resolveCollisions(nx, nz, PLAYER_RADIUS, ZONE_OBSTACLES);
+      // WATER IS SOLID (WORLDSPEC §9b k). It was rendered but walk-through, so the forest lake
+      // was decoration you strolled across. Slide along the shore instead of stopping dead:
+      // retry each axis alone, which is what makes a diagonal into the bank still move you.
+      if (wet(hit.x, hit.z)){
+        const axisX = resolveCollisions(nx, player.position.z, PLAYER_RADIUS, ZONE_OBSTACLES);
+        const axisZ = resolveCollisions(player.position.x, nz, PLAYER_RADIUS, ZONE_OBSTACLES);
+        if (!wet(axisX.x, axisX.z)) hit = axisX;
+        else if (!wet(axisZ.x, axisZ.z)) hit = axisZ;
+        else hit = { x: player.position.x, z: player.position.z };
+      }
       player.position.x = hit.x; player.position.z = hit.z;
       player.position.y = groundY(hit.x, hit.z);      // walk the heightmap (WORLDSPEC §5)
       updateChunks(false);
@@ -843,6 +892,22 @@ export function createWorld(canvas, callbacks, zone){
     // travelling through whatever it is avoiding, which is exactly the artefact this fixes.
     const curDist = Math.hypot(camera.position.x - px, camera.position.z - pz);
     camera.position.lerp(_camTarget, want < curDist - 0.05 ? 1 : 0.12);
+    // POST-STEP CORRECTION. The clamp above is computed for the *target* along the new yaw, but
+    // easing back out leaves the camera somewhere between its old and new positions — and while
+    // orbiting a building, both endpoints can be clear while the arc between them cuts straight
+    // through the corner. That is the intermittent "camera inside geometry" this used to fail
+    // on. Re-clamp where the camera ACTUALLY landed, along its own bearing from the player.
+    const ax = camera.position.x - px, az = camera.position.z - pz;
+    const aDist = Math.hypot(ax, az);
+    if (aDist > 1e-4){
+      const aYaw = Math.atan2(ax, az);
+      const safe = cameraDistanceLimit(px, pz, aYaw, aDist, ZONE_OBSTACLES, CAMERA_RADIUS);
+      if (safe < aDist){
+        camera.position.x = px + Math.sin(aYaw) * safe;
+        camera.position.z = pz + Math.cos(aYaw) * safe;
+        camera.position.y = Math.max(camera.position.y, groundY(camera.position.x, camera.position.z) + 1.8);
+      }
+    }
     camera.lookAt(px, py + 2.2, pz);
   }
 
@@ -855,6 +920,7 @@ export function createWorld(canvas, callbacks, zone){
     npcUpdate(dt, now);
     updateChars(dt);
     updateNearby();
+    updateExits();
     updateCamera();
     renderer.render(scene, camera);
   }
@@ -884,6 +950,8 @@ export function createWorld(canvas, callbacks, zone){
       near: out.slice(0,8),
       chars: Object.fromEntries(Object.entries(chars).map(([k,c])=>[k,{loaded:!!c.model, scale: c.model?+c.model.scale.x.toFixed(3):null, rawSize: c.rawSize?+c.rawSize.toFixed(3):null, meshWorldScale: c.meshWorldScale?+c.meshWorldScale.toFixed(4):null, computed: c.computedScale?+c.computedScale.toFixed(2):null, mixer: !!c.mixer, walk: !!c.walk, idle: !!c.idle}])),
       chunks: CHUNKS ? { loaded: CHUNKS.loaded.size, total: CHUNKS.buckets.size } : null,
+      zone: ZONE.id, exits: (ZONE.exits||[]).map(e=>({to:e.toZone,x:e.x,z:e.z})), exitArmed,
+      inWater: wet(player.position.x, player.position.z),
       playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };
   };
   return {
@@ -913,6 +981,9 @@ export function createWorld(canvas, callbacks, zone){
       const p = resolveCollisions(
         clampX(x), clampZ(z),
         PLAYER_RADIUS, ZONE_OBSTACLES);
+      // A teleport into water would drop the player somewhere they cannot walk out of, now that
+      // water is solid — keep them where they are rather than stranding them mid-lake.
+      if (wet(p.x, p.z)) return { x:player.position.x, y:player.position.y, z:player.position.z };
       player.position.x = p.x; player.position.z = p.z;
       player.position.y = groundY(p.x, p.z);   // land on the surface, not at y=0
       tapTarget = null; tapSet = false;

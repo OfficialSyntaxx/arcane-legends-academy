@@ -203,11 +203,11 @@ if (hasWorld){
   check("dragging does not also tap-to-move", tapDrift < 1.5, `player drifted ${tapDrift.toFixed(2)}`);
 
   // --- tap to move ---
-  const tapBefore = (await dbg()).player;
+  const tapBefore = (await dbg()).playerExact;
   await page.locator("#world").dispatchEvent("pointerdown", { pointerId:4, clientX:120, clientY:300, isPrimary:true });
   await page.locator("#world").dispatchEvent("pointerup", { pointerId:4, clientX:121, clientY:301, isPrimary:true });
   await page.waitForTimeout(900);
-  const tapAfter = (await dbg()).player;
+  const tapAfter = (await dbg()).playerExact;
   const tapMoved = Math.hypot(tapAfter[0]-tapBefore[0], tapAfter[2]-tapBefore[2]);
   check("tap-to-move walks the player", tapMoved > 0.5, `moved ${tapMoved.toFixed(2)}`);
 
@@ -323,6 +323,71 @@ if (hasWorld){
   });
   check("the camera never ends up inside geometry while orbiting", cam.bad.length === 0,
         `${cam.bad.length}/${cam.total} positions inside: ${JSON.stringify(cam.bad.slice(0,3))}`);
+
+  // --- zone transitions (WORLDSPEC step 4) ---
+  // Drives the real trigger: teleport next to the academy's north gateway, walk into it, and
+  // assert the world actually rebuilt as the forest — then walk back. A one-way transition
+  // strands the player, which is the whole point of §9b f.
+  const trip = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const zoneNow = () => window.__worldDebug().zone;
+    const log = { start: zoneNow() };
+    // Step ONTO the exit. `setTouchMove` is camera-relative, so it cannot be aimed at a
+    // world-space point without also solving for camYaw; teleport drives the same per-frame
+    // trigger, which is what this test is actually about.
+    const step = async () => {
+      const e = (window.__worldDebug().exits || [])[0];
+      if (!e) return null;
+      window.__world.teleport(e.x, e.z);
+      await settle(700);
+      return zoneNow();
+    };
+    log.after1 = await step();
+    await settle(800);
+    log.stillThere = zoneNow();       // must NOT have bounced straight back
+    // The anti-ping-pong guard: the arrival point must sit OUTSIDE the return exit's radius,
+    // so the trigger re-arms naturally instead of firing us straight back.
+    const WC = await import("./worldconfig.js");
+    const cfg = await WC.loadWorldConfig();
+    const d = window.__worldDebug();
+    log.arrival = { zone: d.zone, at: [+d.playerExact[0].toFixed(2), +d.playerExact[2].toFixed(2)] };
+    log.arrivalClear = WC.exitNear(cfg.get(d.zone), d.playerExact[0], d.playerExact[2]) === null;
+    log.after2 = await step();
+    return log;
+  });
+  check("walking into a gateway changes zone", trip.after1 && trip.after1 !== trip.start,
+        `${trip.start} -> ${trip.after1}`);
+  check("arriving does not ping-pong back", trip.stillThere === trip.after1,
+        `${trip.after1} -> ${trip.stillThere}`);
+  check("the arrival point is clear of the return trigger", trip.arrivalClear === true, JSON.stringify(trip.arrival));
+  check("the way back works too", trip.after2 === trip.start, `${trip.after1} -> ${trip.after2}`);
+
+  // --- water is solid (WORLDSPEC §9b k) ---
+  const wet = await page.evaluate(async () => {
+    const TER = await import("./terrain.js");
+    const WC = await import("./worldconfig.js");
+    const cfg = await WC.loadWorldConfig();
+    const z = cfg.zoneIds.map(id => cfg.get(id)).find(zz => zz.terrain.waterLevel != null);
+    if (!z || window.__worldDebug().zone !== z.id) return { skipped: true };
+    const flats = TER.flatsForZone(z);
+    // find a water tile, park the player on the shore beside it and push straight in
+    for (let x = z.bounds.minX + 8; x < z.bounds.maxX - 8; x += 6){
+      for (let zz = z.bounds.minZ + 8; zz < z.bounds.maxZ - 8; zz += 6){
+        if (!TER.isWater(x, zz, z.terrain, flats)) continue;
+        const t = window.__world.teleport(x, zz);
+        // teleport must refuse to drop us in the lake at all
+        const refused = TER.isWater(t.x, t.z, z.terrain, flats) === false;
+        window.__world.setTouchMove(0, 0);
+        return { found: true, refused, inWater: window.__worldDebug().inWater };
+      }
+    }
+    return { found: false };
+  });
+  if (wet.skipped || wet.found === false) check("water check ran", true, "no water zone active — skipped");
+  else {
+    check("teleport refuses to strand the player in water", wet.refused === true);
+    check("the player is never standing in water", wet.inWater === false);
+  }
 
   // --- character models loaded ---
   const chars = (await dbg()).chars;
