@@ -30,7 +30,7 @@
 
 ## 2. Academy & Character
 
-- [~] Character creation — school questionnaire + picker exist; a full creation screen with 3D preview is designed but not built (`docs/DESIGN-DECISIONS.md` §4)
+- [x] Character creation — school questionnaire + picker with a live rotating 3D wizard preview tinted by school (free tinting version; per-school garments still open, see `docs/DESIGN-DECISIONS.md` §4)
 - [~] School identity / specialization — 7 schools, starter decks, +1 affinity and the elemental ring all live; per-school *visuals* not yet
 - [~] Academy classes and curriculum — see §1 above (`academy.js`); numeric perks only, no lesson content yet
 - [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
