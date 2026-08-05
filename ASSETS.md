@@ -97,11 +97,15 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 - 🔗 **Ultimate Animated Character Pack** (Quaternius, 50+ characters) — quaternius.com
 
 ### 🐾 Familiars / card monsters
+- ✅ **Ultimate Monsters** (Quaternius, via Google Drive connector) — Dino, Orc, Demon, Frog, MushroomKing, Fish, Bunny, Yeti, Alien imported (14 anims each); more available (Tribal, Ninja, Cactoro, BlueDemon, Birb…)
 - ✅ **Textured Cute Monster Pack** (Quaternius) — 21 animated monsters (Chicken, Panda, Deer, Ghost, Yeti, Cthulhu, Cyclops, Demon, Mushroom…) — 6 imported so far
 - ✅ **LowPoly Animated Monsters** — Dragon, Slime, Bat, Skeleton (in-game)
-- 🔗 **Ultimate Monsters** (Quaternius, 50) — quaternius.com
 - 🔗 **Ultimate Animated Animal Pack** (Quaternius, 12 animals × 13 anims) — familiars — quaternius.com
 - 🔗 **Farm Animal Pack / Animated Dinosaur Pack** (Quaternius) — CC0
+
+### 🖼 UI / icons (2D)
+- ✅ **Shikashi's Fantasy Icons Pack v2** (CC BY 3.0) — 245 fantasy icons (weapons, potions, food, status effects, orbs, resources) — great for card/UI art — attached by user
+- 🔗 Free fantasy UI/icon kits on the itch [UI tag](https://itch.io/game-assets/free/tag-ui)
 
 ### 🏗 World / buildings / props
 - ✅ **KayKit** Medieval Hexagon, Dungeon, Forest, Furniture (in-game)

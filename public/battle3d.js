@@ -17,6 +17,19 @@ const MODELS = {
   slime: 'creature_Slime.glb',
   skeleton: 'enemy_skeleton.glb',
   mage: 'npc_mage.glb',
+  dino: 'creature_Dino.glb',
+  orc: 'creature_Orc.glb',
+  demon: 'creature_Demon.glb',
+  frog: 'creature_Frog.glb',
+  mushroom: 'creature_MushroomKing.glb',
+  fish: 'creature_Fish.glb',
+  bunny: 'creature_Bunny.glb',
+  yeti: 'creature_Yeti.glb',
+  alien: 'creature_Alien.glb',
+  chicken: 'creature_Chicken.glb',
+  panda: 'creature_Panda.glb',
+  deer: 'creature_Deer.glb',
+  ghost: 'creature_Ghost.glb',
   default: 'enemy_skeleton.glb',
 };
 const LOCAL = name => './assets/models/' + name;
@@ -26,6 +39,19 @@ function modelFor(cardId, name) {
   if (/bat/.test(n)) return MODELS.bat;
   if (/slime|blob|ooze/.test(n)) return MODELS.slime;
   if (/skeleton|bone/.test(n)) return MODELS.skeleton;
+  if (/dino|dinosaur|rex/.test(n)) return MODELS.dino;
+  if (/orc|goblin|troll/.test(n)) return MODELS.orc;
+  if (/demon|devil|imp|ghoul/.test(n)) return MODELS.demon;
+  if (/frog|toad/.test(n)) return MODELS.frog;
+  if (/mushroom|shroom|fungus/.test(n)) return MODELS.mushroom;
+  if (/fish|shark|crab|shrimp/.test(n)) return MODELS.fish;
+  if (/bunny|rabbit/.test(n)) return MODELS.bunny;
+  if (/yeti|giant|ogre|golem/.test(n)) return MODELS.yeti;
+  if (/alien/.test(n)) return MODELS.alien;
+  if (/chicken|rooster|bird/.test(n)) return MODELS.chicken;
+  if (/panda|bear/.test(n)) return MODELS.panda;
+  if (/deer|stag|elk/.test(n)) return MODELS.deer;
+  if (/ghost|wraith|spirit|reaper|vampire/.test(n)) return MODELS.ghost;
   if (/mage|wizard|elf|pixie|walker|novice|assistant|fairy/.test(n)) return MODELS.mage;
   return MODELS.default;
 }
