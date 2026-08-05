@@ -55,29 +55,43 @@ wizard-tcg/                 (the repo root)
 │   ├── items.js            skills, materials, equipment, recipes, home upgrades
 │   ├── nodes.js            gathering-node table (data; world.js builds the meshes from it)
 │   ├── structures.js       buildings, NPC positions, obstacles + the collision resolver (data)
-│   ├── terrain.js          procedural heightmap maths — PURE, no THREE (WORLDSPEC §5)
-│   ├── worldconfig.js      zone loading/validation/defaults + chunk helpers — PURE
-│   ├── world/zones.json    the zone catalog (academy + whispering_forest)
+│   ├── terrain.js          procedural heightmap + ground-colour maths — PURE, no THREE (WORLDSPEC §5)
+│   ├── worldconfig.js      zone loading/validation/defaults, chunk + zone-exit helpers — PURE
+│   ├── dungeons.js         dungeon layout (rooms/corridors/walls) — PURE (WORLDSPEC §6); compiles
+│   │                       a dungeon to the same zone shape world.js already renders
+│   ├── zonequests.js       field quests given by world NPCs — PURE, save-derived progress
+│   ├── onboarding.js       the guided first-session chain — PURE, every step derived from the save
+│   ├── academy.js          curriculum years + perks (quest gold / market discount / XP) — PURE
+│   ├── reputation.js       per-NPC standing + reward bonuses — PURE
+│   ├── vfx.js              spell visual-effect archetypes, chosen from a card's own fx — PURE
+│   ├── world/zones.json    the zone catalog (academy, whispering_forest)
+│   ├── world/dungeons.json the dungeon catalog (cinderhollow_caverns)
 │   ├── audio.js            procedural WebAudio: SFX, ambience, music (no asset files)
 │   ├── game.js             engine: skills, economy, market, auctions, housing, duels, AI
-│   ├── world.js            the 3D academy world (Three.js scene, movement, camera, NPCs, GLB loading)
+│   ├── world.js            the 3D world (Three.js scene, movement, camera, NPCs, zones, dungeons)
+│   ├── battle3d.js         the 3D duel arena (colonnade + pads) and spell VFX playback
+│   ├── cdn.js              CDN-vs-local model URL resolution (modelUrl / CDN map)
 │   ├── strings.js          ALL player-visible text (external on purpose)
 │   ├── manifest.json       PWA manifest
 │   ├── vendor/             pinned libs (three.min.js, GLTFLoader.js, DRACOLoader.js, draco/)
-│   └── assets/             generated art, character GLBs (models/), landmarks (buildings/)
-├── tools/                  headless test suites
+│   └── assets/             generated art: character GLBs (models/), landmarks (buildings/)
+├── models_cdn/              git-tracked source copies of large GLBs (not deployed — see cdn.js)
+├── tools/                  headless test suites + asset pipeline
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
 │   ├── sync-zones.mjs      regenerates the academy zone in zones.json (--check in CI)
-│   ├── test.mjs            engine tests (164 checks)
+│   ├── test.mjs            engine tests (252 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
-│   ├── browser-test.mjs    real-Chromium responsive + input-gesture suite
-│   └── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
+│   ├── browser-test.mjs    real-Chromium responsive + input-gesture + world/quest/VFX suite (62 checks)
+│   ├── model-check.mjs     loads AND renders every shipped GLB in a real browser (npm run check:models)
+│   ├── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
+│   └── rig-character.py    Blender-as-a-module auto-rigger for unrigged generated characters
 ├── BACKLOG.md              whole-game feature backlog + recommended phase order
 ├── WORLDSPEC.md            world architecture blueprint (zones, terrain, chunks, dungeons)
 ├── design/                 design docs (plan, thresholds, asset manifest)
 └── docs/
-    ├── NEXT-PHASE-PLAN.md  the systems audit + phase tracker
+    ├── NEXT-PHASE-PLAN.md  the ORIGINAL systems audit (Phases A-D) — historical, superseded by
+    │                       BACKLOG.md/WORLDSPEC.md for anything current; kept for context
     ├── ASSET-BUDGET.md     what's generated, platform costs, CC0 sources, licensing
     └── DESIGN-DECISIONS.md open design questions + answers (interiors, 3D duels, outfits)
 ```
@@ -86,12 +100,18 @@ wizard-tcg/                 (the repo root)
 
 ## 4. The 3D World
 
-> **World expansion blueprint:** see [`WORLDSPEC.md`](WORLDSPEC.md) — zone-based architecture, zone config schema, chunk streaming, procedural terrain, and dungeon instancing. This is the roadmap to move from the single campus to a large roamable world.
+> **World expansion blueprint:** see [`WORLDSPEC.md`](WORLDSPEC.md) — zone-based architecture, zone config schema, chunk streaming, procedural terrain, and dungeon instancing. **All five implementation steps in WORLDSPEC §9 are done** (config/data model, terrain, chunk streaming, zone transitions, dungeon instancing); step 6, the content pass, is in progress — see §9 below for what's left.
 
-The world is a walkable academy campus built in Three.js (procedural low-poly + generated GLB characters). Key facts:
+The world is **multi-zone**: a hub campus (`academy`) plus a streaming outdoor zone (`whispering_forest`) reachable through a walkable gateway, plus an instanced dungeon (`cinderhollow_caverns`) reachable through a doorway inside the forest. All three are built in Three.js — procedural terrain/geometry plus generated GLB characters and landmarks. Key facts:
 
-- **Camera:** auto-follow, **drag-to-rotate** (orbit), **pinch-to-zoom**, camera-relative movement. Touch joystick on the left, drag on the right, tap-to-move.
-- **Movement:** WASD/arrow keys (bound to `event.code`), touch joystick, gamepad thumbstick, tap-to-move.
+- **Camera:** auto-follow, **drag-to-rotate** (orbit), **pinch-to-zoom**, camera-relative movement, and **collision** (re-clamped along its own bearing after the follow lerp, or an orbit around a building can sweep the camera through a corner even when both endpoints are clear). Touch joystick on the left, drag on the right, tap-to-move.
+- **Movement:** WASD/arrow keys (bound to `event.code`), touch joystick, gamepad thumbstick, tap-to-move. The player walks the terrain heightmap (`groundY`), and **water is solid** — movement retries each axis alone so the player slides along a shoreline instead of stopping dead.
+- **Zones** are data (`public/world/zones.json`), validated by `worldconfig.js` (`validateZone`, `validateExits`): bounds, terrain params (seed/biome/amplitude/waterLevel), buildings/landmarks/props/NPCs/resource nodes/exits. `academy` is *generated* from `structures.js`/`nodes.js` by `tools/sync-zones.mjs` (`npm test` fails if stale); `whispering_forest` is hand-authored pure JSON, proof that a new zone needs no engine change.
+- **Zone transitions:** walking onto an exit rebuilds the world for the target zone and drops the player at the *reciprocal* exit, so the two zones join up geographically. Two anti-ping-pong guards: the arrival point is offset inward, and the trigger arrives disarmed until the player walks clear.
+- **Chunk streaming:** each zone's scattered content (props/nodes/enemies with a `count`) is bucketed into chunks once and only load/unload deltas are applied on each chunk-boundary crossing, with load/unload hysteresis and GPU disposal on unload.
+- **Ground colour:** the terrain is painted with vertex colours per point (height bands, bare rock on steep slopes, a shoreline band, low-frequency mottling) — no textures, so nothing to author or compress. See `terrain.js groundColorAt`.
+- **Dungeons** (`dungeons.js` + `world/dungeons.json`): a dungeon *compiles to a zone* — rooms/corridors/walls become the zone's obstacles and floor meshes, so entering one is just another zone transition and every zone-transition guarantee (reachability, no ping-pong, saved position) applies for free. Enemy kills, cleared rooms and boss defeat persist in `worldState.dungeons[id]` and defeated enemies do not respawn. `cinderhollow_caverns` (4 rooms + a boss, reachable from the forest) is the first one.
+- **Field quests** (`zonequests.js`): NPC-given quests out in a zone (gather/slay/clear/boss/visit objectives), separate from the duel-ladder `QUESTS` in `game.js`. State split: what the player *chose* (`accepted`/`done`) is saved, what they *achieved* is derived from inventory/dungeon state every time it's read — the same pattern as onboarding, below.
 - **Stations** (each opens an in-world overlay or dialogue):
   - Scribing Hall → Scribing overlay (refine + scribe cards)
   - Smithy → Forge overlay (smelt, forge equipment, brew)
@@ -101,11 +121,17 @@ The world is a walkable academy campus built in Three.js (procedural low-poly + 
   - Duel Trainer → practice duel
   - Student Dorms → home
   - Librarian → daily challenge
+  - Forest NPCs (Sage Rowan, Warden Brisk, a pedlar) → field-quest dialogue, built from `zonequests.js` data rather than hand-written per NPC
 - **Gathering nodes** (data in `public/nodes.js`): ore crystals (copper/tin/iron/silver/gold/mithril/runite), wood stumps (oak/willow/magic), ponds (shrimp/salmon/lobster/shark). Each grants a material + skill XP. Ore and wood nodes render as **CC0 KayKit rock/tree** models (`NODE_MODELS`), falling back to the procedural mesh if a GLB fails — see §4.1 and `ASSETS.md`.
-- **NPCs:** Professor, Merchant, Referee, Trainer, Librarian, and wandering students — all with dialogue.
-- **Character models:** generated via 2D→3D (`.glb`). All 10 characters render at ~1.8 units; walk is added procedurally (see §9).
+- **NPCs:** Professor, Merchant, Referee, Trainer, Librarian, wandering students, and the forest quest-givers — all with dialogue.
+- **Character models:** generated via 2D→3D (`.glb`), normalised to `CHARACTER_HEIGHT = 2.6` (`structures.js`) — the larger of the skeleton span and the mesh box, since a hat or cloak can extend past either. Skinned models drive the player from a mixer clip; NPCs get a procedural walk cycle keyed on Mixamo-style bone names (see §9.4). Every character/prop/landmark load retries a local copy if the CDN fetch fails (`makeCharModel`/`loadLandmarkModel`), verified by a test that the CDN map and the local fallback files actually agree.
 - **Buildings & landmarks:** declared in `structures.js` (`BUILDINGS`, `LANDMARKS`, `PROPS`) and loaded by `loadLandmarkModel`. The everyday campus is **CC0 KayKit**; the **Central Tower and Duel Arena are generated Tripo** models — the two hero landmarks. Placement is data, never hand-written into `world.js`, and `npm test` fails if anything is sealed inside geometry or points at a missing file.
-- **CDN model loading:** large models (>1MB) are hosted on the Higgsfield CDN and loaded at runtime via `cdn.js` (`modelUrl()`), so the deployed `public/` stays ~6.5MB. Local copies live in `models_cdn/` (git, not deployed). See `ASSETS.md` §CDN.
+- **CDN model loading:** large models (>1MB) are hosted on the Higgsfield CDN and loaded at runtime via `cdn.js` (`modelUrl()`), with a local-copy retry on failure. Local copies live in `models_cdn/` (git, not deployed) and are also copied into `public/assets/models/` as the fallback target. See `ASSETS.md` §CDN.
+- **Model integrity:** `tools/model-check.mjs` (`npm run check:models`) loads and *renders* (twice — a corrupt attribute only throws on GPU upload, not on the frame the model is added) every shipped GLB in a real browser. This exists because four models were silently broken in the repo (two failed to parse, two rendered but threw every frame) with nothing catching it — `world.js` degrades a load failure to the procedural stand-in with only a console warning.
+- **Unrigged generated characters:** `tools/rig-character.py` (Blender as a Python module — `pip install bpy`) auto-rigs a static A-pose GLB: skeleton + skinning (bone-heat fails on generated meshes, so weights come from measured bone proximity) + baked Idle/Walk clips built on a *standing* pose, not the bind pose (a small swing layered on an A-pose still reads as a T-pose). See `ASSETS.md` for the specific failure modes it works around (skirt/leg weight bleed, per-limb swing-axis derivation).
+- **Duel arena** (`battle3d.js`): a procedural pit — stone floor, inlaid rune circle, a raised pad per duellist, a colonnade with lit braziers, team banners, fog. The arena band sits *above* the duel UI (it used to be a competing `flex:1`, which cut the player's hand in half). Camera fits the whole stage by solving for a distance where every corner of the play volume projects inside the frustum, rather than a fixed position tuned for one aspect ratio.
+- **Spell VFX** (`vfx.js` + `battle3d.js`): six procedural archetypes — bolt, burst, rain, aura, beam, glyph — chosen from a card's own `fx` list and school, zero assets. Effect *lifetime* runs on the wall clock, not the frame loop's capped `dt` — using the capped value meant a throttled frame rate stretched every effect indefinitely.
+
 ### 4.1 Importing free 3D assets (itch.io / CraftPix / KayKit…)
 
 We can reuse free low-poly assets even though most ship as `.fbx`. Pipeline: **everything ends up as a resized `.glb`** before it enters the game. One command does it all:
@@ -187,13 +213,22 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Market:** Bazaar (NPC buy/sell, grade-aware) + Auction House (NPC-driven bids).
 
 ### 6.5 Quests & PvP
-- **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve.
+- **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
+- **Field quests** (`zonequests.js`) — separate from the duel ladder: things to do in a *place*, given by NPCs out in the world (gather/slay/clear/boss objectives, prerequisites, a quest log). Five ship in the Whispering Forest, leading into Cinderhollow Caverns.
 - **Local PvP:** dueling AI wizards (and a practice duel with the Trainer).
 - **Online PvP:** real players via `logic.js` — create a room, share the invite link (two tabs = two players).
 
-### 6.6 Retention
+### 6.6 Onboarding
+A 7-step guided first session (`onboarding.js`): school → gather → refine → scribe → grade → deck → first duel, shown as a persistent objective bar on every screen (including the 3D world). Every step's `done` check is **derived from the save**, never tracked as a separate counter — a player who scribes before being told to is not stuck re-asked to do it, because the check just asks the save "have you scribed a card" and the answer is already yes. Same pattern used by `zonequests.js` progress.
+
+### 6.7 Academy curriculum & NPC reputation
+- **Curriculum** (`academy.js`): 7 years (Novice → Archmage — the same names/thresholds the old cosmetic "academy rank" always used, so no save's rank silently changed), each unlocking real perks: bonus quest gold, a market discount on cards, bonus wizard XP. `game.js academyPerks(s)` is the one place both the duel-ladder reward path (`completeQuest`) and `buyCard` read from.
+- **NPC reputation** (`reputation.js`): standing with quest-giving NPCs specifically (Stranger → Acquainted → Friendly → Trusted → Honored), raised by turning in that NPC's field quests, granting a reward bonus on top of the curriculum bonus. The two systems stack without knowing about each other — `zonequests.js` hands back a base reward and stays pure; the UI layer (`turnInQuest` in `index.html`) applies both bonuses and raises reputation.
+- Both show on the Hall screen: a Curriculum panel (current year, perks, progress to next) always, a Reputation panel once the player has any.
+
+### 6.8 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
-- **Academy rank** (Novice → Apprentice → … → Archmage) based on level + collection value + duels won.
+- **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
 ---
 
@@ -225,10 +260,11 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 87 engine checks
+node tools/test.mjs          # 252 engine checks (economy, combat, world/zone/dungeon/quest data)
 node tools/logic-test.mjs    # 34 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + 15 input gestures in real Chromium
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/VFX flows, real Chromium (62 checks)
+npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
 Chromium download (`npx playwright install chromium`) and runs as its own CI job — it is the
@@ -253,108 +289,93 @@ Use the `deploy_game` tool:
 
 ---
 
-## 9. Current State & Known Issues
+## 9. Current State & Where We Left Off
 
-**Working:** 3D world, camera, movement, in-world gathering/crafting, NPC dialogue, school system + elemental matrix, field/trap cards, grading/slabs + regrade, daily quests, academy rank, market/auctions, home/guild, all 8 quests, local AI PvP, online PvP, PWA manifest, all tests green. **3D duel arena** (`battle3d.js`): when a creature card is played, its animated 3D model drops onto a 3D battlefield (synced to `logic.js` boards; card→model by keyword: dragon/wyrm→Dragon, bat→Bat, slime→Slime, skeleton→Skeleton, mage/elf→Mage, default→Skeleton). Wired into `renderDuel` via `syncBattle3d()`; defensive try/catch so a 3D failure degrades to the 2D duel.
+> **The authoritative trackers are [`BACKLOG.md`](BACKLOG.md) (whole-game feature status, checked
+> off as things land) and [`WORLDSPEC.md`](WORLDSPEC.md) (world-architecture implementation
+> order, §9). Check those first for "is X done yet" — this section is a narrative summary, not
+> the source of truth for checkbox state.** The old phase-by-phase audit that used to live here
+> (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
+> for historical context; everything in it is done and superseded by the two docs above.
 
-**A full systems audit lives in `docs/NEXT-PHASE-PLAN.md`** — read it alongside this file. It
-lists verified defects and orders them into phases. **Phase A (correctness) is done:**
+**All tests green:** 252 engine / 34 online-rules / 62 real-browser (layout + gestures + world +
+dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
+gates every push.
 
-- `gradeForRoll` used a forward `find` over an ascending table, so *every* roll graded "Poor" —
-  no slab had ever been minted. Now resolves descending, with 10 regression assertions.
-- `drain` healed the defending wizard; Death-school creatures were healing their victims.
-- `freezeAll` was inert (`freeze` was written and never read). Now enforced in both engines,
-  and the tick moved from `beginTurn` to `endTurn` so a frozen creature really loses a turn.
-- AoE effects hardcoded `b.enemy`, so the AI (and player 2 online) hit their own board and
-  wizard. Effects now resolve against the *caster's* opponent.
-- Targeted spells in local duels applied damage to the UI's `{kind, idx}` descriptor instead of
-  the creature — Firebolt, Fireball, Lightning, Storm Shift, Myth Blast, Dark Pact and Balance
-  Streak were all blank cards. Descriptors are now resolved to real entities.
-- `ui-smoke.mjs` read an absolute path from a dead sandbox and exited 0 on failure.
+**What's working, end to end:**
+- Full card/duel/economy loop: schools, elemental matrix, all 4 card types, grading/slabs,
+  scribing, skills, equipment, home/guild, market/auctions, daily quests, local + online PvP.
+- **A multi-zone 3D world**, not just a single campus: the `academy` hub, a streaming outdoor
+  zone (`whispering_forest`, reached through a walkable gateway) with its own NPCs and field
+  quests, and an instanced dungeon (`cinderhollow_caverns`, reached through a doorway in the
+  forest) with persistent kill/room/boss progress. All of **WORLDSPEC §9's five implementation
+  steps are done** — config/data model, terrain, chunk streaming, zone transitions, dungeon
+  instancing.
+- **Painted terrain** (vertex-colour height bands, rock on slopes, shorelines, mottling) — no
+  textures, so no assets to author or compress for the ground.
+- **A rigged, animated player character** with a proper standing pose (not a bind-pose T-pose),
+  scaled correctly (`CHARACTER_HEIGHT = 2.6`), via `tools/rig-character.py` for any future
+  unrigged generated character.
+- **A guided first session** (`onboarding.js`) that actually walks a new player through the whole
+  loop, and **field quests** (`zonequests.js`) that give the forest a reason to exist.
+- **Spell VFX** (six procedural archetypes) and a **duel arena that reads as a place** (colonnade,
+  rune circle, raised pads) rather than a flat coloured disc.
+- **Academy curriculum + NPC reputation** (`academy.js` / `reputation.js`) — the academy rank that
+  used to be a cosmetic label now unlocks real perks (quest gold bonus, market discount, XP
+  bonus), and standing with quest-givers stacks its own bonus on top.
+- **Model integrity is actively checked** (`tools/model-check.mjs`) after finding four silently
+  broken GLBs in the repo that no existing test caught (`world.js` degrades a load/render failure
+  to the procedural stand-in with only a console warning — invisible in play).
 
-**Phase B (closing the loops) is also done:**
+**SCALE: 1 world unit = 1 metre.** Characters are `CHARACTER_HEIGHT = 2.6` (not 1.8 — that read as
+anatomically correct but *looked* tiny, because the normalisation measures the full bounding box
+and a pointed hat is ~28% of it). Halls are 7–10.5m tall and 13–15m wide, the tower is 40m, the
+arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this scale.**
 
-- **Gathering nodes are data now** (`public/nodes.js`); `world.js` builds meshes from that
-  table. `tin`, `raw_shark` and `magic_log` had recipes but no node anywhere, so Bronze Bars —
-  the first rung of the entire Smithing ladder — could not be crafted. Nodes added, and the
-  test suite asserts every recipe input is reachable. Runite also sat 1.4 units from iron,
-  inside the 2.6-unit interaction radius; it moved out to `(-14,-14)`.
-- **Potions work in duels** — `usePotion()`, 1 pip, one per turn, surfaced as a row in the duel
-  UI. Alchemy previously produced items with no use whatsoever.
-- **Auctions use `Date.now()`** and settle on load. They stored `performance.now() + 60s`
-  against a persisted save, so every listing was already expired after any reload.
-- **The school picker survives a mid-creation quit** (`migrate` only skips it when the flag is
-  absent, not when it is explicitly `false`).
+**Two planning documents for asset work, both current:**
+- **`docs/ASSET-BUDGET.md`** — platform costs (Higgsfield vs Tripo vs Meshy), free CC0 sources,
+  the free-tier licensing trap.
+- **`docs/DESIGN-DECISIONS.md`** — building interiors, 3D duel staging, character-creation/outfit
+  system.
+- **`ASSETS.md`** — the CDN pipeline, the compression pipeline and its two known traps
+  (`gltf-transform optimize` decimates by default; the `webp` pass must run *before* Draco or it
+  silently ships uncompressed geometry), and the auto-rig pipeline's specific failure modes
+  (bone-heat fails on generated meshes; a robe tears at the hem if legs are gated by height
+  instead of distance; limb swing axes must be derived per-bone, not assumed).
 
-When adding a gatherable material, add it to **both** `items.js` and `nodes.js` — the test
-suite will fail the build if a recipe input has no node.
+### Where we left off
 
-**Phase C (de-risking the online path) and a full mobile/input pass are also done:**
+The last work landed **Academy curriculum + NPC reputation** (§6.7) — pushed to
+`claude/integrate-cc0-and-systems`. Before that, in order: spell VFX and a rebuilt duel arena,
+field quests for the Whispering Forest, the onboarding chain, dungeon-enemy persistence (fixing a
+gap left by the initial dungeon-instancing commit — kills weren't actually sticking), a rigged
+player character with a standing pose, painted terrain, and WORLDSPEC steps 3–5 (chunk streaming,
+zone transitions, dungeon instancing).
 
-- **The two engines can no longer diverge.** `logic.js`'s catalog is generated from `cards.js`
-  by `npm run sync`; `npm test` fails if it is stale. Online duels had been using a *different*
-  elemental matrix (an old 3-link ring vs the 6-link one) — they now match.
-- **Matches always terminate** — `MAX_TURNS = 100` in both engines, higher HP wins at the cap,
-  equal HP (and double knockouts) are explicit draws, rendered as draws in both duel UIs.
-- **Duels are reproducible** from a seed, in both engines.
-- **Mobile layout:** `dvh` sizing, safe-area insets, fluid `clamp()` cards, and breakpoints for
-  phones, small phones (≤380px), landscape phones and tablets. Locally generated PWA icons
-  replace the CloudFront hotlink (which broke the installable PWA offline).
-- **World input rewritten onto Pointer Events.** A two-finger pinch used to keep rotating the
-  camera, a drag ending off-canvas left the drag stuck, and a drag could fire tap-to-move on
-  release. All three are fixed and covered by `npm run test:browser`.
-
-**SCALE: 1 world unit = 1 metre.** A character is 1.8. Buildings used to be 3.5–5.5 units tall
-against them — a "hall" barely 2.5 people high — which is what made the campus read as a model
-village. Halls are now 7–10.5m tall and 13–15m wide, the tower is 40m, the arena 25m across, and
-the layout is spread to match (`WORLD_BOUND` 72). The camera sits at height 4.6 / distance 10.5 /
-62° FOV. **Keep new geometry on this scale**, and author generated building models to the exact
-`w`/`d`/`h` footprints in `structures.js` — a mismatch will float or clip its collision box.
-
-**Phase D part 1 is done: the world is solid.** `public/structures.js` holds the buildings, NPC
-positions, obstacle shapes and a pure collision resolver, so the layout is testable headlessly.
-Making the world solid immediately revealed that the professor and merchant were standing inside
-their own buildings and that every station prompt sat at a building's centre (behind a wall) —
-prompts are at doors now, and the suite asserts every NPC, door, node and the spawn is clear.
-GLB models keep the procedural stand-in until they load (and on failure), with progress in the
-HUD. **When adding a building or moving an NPC, edit `structures.js`** — the meshes, collision
-boxes and door prompts are all generated from it, and the tests will fail if something ends up
-sealed inside geometry.
-
-**Draco compression and sound are done** (see items 3 and 6 below). The deploy is now ~6MB total,
-down from ~24MB.
-
-**Three generated landmarks are in:** the Central Tower (40m), Scribing Hall and Duel Arena, all
-via Tripo 2D→3D. They load through `loadLandmarkModel` in `world.js`, which scales by `height` or
-by `width` (the arena fits by width — its floor is the duel space, so the diameter is what must be
-right). Each keeps its procedural box as a visible fallback until the GLB loads.
-
-**Two planning documents, both current:**
-- **`docs/ASSET-BUDGET.md`** — what is already generated, measured platform costs
-  (Higgsfield $2.00/model vs Tripo ~$0.40 vs Meshy ~$0.40), free CC0 sources, the free-tier
-  licensing trap, and the costed remainder.
-- **`docs/DESIGN-DECISIONS.md`** — answers to the open design questions: building interiors,
-  Wizard101-style 3D duel staging, the character-creation/school-outfit system, and the known
-  camera-collision bug. Includes a priority order in which **four of the six items cost nothing**.
-
-**Known issues / next steps:** *(Phase D part 2; the items below still stand)*
-1. **All character models are now generated 3D models.** The player wizard, professor, merchant, referee, trainer, librarian, and 4 wandering students are all 2D→3D generated GLBs (except the professor, which is a static text-to-3D mesh). They load at ~1.8 units and render correctly. The fix in `makeCharModel` (`world.js`): for **skinned Meshy GLBs** the object box is degenerate (0) and the raw mesh box is only the *bind pose* — the real size is the **skeleton node span** (bones sit far above the mesh), so height is computed from node world positions. For **static meshes** (e.g. professor.glb has no skeleton), the real size is the **geometry box**. The loader auto-detects skinned vs static. NPC GLB keys match their roles (`duel`, `trainer`, `librarian`, `wander0`–`wander3`) so the update loop uses the GLB mixer. Character textures are **512px** — not by choice, but because the source GLBs were downsized in an early session before the compression pipeline was fixed; that detail is not recoverable by recompressing and would need regeneration. Buildings generated since keep their full **2048px** source textures. The whole model set is ~5.9MB.
-2. **The 2D→3D pipeline** (2D reference image → image-to-3D) produces a much better, recognizable result than text-to-3D, which returned a generic blob. All character GLBs were generated this way, on Higgsfield at ~40 credits (~$2.00) each. **The tower, Scribing Hall and Duel Arena were generated on Tripo**, which is ~5× cheaper per asset — see `docs/ASSET-BUDGET.md` for the platform comparison and the licensing traps on free tiers.
-3. **GLB files are Draco-compressed with WebP textures at source resolution (2048px)** — the whole model set is ~5.9MB. The decoder is vendored at `public/vendor/draco/` and wired up in `world.js`; an uncompressed GLB still loads fine, so `npm run compress` is safe to re-run. **Run it after generating any new model.** Two traps the script now avoids, both of which silently destroyed quality: `gltf-transform optimize` runs `simplify` by **default** (decimates geometry — disabled), and the `webp` pass **decodes Draco without re-applying it**, so textures must run first and Draco last.
-4. **Procedural walk animation.** The Meshy GLBs only carry ONE animation clip each (idle). Rather than regenerate (which would cost credits and drop the idle), `makeCharModel` collects the skeleton bones (standard biped names: LeftLeg, RightLeg, LeftArm, RightArm, Spine…) and `world.js` applies a procedural walk cycle (bones swing via quaternion on top of the base pose) whenever a wanderer NPC is moving; it falls back to the idle clip when stationary. The stationary NPCs (referee, trainer, librarian) keep their idle. Same technique can add swing/attack/emote poses to any GLB character without extra generation.
-5. **Buildings, nodes, and props are still procedural** primitives — these are next to generate as 3D models. `structures.js` is the seam: each building carries an id, position, size and rotation, so a generated mesh can replace the primitive per id without touching collision or station wiring.
-6. **Sound is implemented** in `public/audio.js` — fully procedural WebAudio (SFX, an ambient pad for the world, and a self-generating arpeggio that changes mode per screen), so it adds **zero bytes** to the deploy. Audio starts suspended until the first user gesture (browser policy) and degrades to silence with no AudioContext. Mute + volumes persist separately from the game save. **Add new cues to the `SFX` table in `audio.js`** — a test asserts every `AUDIO.play("x")` in the UI has a matching entry.
-7. **Models/animations** need rigging verification once quality models are in.
+**Immediate next candidates** (none started yet):
+1. **WORLDSPEC step 6, the content pass** — a second dungeon and a third outdoor zone. This is
+   mostly authoring `zones.json`/`dungeons.json` entries now that the engine work (terrain,
+   streaming, transitions, instancing) is done; see WORLDSPEC §3/§6 schemas.
+2. **Academy §2 remaining items** (`BACKLOG.md` §2) — a real character-creation screen with a 3D
+   preview and per-school outfit visuals (`docs/DESIGN-DECISIONS.md` §4 has the design), visual
+   equipment on the 3D character, dorm customization.
+3. **Academy classes/curriculum content** beyond the perk unlocks that just landed — the
+   curriculum currently only grants numeric bonuses; there's no lesson/class *content* yet.
+4. Everything else unstarted is tracked in `BACKLOG.md` — PvP ranking/leaderboards, guilds, pets,
+   card variants/evolution, and the long-term endgame section are all still `[ ]`.
 
 ## 10. Roadmap (in priority order)
 
-1. **Fix the GLB character integration** — get the 2D→3D player wizard rendering correctly (scale + position + walk/idle animations), then load the professor/merchant GLBs and generate the remaining NPCs.
-2. **Character model quality** — finish the full roster via 2D→3D (player + 6 named NPCs).
-3. **Buildings & world assets** — generate 3D models for the Scribing Hall, Smithy, Library, Merchant, Duel Arena, Dorms, tower, trees, nodes, fountain.
-4. **Mobile optimization** — Draco-compress GLBs, lower poly counts, verify on a phone viewport.
-5. **Sound** — music, SFX, and animated rigs.
-6. **More depth** — expand to 9 schools (Water/Earth/Air/etc.), a sideboard, houses/factions, seasonal events, more elemental spells.
+1. **WORLDSPEC step 6 — content pass.** Second dungeon, third outdoor zone. The engine is ready;
+   this is authoring work against the schemas in `WORLDSPEC.md` §3/§6.
+2. **Character creation & visuals.** 3D preview at character creation, per-school outfit
+   visuals, visible equipment on the 3D model — `BACKLOG.md` §2, `docs/DESIGN-DECISIONS.md` §4.
+3. **Deepen the Academy curriculum** — actual class/lesson content, not just the numeric perks
+   `academy.js` already grants.
+4. **Collection depth** — card evolution, foil/holo variants, an encyclopedia (`BACKLOG.md` §5).
+5. **Social layer** — PvP ranking, guilds, leaderboards (`BACKLOG.md` §8).
+6. **Endgame** — pets/mounts, prestige, seasonal content (`BACKLOG.md` §10).
 
 ---
 
-*This document is the source of truth for AI collaborators. If you change architecture or add a system, keep this file updated.*
+*This document is the source of truth for AI collaborators. If you change architecture or add a system, keep this file updated — including the "Where we left off" note above, so the next session knows exactly what to pick up.*

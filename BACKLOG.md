@@ -11,9 +11,11 @@
 
 ## 1. Highest Priority
 
-- [ ] **Academy progression / curriculum**
-  - Make the Academy the central progression loop.
-  - Add years, classes, school progression, and unlocks.
+- [~] **Academy progression / curriculum**
+  - `academy.js`: 7 curriculum years (Novice → Archmage) each unlocking real perks — bonus quest
+    gold, a market discount, bonus wizard XP — applied at `completeQuest`/`buyCard`. Shown on the
+    Hall screen (current year, perks, progress to next). Still missing: actual class/lesson
+    *content* — right now a year only grants numeric bonuses, there's nothing to attend or choose.
 
 - [~] **First 10 minutes / onboarding**
   - A 7-step guided chain (`onboarding.js`) with a persistent objective bar: school → gather → refine → scribe → grade → deck → first duel. Every step is DERIVED from the save, so playing out of order cannot desync it. A full character-creation screen is still pending.
@@ -30,8 +32,8 @@
 
 - [~] Character creation — school questionnaire + picker exist; a full creation screen with 3D preview is designed but not built (`docs/DESIGN-DECISIONS.md` §4)
 - [~] School identity / specialization — 7 schools, starter decks, +1 affinity and the elemental ring all live; per-school *visuals* not yet
-- [ ] Academy classes and curriculum
-- [ ] NPC reputation
+- [~] Academy classes and curriculum — see §1 above (`academy.js`); numeric perks only, no lesson content yet
+- [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
 - [~] Main story + side quests — five field quests in the Whispering Forest from two NPCs (`zonequests.js`), with gather/slay/clear/boss objectives, prerequisites and a quest log. The main story is still to write.
 - [ ] Visual equipment on 3D character
 - [ ] Dorm customization
@@ -45,7 +47,7 @@
 - [x] Whispering Forest — streams, reachable through the academy's north gateway, three NPCs and five quests that lead into Cinderhollow
 - [ ] Lake Arcanum
 - [ ] Ashen Mountains
-- [ ] Cinderhollow Caverns
+- [x] Cinderhollow Caverns — 4-room dungeon reachable from the Whispering Forest, boss + persistent kill/room/boss progress
 - [x] Zone transitions — walkable gateways, reciprocal arrival, world state persisted in the save
 - [x] Chunk streaming — scatter-once/bucket-once with load/unload hysteresis and GPU disposal
 - [ ] Fast travel
@@ -129,7 +131,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 135 engine / 34 online / 8 viewports / 20 gestures, plus CI
+- [x] Expanded automated tests — 252 engine / 34 online / 62 real-browser (8 viewports + gestures + world/dungeon/quest/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -186,16 +188,24 @@ For each feature we select, we should decide:
 ## Current Review Status
 
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
+**Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made:** WORLDSPEC steps 1–3 (zone config, procedural terrain, chunk streaming),
-camera collision, and the character-model fix — the player and every NPC were CDN-only with no
-retry, so any CDN failure silently replaced the whole cast with the procedural stand-in. They now
-ship locally as a fallback, guarded by a test.
+**Changes made, most recent first:** Academy curriculum + NPC reputation (`academy.js` /
+`reputation.js` — perks and per-NPC standing bonuses on quest/market rewards) → spell VFX + a
+rebuilt duel arena (`vfx.js` / `battle3d.js`) → field quests for the Whispering Forest
+(`zonequests.js`) → the onboarding chain (`onboarding.js`) → dungeon-enemy persistence (kills,
+cleared rooms, boss defeat actually stick and don't respawn) → a rigged, correctly-posed and
+correctly-scaled player character (`tools/rig-character.py`, `CHARACTER_HEIGHT = 2.6`) → painted
+terrain (vertex-colour height bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5
+(chunk streaming, zone transitions, dungeon instancing).
 
-**Next step:** WORLDSPEC steps 1-5 are done and the ground is painted (no longer one flat colour). Remaining world work is step 6 (content pass).
-The two §1 items that need no new art are the best value next: spell VFX (§4) and the onboarding
-chain (§1). The forest also still needs quests and NPCs of its own.
-
+**Next step:** WORLDSPEC steps 1–5 are all done. Remaining world work is **step 6, the content
+pass** — a second dungeon and a third outdoor zone, mostly authoring against the schemas already
+built (§3/§6 in WORLDSPEC.md). In parallel, the §2 Academy items that still need real work:
+a character-creation screen with a 3D preview + per-school outfit visuals
+(`docs/DESIGN-DECISIONS.md` §4), visual equipment on the 3D character, and actual
+class/lesson *content* for the curriculum (right now a year only grants numeric bonuses).
+See `CLAUDEREADME.md` §9 "Where we left off" for the fuller narrative version of this note.
 
 ---
 
@@ -204,7 +214,6 @@ chain (§1). The forest also still needs quests and NPCs of its own.
 `WORLDSPEC.md` is the detailed plan for **§3 Open World** and the world half of **§4 PvE**.
 This backlog is the wider game. When the two disagree, WORLDSPEC wins for world architecture.
 
-**Currently in progress:** WORLDSPEC steps 1–3 (zone config, procedural terrain, chunk
-streaming) are complete, along with camera collision. Step 4 (zone transitions) is next — it is
-what actually lets a player reach `whispering_forest`, which currently streams correctly but has
-no door into it.
+**Status:** WORLDSPEC steps 1–5 (zone config, procedural terrain, chunk streaming, zone
+transitions, dungeon instancing) are **all complete**. Step 6 (content pass — a second dungeon,
+a third zone) is next; see WORLDSPEC.md §9 for the exact schemas to author against.
