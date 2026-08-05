@@ -82,6 +82,41 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 - **Quaternius Ultimate Fantasy RTS / Medieval Village / RPG packs** — more units/props for creature variety (CC0).
 - **KayKit Dungeon Pack** (already imported) — dungeon props for PvE arenas.
 
+## 📦 Asset library (all categories, CC0 unless noted)
+> **✅ Have** = already imported/in-game. **⬇️ I can fetch** = direct download works. **🔗 Attach** = itch session-protected, send the zip.
+
+### 🎨 Character creation / customization
+- 🔗 **Modular Character Outfits – Fantasy** (Quaternius) — 12 outfits / 62 modular parts / 3 colors each, humanoid-rigged — *the* customization pack — https://quaternius.itch.io/modular-character-outfits-fantasy (280MB)
+- 🔗 **RPG Character Pack** (Quaternius) — CC0, quaternius.com
+- 🔗 **Ultimate Modular Men / Women Pack** (Quaternius) — CC0
+- ✅ **Character-creation screen** — built in code (live 3D preview, school tint); garments from the outfit pack above when you attach it.
+
+### 🧙 NPCs / characters
+- ✅ **KayKit Character Pack: Adventurers** (Mage NPC in-game), **Skeletons** (enemy in-game)
+- 🔗 **Quaternius Animated Knights / Medieval Village / RPG Characters** — CC0, quaternius.com
+- 🔗 **Ultimate Animated Character Pack** (Quaternius, 50+ characters) — quaternius.com
+
+### 🐾 Familiars / card monsters
+- ✅ **Textured Cute Monster Pack** (Quaternius) — 21 animated monsters (Chicken, Panda, Deer, Ghost, Yeti, Cthulhu, Cyclops, Demon, Mushroom…) — 6 imported so far
+- ✅ **LowPoly Animated Monsters** — Dragon, Slime, Bat, Skeleton (in-game)
+- 🔗 **Ultimate Monsters** (Quaternius, 50) — quaternius.com
+- 🔗 **Ultimate Animated Animal Pack** (Quaternius, 12 animals × 13 anims) — familiars — quaternius.com
+- 🔗 **Farm Animal Pack / Animated Dinosaur Pack** (Quaternius) — CC0
+
+### 🏗 World / buildings / props
+- ✅ **KayKit** Medieval Hexagon, Dungeon, Forest, Furniture (in-game)
+- 🔗 **Quaternius Medieval Village MegaKit, Modular Dungeon Pack, Fantasy Props MegaKit, Buildings Pack** — CC0, quaternius.com
+
+### 🎬 Animations
+- ✅ **Universal Animation Library 2** (130+ anims, have)
+- 🔗 **KayKit Character Animations** — https://kaylousberg.itch.io/character-animations
+
+### 🖥 UI menus (2D)
+- 🔗 Free UI/icon kits on the itch [UI tag](https://itch.io/game-assets/free/tag-ui) — attach the ones you like (e.g. a fantasy UI kit, RPG icon pack).
+
+### ⚙️ Backend
+- Not asset-based — the save/state/test systems are already built (see CLAUDEREADME).
+
 > **KayKit packs are NOT here** — they're on GitHub (KayKit-Game-Assets org), so I can fetch them directly. Done for: Medieval Hexagon, Dungeon, Skeletons, Adventures, Furniture, City Builder.
 
 ## ☁️ CDN hosting (keeps the deploy small)
