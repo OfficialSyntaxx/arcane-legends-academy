@@ -1,0 +1,19 @@
+<canvas id=c></canvas>
+<script src="./vendor/three.min.js"></script><script src="./vendor/GLTFLoader.js"></script><script src="./vendor/DRACOLoader.js"></script>
+<script>
+const R=new THREE.WebGLRenderer({canvas:document.getElementById('c')});R.setSize(64,64);
+const S=new THREE.Scene(), C=new THREE.PerspectiveCamera(50,1,0.1,100); C.position.set(0,2,6);
+const dl=new THREE.DRACOLoader(); dl.setDecoderPath('./vendor/draco/'); dl.setDecoderConfig({type:'js'});
+window.probe=(url)=>new Promise(res=>{
+  const l=new THREE.GLTFLoader(); l.setDRACOLoader(dl);
+  l.load(url, g=>{
+    try{
+      S.add(g.scene);
+      // render twice — a broken attribute only throws when the GPU actually uploads it
+      R.render(S,C); R.render(S,C);
+      S.remove(g.scene);
+      res({ok:true, anims:g.animations.length});
+    }catch(e){ S.remove(g.scene); res({ok:false, where:'render', err:String(e.message)}); }
+  }, undefined, e=>res({ok:false, where:'load', err:String(e&&e.message)}));
+});
+</script>

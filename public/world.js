@@ -114,6 +114,61 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   const glow = new THREE.PointLight(0xff8844, ZONE.interior ? 0 : 0.55, 90);
   glow.position.set(0, 12, 0); scene.add(glow);
 
+  // ---- sky dome: replaces the flat clear-color void for outdoor zones ----
+  // A large unlit gradient sphere that follows the camera, plus a soft sun glow + a few stars.
+  // Interiors (dungeons) keep the flat background + fog — see the INTERIOR branch below.
+  let skyGroup = null;
+  if (!ZONE.interior){
+    skyGroup = new THREE.Group();
+    try {
+      // vertical gradient sky (sRGB -> treated as colour via MeshBasicMaterial, unlit)
+      const c = document.createElement('canvas'); c.width = 64; c.height = 256;
+      const g = c.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0.00, '#0d0a24');   // zenith deep indigo
+      grad.addColorStop(0.38, '#2a2a6e');   // upper sky violet-blue
+      grad.addColorStop(0.52, '#5a5a9e');   // mid horizon
+      grad.addColorStop(0.56, '#c9a06a');   // warm sun haze band
+      grad.addColorStop(0.60, '#8a6a8a');   // lower haze
+      grad.addColorStop(1.00, '#3a2a4a');   // ground fog
+      g.fillStyle = grad; g.fillRect(0, 0, 64, 256);
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.ClampToEdgeWrapping;
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(360, 24, 20),
+        new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false, fog: false })
+      );
+      dome.renderOrder = -10; dome.frustumCulled = false;
+      skyGroup.add(dome);
+      // sun glow (a bright soft disc near the horizon)
+      const sg = document.createElement('canvas'); sg.width = 64; sg.height = 64;
+      const sgx = sg.getContext('2d');
+      const srad = sgx.createRadialGradient(32, 32, 2, 32, 32, 30);
+      srad.addColorStop(0, 'rgba(255,236,180,1)');
+      srad.addColorStop(0.25, 'rgba(255,200,120,0.85)');
+      srad.addColorStop(1, 'rgba(255,180,90,0)');
+      sgx.fillStyle = srad; sgx.fillRect(0, 0, 64, 64);
+      const stex = new THREE.CanvasTexture(sg);
+      const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: stex, transparent: true, depthWrite: false, fog: false }));
+      sun.scale.set(120, 120, 1); sun.position.set(300, 90, -180);
+      skyGroup.add(sun);
+      // sparse stars
+      const starGeo = new THREE.BufferGeometry();
+      const starN = 220, starPos = new Float32Array(starN * 3);
+      for (let i = 0; i < starN; i++){
+        const th = Math.random() * Math.PI * 2, ph = Math.acos(1 - Math.random() * 0.55);
+        starPos[i*3]   = 360 * Math.sin(ph) * Math.cos(th);
+        starPos[i*3+1] = 360 * Math.cos(ph);
+        starPos[i*3+2] = 360 * Math.sin(ph) * Math.sin(th);
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, transparent: true, opacity: 0.7, sizeAttenuation: true, fog: false, depthWrite: false }));
+      stars.renderOrder = -9; stars.frustumCulled = false;
+      skyGroup.add(stars);
+    } catch(e){ console.warn("sky unavailable:", e && e.message); }
+    scene.add(skyGroup);
+  }
+
   // Procedural colours are authored as sRGB hex, so they must be converted to linear now that
   // the renderer gamma-encodes its output. Without this the whole hand-built world washes out.
   const mat = c => {
@@ -1050,6 +1105,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     updateNearby();
     updateExits();
     updateCamera();
+    if (skyGroup) skyGroup.position.copy(camera.position);   // keep the sky centered on the camera
     renderer.render(scene, camera);
   }
   raf = requestAnimationFrame(frame);
