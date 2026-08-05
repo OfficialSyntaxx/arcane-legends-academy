@@ -265,6 +265,37 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   const ground = add(groundGeo, groundMat, groundCX, 0, groundCZ, {receive:true});
   ground.rotation.x = -Math.PI/2;
 
+  // ---- cloud shadows: soft moving darkness projected onto the ground ----
+  // A large flat plane just above the terrain, textured with a dark cloud pattern, that follows
+  // the player and whose texture drifts with the sky clouds. depthTest keeps it out of hills
+  // (wherever it sits below the terrain, the ground occludes it), so it reads as sun/shade.
+  let cloudShadow = null;
+  if (!ZONE.interior){
+    try {
+      const sc = document.createElement('canvas'); sc.width = 256; sc.height = 256;
+      const sx = sc.getContext('2d');
+      sx.clearRect(0, 0, 256, 256);
+      for (let i = 0; i < 40; i++){
+        const bx = Math.random() * 256, by = Math.random() * 256, br = 20 + Math.random() * 46;
+        const rg = sx.createRadialGradient(bx, by, 2, bx, by, br);
+        rg.addColorStop(0, 'rgba(0,0,25,0.85)');
+        rg.addColorStop(0.6, 'rgba(0,0,20,0.35)');
+        rg.addColorStop(1, 'rgba(0,0,20,0)');
+        sx.fillStyle = rg; sx.beginPath(); sx.arc(bx, by, br, 0, 6.2832); sx.fill();
+      }
+      const stex = new THREE.CanvasTexture(sc);
+      stex.wrapS = stex.wrapT = THREE.RepeatWrapping;
+      const sh = new THREE.Mesh(
+        new THREE.PlaneGeometry(320, 320),
+        new THREE.MeshBasicMaterial({ map: stex, transparent: true, opacity: 0.55, depthWrite: false, color: 0x000000 })
+      );
+      sh.rotation.x = -Math.PI / 2;
+      sh.renderOrder = 2;                        // over the ground, under everything else
+      scene.add(sh);
+      cloudShadow = { mesh: sh, tex: stex };
+    } catch(e){ console.warn("cloud shadows unavailable:", e && e.message); }
+  }
+
   // ---------- dungeon rooms (WORLDSPEC §6) ----------
   // Floors, walls and corridors. Every position and every wall segment was computed by
   // dungeons.js — nothing spatial is decided here, matching the rule that world.js renders what
@@ -1153,6 +1184,12 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
         c.userData.drift += dt * 0.6;
         c.position.y += Math.sin(c.userData.drift) * 0.25 * dt;   // gentle bob
       }
+    }
+    if (cloudShadow){                                   // project the drifting cloud shadows
+      cloudShadow.tex.offset.x += dt * 0.0035;
+      cloudShadow.tex.offset.y += dt * 0.0012;
+      const px = player.position.x, pz = player.position.z;
+      cloudShadow.mesh.position.set(px, groundY(px, pz) + 0.06, pz);
     }
     renderer.render(scene, camera);
   }
