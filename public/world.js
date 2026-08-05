@@ -118,6 +118,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // A large unlit gradient sphere that follows the camera, plus a soft sun glow + a few stars.
   // Interiors (dungeons) keep the flat background + fog — see the INTERIOR branch below.
   let skyGroup = null;
+  let cloudGroup = null;
   if (!ZONE.interior){
     skyGroup = new THREE.Group();
     try {
@@ -132,6 +133,17 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       grad.addColorStop(0.60, '#8a6a8a');   // lower haze
       grad.addColorStop(1.00, '#3a2a4a');   // ground fog
       g.fillStyle = grad; g.fillRect(0, 0, 64, 256);
+      // bake a soft cloud/haze band into the sky near the horizon so clouds read at any angle
+      g.globalCompositeOperation = 'lighter';
+      const bandY = 133, bandH = 26;   // ~0.52–0.62 of the 256px canvas
+      for (let i = 0; i < 26; i++){
+        const cx = Math.random() * 70, cy = bandY + Math.random() * bandH, cr = 4 + Math.random() * 9;
+        const rg = g.createRadialGradient(cx, cy, 1, cx, cy, cr);
+        rg.addColorStop(0, 'rgba(255,255,255,0.55)');
+        rg.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = rg; g.beginPath(); g.arc(cx, cy, cr, 0, 6.2832); g.fill();
+      }
+      g.globalCompositeOperation = 'source-over';
       const tex = new THREE.CanvasTexture(c);
       tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.ClampToEdgeWrapping;
       const dome = new THREE.Mesh(
@@ -165,6 +177,35 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, transparent: true, opacity: 0.7, sizeAttenuation: true, fog: false, depthWrite: false }));
       stars.renderOrder = -9; stars.frustumCulled = false;
       skyGroup.add(stars);
+      // drifting procedural clouds (flattened translucent puffs, animated in the frame loop)
+      cloudGroup = new THREE.Group();
+      const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, fog: false, depthWrite: false, side: THREE.DoubleSide });
+      const makeCloud = (scale) => {
+        const g = new THREE.Group();
+        g.frustumCulled = false;
+        const puffs = [[0,0,0,1],[1.1,0.18,0.2,0.7],[-1.0,0.1,-0.1,0.6],[0.5,0.32,0.4,0.5],[-0.4,0.38,-0.2,0.45],[1.6,0.05,0.1,0.5]];
+        for (const [px,py,pz,ps] of puffs){
+          const m = new THREE.Mesh(new THREE.SphereGeometry(ps, 10, 8), cloudMat);
+          m.position.set(px*scale, py*scale, pz*scale);
+          m.scale.y = 0.4; m.scale.z = 0.75;
+          m.frustumCulled = false;
+          g.add(m);
+        }
+        return g;
+      };
+      // Clouds live just above the horizon (the band the down-looking camera actually sees),
+      // spread wide and made LARGE so they read clearly as cloud masses.
+      for (let i = 0; i < 24; i++){
+        const cl = makeCloud(9 + Math.random() * 8);
+        const a = Math.random() * Math.PI * 2;
+        const r = 50 + Math.random() * 240;
+        const elev = 0.02 + Math.random() * 0.09;   // in radians: 1.1°–5.1° above horizon
+        cl.position.set(Math.cos(a) * r, r * elev, Math.sin(a) * r);
+        cl.userData.speed = 2 + Math.random() * 3;
+        cl.userData.drift = Math.random() * 6.28;
+        cloudGroup.add(cl);
+      }
+      skyGroup.add(cloudGroup);
     } catch(e){ console.warn("sky unavailable:", e && e.message); }
     scene.add(skyGroup);
   }
@@ -1106,6 +1147,13 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     updateExits();
     updateCamera();
     if (skyGroup) skyGroup.position.copy(camera.position);   // keep the sky centered on the camera
+    if (cloudGroup){                                        // drift clouds around the sky
+      cloudGroup.rotation.y += dt * 0.012;
+      for (const c of cloudGroup.children){
+        c.userData.drift += dt * 0.6;
+        c.position.y += Math.sin(c.userData.drift) * 0.25 * dt;   // gentle bob
+      }
+    }
     renderer.render(scene, camera);
   }
   raf = requestAnimationFrame(frame);
