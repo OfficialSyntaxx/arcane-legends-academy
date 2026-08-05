@@ -190,14 +190,20 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** Academy curriculum + NPC reputation (`academy.js` /
-`reputation.js` — perks and per-NPC standing bonuses on quest/market rewards) → spell VFX + a
-rebuilt duel arena (`vfx.js` / `battle3d.js`) → field quests for the Whispering Forest
-(`zonequests.js`) → the onboarding chain (`onboarding.js`) → dungeon-enemy persistence (kills,
-cleared rooms, boss defeat actually stick and don't respawn) → a rigged, correctly-posed and
-correctly-scaled player character (`tools/rig-character.py`, `CHARACTER_HEIGHT = 2.6`) → painted
-terrain (vertex-colour height bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5
-(chunk streaming, zone transitions, dungeon instancing).
+**Changes made, most recent first:** the outdoor **Duel Arena landmark** swapped for a
+user-provided Tripo model (`public/assets/buildings/arena.glb`, rune-floor platform with a pillar
+ring, compressed 1.12MB→0.71MB) — verified via standalone render, post-compression render,
+`model-check.mjs`, in-game debug, and the full `browser-test.mjs` suite (incl. the camera-orbit
+check next to the arena) before pushing; confirmed with the user that this landmark is decorative
+collision only, since duels render in the separate `battle3d.js` scene, not on this platform →
+Academy curriculum + NPC reputation (`academy.js` / `reputation.js` — perks and per-NPC standing
+bonuses on quest/market rewards) → spell VFX + a rebuilt *in-duel* arena (`vfx.js` / `battle3d.js`)
+→ field quests for the Whispering Forest (`zonequests.js`) → the onboarding chain
+(`onboarding.js`) → dungeon-enemy persistence (kills, cleared rooms, boss defeat actually stick
+and don't respawn) → a rigged, correctly-posed and correctly-scaled player character
+(`tools/rig-character.py`, `CHARACTER_HEIGHT = 2.6`) → painted terrain (vertex-colour height
+bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
+transitions, dungeon instancing).
 
 **Next step:** WORLDSPEC steps 1–5 are all done. Remaining world work is **step 6, the content
 pass** — a second dungeon and a third outdoor zone, mostly authoring against the schemas already
@@ -205,7 +211,10 @@ built (§3/§6 in WORLDSPEC.md). In parallel, the §2 Academy items that still n
 a character-creation screen with a 3D preview + per-school outfit visuals
 (`docs/DESIGN-DECISIONS.md` §4), visual equipment on the 3D character, and actual
 class/lesson *content* for the curriculum (right now a year only grants numeric bonuses).
-See `CLAUDEREADME.md` §9 "Where we left off" for the fuller narrative version of this note.
+See `CLAUDEREADME.md` §9 "Where we left off" for the fuller narrative version of this note,
+including suggestions flagged during the arena swap (re-measuring its collision circle against
+the new mesh, and a longer-term idea to make the outdoor landmark the actual duel space instead
+of two disconnected scenes).
 
 ---
 

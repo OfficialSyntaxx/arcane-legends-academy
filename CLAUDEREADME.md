@@ -345,12 +345,24 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-The last work landed **Academy curriculum + NPC reputation** (§6.7) — pushed to
-`claude/integrate-cc0-and-systems`. Before that, in order: spell VFX and a rebuilt duel arena,
-field quests for the Whispering Forest, the onboarding chain, dungeon-enemy persistence (fixing a
-gap left by the initial dungeon-instancing commit — kills weren't actually sticking), a rigged
-player character with a standing pose, painted terrain, and WORLDSPEC steps 3–5 (chunk streaming,
-zone transitions, dungeon instancing).
+**Last landed:** a user-provided model swapped in as the outdoor **Duel Arena landmark**
+(`public/assets/buildings/arena.glb`) — a Tripo "magic circle" platform (rune floor, pillar ring,
+braziers), compressed 1.12MB → 0.71MB through the existing pipeline. Verified before pushing:
+rendered standalone (raw upload and the compressed file separately, to catch any compression
+damage — none found), `tools/model-check.mjs` clean, in-game debug confirms correct scale/position
+(fit:"width" → 25m), and the full `browser-test.mjs` suite green including the specific
+16-direction camera-orbit check next to the arena (the one that exists precisely to catch a camera
+clipping into landmark geometry). Confirmed with the user that this landmark is **decorative
+collision only** — duels never place the player inside its footprint; pressing the duel trigger
+switches `screen` to `"duel"` and renders the separate `battle3d.js` procedural pit instead, so the
+landmark's own walkability/platform never matters gameplay-wise. Pushed as `208aa7a`.
+
+Before that, in order: Academy curriculum + NPC reputation (§6.7), spell VFX and a rebuilt duel
+arena (the *procedural* in-duel one, `battle3d.js` — not to be confused with the outdoor landmark
+above), field quests for the Whispering Forest, the onboarding chain, dungeon-enemy persistence
+(fixing a gap left by the initial dungeon-instancing commit — kills weren't actually sticking), a
+rigged player character with a standing pose, painted terrain, and WORLDSPEC steps 3–5 (chunk
+streaming, zone transitions, dungeon instancing).
 
 **Immediate next candidates** (none started yet):
 1. **WORLDSPEC step 6, the content pass** — a second dungeon and a third outdoor zone. This is
@@ -363,6 +375,25 @@ zone transitions, dungeon instancing).
    curriculum currently only grants numeric bonuses; there's no lesson/class *content* yet.
 4. Everything else unstarted is tracked in `BACKLOG.md` — PvP ranking/leaderboards, guilds, pets,
    card variants/evolution, and the long-term endgame section are all still `[ ]`.
+
+**Suggestions worth considering (not yet on the backlog, flagged while working nearby):**
+- **A second landmark pass on the arena's collision circle.** It was kept at the old model's
+  radius (r=13) by inheritance, not re-measured against the new mesh's actual footprint. Tests
+  confirm no camera clipping, but if the visual rim and the invisible collision wall ever look
+  mismatched to a player walking the edge, re-measure `w`/`d` in `structures.js` against the new
+  GLB's bounding box the way `ASSETS.md` §Import checklist describes.
+- **The outdoor arena landmark could eventually BE the duel space**, matching the Wizard101
+  reference more closely — walk up, get visually drawn toward the platform, camera cuts to the
+  `battle3d.js` view. Right now the two are unconnected (a decorative building outside, a fully
+  separate procedural scene for the fight). Not urgent, but worth a design pass once step 6
+  content is in, since it's the kind of polish that reads as "one game" rather than "a menu on
+  top of a 3D backdrop."
+- **A general "verify before trusting" pattern for future asset swaps**: this session's arena
+  work is a decent template — render standalone, render post-compression, run `model-check.mjs`,
+  confirm via debug hooks in-game, then run the *specific* existing test that would catch the
+  failure mode you're worried about (here: the camera-collision orbit check) rather than assuming
+  a fresh screenshot proves anything on its own. Worth keeping as the default checklist for any
+  future generated-model integration, character or landmark alike.
 
 ## 10. Roadmap (in priority order)
 
