@@ -310,10 +310,11 @@ body.has-touch .worldbtn{display:flex;}
   </div>
 </div>
 <div id="schoolPicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:99;overflow-y:auto">
-  <div style="max-width:680px;margin:10vh auto;background:var(--panel);border:1px solid var(--gold);border-radius:22px;padding:30px;text-align:center">
+  <div style="max-width:680px;margin:8vh auto;background:var(--panel);border:1px solid var(--gold);border-radius:22px;padding:20px;text-align:center">
     <div style="color:var(--gold);font-weight:800;font-size:26px">Choose Your School</div>
+    <canvas id="spPreview" width="260" height="260" style="display:block;margin:6px auto 0;border-radius:14px;background:radial-gradient(circle at 50% 35%,#2a2a5a,#120c26)"></canvas>
     <div style="color:var(--muted);font-size:14px;margin-top:8px" id="spSub">Answer a few questions and the Academy will suggest the school that fits you best.</div>
-    <div id="spBody" style="margin-top:20px"></div>
+    <div id="spBody" style="margin-top:16px"></div>
   </div>
 </div>
 <script src="./vendor/three.min.js"></script>
@@ -329,6 +330,7 @@ import { createAudio, SFX } from "./audio.js";
 import { createBattle3d } from "./battle3d.js";
 import * as VFX from "./vfx.js";
 import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
+import { modelUrl } from "./cdn.js";
 import { loadDungeons, dungeonZone } from "./dungeons.js";
 import * as ONBOARD from "./onboarding.js";
 import * as ZQ from "./zonequests.js";
@@ -396,7 +398,69 @@ function showSchoolPicker(){
   spAnswers = [];
   $("schoolPicker").style.display = "block";
   $("spSub").textContent = "Answer a few questions and the Academy will suggest the school that fits you best.";
+  setupCharacterPreview();
   renderSPQuestion(0);
+}
+
+// ---- live 3D character preview (rotating player wizard, tinted by school) ----
+let spCtx = null;
+function setupCharacterPreview(){
+  if (spCtx && spCtx.renderer) return;
+  const cv = $("spPreview"); if (!cv) return;
+  try {
+    const W = window.THREE;
+    const renderer = new W.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setSize(260, 260, false);
+    renderer.outputEncoding = W.sRGBEncoding;
+    renderer.toneMapping = W.ACESFilmicToneMapping;
+    const scene = new W.Scene();
+    scene.add(new W.AmbientLight(0xffffff, 0.7));
+    const sun = new W.DirectionalLight(0xffffff, 1.1); sun.position.set(3, 5, 4); scene.add(sun);
+    const rim = new W.DirectionalLight(0x8855ff, 0.4); rim.position.set(-3, 4, -3); scene.add(rim);
+    const cam = new W.PerspectiveCamera(45, 1, 0.1, 100);
+    cam.position.set(2.1, 1.7, 3.6); cam.lookAt(0, 0.95, 0);
+    const group = new W.Group(); scene.add(group);
+    spCtx = { renderer, scene, camera: cam, group, model: null, mixer: null, raf: 0, running: false };
+    new W.GLTFLoader().load(modelUrl('player_wizard.glb'), gltf => {
+      const m = gltf.scene;
+      m.updateMatrixWorld(true);
+      let minY = Infinity, maxY = -Infinity;
+      m.traverse(o => { const p = new W.Vector3(); o.getWorldPosition(p); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+      const h = maxY - minY, s = h > 0.001 ? 1.8 / h : 1;
+      m.scale.setScalar(s); m.position.y -= minY * s;
+      group.add(m);
+      spCtx.model = m;
+      if (gltf.animations && gltf.animations.length){ spCtx.mixer = new W.AnimationMixer(m); spCtx.mixer.clipAction(gltf.animations[0]).play(); }
+      setPreviewColor(S && S.school ? SCHOOLS[S.school].color : 0x6a5b9e);
+      startCharacterPreview();
+    }, undefined, () => { console.warn("preview model failed to load"); });
+  } catch(e){ console.warn("character preview unavailable:", e && e.message); }
+}
+function startCharacterPreview(){
+  if (!spCtx || spCtx.running) return;
+  spCtx.running = true;
+  const loop = () => {
+    spCtx.raf = requestAnimationFrame(loop);
+    if (spCtx.group) spCtx.group.rotation.y += 0.012;
+    if (spCtx.mixer) spCtx.mixer.update(0.016);
+    spCtx.renderer.render(spCtx.scene, spCtx.camera);
+  };
+  loop();
+}
+function stopCharacterPreview(){
+  if (spCtx){ spCtx.running = false; cancelAnimationFrame(spCtx.raf); }
+}
+function setPreviewColor(hex){
+  if (!spCtx || !spCtx.model) return;
+  const c = new window.THREE.Color(hex);
+  spCtx.model.traverse(o => {
+    if (o.isMesh){
+      if (!o.userData.baseColor) o.userData.baseColor = o.material.color.clone();
+      if (o.material) o.material = o.material.clone();
+      o.material.color.copy(o.userData.baseColor).lerp(c, 0.45);
+    }
+  });
 }
 function renderSPQuestion(i){
   const q = SCHOOL_Q[i];
@@ -405,6 +469,7 @@ function renderSPQuestion(i){
 }
 function renderSPSuggest(sug){
   const sc = SCHOOLS[sug];
+  setPreviewColor(sc.color);
   $("spSub").textContent = "The Academy suggests...";
   $("spBody").innerHTML = `<div style="font-size:52px;margin:8px 0">${SCHOOL_ICON[sug]}</div>
     <div style="font-weight:800;font-size:30px;color:${sc.color}">${sc.name} School</div>
@@ -415,10 +480,10 @@ function renderSPSuggest(sug){
     </div>`;
 }
 function renderSPAll(){
-  $("spSub").textContent = "Pick your school:";
+  $("spSub").textContent = "Pick your school (hover to preview):";
   $("spBody").innerHTML = `<div class="row" style="justify-content:center">` + Object.keys(SCHOOLS).map(s=>{
     const sc = SCHOOLS[s];
-    return `<button class="panel" style="flex:1;min-width:130px;cursor:pointer;border:2px solid ${sc.color}" onclick="window.__ev('chooseSchool|${s}')"><div style="font-size:30px;margin-top:6px">${SCHOOL_ICON[s]}</div><div style="font-weight:800;color:${sc.color};margin:4px 0">${sc.name}</div><div style="font-size:11px;color:var(--muted)">${SCHOOL_DESC[s].split(".")[0]}.</div></button>`;
+    return `<button class="panel" style="flex:1;min-width:130px;cursor:pointer;border:2px solid ${sc.color}" onclick="window.__ev('chooseSchool|${s}')" onmouseover="window.__EV.previewSchool('${s}')"><div style="font-size:30px;margin-top:6px">${SCHOOL_ICON[s]}</div><div style="font-weight:800;color:${sc.color};margin:4px 0">${sc.name}</div><div style="font-size:11px;color:var(--muted)">${SCHOOL_DESC[s].split(".")[0]}.</div></button>`;
   }).join("") + `</div>`;
 }
 function showOverlay(title, html){ $("ovTitle").textContent = title; $("ovBody").innerHTML = html; $("overlay").style.display = "block"; }
@@ -508,10 +573,12 @@ window.__EV.spPick = (i,j)=>{
   else { const tally={}; for(const s of spAnswers) tally[s]=(tally[s]||0)+1; const sug=Object.entries(tally).sort((a,b)=>b[1]-a[1])[0][0]; renderSPSuggest(sug); }
 };
 window.__EV.spAll = ()=>renderSPAll();
+window.__EV.previewSchool = (s)=>setPreviewColor(SCHOOLS[s].color);
 window.__EV.chooseSchool = (s)=>{
   G.setSchool(S, s); S.flags.schoolPicked = true;
   G.issueSchoolStarter(S, s);
   save();
+  stopCharacterPreview();
   $("schoolPicker").style.display = "none";
   if (world) world.setPlayerColor(SCHOOLS[s].color);
   toast(`Welcome to the ${SCHOOLS[s].name} School! Your school's cards were added to your collection.`); render();
