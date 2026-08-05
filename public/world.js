@@ -413,9 +413,17 @@ export function createWorld(canvas, callbacks, zone){
     dracoLoader.setDecoderConfig({ type: 'js' });
     return dracoLoader;
   }
-  function makeCharModel(key, url, group, onReady){
+  function makeCharModel(key, localUrl, group, onReady){
     loadState.total++;
-    url = CDN[url.split('/').pop()] || url;   // CDN if hosted there, else the caller's path
+    // Characters ship in `public/assets/models/` AND on the CDN. Try the CDN first (it keeps
+    // the deploy warm and is usually closer to the player), but a CDN miss must not strip the
+    // character out of the world: every failure retried the load exactly zero times before, so
+    // one unreachable CloudFront host left EVERY npc and the player as the procedural stand-in
+    // — which is exactly the "why does my wizard look low-poly" report. Fall back to the local
+    // copy once, then give up.
+    const cdnUrl = CDN[localUrl.split('/').pop()];
+    load(cdnUrl || localUrl, cdnUrl ? localUrl : null);
+    function load(url, fallbackUrl){
     const loader = new THREE.GLTFLoader();
     const d = getDraco();
     if (d) loader.setDRACOLoader(d);
@@ -483,10 +491,16 @@ export function createWorld(canvas, callbacks, zone){
     },
     undefined,
     err => {
+      if (fallbackUrl){
+        console.warn("character model failed from CDN, retrying locally:", url, err && err.message);
+        load(fallbackUrl, null);
+        return;
+      }
       // Keep the procedural wizard rather than leaving a hole in the world, and say so.
       console.warn("character model failed to load:", url, err && err.message);
       loadState.done++; loadState.failed.push(key); loadProgress();
     });
+    }
   }
   // Generated GLB character models — keys match NPC roles so the update loop uses the GLB mixer.
   makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>applyPlayerColor());

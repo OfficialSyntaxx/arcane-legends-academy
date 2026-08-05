@@ -185,6 +185,17 @@ check("every character model resolves (local file or CDN)", (()=>{
   if (missing.length) console.log("   missing:", missing.join(", "));
   return missing.length === 0;
 })());
+// Characters are the one class of model that must ALSO exist locally. They were CDN-only, and
+// because the loader had no retry, a single unreachable CloudFront host replaced the player and
+// every NPC with the procedural stand-in — the whole cast turned low-poly with only a console
+// warning. world.js now falls back to ./assets/models/<name>, which is only a fallback if the
+// file is actually there, so assert it rather than trusting the CDN to stay up.
+check("every character model also ships locally (CDN fallback is real)", (()=>{
+  const names = ["player_wizard.glb", ...ST.NPCS.map(n=>n.model), ...ST.WANDERERS.map(w=>w.model)];
+  const missing = [...new Set(names)].filter(n => !fs.existsSync(path.join(ROOT_PUBLIC, "assets/models", n)));
+  if (missing.length) console.log("   CDN-only (no local fallback):", missing.join(", "));
+  return missing.length === 0;
+})());
 check("every CDN entry is a real https URL", Object.values(CDN).every(u => /^https:\/\//.test(u)));
 check("solid props contribute collision", ST.PROPS.filter(p=>p.solid).every(p =>
   ST.OBSTACLES.some(o => o.id === "prop:" + p.url.split("/").pop())));
