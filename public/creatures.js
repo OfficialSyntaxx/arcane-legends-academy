@@ -50,3 +50,88 @@ export function creatureFor(modelFile) {
   const key = (modelFile || '').replace(/^creature_/, '').replace(/\.glb$/, '').toLowerCase();
   return CREATURES[key] || null;
 }
+
+// Mechanical battle rules per creature slug — these are what the duel engine (game.js) applies.
+// Keys: taunt, haste, drain, multi, regen, poison, thorns, evade, shield, survive, spellImmune,
+// wizardDmg (to enemy wiz on attack), onPlayDmgAll, onPlayHealAll, onPlayBuffAll, onPlayFreeze,
+// onPlayDraw, healOnHit, freezeOnHit.
+export const RULES = {
+  slime:        { regen: 1 },
+  bat:          { haste: true },
+  skeleton:     {},
+  dragon:       { haste: true, onPlayDmgAll: 2 },
+  chicken:      {},
+  panda:        { taunt: true },
+  deer:         { evade: true },
+  ghost:        { regen: 1, spellImmune: true },
+  mushroom:     { regen: 1, onPlayHealAll: 1 },
+  yeti:         { taunt: true, freezeOnHit: true },
+  dino:         { onAttackDmgAll: 1 },
+  orc:          { warband: true },
+  orc_skull:    { drain: true },
+  demon:        { drain: true, wizardDmg: 1 },
+  bluedemon:    { onPlayFreeze: true },
+  frog:         { onPlayBuffAll: 1 },
+  mushroomking: { regen: 2, onPlayBuffAll: 1 },
+  mushnub:      { regen: 2, onPlayHealAll: 1 },
+  mushnub_evolved: { regen: 2, onPlayHealAll: 2, taunt: true },
+  fish:         { spellImmune: true },
+  bunny:        { haste: true, evade: true },
+  alien:        { spellImmune: true },
+  wizard:       { onPlayDmgWiz: 2 },
+  ninja:        { evade: true },
+  monkroose:    { healOnHit: 3, freezeImmune: true },
+  birb:         { haste: true, wizardDmg: 1 },
+  cactoro:      { thorns: 1, regen: 1 },
+  cat:          { haste: true, survive: true },
+  dog:          { taunt: true, warband: true },
+  pigeon:       { haste: true, onPlayDraw: 1 },
+  pinkblob:     { regen: 2, healOnHit: 1 },
+  greenblob:    { regen: 1, poison: 1 },
+  greenspikyblob: { regen: 1, thorns: 1, taunt: true },
+  glub:         { shield: 2 },
+  goleling:     { taunt: true, healOnHit: 1 },
+  squidle:      { onAttackDebuff: 1 },
+  hywirl:       { onPlayDmgAll: 1 },
+  alpaking:     { regen: 1, onPlayHealAll: 1 },
+  armabee:      { haste: true, poison: 1 },
+};
+
+// Resolve a CARD to its creature rules by keyword (kept in step with battle3d.js modelFor).
+export function traitForCard(cardId, name) {
+  const n = (name || cardId || '').toLowerCase();
+  let slug = null;
+  if (/dragon|wyrm|titan|snake|serpent/.test(n)) slug = 'dragon';
+  else if (/bat/.test(n)) slug = 'bat';
+  else if (/slime|blob|ooze/.test(n)) slug = 'slime';
+  else if (/skeleton|bone/.test(n) && /\bskeleton\b/.test(n)) slug = 'skeleton';
+  else if (/dino|dinosaur|rex/.test(n)) slug = 'dino';
+  else if (/orc/.test(n)) slug = /skull/.test(n) ? 'orc_skull' : 'orc';
+  else if (/demon/.test(n) && /blue|frost|ice/.test(n)) slug = 'bluedemon';
+  else if (/demon|devil|imp|ghoul/.test(n)) slug = 'demon';
+  else if (/frog|toad/.test(n)) slug = 'frog';
+  else if (/mushroomking/.test(n)) slug = 'mushroomking';
+  else if (/mushnub/.test(n)) slug = /evolved|grand/.test(n) ? 'mushnub_evolved' : 'mushnub';
+  else if (/shark|fish|squid|crab|shrimp/.test(n)) slug = /squid|kraken/.test(n) ? 'squidle' : 'fish';
+  else if (/bunny|rabbit/.test(n)) slug = 'bunny';
+  else if (/yeti|giant|ogre/.test(n)) slug = 'yeti';
+  else if (/golem|rock|stone/.test(n)) slug = 'goleling';
+  else if (/alien/.test(n)) slug = 'alien';
+  else if (/chicken|rooster|bird/.test(n)) slug = /pigeon|messenger/.test(n) ? 'pigeon' : (/birb/.test(n)?'birb':'chicken');
+  else if (/panda|bear/.test(n)) slug = 'panda';
+  else if (/deer|stag|elk/.test(n)) slug = 'deer';
+  else if (/ghost|wraith|spirit|reaper|vampire/.test(n)) slug = 'ghost';
+  else if (/cat|kitten|feline/.test(n)) slug = 'cat';
+  else if (/dog|hound|wolf|pup/.test(n)) slug = 'dog';
+  else if (/ninja|assassin|shadow/.test(n)) slug = 'ninja';
+  else if (/mushroom|shroom|fungus/.test(n)) slug = 'mushroom';
+  else if (/cactus|cactoro/.test(n)) slug = 'cactoro';
+  else if (/alpaca|llama|alpaking/.test(n)) slug = 'alpaking';
+  else if (/bee|wasp|armabee/.test(n)) slug = 'armabee';
+  else if (/monk|monkroose/.test(n)) slug = 'monkroose';
+  else if (/whirl|elemental|cyclone|hywirl|wind/.test(n)) slug = 'hywirl';
+  else if (/glub|bubble/.test(n)) slug = 'glub';
+  else if (/mage|wizard|elf|pixie|walker|novice|assistant|fairy/.test(n)) slug = /wizard/.test(n) ? 'wizard' : 'ninja';
+  else if (/blob/.test(n)) slug = /pink/.test(n) ? 'pinkblob' : (/spiky/.test(n) ? 'greenspikyblob' : 'greenblob');
+  return slug ? { creature: CREATURES[slug], rules: RULES[slug] || {} } : null;
+}

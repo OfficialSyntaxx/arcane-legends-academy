@@ -2,6 +2,7 @@
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, SCHOOL_BONUS, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
 import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS } from "./items.js";
 import * as ACADEMY from "./academy.js";
+import { traitForCard } from "./creatures.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
 export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
@@ -415,11 +416,19 @@ function makeCreature(cardId, p){
   const c = CARD_MAP[cardId];
   const atk = c.atk + (p.atkBonus||0) + fieldAtkBonus(p) + (p.school && c.school === p.school ? 1 : 0); // school affinity
   const fx = c.fx || [];
-  return {
-    uid: uid(), id: cardId, school: c.school, name: c.name, atk, hp: c.hp, maxHp: c.hp,
-    exhausted:false, summoning:true, taunt: fx.includes("taunt"), haste: fx.includes("haste"),
-    drain: fx.includes("drain"), multi: fx.includes("multiAttack")?2:1, attacks:0, freeze:0, owner: p.id,
+  const tr = (traitForCard(cardId, c.name) || {}).rules || {};
+  const hp = c.hp + (tr.onPlayHp || 0);
+  const cr = {
+    uid: uid(), id: cardId, school: c.school, name: c.name, atk, hp, maxHp: hp,
+    exhausted:false, summoning:true, taunt: fx.includes("taunt") || !!tr.taunt, haste: fx.includes("haste") || !!tr.haste,
+    drain: fx.includes("drain") || !!tr.drain, multi: fx.includes("multiAttack")?2:1, attacks:0, freeze:0, owner: p.id,
+    shield0: tr.shield || 0, regen: tr.regen || 0, poison: tr.poison || 0, thorns: tr.thorns || 0,
+    evade: !!tr.evade, survive: !!tr.survive, spellImmune: !!tr.spellImmune, freezeImmune: !!tr.freezeImmune,
+    wizardDmg: tr.wizardDmg || 0, onAttackDmgAll: tr.onAttackDmgAll || 0, onAttackDebuff: tr.onAttackDebuff || 0,
+    healOnHit: tr.healOnHit || 0, freezeOnHit: !!tr.freezeOnHit, warband: !!tr.warband, _R: tr,
   };
+  if (cr.multi > 1) cr.multi = tr.multi ? 2 : cr.multi;   // creature rule can force double-attack
+  return cr;
 }
 // Shuffles use the battle's own RNG so a duel is reproducible from its seed (the `gear` argument
 // was never used — the shuffle doesn't depend on equipment).
@@ -464,7 +473,7 @@ export function beginTurn(b, p){
   p.potionUsed = false;   // one potion per turn (see usePotion)
   // NB: freeze is NOT cleared here — it ticks down at the END of the frozen player's turn
   // (see endTurn), so a creature frozen on the opponent's turn actually misses one turn.
-  for (const c of p.board){ c.exhausted = false; c.attacks = 0; }
+  for (const c of p.board){ c.exhausted = false; c.attacks = 0; if (c.freezeImmune && c.freeze > 0) c.freeze = 0; if (c.regen) c.hp = Math.min(c.maxHp, c.hp + c.regen); }
 }
 export function fieldAtkBonus(p){
   let n = 0;
@@ -492,11 +501,11 @@ const applyFx = (b, owner, fx, zone) => {
     if (typeof f === "string") continue;
     if (f.k === "dmg"){
       const t = resolveTarget(b, foe, zone && zone.target);
-      if (!t) continue;
+      if (!t || t.spellImmune) continue;
       if (t === foe) damageWizard(foe, f.n, foe.defBonus);
       else t.hp -= f.n;                       // creatures have no shield/defBonus
     }
-    else if (f.k === "dmgAll"){ for (const c of [...foe.board]) c.hp -= f.n; }
+    else if (f.k === "dmgAll"){ for (const c of [...foe.board]) if (!c.spellImmune) c.hp -= f.n; }
     else if (f.k === "dmgWiz"){ damageWizard(foe, f.n, foe.defBonus); }
     else if (f.k === "heal"){ owner.hp = Math.min(owner.maxHp, owner.hp + f.n); }
     else if (f.k === "shield"){ owner.shield += f.n; }
@@ -521,6 +530,14 @@ export function playCard(b, p, handIndex, target){
     }
     if (cr.haste) cr.summoning = false;
     p.board.push(cr);
+    // creature passive on-play effects (from creatures.js RULES)
+    const R = cr._R || {};
+    if (R.onPlayDmgAll){ for (const c2 of [...enemy.board]) c2.hp -= R.onPlayDmgAll; b.log.push(cr.name+" blasts all enemies for "+R.onPlayDmgAll); }
+    if (R.onPlayDmgWiz){ damageWizard(enemy, R.onPlayDmgWiz, enemy.defBonus); b.log.push(cr.name+" strikes the enemy wizard for "+R.onPlayDmgWiz); }
+    if (R.onPlayHealAll){ for (const c2 of p.board) c2.hp = Math.min(c2.maxHp, c2.hp + R.onPlayHealAll); b.log.push(cr.name+" heals allies for "+R.onPlayHealAll); }
+    if (R.onPlayBuffAll){ for (const c2 of p.board) c2.atk += R.onPlayBuffAll; b.log.push(cr.name+" buffs allies +"+R.onPlayBuffAll+" atk"); }
+    if (R.onPlayFreeze){ const live = enemy.board.filter(c=>c.hp>0); if (live.length){ live[(b.rand?Math.floor(b.rand()*live.length):0)].freeze = 1; b.log.push(cr.name+" freezes an enemy"); } }
+    if (R.onPlayDraw){ for (let i=0;i<R.onPlayDraw;i++) draw(p); b.log.push(cr.name+" draws a card"); }
     // enemy traps trigger on creature play
     if (enemy.traps && enemy.traps.length){
       const t = enemy.traps.shift();
@@ -539,6 +556,13 @@ export function playCard(b, p, handIndex, target){
   }
   return {ok:true};
 }
+// Deal damage to a creature honouring its defensive creature rules (shield0, survive, evade).
+function creatureHit(cr, dmg, b){
+  const absorb = Math.min(cr.shield0 || 0, dmg); cr.shield0 = (cr.shield0||0) - absorb; dmg -= absorb;
+  cr.hp -= dmg;
+  if (cr.hp <= 0 && cr.survive && !cr.surviveUsed){ cr.surviveUsed = true; cr.hp = 1; }
+  return cr.hp <= 0;
+}
 export function attack(b, attackerIdx, targetKind, targetIdx){
   const p = b[b.turn];
   const atk = p.board[attackerIdx]; if (!atk) return {ok:false,err:"no creature"};
@@ -546,19 +570,34 @@ export function attack(b, attackerIdx, targetKind, targetIdx){
   if (atk.exhausted || atk.summoning) return {ok:false,err:"tired"};
   if (atk.attacks >= atk.multi) return {ok:false,err:"tired"};
   const enemy = b.turn==="you" ? b.enemy : b.you;
+  // warband: +1 atk per friendly living creature (beyond itself)
+  const wbAtk = atk.warband ? Math.max(atk.atk, atk.atk + (p.board.filter(c=>c.hp>0).length - 1)) : atk.atk;
   // taunt check
   if (targetKind === "wiz" && enemy.board.some(c=>c.taunt && c.hp>0)) return {ok:false,err:"taunt"};
-  let dmg = atk.atk;
+  // on-attack creature rules (AoE stomp, wizard snipe, venom)
+  const bth = atk;
+  if (bth.onAttackDmgAll){ for (const c2 of enemy.board) if (c2.hp > 0){ creatureHit(c2, bth.onAttackDmgAll, b); } b.log.push(atk.name+" stomps all enemies for "+bth.onAttackDmgAll); }
+  if (bth.wizardDmg){ damageWizard(enemy, bth.wizardDmg, enemy.defBonus); b.log.push(atk.name+" nicks the enemy wizard for "+bth.wizardDmg); }
+  let dmg = targetKind === "creature" ? wbAtk + (atk.poison||0) : wbAtk;
   if (targetKind === "creature"){
     const t = enemy.board[targetIdx]; if (!t) return {ok:false};
     dmg += schoolBonus(atk.school, t.school);
-    t.hp -= dmg;
-    // Drain heals the ATTACKER's wizard for damage dealt (it used to heal the defender,
-    // which made every Death-school creature a liability to its own owner).
-    if (atk.drain) p.hp = Math.min(p.maxHp, p.hp + dmg);
+    let dealt = false;
+    if (t.evade && !t.evadeUsed){ t.evadeUsed = true; b.log.push(t.name+" dodges the attack!"); }
+    else {
+      const died = creatureHit(t, dmg, b);
+      dealt = true;
+      if (atk.drain) p.hp = Math.min(p.maxHp, p.hp + dmg);
+      if (t.healOnHit && t.hp > 0) t.hp = Math.min(t.maxHp, t.hp + t.healOnHit);
+      if (t.freezeOnHit && t.hp > 0){ atk.freeze = 1; b.log.push(t.name+" froze "+atk.name); }
+      if (bth.onAttackDebuff) t.atk = Math.max(0, t.atk - bth.onAttackDebuff);
+      if (died) b.log.push(t.name+" died");
+    }
     enemy.board = enemy.board.filter(c=>c.hp>0);
-    // retaliation (damage taken — never a drain heal)
-    if (t.hp > 0) atk.hp -= t.atk;
+    // thorns reflect
+    if (dealt && t.thorns && atk.hp > 0){ creatureHit(atk, t.thorns, b); b.log.push(atk.name+" takes "+t.thorns+" thorns damage"); }
+    // retaliation (never a drain heal on the defender's behalf)
+    if (t.hp > 0 && dealt){ creatureHit(atk, t.atk, b); }
   } else {
     damageWizard(enemy, dmg, enemy.defBonus);
     if (atk.drain) p.hp = Math.min(p.maxHp, p.hp + dmg);
@@ -566,6 +605,7 @@ export function attack(b, attackerIdx, targetKind, targetIdx){
   atk.attacks++;
   if (atk.attacks >= atk.multi) atk.exhausted = true;
   p.board = p.board.filter(c=>c.hp>0);
+  enemy.board = enemy.board.filter(c=>c.hp>0);
   // defender traps trigger on attack
   if (enemy.traps && enemy.traps.length){
     const t = enemy.traps.shift();
