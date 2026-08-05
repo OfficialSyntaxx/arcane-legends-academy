@@ -160,6 +160,21 @@ Three things it works around, all found the hard way:
   obvious by eye — it looks like a subtle shimmy — so verify by measuring vertex deflection, not
   by watching it.
 
-Characters are normalised to `CHARACTER_HEIGHT` (`structures.js`). This measures the FULL
-bounding box, and a pointed wizard hat is ~28% of it, so the number is not the character's
-apparent height.
+A fourth thing, found when the wizard still looked T-posed in game:
+
+- **The bind pose is not a standing pose.** Generated characters are authored in an A-pose with
+  the arms out, because that is what makes them riggable. Animating a small swing around that
+  pose leaves the arms permanently spread and the character reads as T-posed however correct the
+  skeleton underneath is. Every clip is now built on a standing pose that brings the arms down,
+  with the swing layered on top — and the arms are keyed even where they barely move, because a
+  bone with no key falls back to its bind transform and snaps straight back out.
+
+Separating a **robe** from **legs** is the fiddly part, and a height threshold cannot do it: the
+hem and the boot tops overlap, so cutting above the hem tears the robe and cutting below it
+detaches the boots. Both were visible on screen. Legs are gated by DISTANCE instead — boots hug
+the leg bones, a skirt flares clear of them.
+
+Characters are normalised to `CHARACTER_HEIGHT` (`structures.js`), measured as the larger of the
+skeleton span and the mesh box. Neither alone is right: some rigs put bones outside the mesh,
+while a pointed hat or a cloak puts mesh outside the bones. Using the skeleton alone scaled this
+wizard 43% too large, because its bones stop at the top of the head and the hat does not.

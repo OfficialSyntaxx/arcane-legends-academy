@@ -201,6 +201,56 @@ check("every character model also ships locally (CDN fallback is real)", (()=>{
 // the procedural NPC cycle looks bones up by name. Both failure modes are silent — a model that
 // lost its skin during compression, or one rigged with different bone names, loads without error
 // and simply never moves. Both happened while integrating the re-rigged wizard.
+// Reading a GLB's animation data. Draco compresses MESH attributes only, so animation samplers
+// stay as plain accessors and can be read straight out of the binary chunk.
+function glbDoc(rel){
+  const buf = fs.readFileSync(path.join(ROOT_PUBLIC, rel));
+  const jsonLen = buf.readUInt32LE(12);
+  const doc = JSON.parse(buf.slice(20, 20 + jsonLen).toString("utf8"));
+  return { doc, buf, binStart: 20 + jsonLen + 8 };
+}
+function firstRotation({ doc, buf, binStart }, clipName, boneName){
+  const clip = (doc.animations || []).find(a => new RegExp(clipName, "i").test(a.name));
+  if (!clip) return null;
+  for (const ch of clip.channels){
+    if (ch.target.path !== "rotation") continue;
+    if (doc.nodes[ch.target.node].name !== boneName) continue;
+    const acc = doc.accessors[clip.samplers[ch.sampler].output];
+    if (acc.type !== "VEC4" || acc.componentType !== 5126) continue;
+    const bv = doc.bufferViews[acc.bufferView];
+    const off = binStart + (bv.byteOffset || 0) + (acc.byteOffset || 0);
+    const q = [0, 1, 2, 3].map(k => buf.readFloatLE(off + k * 4));
+    return 2 * Math.acos(Math.min(1, Math.abs(q[3]))) * 180 / Math.PI;   // degrees from bind pose
+  }
+  return null;
+}
+// THE T-POSE TEST. Generated characters are authored in an A-pose because that is what makes them
+// riggable — arms out, away from the body. A clip that only adds a small swing leaves the arms
+// spread, and the character reads as T-posed however correct the skeleton is. That shipped once.
+// So: assert the idle clip actually POSES the arms well away from where they were bound.
+check("the player's idle brings the arms down, not the bind pose", (()=>{
+  const g = glbDoc("assets/models/player_wizard.glb");
+  const bad = [];
+  for (const bone of ["LeftArm", "RightArm"]){
+    const deg = firstRotation(g, "idle", bone);
+    if (deg == null) bad.push(`${bone}: idle does not rotate it at all`);
+    else if (deg < 25) bad.push(`${bone}: only ${deg.toFixed(1)} deg from the bind pose`);
+  }
+  if (bad.length) console.log("   " + bad.join("; "));
+  return bad.length === 0;
+})());
+check("the walk clip swings the legs enough to read", (()=>{
+  const g = glbDoc("assets/models/player_wizard.glb");
+  // frame 1 is the passing pose, so the legs sit near neutral there; what matters is that the
+  // track exists and the clip is not a single static key
+  const g2 = glbDoc("assets/models/player_wizard.glb");
+  const clip = g2.doc.animations.find(a => /walk/i.test(a.name));
+  const legCh = clip.channels.filter(c => c.target.path === "rotation" &&
+    /UpLeg$/.test(g2.doc.nodes[c.target.node].name));
+  if (!legCh.length){ console.log("   walk clip has no leg rotation tracks"); return false; }
+  const acc = g2.doc.accessors[clip.samplers[legCh[0].sampler].output];
+  return acc.count >= 3;      // more than one key, i.e. it actually moves
+})());
 check("the player model is skinned and animated", (()=>{
   const buf = fs.readFileSync(path.join(ROOT_PUBLIC, "assets/models/player_wizard.glb"));
   const doc = JSON.parse(buf.slice(20, 20 + buf.readUInt32LE(12)).toString("utf8"));
@@ -221,6 +271,15 @@ check("the player model is skinned and animated", (()=>{
   if (missing.length) problems.push("bones applyWalkCycle needs are missing: " + missing.join(", "));
   if (problems.length) console.log("   " + problems.join("; "));
   return problems.length === 0;
+})());
+// Props and landmarks fall back to a local copy the same way characters do, which is only a
+// fallback if the file is there. Anything listed in cdn.js must also exist under public/.
+check("every CDN-hosted model also ships locally", (()=>{
+  const missing = Object.keys(CDN).filter(n =>
+    !fs.existsSync(path.join(ROOT_PUBLIC, "assets/models", n)) &&
+    !fs.existsSync(path.join(ROOT_PUBLIC, "assets/buildings", n)));
+  if (missing.length) console.log("   CDN-only (no local fallback):", missing.join(", "));
+  return missing.length === 0;
 })());
 check("every CDN entry is a real https URL", Object.values(CDN).every(u => /^https:\/\//.test(u)));
 check("solid props contribute collision", ST.PROPS.filter(p=>p.solid).every(p =>

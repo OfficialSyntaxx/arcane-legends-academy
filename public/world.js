@@ -510,6 +510,17 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
           minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
           minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
         });
+        // ...but the skeleton is not always the whole character either. Our re-rigged wizard's
+        // bones stop at the top of the HEAD, while the model wears a pointed hat that reaches
+        // well past it — so the skeleton span read 0.70 against a 1.0-tall model and the
+        // character was scaled 43% too big. Take whichever box is larger: the skeleton wins where
+        // bones sit outside the mesh (the original problem), the mesh wins where it sits outside
+        // the bones (a hat, a cloak, a tail).
+        if (!geoBox.isEmpty()){
+          minY = Math.min(minY, geoBox.min.y); maxY = Math.max(maxY, geoBox.max.y);
+          minX = Math.min(minX, geoBox.min.x); maxX = Math.max(maxX, geoBox.max.x);
+          minZ = Math.min(minZ, geoBox.min.z); maxZ = Math.max(maxZ, geoBox.max.z);
+        }
       } else {
         minY = geoBox.min.y; maxY = geoBox.max.y;
         minX = geoBox.min.x; maxX = geoBox.max.x;
@@ -573,11 +584,16 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // `fit` is "height" or "width": height for things whose height defines them (the tower),
   // width when the FOOTPRINT is the gameplay-relevant dimension (the arena floor is the duel
   // space, so its diameter must be right and the height follows from the model's proportions).
-  function loadLandmarkModel(key, url, group, opts){
+  function loadLandmarkModel(key, localUrl, group, opts){
     const { size, fit = "height", x = 0, z = 0, ry = 0, onReady, quiet = false } = opts;
     // streamed chunk content loads continuously, so it must not drive the boot progress HUD
     if (!quiet) loadState.total++;
-    url = CDN[url.split('/').pop()] || url;   // CDN if hosted there, else the caller's path
+    // Same CDN-then-local retry as makeCharModel. Characters got this when a CDN outage turned
+    // the whole cast into stand-ins; props, landmarks and buildings had the identical single
+    // point of failure and were simply missing from the world when the CDN was unreachable.
+    const cdnUrl = CDN[localUrl.split('/').pop()];
+    load(cdnUrl || localUrl, cdnUrl ? localUrl : null);
+    function load(url, fallbackUrl){
     const loader = new THREE.GLTFLoader();
     const d = getDraco();
     if (d) loader.setDRACOLoader(d);
@@ -604,10 +620,12 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     },
     undefined,
     err => {
+      if (fallbackUrl){ load(fallbackUrl, null); return; }
       // Keep the procedural placeholder rather than an empty patch of ground.
       console.warn("landmark model failed to load:", url, err && err.message);
       if (!quiet){ loadState.done++; loadState.failed.push(key); loadProgress(); }
     });
+    }
   }
   // Standalone landmarks (tower, arena) — generated via Tripo (2D->3D). Their collision shapes
   // in structures.js are sized to these models' real footprints, not the old procedural ones.

@@ -198,15 +198,15 @@ def frac(z):
 
 WAIST, SHOULDER_F = frac(HIP_Z), frac(SHOULDER_Z)
 
-# HEM. A robe is a single skirt spanning both legs, so binding it to the leg bones tears it in
-# half down the middle the moment the legs swing — clearly visible as a rip in the render. Find
-# where the skirt ends and let the legs claim ONLY below it; everything above rides the hips,
-# which is how a robe is animated by hand too.
+# LEGS vs SKIRT. A robe is one surface spanning both legs, so binding it to them rips it down
+# the middle on the first stride. The obvious separator — "legs only below the hem" — does not
+# work, because the hem and the boot tops OVERLAP in height: cut above the hem and the robe
+# tears, cut below it and the boots detach at the ankle. Both were seen on screen.
 #
-# WIDTH does not find the hem: this skirt flares to a half-width of 0.153 and the feet below are
-# spread 0.115 apart, so the silhouette never narrows. VERTEX DENSITY does — a skirt is one broad
-# surface with hundreds of verts per slice, while bare legs are two thin tubes with a fraction of
-# that. HEM stays None for a character in trousers, whose legs then bend normally.
+# The reliable separator is DISTANCE, not height. Boots and trousers hug the leg bones; a skirt
+# is a broad surface that flares well clear of them. So legs claim only what is close to them.
+# LEG_REACH is measured: how far the leg silhouette extends past the bone itself, down where
+# there is nothing but leg.
 skirt_top = min(int(WAIST * 100), int(frac(HAND_Z) * 100) - 3)
 counts = [(f, len(band(f / 100.0, f / 100.0 + 0.03))) for f in range(15, max(18, skirt_top), 3)]
 typical = sorted(c for _, c in counts)[len(counts) // 2] if counts else 0
@@ -215,22 +215,26 @@ for f in range(max(18, skirt_top), 4, -3):
     if typical and len(band(f / 100.0, f / 100.0 + 0.03)) < typical * 0.35:
         HEM = f / 100.0 + 0.03
         break
-print("  skirt: %d verts per slice -> hem at %s" % (typical, "%.2f" % HEM if HEM else "none (no skirt)"))
-# In an A-pose the hands hang BELOW the waist, so gating arms at the waist cuts them off from
-# their own hands: the hands get claimed by the torso and the arm swing all but disappears
-# (measured 1.4% of body height where ~14% was expected). Gate on the hands instead.
+below = [v for v in V if frac(v.z) < (HEM if HEM is not None else WAIST)]
+leg_span = max((abs(lr(v)) for v in below), default=FOOT_LR * 2)
+LEG_REACH = max(FOOT_LR * 0.6, (leg_span - FOOT_LR) * 1.35)
+print("  hem %s | leg reach %.3f (span %.3f, bone at %.3f)"
+      % ("%.2f" % HEM if HEM else "none", LEG_REACH, leg_span, FOOT_LR))
+
 ARM_BOTTOM = min(WAIST, frac(HAND_Z)) - 0.05
-LEG_TOP = (HEM + 0.03) if HEM is not None else (WAIST + 0.08)
+LEG_TOP = WAIST + 0.04
 gate = {}
 for name, hd, tl in bones:
     if name.endswith(("UpLeg", "Leg", "Foot")):
-        gate[name] = (-1.0, LEG_TOP)             # legs stop at the hem (or the waist, if no skirt)
+        # height cap keeps legs out of the chest; the DISTANCE cap is what keeps the skirt off
+        # them while still letting the boots ride along
+        gate[name] = (-1.0, LEG_TOP, LEG_REACH if HEM is not None else 1e9)
     elif name.endswith(("Shoulder", "Arm", "ForeArm", "Hand")):
-        gate[name] = (ARM_BOTTOM, 2.0)
+        gate[name] = (ARM_BOTTOM, 2.0, 1e9)
     elif name in ("Neck", "Head"):
-        gate[name] = (SHOULDER_F - 0.04, 2.0)
+        gate[name] = (SHOULDER_F - 0.04, 2.0, 1e9)
     else:
-        gate[name] = (-1.0, 2.0)
+        gate[name] = (-1.0, 2.0, 1e9)
 
 zf = (co[:, 2] - Z0) / H
 W = np.zeros((len(co), len(bones)))
@@ -239,8 +243,8 @@ for bi, (name, hd, tl) in enumerate(bones):
     L2 = float(ab @ ab) or 1e-9
     t = np.clip(((co - hd) @ ab) / L2, 0.0, 1.0)[:, None]
     d = np.linalg.norm(co - (hd + t * ab), axis=1)
-    lo, hi = gate[name]
-    ok = (zf >= lo) & (zf <= hi)
+    lo, hi, maxd = gate[name]
+    ok = (zf >= lo) & (zf <= hi) & (d <= maxd)
     # inverse-power falloff: high power keeps a bone's influence local, which is what stops a
     # sleeve from dragging the hem of the robe with it
     W[:, bi] = np.where(ok, 1.0 / np.maximum(d, 1e-4) ** 4, 0.0)
@@ -280,7 +284,10 @@ print("skinned by bone proximity: %d verts, %d bones" % (len(co), len(bones)))
 bpy.context.view_layer.objects.active = obj
 bpy.ops.object.mode_set(mode="WEIGHT_PAINT")
 try:
-    bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.5, repeat=6)
+    # Heavy smoothing. The standing pose swings the arms 52 degrees down from the bind pose, so
+    # any hard boundary between arm weights and torso weights becomes a visible tear in the
+    # sleeve — far more than the small swing the first version was tuned against.
+    bpy.ops.object.vertex_group_smooth(group_select_mode="ALL", factor=0.55, repeat=10)
 except RuntimeError as e:
     print("weight smoothing skipped:", e)
 bpy.ops.object.mode_set(mode="OBJECT")
@@ -325,10 +332,51 @@ def local_swing(bone_name, angle):
     return Quaternion(local, angle)
 
 
+DOWN = Vector((0, 0, -1))
+
+
+def local_toward(bone_name, target, angle):
+    """Rotate a bone `angle` radians from where it points toward `target`, in bone space.
+
+    Same derivation as local_swing: the axis is bone_direction x target, which is perpendicular
+    to both, so a POSITIVE angle always moves the bone toward the target whatever its orientation
+    and whatever handedness the model was authored with. No per-side sign table to get wrong.
+    """
+    bone = rig.data.bones[bone_name]
+    d = (Vector(bone.tail_local) - Vector(bone.head_local)).normalized()
+    axis = d.cross(target)
+    if axis.length < 1e-4:
+        return Quaternion((1, 0, 0, 0))
+    axis.normalize()
+    local = bone.matrix_local.to_3x3().inverted() @ axis
+    local.normalize()
+    return Quaternion(local, angle)
+
+
+# REST POSE vs STANDING POSE. Generated characters are authored in an A-pose — arms out, away
+# from the body — because that is what makes them riggable. It is NOT how a character stands.
+# Animating a small swing around the A-pose leaves the arms permanently spread, which reads as a
+# T-pose no matter how correct the skeleton underneath is; that is exactly what shipped first.
+#
+# So every clip is built on top of a standing pose that brings the arms down to the sides, and
+# the swing is layered on that rather than on the bind pose.
+ARM_DOWN = math.radians(46)
+FOREARM_IN = math.radians(10)
+STANDING = {}
+for _side in ("L", "R"):
+    STANDING[UA[_side]] = local_toward(UA[_side], DOWN, ARM_DOWN)
+    STANDING[LA[_side]] = local_toward(LA[_side], DOWN, FOREARM_IN)
+
+
 def key(bone_name, frame, angle=None, loc=None):
     b = pb[bone_name]
     if angle is not None:
-        b.rotation_quaternion = local_swing(bone_name, angle)
+        # compose: stand first, then swing. Quaternion multiply, not addition of Euler angles,
+        # or the two rotations fight over the same axis and the arm ends up somewhere neither
+        # pose intended.
+        q = local_swing(bone_name, angle)
+        base = STANDING.get(bone_name)
+        b.rotation_quaternion = (base @ q) if base else q
         b.keyframe_insert("rotation_quaternion", frame=frame)
     if loc:
         b.location = Vector(loc)
@@ -337,7 +385,7 @@ def key(bone_name, frame, angle=None, loc=None):
 
 def new_action(name):
     for b in pb:
-        b.rotation_quaternion = (1, 0, 0, 0)
+        b.rotation_quaternion = STANDING.get(b.name, Quaternion((1, 0, 0, 0)))
         b.location = (0, 0, 0)
     a = bpy.data.actions.new(name)
     rig.animation_data_create()
@@ -351,10 +399,13 @@ D = math.radians
 for f, phase in ((1, 0), (7, 1), (13, 2), (19, 3), (25, 0)):
     # phase 0/2 = passing, 1 = left leg forward, 3 = right leg forward
     a = {0: 0.0, 1: 1.0, 2: 0.0, 3: -1.0}[phase]
-    key("LeftUpLeg", f, (D(26) * a))
-    key("RightUpLeg", f, (D(-26) * a))
-    key("LeftLeg", f, (D(-20) * max(0.0, -a)))
-    key("RightLeg", f, (D(-20) * max(0.0, a)))
+    # Modest stride. Weight smoothing (needed for the sleeves) bleeds a little leg influence
+    # back into the skirt, and a big swing turns that residue into a visible tear rather than a
+    # sway. A robed wizard steps short anyway.
+    key("LeftUpLeg", f, (D(17) * a))
+    key("RightUpLeg", f, (D(-17) * a))
+    key("LeftLeg", f, (D(-16) * max(0.0, -a)))
+    key("RightLeg", f, (D(-16) * max(0.0, a)))
     # arms counter-swing the legs, which is what makes a walk read as a walk
     key("LeftArm", f, (D(-22) * a))
     key("RightArm", f, (D(22) * a))
@@ -371,8 +422,12 @@ for f, t in ((1, 0.0), (25, 1.0), (49, 0.0)):
     key("Spine", f, (D(-2.2) * t))
     key("Spine1", f, (D(2.0) * t))
     key("Head", f, (D(-1.5) * t))
-    key("LeftArm", f, (D(3.0) * t))
-    key("RightArm", f, (D(-3.0) * t))
+    # Arms are keyed even where they barely move, so the STANDING pose is baked into the clip.
+    # Without a key the bone falls back to its bind transform and the arms snap back out.
+    key("LeftArm", f, (D(4.0) * t))
+    key("RightArm", f, (D(-4.0) * t))
+    key("LeftForeArm", f, (D(3.0) * t))
+    key("RightForeArm", f, (D(3.0) * t))
     key("Hips", f, None, (0, 0, H * 0.006 * t))
 
 for a in (walk, idle):
