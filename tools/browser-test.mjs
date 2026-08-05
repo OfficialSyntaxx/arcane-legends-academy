@@ -658,6 +658,12 @@ if (hasWorld){
     out.stillAccepted = save.zoneQuests.accepted.slice();
     out.goldAfter = window.__testGold();
     out.leftovers = save.inventory.willow_log || 0;
+    out.reputation = (save.reputation || {}).forest_sage || 0;
+    // The Hall's reputation panel is conditional on having reputation with SOMEONE — check it
+    // actually appears now that a quest has been turned in, not just that the data exists.
+    document.querySelector('.navbtn[data-screen="home"]').click();
+    await settle(200);
+    out.hallText = document.getElementById("scr_home").innerText;
     return out;
   });
   check("the forest has a quest giver standing in it", q.foundGiver === true, q.zone);
@@ -669,6 +675,9 @@ if (hasWorld){
         (q.done || []).length === 1 && (q.stillAccepted || []).length === 0 && q.goldAfter > q.goldBefore,
         `done=${JSON.stringify(q.done)} gold ${q.goldBefore}->${q.goldAfter}`);
   check("handing in consumes the materials", q.leftovers === 0, `${q.leftovers} left`);
+  check("handing in raises reputation with the giver", q.reputation === 12, `rep=${q.reputation}`);
+  check("the Hall shows the curriculum panel", /Curriculum/.test(q.hallText));
+  check("the Hall shows reputation once the player has some", /Reputation/.test(q.hallText) && /Sage Rowan/.test(q.hallText));
 }
 
 check("no uncaught page errors", errs.length === 0, errs.slice(0,3).join(" | "));

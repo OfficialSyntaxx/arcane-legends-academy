@@ -1,6 +1,7 @@
 // Wizard TCG — engine (saved state, skills, economy, market, auctions, housing, duels, AI)
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, SCHOOL_BONUS, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
 import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS } from "./items.js";
+import * as ACADEMY from "./academy.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
 export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
@@ -33,6 +34,9 @@ export function newGame(){
     // Quests given by NPCs out in the world (zonequests.js). Only the player's CHOICES live
     // here — progress is derived from inventory/dungeon state every time it is read.
     zoneQuests:{ accepted:[], done:[] },
+    // NPC reputation (reputation.js). Only quest givers earn any right now — see that module
+    // for why this is a flat {npcKey: number} map rather than a richer per-NPC shape.
+    reputation:{},
     auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false },
   };
 }
@@ -69,6 +73,7 @@ function migrate(s){
   if (!s.zoneQuests) s.zoneQuests = { accepted: [], done: [] };
   if (!Array.isArray(s.zoneQuests.accepted)) s.zoneQuests.accepted = [];
   if (!Array.isArray(s.zoneQuests.done)) s.zoneQuests.done = [];
+  if (!s.reputation || typeof s.reputation !== "object") s.reputation = {};
   // `defeated` arrived after `cleared`/`bossDead`, so older saves have the object but not the list.
   for (const d of Object.values(s.worldState.dungeons)){
     if (!Array.isArray(d.defeated)) d.defeated = [];
@@ -198,13 +203,12 @@ export function dailyLabel(s){
   const d = checkDaily(s);
   return { type: d.type, text: d.type==="win" ? "Win duels" : d.type==="gather" ? "Gather materials" : "Scribe cards", progress: d.progress, target: d.target, claimed: d.claimed };
 }
-export function academyRank(s){
-  const score = s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won;
-  const tiers = [["Novice",0],["Apprentice",15],["Adept",30],["Scholar",50],["Master",75],["Grandmaster",100],["Archmage",140]];
-  let rank = tiers[0][0];
-  for (const [name,min] of tiers) if (score >= min) rank = name;
-  return rank;
-}
+// Score/tier names live in academy.js now (BACKLOG "Academy progression"), which also defines
+// what a rank actually UNLOCKS. This kept the exact formula and the seven names untouched, so an
+// existing save's rank does not shift under it — only what the rank DOES is new.
+export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won; }
+export function academyRank(s){ return ACADEMY.yearFor(academyScore(s)).name; }
+export function academyPerks(s){ return ACADEMY.perksFor(academyScore(s)); }
 
 // ---------- Equipment / loadout ----------
 export function equipStats(s){
@@ -280,7 +284,10 @@ export function sellCard(s, uidC){
   return { ok:true, value: cardValue(c.id, c.roll) };
 }
 export function buyCard(s, id){
-  const c = CARD_MAP[id]; const price = RARITY[c.rarity].base * 2;
+  const c = CARD_MAP[id]; const base = RARITY[c.rarity].base * 2;
+  // A discount reduces price, so the bonus percentage is subtracted rather than added — applying
+  // applyBonus() (built for rewards, which go up) here would make higher rank COST more.
+  const price = Math.max(1, ACADEMY.applyBonus(base, -academyPerks(s).market));
   if (s.gold < price) return { ok:false, err:"gold" };
   s.gold -= price;
   s.cards.push({ uid:uid(), id, roll:Math.floor(rng()*101), graded:false });
@@ -391,8 +398,9 @@ export function canDoQuest(s, i){ return i===0 || s.quests.done.includes(i-1); }
 export function completeQuest(s, i){
   const qq = QUESTS[i];
   if (s.quests.done.includes(i)) return {ok:false};
-  addWizardXp(s, 100 + i*60);
-  gainGold(s, qq.reward);
+  const perks = academyPerks(s);   // read BEFORE the xp/level change this call makes
+  addWizardXp(s, ACADEMY.applyBonus(100 + i*60, perks.xp));
+  gainGold(s, ACADEMY.applyBonus(qq.reward, perks.questGold));
   s.quests.done.push(i);
   if (s.quests.current === i) s.quests.current = i+1;
   const drops = dropCards(s, qq.dropN);

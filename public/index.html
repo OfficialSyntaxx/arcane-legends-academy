@@ -332,6 +332,8 @@ import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
 import { loadDungeons, dungeonZone } from "./dungeons.js";
 import * as ONBOARD from "./onboarding.js";
 import * as ZQ from "./zonequests.js";
+import * as REP from "./reputation.js";
+import * as ACADEMY from "./academy.js";
 
 // ================= state =================
 let S = G.load();
@@ -589,6 +591,40 @@ function render(){
 }
 
 // ================= HOME =================
+// The curriculum panel: current year, its perks, and progress toward the next one. Pulled out of
+// renderHome() so the Hall stays readable — it is already the busiest screen in the game.
+function renderCurriculum(){
+  const score = G.academyScore(S);
+  const year = ACADEMY.yearFor(score);
+  const prog = ACADEMY.progressToNext(score);
+  const perkRow = (label, pct) => pct > 0
+    ? `<div class="kpi"><div class="lv" style="font-size:16px">+${pct}%</div><div class="nm">${label}</div></div>` : "";
+  return `<div class="panel" style="margin-top:12px"><h3>📖 Curriculum — ${year.name}, ${year.subtitle}</h3>
+    <div class="row">${perkRow("Quest Gold", year.perks.questGold)}${perkRow("Market Discount", year.perks.market)}${perkRow("XP Gain", year.perks.xp)}</div>
+    ${prog.maxed
+      ? `<p class="sub" style="margin-top:8px">You have completed the curriculum. There is nothing left to teach you here.</p>`
+      : `<p class="sub" style="margin-top:8px">${prog.have}/${prog.need} toward ${prog.next.name}</p>
+         <div class="pbar"><div style="width:${prog.pct}%"></div></div>`}
+  </div>`;
+}
+// Reputation with the NPCs the player has actually quested for. Empty until the first field
+// quest is accepted, rather than listing every giver in the game with zero standing.
+function renderReputationPanel(){
+  const known = Object.keys(S.reputation || {});
+  if (!known.length) return "";
+  let h = `<div class="panel" style="margin-top:12px"><h3>🤝 Reputation</h3>`;
+  for (const key of known){
+    const name = (QUEST_GIVERS[key] && QUEST_GIVERS[key].name) || key;
+    const rep = REP.repOf(S, key), lvl = REP.levelFor(rep), prog = REP.progressToNext(rep);
+    h += `<div class="row" style="align-items:center;margin-bottom:6px">
+      <div class="grow"><b>${name}</b> <span class="sub">${lvl.name}${lvl.bonus ? ` (+${lvl.bonus}%)` : ""}</span>
+        ${prog.maxed ? "" : `<div class="pbar" style="margin-top:4px"><div style="width:${prog.pct}%"></div></div>`}
+      </div>
+    </div>`;
+  }
+  h += `</div>`;
+  return h;
+}
 function renderHome(el){
   let h = `<h2>${STR.hall_title}</h2>`;
   if (!S.home.owned){
@@ -622,6 +658,8 @@ function renderHome(el){
   h += `<div class="kpi"><div class="lv">${G.totalCollectionValue(S)}</div><div class="nm">Collection Value</div></div>`;
   h += `<div class="kpi"><div class="lv">${S.stats.slabs}</div><div class="nm">Slabs</div></div>`;
   h += `</div>`;
+  h += renderCurriculum();
+  h += renderReputationPanel();
   // daily quest
   const dl = G.dailyLabel(S);
   h += `<div class="panel" style="margin-top:12px"><h3>📅 Daily Quest</h3><div class="row" style="align-items:center">
@@ -1293,14 +1331,18 @@ function questDialogue(giver){
   const offers = ZQ.offeredBy(S, giver);
   const turnIns = ZQ.turnInsFor(S, giver);
   const active = ZQ.activeQuests(S).filter(q => q.giver === giver);
+  const rep = REP.repOf(S, giver), repLvl = REP.levelFor(rep);
   const lines = [];
+  // Reputation is shown at the TOP of the conversation, not buried, since it is the one thing
+  // this NPC's dialogue says about the player rather than about a quest.
+  lines.push(`<span style="color:var(--muted);font-size:12px">Standing: <b style="color:var(--gold)">${repLvl.name}</b>${repLvl.bonus ? ` (+${repLvl.bonus}% from ${g.name})` : ""}</span>`);
   for (const q of turnIns) lines.push(`<b style="color:var(--gold)">${q.title}</b> — done. Well fought.`);
   for (const q of active.filter(q => !turnIns.includes(q))){
     const p = ZQ.progressOf(S, q);
     lines.push(`<b>${q.title}</b> — ${ZQ.objectiveText(q, matName(q))} <span style="color:var(--muted)">(${p.have}/${p.need})</span>`);
   }
   for (const q of offers) lines.push(`<b style="color:var(--gold)">${q.title}</b><br>${q.brief}`);
-  if (!lines.length) lines.push(...g.idle);
+  if (!turnIns.length && !active.length && !offers.length) lines.push(...g.idle);
   const buttons = [];
   for (const q of turnIns) buttons.push({ label: `✅ Hand in: ${q.title}`, primary: true, action: ()=>turnInQuest(q.id) });
   for (const q of offers) buttons.push({ label: `📜 Accept: ${q.title}`, primary: !turnIns.length, action: ()=>acceptQuest(q.id) });
@@ -1319,11 +1361,18 @@ function acceptQuest(id){
 function turnInQuest(id){
   const r = ZQ.turnIn(S, id);
   if (!r.ok){ err(r.err === "incomplete" ? "Not finished yet." : "That quest is not active."); return; }
-  G.gainGold(S, r.reward.gold || 0);
+  // Two independent bonuses stack on the gold reward: the player's academy year (a global
+  // curriculum perk) and standing with THIS giver (a per-NPC relationship). zonequests.js
+  // deliberately does not know about either — it hands back the base reward and the two systems
+  // that DO know about progression apply their cut here.
+  const pct = G.academyPerks(S).questGold + REP.bonusFor(S, r.quest.giver);
+  const gold = Math.round((r.reward.gold || 0) * (1 + pct / 100));
+  G.gainGold(S, gold);
   if (r.reward.xp) G.addWizardXp(S, r.reward.xp);
   if (r.reward.cards) G.dropCards(S, r.reward.cards);
+  REP.gainRep(S, r.quest.giver, REP.REP_PER_QUEST);
   save(); closeDialogue();
-  toast(`✅ ${r.quest.title} complete! +${r.reward.gold}g${r.reward.cards ? ` +${r.reward.cards} cards` : ""}`);
+  toast(`✅ ${r.quest.title} complete! +${gold}g${r.reward.cards ? ` +${r.reward.cards} cards` : ""}`);
   winSfx();
   render();
 }
