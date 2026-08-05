@@ -177,6 +177,15 @@ body.has-touch .worldbtn{display:flex;}
    the vertical budget — which is what actually breaks on a phone, especially in landscape. */
 
 /* modals: keep them inside the safe area and off the screen edges on small phones */
+#objective{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:0 8px 6px;
+  background:linear-gradient(90deg,rgba(122,92,255,.22),rgba(122,92,255,.06));
+  border:1px solid rgba(160,130,255,.45);border-radius:12px;font-size:13px;}
+#objective .obj-tick{font-size:15px;flex:0 0 auto}
+#objective .obj-main{flex:1;min-width:0}
+#objective .obj-title{font-weight:700;color:var(--gold)}
+#objective .obj-why{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#objective button{flex:0 0 auto;font-size:12px;padding:6px 10px;min-height:34px}
+@media (max-width:520px){ #objective .obj-why{display:none} }
 #schoolPicker>div,#overlay>div{margin-top:max(4vh,var(--sat));margin-bottom:calc(16px + var(--sab));}
 @media (max-width:640px){
   #schoolPicker>div{padding:20px 14px;width:auto;margin-left:10px;margin-right:10px;border-radius:18px;}
@@ -256,6 +265,10 @@ body.has-touch .worldbtn{display:flex;}
     <button id="muteBtn" class="stat statbtn" aria-label="Toggle sound" onclick="window.__ev('toggleMute')">🔊</button>
   </div>
   <div id="nav"></div>
+  <!-- Onboarding objective bar. Present on every screen including the 3D world, because the
+       chain sends the player back and forth between them and an objective you can only see on
+       one screen is an objective you lose track of. -->
+  <div id="objective" style="display:none"></div>
   <div id="screen"></div>
   <div id="worldWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#1a1440">
     <canvas id="world"></canvas>
@@ -308,6 +321,7 @@ import { createAudio, SFX } from "./audio.js";
 import { createBattle3d } from "./battle3d.js";
 import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
 import { loadDungeons, dungeonZone } from "./dungeons.js";
+import * as ONBOARD from "./onboarding.js";
 
 // ================= state =================
 let S = G.load();
@@ -322,7 +336,10 @@ let duelTimeLeft = 30, duelTimerInt = null;   // 30s turn timer (docs)
 const $ = id => document.getElementById(id);
 
 // ================= helpers =================
-function save(){ G.save(S); refreshTop(); }
+// Every state change funnels through here, which is also the right place to re-derive the
+// objective: gathering in the 3D world calls save() but never render(), so without this the bar
+// would keep asking for something the player had already done until they changed screens.
+function save(){ G.save(S); refreshTop(); buildObjective(); }
 function refreshTop(){
   $("sGold").textContent = S.gold;
   $("sLvl").textContent = S.level;
@@ -493,6 +510,31 @@ const NAV = [
   ["world","🌍","World"],["home","🏰",STR.nav_home],["skills","⛏️",STR.nav_skills],["collection","🃏",STR.nav_collection],
   ["loadout","🗡️",STR.nav_loadout],["market","🛒",STR.nav_market],["quests","📜",STR.nav_quests],["pvp","⚔️",STR.nav_pvp],
 ];
+// Onboarding objective bar. Rebuilt on every render because every step is DERIVED from the save
+// (see onboarding.js) — there is no state here to keep in sync, it just re-asks the questions.
+function buildObjective(){
+  const bar = $("objective");
+  const step = ONBOARD.currentStep(S);
+  if (!step || S.flags.onboardingHidden){ bar.style.display = "none"; return; }
+  const p = ONBOARD.progress(S);
+  const where = step.where ? ` — ${step.where}` : "";
+  const canGo = step.goto && step.goto !== screen && step.goto !== "duel";
+  bar.innerHTML =
+    `<span class="obj-tick">🎓</span>` +
+    `<span class="obj-main"><div class="obj-title">${p.index}/${p.total} · ${step.title}</div>` +
+    `<div class="obj-why">${step.why}${where}</div></span>` +
+    (canGo ? `<button class="btn gold" onclick="window.__ev('objGo')">Go</button>` : ``) +
+    `<button class="btn" onclick="window.__ev('objHide')" aria-label="Hide guide">✕</button>`;
+  bar.style.display = "flex";
+}
+window.__EV.objGo = ()=>{
+  const step = ONBOARD.currentStep(S);
+  if (!step) return;
+  screen = step.goto === "world" ? "world" : step.goto;
+  render();
+};
+window.__EV.objHide = ()=>{ S.flags.onboardingHidden = true; save(); render(); };
+
 function buildNav(){
   $("nav").innerHTML = NAV.map(([id,ic,label])=>`<button class="navbtn ${id===screen?"on":""}" data-screen="${id}"><span class="ic">${ic}</span>${label}</button>`).join("");
   document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>{ screen=b.dataset.screen; render(); });
@@ -500,6 +542,7 @@ function buildNav(){
 function render(){
   AUDIO.setContext(screen === "world" ? "world" : (screen === "duel" || screen === "online") ? "duel" : "menu");
   buildNav();
+  buildObjective();
   const scr = $("screen");
   const worldWrap = $("worldWrap");
   const battleWrap = $("battleWrap");
@@ -1482,6 +1525,7 @@ window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
 // Test hooks for tools/browser-test.mjs. They drive the REAL functions rather than reimplementing
 // them, so the test cannot pass against a path the game does not actually use.
 window.__testBattle = ()=> battle;
+window.__testGather = ()=>{ const m = MATERIALS.find(x=>x.id==="oak_log"); G.gather(S, m); save(); };
 window.__testKill = ()=>{ if (battle && battle.dungeonFoe){ recordDungeonKill(battle.dungeonFoe); save(); } };
 window.__EV.toggleMute = ()=>{
   AUDIO.unlock();

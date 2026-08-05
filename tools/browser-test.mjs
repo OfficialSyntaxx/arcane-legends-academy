@@ -504,6 +504,36 @@ if (hasWorld){
   check("character GLB models load", loaded >= 5, `${loaded}/${Object.keys(chars).length} loaded`);
 }
 
+// ---------------- onboarding objective bar ----------------
+// It is derived from the save on every render, so the thing to prove is that it ADVANCES when
+// the player does the thing — including from the 3D world, which calls save() but not render().
+{
+  const ob = await page.evaluate(async () => {
+    const bar = () => document.getElementById("objective");
+    const text = () => { const t = bar().querySelector(".obj-title"); return t ? t.textContent : "(none)"; };
+    const out = { start: text(), shown: bar().style.display };
+    // Step 1 is "choose your school", and the layout section only HID the picker rather than
+    // answering it — so complete it through the real handler before expecting anything else.
+    window.__ev("chooseSchool|fire");
+    await new Promise(r => setTimeout(r, 250));
+    out.afterSchool = text();
+    // Now gather. This goes through save() and NOT render(), which is the path that used to
+    // leave the bar stale.
+    window.__testGather && window.__testGather();
+    await new Promise(r => setTimeout(r, 200));
+    const advanced = text();
+    // dismissing it must stick
+    window.__ev("objHide");
+    await new Promise(r => setTimeout(r, 150));
+    return { ...out, advanced, hiddenAfter: bar().style.display };
+  });
+  check("the objective bar is visible on a fresh save", ob.shown === "flex", ob.start);
+  check("the objective advances as steps are completed",
+        ob.afterSchool !== ob.start && ob.advanced !== ob.afterSchool,
+        `${ob.start} -> ${ob.afterSchool} -> ${ob.advanced}`);
+  check("the objective bar can be dismissed", ob.hiddenAfter === "none", ob.hiddenAfter);
+}
+
 check("no uncaught page errors", errs.length === 0, errs.slice(0,3).join(" | "));
 
 // ---------------- desktop: joystick hidden, zoom buttons hidden ----------------

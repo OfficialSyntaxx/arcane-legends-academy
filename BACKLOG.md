@@ -15,8 +15,8 @@
   - Make the Academy the central progression loop.
   - Add years, classes, school progression, and unlocks.
 
-- [ ] **First 10 minutes / onboarding**
-  - Character creation → Academy → gathering → scribing → grading → first deck → first duel.
+- [~] **First 10 minutes / onboarding**
+  - A 7-step guided chain (`onboarding.js`) with a persistent objective bar: school → gather → refine → scribe → grade → deck → first duel. Every step is DERIVED from the save, so playing out of order cannot desync it. A full character-creation screen is still pending.
 
 - [ ] **Connect existing systems**
   - Make exploration, gathering, crafting, cards, grading, quests, equipment, combat, and housing feel like one game loop.

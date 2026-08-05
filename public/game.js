@@ -26,7 +26,7 @@ export function newGame(){
     home:{ owned:false, upgrades:{ treasury:0, library:0, armory:0, tavern:0 } },
     quests:{ current:0, done:[] },
     pvp:{ wins:0, losses:0 },
-    stats:{ packs:0, graded:0, won:0, slabs:0 },
+    stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 },
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
     worldState:{ zone:"academy", visited:["academy"], dungeons:{} },
@@ -46,6 +46,10 @@ function migrate(s){
   if (!s.skills.scribing) s.skills.scribing = 1;
   if (!s.skillXp.scribing) s.skillXp.scribing = 0;
   if (!s.stats.slabs) s.stats.slabs = 0;
+  // Counters the onboarding chain asks about. They record an ACTION the save had no other record
+  // of — a scribed card is indistinguishable from a starter one once it is in `cards`.
+  if (s.stats.scribed == null) s.stats.scribed = 0;
+  if (s.stats.refined == null) s.stats.refined = 0;
   if (s.slabCounter == null) s.slabCounter = 0;
   if (!s.daily) s.daily = { date:"", type:"win", progress:0, target:3, claimed:false };
   if (!s.school) s.school = "balance";
@@ -138,6 +142,7 @@ export function refine(s, cardMatId, sourceId){
   if (!cm || !cm.from.includes(sourceId)) return {ok:false};
   if ((s.inventory[sourceId]||0) < 1) return { ok:false, err:"resources" };
   s.inventory[sourceId]--; s.inventory[cardMatId] = (s.inventory[cardMatId]||0)+1;
+  s.stats.refined = (s.stats.refined || 0) + 1;
   addSkillXp(s, "scribing", cm.xp);
   return { ok:true, item:cm };
 }
@@ -151,6 +156,7 @@ export function scribe(s){
   const c = randomCardOfRarity(rollRarity());
   const inst = { uid:uid(), id:c.id, roll, graded:false };
   s.cards.push(inst);
+  s.stats.scribed = (s.stats.scribed || 0) + 1;
   addSkillXp(s, "scribing", 30);
   dailyProgress(s, "scribe");
   return { ok:true, inst };

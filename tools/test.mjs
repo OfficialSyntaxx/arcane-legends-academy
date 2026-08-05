@@ -9,6 +9,7 @@ import { CDN } from "../public/cdn.js";
 import * as TER from "../public/terrain.js";
 import * as WC from "../public/worldconfig.js";
 import * as DG from "../public/dungeons.js";
+import * as OB from "../public/onboarding.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -1147,6 +1148,94 @@ const s6 = G.newGame();
 s6.gold = 500; s6.inventory.oak_log = 5;
 check("buy home", G.buyHome(s6).ok && s6.home.owned);
 check("upgrade treasury", G.upgradeHome(s6,"treasury").ok && s6.home.upgrades.treasury===1);
+
+// ---- onboarding chain (BACKLOG §1 "first 10 minutes") ----
+// The point of this suite is that the chain is COMPLETABLE using the real engine functions. A
+// tutorial that asks for something the game cannot deliver is worse than no tutorial, and the
+// only way to know is to play it.
+check("a fresh save starts on 'choose your school'", (()=>{
+  const s = G.newGame();
+  const st = OB.currentStep(s);
+  return st && st.id === "school";
+})());
+check("every onboarding step has a title, a reason and a destination",
+  OB.STEPS.every(st => st.title && st.why && st.goto && typeof st.done === "function"));
+check("onboarding step ids are unique", new Set(OB.STEPS.map(st => st.id)).size === OB.STEPS.length);
+check("the onboarding chain can actually be completed", (()=>{
+  const s = G.newGame();
+  const seen = [];
+  const advance = () => { const st = OB.currentStep(s); if (st) seen.push(st.id); return st; };
+
+  advance();                                   // school
+  G.setSchool(s, "fire"); s.flags.schoolPicked = true;
+
+  advance();                                   // gather
+  // gather enough of the three refinable sources to make one of each scribing input
+  for (const cm of CARD_MATERIALS){
+    const src = MATERIALS.find(m => cm.from.includes(m.id));
+    for (let i = 0; i < 3; i++) G.gather(s, src);
+  }
+
+  advance();                                   // refine
+  for (const cm of CARD_MATERIALS){
+    const src = MATERIALS.find(m => cm.from.includes(m.id));
+    const r = G.refine(s, cm.id, src.id);
+    if (!r.ok){ console.log("   refine failed:", cm.id, r.err); return false; }
+  }
+
+  advance();                                   // scribe
+  const sc = G.scribe(s);
+  if (!sc.ok){ console.log("   scribe failed:", sc.err); return false; }
+
+  advance();                                   // grade
+  s.gold = 5000;
+  const ungraded = s.cards.find(c => !c.graded);
+  const gr = G.gradeCard(s, ungraded.uid);
+  if (!gr.ok){ console.log("   grade failed:", gr.err); return false; }
+
+  advance();                                   // deck (the starter deck is already legal)
+  advance();                                   // duel
+  s.stats.won = 1;
+
+  const done = OB.currentStep(s);
+  if (done){ console.log("   stuck on:", done.id); return false; }
+  // The chain must never go BACKWARDS. `seen` can repeat an id (the starter deck already
+  // satisfies the deck step, so "duel" is the current step twice in a row) — what matters is
+  // that the sequence of distinct steps follows the declared order.
+  const order = OB.STEPS.map(st => st.id);
+  const distinct = seen.filter((id, i) => seen.indexOf(id) === i);
+  const expected = order.filter(id => distinct.includes(id));
+  if (JSON.stringify(distinct) !== JSON.stringify(expected)){
+    console.log("   steps came out of order:", distinct.join(" -> "));
+    return false;
+  }
+  return OB.progress(s).complete;
+})());
+check("the chain does not get stuck when steps are done out of order", (()=>{
+  // The whole reason steps are DERIVED: a player who scribes before being told to must not be
+  // asked to do it again. A tracked counter would be stuck here.
+  const s = G.newGame();
+  s.inventory.canvas = 1; s.inventory.ink = 1; s.inventory.reagent = 1;
+  G.scribe(s);
+  return OB.STEPS.find(st => st.id === "scribe").done(s)
+      && OB.STEPS.find(st => st.id === "refine").done(s);
+})());
+check("gathering alone does not satisfy the refine step", (()=>{
+  const s = G.newGame();
+  G.gather(s, MATERIALS.find(m => m.id === "oak_log"));
+  return OB.STEPS.find(st => st.id === "gather").done(s)
+      && !OB.STEPS.find(st => st.id === "refine").done(s);
+})());
+check("the checklist marks exactly one step active", (()=>{
+  const s = G.newGame();
+  return OB.checklist(s).filter(x => x.active).length === 1;
+})());
+check("a finished chain has no active step", (()=>{
+  const s = G.newGame();
+  s.flags.schoolPicked = true; s.inventory.oak_log = 1; s.stats.scribed = 1;
+  s.stats.graded = 1; s.stats.won = 1;
+  return OB.currentStep(s) === null && OB.checklist(s).every(x => !x.active);
+})());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
