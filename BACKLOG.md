@@ -43,11 +43,12 @@
 
 ## 3. Open World
 
-- [ ] Expand beyond the Academy
+- [~] Expand beyond the Academy — Whispering Forest + Ashen Mountains (+2 dungeons) ship; Lake Arcanum next
 - [x] Whispering Forest — streams, reachable through the academy's north gateway, three NPCs and five quests that lead into Cinderhollow
+- [x] Ashen Mountains — mining zone (iron/gold/mithril/runite), 2 NPCs, Cinder Bats/Ashen Skeletons, leads into Ashen Caverns
 - [ ] Lake Arcanum
-- [ ] Ashen Mountains
 - [x] Cinderhollow Caverns — 4-room dungeon reachable from the Whispering Forest, boss + persistent kill/room/boss progress
+- [x] Ashen Caverns — 4-room mining dungeon reachable from Ashen Mountains, boss The Ember Wyrm
 - [x] Zone transitions — walkable gateways, reciprocal arrival, world state persisted in the save
 - [x] Chunk streaming — scatter-once/bucket-once with load/unload hysteresis and GPU disposal
 - [ ] Fast travel

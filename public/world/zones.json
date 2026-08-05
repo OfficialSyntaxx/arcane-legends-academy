@@ -4,7 +4,7 @@
       "id": "academy",
       "name": "The Arcanum Academy",
       "hub": true,
-      "generated": "tools/sync-zones.mjs \u2014 do not hand-edit; edit structures.js/nodes.js and re-run",
+      "generated": "tools/sync-zones.mjs — do not hand-edit; edit structures.js/nodes.js and re-run",
       "spawn": {
         "x": 13,
         "z": 15
@@ -242,7 +242,7 @@
           "key": "quest",
           "role": "quest",
           "station": "quests",
-          "label": "Professor \u2014 Quests",
+          "label": "Professor — Quests",
           "x": -22,
           "z": 17,
           "main": 10133688,
@@ -266,7 +266,7 @@
           "key": "duel",
           "role": "duel",
           "station": "duel",
-          "label": "Referee \u2014 Duel",
+          "label": "Referee — Duel",
           "x": 9,
           "z": -21,
           "main": 4864634,
@@ -278,7 +278,7 @@
           "key": "trainer",
           "role": "trainer",
           "station": "trainer",
-          "label": "Trainer \u2014 Practice",
+          "label": "Trainer — Practice",
           "x": 17,
           "z": 24,
           "main": 3828696,
@@ -290,7 +290,7 @@
           "key": "librarian",
           "role": "librarian",
           "station": "librarian",
-          "label": "Librarian \u2014 Lore",
+          "label": "Librarian — Lore",
           "x": -31,
           "z": 22,
           "main": 6970270,
@@ -935,6 +935,135 @@
           "toZone": "academy",
           "x": 0,
           "z": 158
+        },
+        {
+          "toZone": "ashen_mountains",
+          "x": 158,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "id": "ashen_mountains",
+      "name": "Ashen Mountains",
+      "spawn": {
+        "x": -100,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -120,
+        "maxX": 120,
+        "minZ": -120,
+        "maxZ": 120
+      },
+      "terrain": {
+        "seed": 55123,
+        "scale": 42,
+        "amplitude": 9,
+        "baseHeight": 0,
+        "waterLevel": -2.5,
+        "biome": "mountains"
+      },
+      "chunkSize": 32,
+      "loadRadius": 70,
+      "unloadRadius": 100,
+      "props": [
+        {
+          "url": "./assets/models/kaykit_rock.glb",
+          "count": 60,
+          "h": 2.2
+        },
+        {
+          "url": "./assets/models/nat_CommonTree_1.glb",
+          "count": 22,
+          "h": 7,
+          "minDistFromSpawn": 12
+        },
+        {
+          "url": "./assets/models/nat_Mushroom_Common.glb",
+          "count": 30,
+          "h": 1
+        }
+      ],
+      "resourceNodes": [
+        {
+          "kind": "crystal",
+          "id": "iron",
+          "label": "Mine Iron",
+          "count": 8
+        },
+        {
+          "kind": "crystal",
+          "id": "gold",
+          "label": "Mine Gold",
+          "count": 6
+        },
+        {
+          "kind": "crystal",
+          "id": "mithril",
+          "label": "Mine Mithril",
+          "count": 5
+        },
+        {
+          "kind": "crystal",
+          "id": "runite",
+          "label": "Mine Runite",
+          "count": 3
+        }
+      ],
+      "nodeModels": {
+        "crystal": {
+          "url": "./assets/models/kaykit_rock.glb",
+          "h": 2.2
+        }
+      },
+      "npcs": [
+        {
+          "key": "mountain_miner",
+          "role": "quest",
+          "station": "mountain_miner",
+          "label": "Foreman Grund",
+          "x": -60,
+          "z": 40,
+          "model": "trainer.glb"
+        },
+        {
+          "key": "mountain_smith",
+          "role": "quest",
+          "station": "market",
+          "label": "Smelter Voss",
+          "x": 50,
+          "z": 60,
+          "model": "merchant.glb"
+        }
+      ],
+      "enemies": [
+        {
+          "model": "creature_Skeleton.glb",
+          "name": "Ashen Skeleton",
+          "count": 10,
+          "level": 5
+        },
+        {
+          "model": "creature_Bat.glb",
+          "name": "Cinder Bat",
+          "count": 6,
+          "level": 4
+        }
+      ],
+      "dungeonEntrances": [
+        {
+          "id": "ashen_caverns",
+          "x": 90,
+          "z": -60,
+          "model": "./assets/models/dng_doorway.glb"
+        }
+      ],
+      "exits": [
+        {
+          "toZone": "whispering_forest",
+          "x": -118,
+          "z": 0
         }
       ]
     }

@@ -214,11 +214,12 @@ Dungeons and boss rooms are **interior instances** — separate scenes, not part
 4. ✅ **Zone transitions** — walkable `exits` that switch the active zone, arriving at the
    target's *reciprocal* exit so the two zones join up geographically.
 5. ✅ **Dungeon instancing** — entrance → suspend zone → load interior → rooms/corridors → boss room → exit restores zone (§6). `cinderhollow_caverns` (4 rooms + boss) ships, reachable from `whispering_forest`; kills/cleared-rooms/boss-defeat persist in `worldState.dungeons` and defeated enemies do not respawn.
-6. **Content pass — in progress.** The first zone pair + one dungeon are done: `academy` (hub),
-   `whispering_forest` (streaming outdoor zone, 3 NPCs, 5 field quests via `zonequests.js`), and
-   `cinderhollow_caverns` (the dungeon those quests lead into). **Still to author:** a second
-   dungeon and a third outdoor zone — the schemas in §3/§6 need no engine change, so this is
-   content-authoring against `zones.json`/`dungeons.json`, not new code.
+6. **Content pass — in progress.** Two zone pairs + two dungeons are done: `academy` (hub) +
+   `whispering_forest` (streaming outdoor zone, 3 NPCs, 5 field quests via `zonequests.js`) leading
+   into `cinderhollow_caverns` (dungeon, boss The Cinder Wyrm); and `ashen_mountains` (mining zone,
+   2 NPCs, iron/gold/mithril/runite nodes) leading into `ashen_caverns` (dungeon, boss The Ember
+   Wyrm). **Still to author:** Lake Arcanum (fourth zone) and anything beyond — the schemas in §3/§6
+   need no engine change, so this is content-authoring against `zones.json`/`dungeons.json`.
 
 ---
 
