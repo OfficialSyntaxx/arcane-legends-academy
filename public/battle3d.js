@@ -3,6 +3,7 @@
 // synced to the logic.js duel engine. Uses window.THREE (global).
 import { modelUrl, CDN } from "./cdn.js";
 import { effectFor, ORIGIN } from "./vfx.js";
+import { creatureFor, CREATURES } from "./creatures.js";
 const MAX_SLOTS = 5;
 const SCHOOL_COLORS = {
   fire: 0xff5a3c, ice: 0x6fc3ff, storm: 0xa06bff, myth: 0xffd766,
@@ -225,6 +226,23 @@ export function createBattle3d(canvas) {
       group.add(model);
       entry.model = model;
       if (clip) { entry.mixer = new THREE.AnimationMixer(model); entry.mixer.clipAction(clip).play(); }
+      // floating trait label: name + passive, so each creature reads as its own identity
+      const spec = creatureFor(modelName);
+      if (spec){
+        const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96;
+        const g = cv.getContext('2d');
+        g.fillStyle = 'rgba(10,6,24,0.72)'; g.fillRect(0, 0, 512, 96);
+        g.strokeStyle = 'rgba(255,201,77,0.7)'; g.lineWidth = 3; g.strokeRect(1, 1, 510, 94);
+        g.fillStyle = '#ffc94d'; g.font = 'bold 40px sans-serif'; g.textAlign = 'center';
+        g.fillText(spec.name, 256, 44);
+        g.fillStyle = '#8fd0ff'; g.font = '24px sans-serif';
+        g.fillText(spec.passive.length > 42 ? spec.passive.slice(0, 42) + '…' : spec.passive, 256, 78);
+        const tex = new THREE.CanvasTexture(cv);
+        const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, fog: false }));
+        label.scale.set(2.4, 0.45, 1); label.position.y = 2.6;
+        group.add(label);
+        entry.label = label;
+      }
     });
   }
   function removeAt(side, i) {
