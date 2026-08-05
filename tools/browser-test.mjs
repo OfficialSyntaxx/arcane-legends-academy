@@ -556,6 +556,19 @@ if (hasWorld){
     window.__testBoard();
     await new Promise(r => setTimeout(r, 900));
     const out = { canvas: (() => { const c = document.getElementById("battle3d"); return { w: c.width, h: c.height }; })() };
+    {
+      const band = document.getElementById("battleWrap").getBoundingClientRect();
+      const scr = document.getElementById("screen").getBoundingClientRect();
+      const card = document.querySelector("#screen .card, #screen .handcard, #screen [class*=card]");
+      const cr = card ? card.getBoundingClientRect() : null;
+      out.layout = {
+        bandFraction: band.height / innerHeight,
+        bandBottom: Math.round(band.bottom), screenTop: Math.round(scr.top),
+        hand: cr ? { top: Math.round(cr.top), bottom: Math.round(cr.bottom) } : null,
+        // a card must be inside the viewport and clear of the arena band
+        handVisible: !!cr && cr.height > 20 && cr.top >= band.bottom - 1 && cr.top < innerHeight,
+      };
+    }
     await new Promise(r => setTimeout(r, 2200));      // let every summon glyph finish
     out.baseline = lit();
     out.cards = {};
@@ -566,14 +579,35 @@ if (hasWorld){
       await new Promise(r => setTimeout(r, 1500));    // let it expire before the next one
     }
     out.leaked = window.__battle3d.activeFx();
+    // Starve the loop: block the main thread so almost no frames run, then check the effect has
+    // still expired once real time has passed.
+    window.__testCast("firebolt", 0);
+    const until = Date.now() + 2600;
+    while (Date.now() < until){ /* busy-wait: starves requestAnimationFrame */ }
+    await new Promise(r => setTimeout(r, 120));
+    out.slowExpiry = window.__battle3d.activeFx();
     return out;
   });
   check("the duel canvas has a real size", vfx.canvas.w > 200 && vfx.canvas.h > 80, JSON.stringify(vfx.canvas));
+  // LAYOUT. The arena band and #screen were both flex:1, so they split the viewport and the
+  // player's hand was cut in half by the top of the arena. The cards matter more than the view.
+  check("the arena band leaves room for the duel UI",
+        vfx.layout.bandFraction < 0.42, `band is ${(vfx.layout.bandFraction*100).toFixed(0)}% of the viewport`);
+  check("the arena sits above the duel UI, not over the hand",
+        vfx.layout.bandBottom <= vfx.layout.screenTop + 2,
+        `band ends at ${vfx.layout.bandBottom}, duel UI starts at ${vfx.layout.screenTop}`);
+  check("the player's hand is on screen during a duel",
+        vfx.layout.handVisible, JSON.stringify(vfx.layout.hand));
   for (const tag of ["bolt","rain","aura","burst","glyph"]){
     check(`the ${tag} spell effect renders`, vfx.cards[tag] > vfx.baseline * 1.15,
           `${vfx.cards[tag]} lit px vs ${vfx.baseline} baseline`);
   }
-  check("spell effects clean themselves up", vfx.leaked === 0, `${vfx.leaked} still alive`);
+  // Effect lifetime runs on the WALL CLOCK, not on the frame loop's capped dt. With capped dt a
+  // throttled frame rate stretched every spell — at ~4fps they never expired at all, their
+  // lights stayed at full brightness and each cast piled another one on top.
+  check("spell effects expire in real time", vfx.leaked === 0, `${vfx.leaked} still alive`);
+  check("effects expire even when frames are scarce", vfx.slowExpiry === 0,
+        `${vfx.slowExpiry} survived a low frame rate`);
 }
 
 check("no uncaught page errors", errs.length === 0, errs.slice(0,3).join(" | "));

@@ -45,26 +45,91 @@ export function createBattle3d(canvas) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.shadowMap.enabled = true;
   const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0d0820, 14, 34);   // the pit fades into dark rather than ending
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
   camera.position.set(0, 6.2, 8.6);
   camera.lookAt(0, 0.4, 0);
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-  sun.position.set(4, 9, 5); sun.castShadow = true; scene.add(sun);
-  const rim = new THREE.DirectionalLight(0x8855ff, 0.5); rim.position.set(-4, 6, -4); scene.add(rim);
+  scene.add(new THREE.AmbientLight(0x8090c0, 0.32));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 0.85);
+  sun.position.set(5, 10, -3); sun.castShadow = true; scene.add(sun);   // from behind, so the hotspot is not facing the camera
+  const rim = new THREE.DirectionalLight(0x8855ff, 0.55); rim.position.set(-4, 6, -6); scene.add(rim);
 
-  const floor = new THREE.Mesh(new THREE.CircleGeometry(7.5, 40), new THREE.MeshStandardMaterial({ color: 0x2a2350, roughness: 0.9 }));
-  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(7.5, 0.12, 8, 60), new THREE.MeshStandardMaterial({ color: 0xffc94d, emissive: 0x664400, emissiveIntensity: 0.4 }));
-  ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02; scene.add(ring);
-  const mk = (z, c) => { const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 3), new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.5 })); m.position.set(0, 0.03, z); scene.add(m); };
-  mk(3.2, 0x3ddc84); mk(-3.2, 0xff5a5a);
+  // ---------------- the arena ----------------
+  // This used to be a flat purple disc with a yellow ring, which read as a disc rather than a
+  // place. It is now built like a duelling pit: a stone floor, an inlaid rune circle, a raised
+  // pad per duellist, a colonnade around the rim and banners behind each side. All procedural —
+  // the duel screen must never wait on a download to look like anything.
+  const stone = (c, rough = 0.95) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0.05 });
+  const arena = new THREE.Group(); scene.add(arena);
+  const add3 = (m, x, y, z) => { m.position.set(x, y, z); arena.add(m); return m; };
 
+  const R = 7.2;
+  // floor: two tones so the circle reads as inlaid rather than painted on
+  const floor = add3(new THREE.Mesh(new THREE.CylinderGeometry(R, R, 0.5, 48), stone(0x3b3357)), 0, -0.25, 0);
+  floor.receiveShadow = true;
+  add3(new THREE.Mesh(new THREE.CylinderGeometry(R * 0.82, R * 0.82, 0.06, 48), stone(0x4a4270)), 0, 0.03, 0).receiveShadow = true;
+  // rune circle
+  const runeMat = new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.55,
+    blending: THREE.AdditiveBlending, depthWrite: false });
+  const rune = add3(new THREE.Mesh(new THREE.RingGeometry(R * 0.52, R * 0.60, 48, 1), runeMat), 0, 0.07, 0);
+  rune.rotation.x = -Math.PI / 2;
+  const rune2 = add3(new THREE.Mesh(new THREE.RingGeometry(R * 0.30, R * 0.33, 32, 1), runeMat.clone()), 0, 0.07, 0);
+  rune2.rotation.x = -Math.PI / 2;
+  // outer lip
+  const lip = add3(new THREE.Mesh(new THREE.TorusGeometry(R, 0.22, 8, 56), stone(0x6a5f96, 0.7)), 0, 0.1, 0);
+  lip.rotation.x = -Math.PI / 2;
+
+  // colonnade — the thing that actually turns a disc into a room
+  for (let i = 0; i < 14; i++){
+    const a = (i / 14) * Math.PI * 2;
+    // leave the front open so the camera is not looking through a fence
+    if (Math.cos(a) > 0.55 && Math.abs(Math.sin(a)) < 0.75) continue;
+    const px = Math.sin(a) * (R + 1.1), pz = Math.cos(a) * (R + 1.1);
+    add3(new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 5.4, 8), stone(0x554b7d)), px, 2.7, pz).castShadow = true;
+    add3(new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.4, 1.1), stone(0x6a5f96, 0.7)), px, 5.6, pz);
+    add3(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.3, 1.2), stone(0x4a4270)), px, 0.15, pz);
+    // brazier glow at every other pillar, so the pit is lit from within
+    if (i % 2 === 0){
+      const fire = add3(new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6),
+        new THREE.MeshBasicMaterial({ color: 0xffb05a, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false })), px, 5.9, pz);
+      const l = new THREE.PointLight(0xff9a3c, 0.7, 12); l.position.set(px, 5.9, pz); arena.add(l);
+      fire.userData.flicker = Math.random() * 6.28;
+    }
+  }
+
+  // duelling pads: a raised, tinted disc under each side, so the two rows read as positions
+  // Fully rough: a smooth cylinder catches the key light as a blown-out white blob dead
+  // centre of the near pad, which is the brightest thing on screen and reads as an error.
+  const padMat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 1.0, metalness: 0 });
+  // A ring, not a filled disc: a solid glowing lozenge under each side dominated the shot and
+  // read as a light rather than a platform.
+  const pads = {};
+  for (const [side, c, z] of [["you", 0x3a86c8, 2.6], ["enemy", 0xc85a6a, -2.6]]){
+    pads[side] = add3(new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.75, 0.14, 32), padMat(0x4a4270)), 0, 0.1, z);
+    const edge = add3(new THREE.Mesh(new THREE.RingGeometry(2.25, 2.55, 32, 1),
+      new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.32,
+        blending: THREE.AdditiveBlending, depthWrite: false })), 0, 0.19, z);
+    edge.rotation.x = -Math.PI / 2;
+  }
+
+  // banners behind each side
+  // Banners hang high on the FAR arc only — one team's colours to each side. Hung on the near
+  // arc they sit between the camera and the arena and simply block the shot, which is what the
+  // first attempt did.
+  for (const [c, sign] of [[0x2f6f8a, -1], [0x7a3550, 1]]){
+    for (const k of [0.30, 0.62, 0.94]){
+      const a = Math.PI - sign * k;                    // far arc, fanning out to one side
+      const px = Math.sin(a) * (R + 0.9), pz = Math.cos(a) * (R + 0.9);
+      const b = add3(new THREE.Mesh(new THREE.PlaneGeometry(1.15, 2.6),
+        new THREE.MeshStandardMaterial({ color: c, roughness: 1, side: THREE.DoubleSide })), px, 4.0, pz);
+      b.rotation.y = Math.atan2(px, pz);
+    }
+  }
   const sides = { you: [], enemy: [] };   // arrays of spawned {cardId, group, ...} in board order
   const cache = new Map(); // url -> {template, clip}
   const loader = new THREE.GLTFLoader();
-  let raf = 0, last = 0, running = false;
+  let raf = 0, last = 0, running = false, frames = 0;
 
   function slotPos(i, count) {            // center the row across the width
     const spread = Math.min(count, MAX_SLOTS);
@@ -210,15 +275,21 @@ export function createBattle3d(canvas) {
       parts.push({ mesh: rune, role: "rune" }, { mesh: inner, role: "inner" });
     }
 
-    const e = { spec, t: 0, dur: spec.duration, from, to, parts, light };
+    // Wall clock, not accumulated dt. The frame loop caps dt at 0.05s to keep the creature
+    // animation sane through a stall, but using that same capped dt for effect LIFETIME means a
+    // throttled or slow frame rate stretches every spell: at ~4fps the effects simply never
+    // expired, their lights stayed at full brightness, and each cast piled another one on.
+    const e = { spec, t: 0, startedAt: (typeof performance !== "undefined" ? performance.now() : Date.now()),
+                dur: spec.duration, from, to, parts, light };
     fx.push(e);
     return e;
   }
 
   function stepFx(dt){
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
     for (let i = fx.length - 1; i >= 0; i--){
       const e = fx[i];
-      e.t += dt;
+      e.t = (now - e.startedAt) / 1000;
       const k = Math.min(1, e.t / e.dur);        // 0..1 progress
       const fade = 1 - k;
       for (const p of e.parts){
@@ -263,6 +334,7 @@ export function createBattle3d(canvas) {
   function frame(t) {
     raf = requestAnimationFrame(frame);
     const dt = Math.min(0.05, (t - last) / 1000 || 0); last = t;
+    frames++;
     stepFx(dt);
     for (const side of ['you', 'enemy']) {
       for (const e of sides[side]) {
@@ -298,11 +370,15 @@ export function createBattle3d(canvas) {
     // until every corner of the play volume projects inside the frustum. Guessing a distance
     // kept putting the NEAR row below the bottom of the canvas — the frame is asymmetric,
     // because the floor runs toward the camera while the far row runs away from it.
+    // Fit the STAGE, not just the creatures: the colonnade sits at radius 8.3, so a camera
+    // framed only on the play volume ends up standing among the pillars and they fill the shot.
+    // Include enough of the floor that the arena reads as a place, and start far enough out to
+    // be behind the columns.
     const pts = [];
-    for (const x of [-2.6, 2.6]) for (const z of [-3.4, 3.4]) for (const y of [0, 2.6]) pts.push(new THREE.Vector3(x, y, z));
-    const look = new THREE.Vector3(0, 1.0, 0);
-    for (let dist = 9; dist <= 30; dist += 0.5){
-      camera.position.set(0, dist * 0.44, dist * 0.9);
+    for (const x of [-5.4, 5.4]) for (const z of [-4.6, 4.6]) for (const y of [0, 3.2]) pts.push(new THREE.Vector3(x, y, z));
+    const look = new THREE.Vector3(0, 1.2, 0);
+    for (let dist = 12; dist <= 44; dist += 0.5){
+      camera.position.set(0, dist * 0.34, dist * 0.94);
       camera.lookAt(look);
       camera.updateMatrixWorld(true);
       camera.updateProjectionMatrix();
@@ -329,6 +405,6 @@ export function createBattle3d(canvas) {
 
   return { setSize, sync, clear, start, stop, renderOnce, dispose, playSpell,
            // exposed for tools/browser-test.mjs, which counts lit pixels to prove effects render
-           __scene: scene,
+           __scene: scene, __frames: () => ({ frames, running }),
            activeFx: () => fx.length };
 }

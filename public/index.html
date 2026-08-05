@@ -54,6 +54,12 @@ html,body{margin:0;height:100%;background:#0d0a1f;color:var(--ink);
 .navbtn.on{background:var(--panel2);color:var(--gold);border-color:var(--line);}
 
 /* screens */
+/* The duel arena is a BAND, not a half-screen. It used to be flex:1 alongside #screen, so the
+   two split the viewport and the player's hand was pushed below the fold behind it. Bounded
+   height keeps the cards reachable, which matters more than a big 3D view. */
+#battleWrap{position:relative;flex:0 0 clamp(190px, 30vh, 330px);overflow:hidden;background:#0d0820;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+#battle3d{position:absolute;inset:0;width:100%;height:100%;display:block;}
 #screen{padding:14px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;padding-bottom:calc(40px + var(--sab));-webkit-overflow-scrolling:touch;}
 .screen{display:none;animation:fade .25s ease;}
 .screen.on{display:block;}
@@ -269,6 +275,11 @@ body.has-touch .worldbtn{display:flex;}
        chain sends the player back and forth between them and an objective you can only see on
        one screen is an objective you lose track of. -->
   <div id="objective" style="display:none"></div>
+  <!-- The duel arena sits ABOVE the duel UI. Below it, it competed with the player's hand for
+       the bottom of the viewport and cut the cards in half. -->
+  <div id="battleWrap" style="display:none">
+    <canvas id="battle3d"></canvas>
+  </div>
   <div id="screen"></div>
   <div id="worldWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#1a1440">
     <canvas id="world"></canvas>
@@ -277,9 +288,6 @@ body.has-touch .worldbtn{display:flex;}
     <div id="prompt"></div>
     <button id="zoomIn" class="worldbtn" aria-label="Zoom in">+</button>
     <button id="zoomOut" class="worldbtn" aria-label="Zoom out">−</button>
-  </div>
-  <div id="battleWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#120c2e">
-    <canvas id="battle3d" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
   </div>
 </div>
 <div id="toast"></div>
