@@ -1047,14 +1047,16 @@ window.__EV.duelAgain = ()=>{
   const qIdx = battle && battle.questIdx;
   const gear = G.equipStats(S);
   const bonus = amt => Math.round(amt * gear.gold/100);
-  const dungeonBoss = battle && battle.dungeonBoss;
+  const dungeonFoe = battle && battle.dungeonFoe;
   if (over.winner==="you"){
     G.dailyProgress(S, "win");
-    if (dungeonBoss){
-      // WORLDSPEC §6: boss kills persist, so a cleared dungeon stays cleared across sessions.
-      const st = (S.worldState.dungeons[dungeonBoss.zone] = S.worldState.dungeons[dungeonBoss.zone] || { cleared: [], bossDead: false });
-      if (!st.bossDead){
-        st.bossDead = true;
+    if (dungeonFoe){
+      // WORLDSPEC §6: dungeon progress persists, so a cleared dungeon stays cleared.
+      const st = S.worldState.dungeons[dungeonFoe.zone] || {};
+      const firstBossKill = dungeonFoe.boss && !st.bossDead;
+      recordDungeonKill(dungeonFoe);
+      if (firstBossKill){
+        S.worldState.dungeons[dungeonFoe.zone].bossDead = true;
         G.gainGold(S, 400);
         G.dropCards(S, 3);
         toast("☠ Boss defeated! +400g +3 cards");
@@ -1236,6 +1238,8 @@ function spawnWorld(canvas, zone, spawnAt){
     onEnemy(name){ startDungeonFight(name); },
   }, zone, {
     spawnAt,
+    // enemies this save has already killed — they must not respawn on re-entry
+    defeated: (S.worldState.dungeons[zone.id] || {}).defeated || [],
     zoneNames: worldCfg ? Object.fromEntries(worldCfg.zoneIds.map(id => [id, worldCfg.get(id).name])) : {},
   });
 }
@@ -1250,19 +1254,37 @@ let zoning = false;
 function enterDungeon(id){
   if (!worldCfg || !worldCfg.get(id)){ console.warn("unknown dungeon", id); return; }
   S.worldState.dungeons = S.worldState.dungeons || {};
-  S.worldState.dungeons[id] = S.worldState.dungeons[id] || { cleared: [], bossDead: false };
+  S.worldState.dungeons[id] = S.worldState.dungeons[id] || { cleared: [], defeated: [], bossDead: false };
   changeZone(id, activeZone && activeZone.id);
 }
 // Bumping into a dungeon enemy starts a duel. The enemy's level picks the quest deck it fights
 // with, so a Lv3 slime is not shuffling the Archon's endgame list.
-function startDungeonFight(name){
+function startDungeonFight(id){
   const zone = activeZone;
-  const foe = (zone && zone.enemies || []).find(e => e.name === name);
+  const foe = (zone && zone.enemies || []).find(e => e.id === id);
   if (!foe) return;
   const tier = Math.max(0, Math.min(G.QUESTS.length - 1, Math.floor((foe.level || 1) / 2)));
   const q = G.QUESTS[tier];
   startLocalDuel(q.deck, q.gear, foe.name, tier, false);
-  if (foe.boss) battle.dungeonBoss = { zone: zone.id };
+  // Remembered on the battle so the reward/persistence step knows what was actually beaten.
+  battle.dungeonFoe = { zone: zone.id, id: foe.id, room: foe.room, boss: !!foe.boss };
+}
+// Record a dungeon kill: remove it from the world, persist it, and mark the room cleared once
+// nothing in it is left standing.
+function recordDungeonKill(foe){
+  const st = (S.worldState.dungeons[foe.zone] = S.worldState.dungeons[foe.zone] ||
+              { cleared: [], defeated: [], bossDead: false });
+  if (st.defeated.includes(foe.id)) return;
+  st.defeated.push(foe.id);
+  if (world && world.removeEnemy) world.removeEnemy(foe.id);
+  const zone = worldCfg && worldCfg.get(foe.zone);
+  if (zone){
+    const left = zone.enemies.filter(e => e.room === foe.room && !st.defeated.includes(e.id));
+    if (!left.length && !st.cleared.includes(foe.room)){
+      st.cleared.push(foe.room);
+      toast("✨ Room cleared: " + foe.room);
+    }
+  }
 }
 function changeZone(toZoneId, fromZoneId){
   if (zoning || !worldCfg) return;
@@ -1457,6 +1479,10 @@ async function initWorld(){
   hud.style.display = "block";
 }
 window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
+// Test hooks for tools/browser-test.mjs. They drive the REAL functions rather than reimplementing
+// them, so the test cannot pass against a path the game does not actually use.
+window.__testBattle = ()=> battle;
+window.__testKill = ()=>{ if (battle && battle.dungeonFoe){ recordDungeonKill(battle.dungeonFoe); save(); } };
 window.__EV.toggleMute = ()=>{
   AUDIO.unlock();
   AUDIO.setMuted(!AUDIO.isMuted());

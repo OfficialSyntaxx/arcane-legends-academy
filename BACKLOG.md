@@ -60,7 +60,7 @@
 - [ ] Better AI deck archetypes
 - [~] Boss battles — the Cinder Wyrm fights via the duel engine; multi-phase/abilities pending
 - [ ] Multi-phase bosses
-- [~] Dungeon progression — Cinderhollow Caverns is playable end to end; `worldState.dungeons` persists boss kills. Room-clear gating and more dungeons pending
+- [~] Dungeon progression — Cinderhollow Caverns is playable end to end; kills, cleared rooms and boss defeat all persist and enemies stay dead. Locked doors / key gating and more dungeons pending
 - [ ] Spell VFX — costs nothing, see `docs/DESIGN-DECISIONS.md` §2 phase 1
 - [~] Attack / summon / death animations — `battle3d.js` exists; procedural walk cycle already added for NPCs
 - [ ] Reusable combat effect system

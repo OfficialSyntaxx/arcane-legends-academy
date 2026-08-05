@@ -421,6 +421,56 @@ if (hasWorld){
   check("the boss can be approached and engaged", dung.bossPrompt === "enemy", `${dung.bossPrompt} / ${dung.bossLabel}`);
   check("leaving the dungeon returns outdoors", dung.zoneAfter === "whispering_forest", String(dung.zoneAfter));
 
+  // --- dungeon progression: a killed enemy must stay killed ---
+  // Without this the same slime can be fought forever and the dungeon has no progression at all.
+  const prog = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    if (dbg().zone !== "cinderhollow_caverns"){
+      const ent = (dbg().dungeonEntrances || [])[0];
+      if (!ent) return { skipped: true };
+      window.__world.teleport(ent.x, ent.z); await settle(400);
+      window.__world.trigger(); await settle(1600);
+    }
+    const before = dbg().enemies;
+    // engage the first enemy, then declare victory the way the duel screen does
+    const foe = dbg().enemyList[0];
+    window.__world.teleport(foe.x, foe.z - 3);
+    await settle(400);
+    const promptedAs = dbg().nearbyKind;
+    window.__ev("worldGo");                       // starts the duel
+    await settle(300);
+    const started = !!(window.__testBattle && window.__testBattle());
+    // kill it directly through the same path the win handler uses
+    window.__testKill && window.__testKill();
+    await settle(400);
+    const after = dbg().enemies;
+    // LEAVE AND COME BACK. Removing the model is only half of it — the enemy must not respawn
+    // when the zone is rebuilt, which is what the saved list is actually for.
+    const out = (dbg().exits || [])[0];
+    window.__world.teleport(out.x, out.z); await settle(1500);
+    const outside = dbg().zone;
+    const ent2 = (dbg().dungeonEntrances || [])[0];
+    window.__world.teleport(ent2.x, ent2.z); await settle(400);
+    window.__world.trigger(); await settle(1800);
+    return { skipped: false, promptedAs, started, before, after, outside,
+             reentered: dbg().zone, afterReentry: dbg().enemies,
+             saved: (JSON.parse(localStorage.getItem("arcane_legends_save_v1") || "{}").worldState || {}).dungeons };
+  });
+  if (prog.skipped) check("dungeon progression check ran", true, "no entrance — skipped");
+  else {
+    check("a dungeon enemy prompts a fight", prog.promptedAs === "enemy", String(prog.promptedAs));
+    check("a defeated enemy is removed from the world", prog.after === prog.before - 1,
+          `${prog.before} -> ${prog.after}`);
+    check("the kill is persisted to the save", !!(prog.saved && prog.saved.cinderhollow_caverns &&
+          prog.saved.cinderhollow_caverns.defeated.length === 1),
+          JSON.stringify(prog.saved && prog.saved.cinderhollow_caverns));
+    check("the defeated enemy does not respawn on re-entry",
+          prog.reentered === "cinderhollow_caverns" && prog.afterReentry === prog.before - 1,
+          `${prog.outside} -> ${prog.reentered}, ${prog.afterReentry} enemies (was ${prog.before})`);
+  }
+
+
   // --- water is solid (WORLDSPEC §9b k) ---
   const wet = await page.evaluate(async () => {
     const TER = await import("./terrain.js");

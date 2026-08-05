@@ -755,17 +755,26 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   }
 
   // ---------- enemies (dungeon rooms; outdoor zones stream theirs per chunk) ----------
+  // `opts.defeated` is the set of enemy ids the save says are already dead. Without it every
+  // dungeon enemy respawns the moment you walk back in, and the same slime can be fought
+  // forever — the dungeon has no progression at all.
+  const DEFEATED = new Set(opts.defeated || []);
+  const enemyGroups = {};
   for (const en of ZONE.enemies || []){
     if (en.x == null) continue;                     // count-based: handled by chunk streaming
+    if (en.id && DEFEATED.has(en.id)) continue;
     const g = new THREE.Group(); scene.add(g);
-    loadLandmarkModel('enemy:' + en.room + ':' + en.name + ':' + en.x, './assets/models/' + en.model, g,
+    enemyGroups[en.id || en.name] = g;
+    loadLandmarkModel('enemy:' + (en.id || en.name), './assets/models/' + en.model, g,
       { size: en.size || 2.4, fit: "height", x: en.x, z: en.z, ry: Math.PI });
     if (en.boss){
       // The boss is the room's light source as well as its threat — a dark cave with an unlit
       // dragon in it reads as an empty room.
       const bl = new THREE.PointLight(0xff6a2a, 1.5, 46); bl.position.set(en.x, 5, en.z); scene.add(bl);
+      g.userData.light = bl;
     }
-    register('enemy', en.x, en.z, en.name, (en.boss ? '☠ ' : '') + en.name + ' (Lv ' + (en.level || 1) + ')', null, en.boss ? 7.0 : 4.6);
+    register('enemy', en.x, en.z, en.id || en.name,
+      (en.boss ? '☠ ' : '') + en.name + ' (Lv ' + (en.level || 1) + ')', null, en.boss ? 7.0 : 4.6);
   }
 
   // ---------- zone exits (WORLDSPEC step 4) ----------
@@ -1076,6 +1085,8 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       wallCount: (ZONE.obstacles||[]).filter(o=>String(o.id).startsWith("wall:")).length,
       nearbyKind: nearby ? nearby.kind : null,
       nearbyLabel: nearby ? nearby.label : null,
+      enemies: Object.keys(enemyGroups).length,
+      enemyList: (ZONE.enemies||[]).filter(e=>e.x!=null && enemyGroups[e.id||e.name]).map(e=>({id:e.id,x:e.x,z:e.z,boss:!!e.boss})),
       spawnClear: isClear(player.position.x, player.position.z, PLAYER_RADIUS, ZONE_OBSTACLES),
       inWater: wet(player.position.x, player.position.z),
       playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };
@@ -1114,6 +1125,30 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       player.position.y = groundY(p.x, p.z);   // land on the surface, not at y=0
       tapTarget = null; tapSet = false;
       return { x:p.x, y:player.position.y, z:p.z };
+    },
+    // Remove a defeated enemy in place. Rebuilding the whole zone after every fight would be
+    // both slow and jarring (it would re-run the loading HUD and reset the camera).
+    removeEnemy(id){
+      const g = enemyGroups[id];
+      if (!g) return false;
+      if (g.userData.light) scene.remove(g.userData.light);
+      g.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+        for (const m of mats) if (m && m.dispose) m.dispose();
+      });
+      scene.remove(g);
+      delete enemyGroups[id];
+      // drop its prompt, and its collision if it had one (bosses do)
+      for (let i = interactives.length - 1; i >= 0; i--)
+        if (interactives[i].kind === 'enemy' && interactives[i].data === id) interactives.splice(i, 1);
+      const oi = ZONE_OBSTACLES.findIndex(o => o.id === 'boss:' + String(id).split(':')[0]);
+      if (oi >= 0) ZONE_OBSTACLES.splice(oi, 1);
+      if (nearby && nearby.kind === 'enemy' && nearby.data === id){
+        nearby = null;
+        callbacks.onNearby && callbacks.onNearby(null);
+      }
+      return true;
     },
     resize(){ onResize(); },
     dispose(){ window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); cancelAnimationFrame(raf); renderer.dispose(); },

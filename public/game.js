@@ -59,6 +59,11 @@ function migrate(s){
   if (!Array.isArray(s.worldState.visited)) s.worldState.visited = ["academy"];
   // WORLDSPEC §6: per-dungeon progress (cleared rooms, boss kills) lives in the save.
   if (!s.worldState.dungeons || typeof s.worldState.dungeons !== "object") s.worldState.dungeons = {};
+  // `defeated` arrived after `cleared`/`bossDead`, so older saves have the object but not the list.
+  for (const d of Object.values(s.worldState.dungeons)){
+    if (!Array.isArray(d.defeated)) d.defeated = [];
+    if (!Array.isArray(d.cleared)) d.cleared = [];
+  }
   if (s.deck && s.deck.length > MAX_DECK) s.deck = s.deck.slice(0, MAX_DECK);
   return s;
 }

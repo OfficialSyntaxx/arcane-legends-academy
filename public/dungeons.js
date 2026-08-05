@@ -15,8 +15,6 @@
 // What a dungeon adds on top of a zone is `rooms`: rectangles on a grid, joined by corridors,
 // whose walls become collision boxes and whose floors become meshes.
 
-import { chunkKey } from "./worldconfig.js";
-
 export const DUNGEON_DEFAULTS = {
   wallThickness: 1.2,
   wallHeight: 7,
@@ -267,12 +265,15 @@ export function dungeonZone(d){
     for (const e of r.enemies || []){
       // `size` is content, not code: fitting every creature to one height makes a squat wide
       // slime into a 4m boulder, because "fit to height" scales its width to match.
-      enemies.push({ model: e.model, name: e.name, level: e.level, room: r.id, size: e.size || 2.4,
+      // A STABLE ID per enemy. Progress is saved against it, so it must not shift when the room
+      // is re-entered or the config is reordered — room id plus the index within that room.
+      enemies.push({ id: r.id + ":" + (r.enemies || []).indexOf(e), model: e.model, name: e.name,
+                     level: e.level, room: r.id, size: e.size || 2.4,
                      x: r.x + (e.x || 0), z: r.z + (e.z || 0) });
     }
     if (r.boss){
-      enemies.push({ model: r.boss.model, name: r.boss.name, level: r.boss.level, boss: true,
-                     room: r.id, size: r.boss.size || 6.5, x: r.x, z: r.z, hp: r.boss.hp });
+      enemies.push({ id: r.id + ":boss", model: r.boss.model, name: r.boss.name, level: r.boss.level,
+                     boss: true, room: r.id, size: r.boss.size || 6.5, x: r.x, z: r.z, hp: r.boss.hp });
     }
   }
   const obstacles = [
@@ -321,6 +322,3 @@ export async function loadDungeons(url = "./world/dungeons.json", fetchImpl){
   const doc = await res.json();
   return (doc.dungeons || []).map(layoutDungeon);
 }
-
-// Re-exported so world.js can import its chunk helper from one place alongside the dungeon API.
-export { chunkKey };
