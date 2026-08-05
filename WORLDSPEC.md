@@ -334,3 +334,14 @@ world.js catches a load failure and silently keeps the procedural stand-in, and 
 is only console spam, so neither showed up in play or in any test. `tools/model-check.mjs` now
 loads and renders every GLB in a real browser — and renders TWICE, because a corrupt attribute
 only throws on upload, not on the frame the model is added.
+
+
+**u. The ground is painted with vertex colours, and the paint has to be BOLD.** One flat biome
+colour over a 150m field is why the world read as a plastic sheet however detailed the models
+were. `terrain.js groundColorAt` blends height bands, turns steep ground to rock, adds a
+shoreline, and applies low-frequency mottling — all pure, so the bands are asserted rather than
+eyeballed. Two attempts failed *silently* before this landed: the function's output changed and
+the screen did not. Converting sRGB to linear collapses a 10/255 difference between dark greens
+into ~0.05 of linear range, and ACES then compresses the midtones again, so a ±16% variation that
+looked fine as numbers was invisible. Verify ground colour by RENDERING it, and test the spread
+over a screen-sized window rather than the whole zone.

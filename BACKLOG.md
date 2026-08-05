@@ -192,7 +192,7 @@ camera collision, and the character-model fix — the player and every NPC were 
 retry, so any CDN failure silently replaced the whole cast with the procedural stand-in. They now
 ship locally as a fallback, guarded by a test.
 
-**Next step:** WORLDSPEC steps 1-5 are done. Remaining world work is step 6 (content pass).
+**Next step:** WORLDSPEC steps 1-5 are done and the ground is painted (no longer one flat colour). Remaining world work is step 6 (content pass).
 The two §1 items that need no new art are the best value next: spell VFX (§4) and the onboarding
 chain (§1). The forest also still needs quests and NPCs of its own.
 

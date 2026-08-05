@@ -356,6 +356,68 @@ check("no arrival point sits in water", WORLD.zoneIds.every(id =>
     const t = WORLD.get(e.toZone), p = WC.entryPointFor(WORLD, e.toZone, id);
     return !TER.isWater(p.x, p.z, t.terrain, TER.flatsForZone(t));
   })));
+// ---- ground colour ----
+// The flat one-colour ground was the last thing that read as "low poly" whatever the models did.
+// These assert the paint actually varies at the scale a player SEES, which is where two earlier
+// attempts failed silently: the numbers changed, the screen did not.
+check("ground colour varies within a single screen-sized patch", (()=>{
+  const lum = c => ((c >> 16 & 255) * 0.3 + (c >> 8 & 255) * 0.6 + (c & 255) * 0.1);
+  const worst = [];
+  for (const id of WORLD.zoneIds){
+    const z = WORLD.get(id);
+    if (z.interior) continue;
+    const flats = TER.flatsForZone(z);
+    const vals = [];
+    for (let x = 0; x < 50; x += 2) for (let zz = 0; zz < 50; zz += 2)
+      vals.push(lum(TER.groundColorAt(z.spawn.x + x - 25, z.spawn.z + zz - 25, z.terrain, flats)));
+    const spread = Math.max(...vals) - Math.min(...vals);
+    if (spread < 12) worst.push(`${id}: only ${spread.toFixed(1)}/255`);
+  }
+  if (worst.length) console.log("   too uniform to see: " + worst.join(", "));
+  return worst.length === 0;
+})());
+check("ground colour is deterministic", (()=>{
+  const z = WORLD.get(WORLD.hub), flats = TER.flatsForZone(z);
+  return TER.groundColorAt(11, -7, z.terrain, flats) === TER.groundColorAt(11, -7, z.terrain, flats);
+})());
+check("each biome paints a different ground", (()=>{
+  const seen = new Map();
+  for (const b of Object.keys(TER.BIOMES)){
+    const t = { seed: 5, scale: 40, amplitude: 6, baseHeight: 0, biome: b };
+    seen.set(b, TER.groundColorAt(3, 9, t));
+  }
+  return new Set(seen.values()).size === seen.size;
+})());
+check("steep ground turns to rock", (()=>{
+  // a mountain zone must contain BOTH grassy and rocky ground, or the slope rule does nothing
+  const t = { seed: 3, scale: 30, amplitude: 14, baseHeight: 0, biome: "mountains" };
+  const rock = TER.BIOMES.mountains.palette.rock;
+  const near = c => Math.abs((c>>16&255)-(rock>>16&255)) + Math.abs((c>>8&255)-(rock>>8&255)) + Math.abs((c&255)-(rock&255));
+  let rocky = 0, other = 0;
+  for (let i = 0; i < 400; i++){
+    const x = (i * 17) % 400 - 200, z = (i * 53) % 400 - 200;
+    if (near(TER.groundColorAt(x, z, t)) < 60) rocky++; else other++;
+  }
+  return rocky > 0 && other > 0;
+})());
+check("a shoreline band appears just above the waterline", (()=>{
+  const z = WORLD.get("whispering_forest"), flats = TER.flatsForZone(z);
+  const shore = TER.BIOMES[z.terrain.biome].palette.shore;
+  // find any point barely above water and check it leans toward the shore colour
+  for (let i = 0; i < 4000; i++){
+    const x = (i * 31) % 300 - 150, zz = (i * 97) % 300 - 150;
+    const h = TER.heightAt(x, zz, z.terrain, flats);
+    const above = h - z.terrain.waterLevel;
+    if (above > 0.05 && above < 0.4){
+      const c = TER.groundColorAt(x, zz, z.terrain, flats);
+      const dry = TER.groundColorAt(x, zz, { ...z.terrain, waterLevel: null }, flats);
+      const closer = a => Math.abs((a>>16&255)-(shore>>16&255)) + Math.abs((a&255)-(shore&255));
+      return closer(c) < closer(dry);
+    }
+  }
+  return false;   // no shoreline sampled at all — the test would be vacuous
+})());
+
 // ---- dungeons / instanced interiors (WORLDSPEC step 5) ----
 const dungeonDoc = JSON.parse(fs.readFileSync(path.join(ROOT_PUBLIC, "world", "dungeons.json"), "utf8"));
 const DUNGEONS = dungeonDoc.dungeons.map(DG.layoutDungeon);

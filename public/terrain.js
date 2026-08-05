@@ -42,12 +42,88 @@ export function fbm(x, z, seed, octaves = 4){
 // ---------------------------------------------------------------- biomes
 // Biomes modulate the shape of the terrain, not its content. `rough` multiplies amplitude;
 // `octaves` controls how jagged it reads.
+// `ground` is the biome's base colour and stays the fallback for anything that just needs one
+// number. `palette` is what the ground MESH is actually painted with — see groundColorAt.
 export const BIOMES = {
-  plains:    { rough: 0.55, octaves: 3, ground: 0x2f7d4f, water: 0x3a86c8 },
-  forest:    { rough: 1.00, octaves: 4, ground: 0x2b6b46, water: 0x2f6f8a },
-  mountains: { rough: 2.60, octaves: 5, ground: 0x6b6b78, water: 0x3a6a9a },
-  snow:      { rough: 2.10, octaves: 5, ground: 0xdfe6f5, water: 0x7fb6d8 },
+  // The plains bands are deliberately further apart than the others: this is the hub, it is
+  // nearly flat (amplitude 1.4) and flattened again around every landmark, so it has the least
+  // height variation to work with and needs the most colour contrast to not read as one sheet.
+  plains:    { rough: 0.55, octaves: 3, ground: 0x2f7d4f, water: 0x3a86c8,
+               palette: { low: 0x4f9c60, mid: 0x2f7d4f, high: 0x87905d, rock: 0x7a7466, shore: 0xc9bd8a } },
+  forest:    { rough: 1.00, octaves: 4, ground: 0x2b6b46, water: 0x2f6f8a,
+               palette: { low: 0x35774c, mid: 0x27603f, high: 0x4a6a4a, rock: 0x5f6459, shore: 0x9c9268 } },
+  mountains: { rough: 2.60, octaves: 5, ground: 0x6b6b78, water: 0x3a6a9a,
+               palette: { low: 0x5c6a52, mid: 0x6b6b78, high: 0xa8adbc, rock: 0x585461, shore: 0x8c8878 } },
+  snow:      { rough: 2.10, octaves: 5, ground: 0xdfe6f5, water: 0x7fb6d8,
+               palette: { low: 0xc3d2e6, mid: 0xdfe6f5, high: 0xffffff, rock: 0x6e7385, shore: 0xb9c6d6 } },
 };
+
+// ---------------------------------------------------------------- ground colour
+// The single flat biome colour is why the world read as a plastic green sheet no matter how much
+// detail the models had: a 150m field painted one RGB value has no shape to it, because nothing
+// varies across it. This blends four bands by HEIGHT and overrides them by SLOPE, which is enough
+// to give hills a visible profile with zero assets — the paint comes out as vertex colours on the
+// ground mesh, so there is no texture to author, download or compress.
+//
+// Pure, so tools/test.mjs can assert the bands actually differ instead of trusting a screenshot.
+function mix(a, b, t){
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+  const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+  return (((ar + (br - ar) * t) | 0) << 16) | (((ag + (bg - ag) * t) | 0) << 8) | ((ab + (bb - ab) * t) | 0);
+}
+
+/**
+ * The colour of the ground at (x, z), as a 24-bit sRGB int.
+ *
+ * @param band  vertical span over which the low->mid->high bands blend. Defaults to the zone's own
+ *              amplitude, so a gentle zone still uses its full palette instead of sitting in one
+ *              band — a fixed metre value would make the flat academy uniformly "low".
+ */
+export function groundColorAt(x, z, terrain, flats = [], opts = {}){
+  const t = terrain || {};
+  const biome = BIOMES[t.biome] || BIOMES.plains;
+  const p = biome.palette || { low: biome.ground, mid: biome.ground, high: biome.ground,
+                               rock: biome.ground, shore: biome.ground };
+  const h = heightAt(x, z, terrain, flats);
+  const base = t.baseHeight || 0;
+  const band = opts.band || Math.max(2, (t.amplitude != null ? t.amplitude : 6) * biome.rough * 1.6);
+  const n = (h - base) / band;                    // roughly -1 (valley) .. +1 (peak)
+
+  let c = n < 0 ? mix(p.mid, p.low, Math.min(1, -n)) : mix(p.mid, p.high, Math.min(1, n));
+
+  // Height bands alone are not enough on a FLAT zone. The academy has amplitude 1.4 and is
+  // flattened further around every landmark, so `n` barely moves and the whole campus lands in
+  // one band — which is the plastic-green-sheet look again, just arrived at differently. A slow
+  // patch noise varies the colour independently of height, the way real ground is never uniform.
+  const seed = (t.seed || 1) ^ 0x9e37;
+  const patchScale = (t.scale || 40) * 0.55;   // ~30m features: big enough to read as ground, small enough to see in one shot
+  const patch = fbm(x / patchScale, z / patchScale, seed, 2);   // -1..1
+  c = mix(c, patch < 0 ? p.low : p.high, Math.abs(patch) * 0.6);
+
+  // Brightness variation, and it has to be BOLD to survive the render pipeline. Two things eat
+  // it: converting sRGB to linear collapses a 10/255 difference between dark greens into ~0.05 of
+  // linear range, and ACES tone mapping then compresses the midtones again. A ±16% jitter that
+  // looked reasonable as numbers was invisible on screen; ±30% is what actually reads as uneven
+  // ground. Verified by rendering, not by inspecting the values.
+  const shade = 1 + fbm(x / (patchScale * 0.34), z / (patchScale * 0.34), seed ^ 0x5bf0, 3) * 0.30;
+  c = (Math.min(255, Math.max(0, ((c >> 16) & 255) * shade)) | 0) << 16
+    | (Math.min(255, Math.max(0, ((c >> 8) & 255) * shade)) | 0) << 8
+    | (Math.min(255, Math.max(0, (c & 255) * shade)) | 0);
+
+  // Steep ground is bare rock — this is what actually makes a hill read as a hill, because the
+  // colour change follows the surface's shape rather than its height.
+  const slope = slopeAt(x, z, terrain, flats);
+  if (slope > 0.35) c = mix(c, p.rock, Math.min(1, (slope - 0.35) / 0.75));
+
+  // A shoreline band just above the waterline, so water meets land instead of being a blue
+  // rectangle laid on grass.
+  if (t.waterLevel != null){
+    const above = h - t.waterLevel;
+    if (above >= 0 && above < 1.6) c = mix(p.shore, c, above / 1.6);
+  }
+  return c;
+}
 
 // ---------------------------------------------------------------- flat zones
 // WORLDSPEC §5 requires landmarks to sit on flat ground, or buildings float and clip. Rather than

@@ -5,7 +5,7 @@
 import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
 import { isClear, CHARACTER_HEIGHT, BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
-import { heightAt, isWater, flatsForZone, BIOMES } from "./terrain.js";
+import { heightAt, isWater, flatsForZone, groundColorAt, BIOMES } from "./terrain.js";
 import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS } from "./worldconfig.js";
 
 // `zone` is an optional normalised zone config (see worldconfig.js). Omitted, the world falls
@@ -141,17 +141,32 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   const groundGeo = new THREE.PlaneGeometry(groundSpan, groundSpan, GROUND_SEGS, GROUND_SEGS);
   {
     const pos = groundGeo.attributes.position;
+    // VERTEX COLOURS. A 150m field painted one flat biome colour has no shape to it — that is
+    // why the world read as a plastic green sheet however detailed the models were. terrain.js
+    // decides the colour per point (height bands, bare rock on slopes, a shoreline); this only
+    // samples it. Vertex colours cost nothing: no texture to author, host or compress.
+    const col = new Float32Array(pos.count * 3);
+    const _c = new THREE.Color();
     for (let i = 0; i < pos.count; i++){
       // the plane is built in XY then rotated onto XZ, so its local y IS world -z
       const wx = pos.getX(i) + groundCX, wz = -pos.getY(i) + groundCZ;
       pos.setZ(i, groundY(wx, wz));
+      if (!ZONE.interior){
+        _c.setHex(groundColorAt(wx, wz, ZONE.terrain, FLATS)).convertSRGBToLinear();
+        col[i*3] = _c.r; col[i*3+1] = _c.g; col[i*3+2] = _c.b;
+      }
     }
     pos.needsUpdate = true;
+    if (!ZONE.interior) groundGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     groundGeo.computeVertexNormals();
   }
   // Interiors get a dark cavern bed instead of a biome ground colour — the room floors sit on
   // top of it, and anything past them reads as unlit rock rather than a green field.
-  const ground = add(groundGeo, mat(ZONE.interior ? 0x1b1526 : biome.ground), groundCX, 0, groundCZ, {receive:true});
+  // White base colour so the vertex colours come through unmultiplied; interiors keep a flat
+  // cavern bed since their floors are separate meshes.
+  const groundMat = ZONE.interior ? mat(0x1b1526)
+    : Object.assign(new THREE.MeshLambertMaterial({ color: 0xffffff }), { vertexColors: true });
+  const ground = add(groundGeo, groundMat, groundCX, 0, groundCZ, {receive:true});
   ground.rotation.x = -Math.PI/2;
 
   // ---------- dungeon rooms (WORLDSPEC §6) ----------
