@@ -42,12 +42,12 @@
 ## 3. Open World
 
 - [ ] Expand beyond the Academy
-- [~] Whispering Forest — authored as a zone in `world/zones.json`; needs chunk streaming (WORLDSPEC step 3) to render its scattered content
+- [~] Whispering Forest — authored in `world/zones.json` and rendering via chunk streaming; needs its own quests/enemies and a way in (step 4)
 - [ ] Lake Arcanum
 - [ ] Ashen Mountains
 - [ ] Cinderhollow Caverns
-- [ ] Zone transitions — WORLDSPEC step 4
-- [ ] Chunk streaming — WORLDSPEC step 3
+- [ ] Zone transitions — WORLDSPEC step 4 (**next**)
+- [x] Chunk streaming — scatter-once/bucket-once with load/unload hysteresis and GPU disposal
 - [ ] Fast travel
 - [ ] Hidden areas / treasure
 - [ ] Day/night cycle
@@ -187,9 +187,13 @@ For each feature we select, we should decide:
 
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 
-**Changes made:** None
+**Changes made:** WORLDSPEC steps 1–3 (zone config, procedural terrain, chunk streaming),
+camera collision, and the character-model fix — the player and every NPC were CDN-only with no
+retry, so any CDN failure silently replaced the whole cast with the procedural stand-in. They now
+ship locally as a fallback, guarded by a test.
 
-**Next step:** Pick a section or feature and we'll break it down together before touching the code.
+**Next step:** WORLDSPEC step 4 (zone transitions), which unblocks §3 Open World, and then the
+two §1 items that need no new art — spell VFX (§4) and the onboarding chain (§1).
 
 
 ---
@@ -199,6 +203,7 @@ For each feature we select, we should decide:
 `WORLDSPEC.md` is the detailed plan for **§3 Open World** and the world half of **§4 PvE**.
 This backlog is the wider game. When the two disagree, WORLDSPEC wins for world architecture.
 
-**Currently in progress:** WORLDSPEC steps 1–2 (zone config + terrain) are complete;
-step 3 (chunk streaming) is next and is what makes `whispering_forest` render its scattered
-content.
+**Currently in progress:** WORLDSPEC steps 1–3 (zone config, procedural terrain, chunk
+streaming) are complete, along with camera collision. Step 4 (zone transitions) is next — it is
+what actually lets a player reach `whispering_forest`, which currently streams correctly but has
+no door into it.
