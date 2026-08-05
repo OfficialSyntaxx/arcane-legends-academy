@@ -61,11 +61,12 @@
 
 - [ ] Enemy levels and archetypes
 - [ ] Better AI deck archetypes
-- [~] Boss battles — the Cinder Wyrm fights via the duel engine; multi-phase/abilities pending
+- [x] Boss battles — the Cinder Wyrm fights via the duel engine; multi-phase/abilities pending
 - [ ] Multi-phase bosses
-- [~] Dungeon progression — Cinderhollow Caverns is playable end to end; kills, cleared rooms and boss defeat all persist and enemies stay dead. Locked doors / key gating and more dungeons pending
+- [~] Dungeon progression — Cinderhollow Caverns + Ashen Caverns playable end to end; kills, cleared rooms and boss defeat all persist and enemies stay dead. Locked doors / key gating and more dungeons pending
 - [x] Spell VFX — six procedural archetypes (bolt/burst/rain/aura/beam/glyph) driven from each card's own effects and school; zero assets
-- [~] Attack / summon / death animations — `battle3d.js` exists; procedural walk cycle already added for NPCs
+- [x] Creature combat pass — all 39 creatures have unique stats/abilities/passives (`creatures.js`), shown in the Creature Codex + in-battle labels, and **wired into the duel engine** (Taunt, Haste, Drain, Regen, Poison, Thorns, Evade, Shield, Survive, Spell/Freeze-immune, on-play + on-attack effects)
+- [~] Attack / summon / death animations — `battle3d.js` exists; procedural walk cycle already added for NPCs; creature active *abilities* (firespell targeting, tongue steal, rage threshold) still codex-flavoured, not interactive
 - [ ] Reusable combat effect system
 - [ ] School-specific mechanics
 - [ ] School ultimate abilities
