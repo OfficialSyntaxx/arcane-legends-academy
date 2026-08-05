@@ -97,8 +97,8 @@ Reference list of free 3D asset packs we can pull into the game. **Verify each p
 - 🔗 **Ultimate Animated Character Pack** (Quaternius, 50+ characters) — quaternius.com
 
 ### 🐾 Familiars / card monsters
-- ✅ **Ultimate Monsters** (Quaternius, via Google Drive connector) — Dino, Orc, Demon, Frog, MushroomKing, Fish, Bunny, Yeti, Alien imported (14 anims each); more available (Tribal, Ninja, Cactoro, BlueDemon, Birb…)
-- ✅ **Textured Cute Monster Pack** (Quaternius) — 21 animated monsters (Chicken, Panda, Deer, Ghost, Yeti, Cthulhu, Cyclops, Demon, Mushroom…) — 6 imported so far
+- ✅ **Ultimate Monsters** (Quaternius, via Google Drive connector) — full roster imported: Dino, Orc, Orc_Skull, Demon, BlueDemon, Frog, MushroomKing, Mushnub, Mushnub_Evolved, Fish, Bunny, Yeti, Alien, Wizard, Ninja, Monkroose, Birb, Cactoro, Cat, Dog, Pigeon, PinkBlob, GreenBlob, GreenSpikyBlob, Ghost, Glub, Goleling, Squidle, Hywirl, Alpaking, Armabee (8–14 anims each)
+- ✅ **Textured Cute Monster Pack** (Quaternius) — Chicken, Panda, Deer, Ghost, Yeti, Mushroom imported (more available)
 - ✅ **LowPoly Animated Monsters** — Dragon, Slime, Bat, Skeleton (in-game)
 - 🔗 **Ultimate Animated Animal Pack** (Quaternius, 12 animals × 13 anims) — familiars — quaternius.com
 - 🔗 **Farm Animal Pack / Animated Dinosaur Pack** (Quaternius) — CC0

@@ -30,6 +30,17 @@ const MODELS = {
   panda: 'creature_Panda.glb',
   deer: 'creature_Deer.glb',
   ghost: 'creature_Ghost.glb',
+  cat: 'creature_Cat.glb',
+  dog: 'creature_Dog.glb',
+  pigeon: 'creature_Pigeon.glb',
+  ninja: 'creature_Ninja.glb',
+  goleling: 'creature_Goleling.glb',
+  squidle: 'creature_Squidle.glb',
+  armabee: 'creature_Armabee.glb',
+  alpaking: 'creature_Alpaking.glb',
+  hywirl: 'creature_Hywirl.glb',
+  cactoro: 'creature_Cactoro.glb',
+  wizard: 'creature_Wizard.glb',
   default: 'enemy_skeleton.glb',
 };
 const LOCAL = name => './assets/models/' + name;
@@ -52,6 +63,16 @@ function modelFor(cardId, name) {
   if (/panda|bear/.test(n)) return MODELS.panda;
   if (/deer|stag|elk/.test(n)) return MODELS.deer;
   if (/ghost|wraith|spirit|reaper|vampire/.test(n)) return MODELS.ghost;
+  if (/cat|kitten|feline/.test(n)) return MODELS.cat;
+  if (/dog|hound|wolf|pup/.test(n)) return MODELS.dog;
+  if (/pigeon|dove|poop|bird/.test(n)) return MODELS.pigeon;
+  if (/ninja|assassin|shadow/.test(n)) return MODELS.ninja;
+  if (/golem|rock|stone|goleling/.test(n)) return MODELS.goleling;
+  if (/squid|kraken|octopus|tentacle|shark/.test(n)) return MODELS.squidle;
+  if (/bee|wasp|hornet|armabee/.test(n)) return MODELS.armabee;
+  if (/alpaca|llama|alpaking/.test(n)) return MODELS.alpaking;
+  if (/whirl|elemental|cyclone|hywirl|wind/.test(n)) return MODELS.hywirl;
+  if (/cactus|cactoro/.test(n)) return MODELS.cactoro;
   if (/mage|wizard|elf|pixie|walker|novice|assistant|fairy/.test(n)) return MODELS.mage;
   return MODELS.default;
 }
