@@ -127,3 +127,39 @@ Large models (>1MB) are hosted on the **Higgsfield CDN** and loaded at runtime b
 - **KayKit** = by Kay Lousberg, CC0 (free for personal/educational/commercial, no attribution required). Ships `.fbx` + `.gltf` + `.obj`.
 - **Non-KayKit** — always read the pack's `License.txt` before importing; prefer CC0 / "free for commercial".
 - To add a pack: run it through `tools/import-asset.mjs`, drop the GLB into `public/assets/models/`, wire it in via `loadProp()` (props) or `makeCharModel()` (characters), verify in-game, commit + push.
+
+## Rigging generated characters
+
+Generated characters (Tripo, Meshy, Higgsfield) arrive as a single static mesh with **no skeleton
+and no animations**. The game cannot use them as-is: `makeCharModel` drives the player from a
+mixer clip and NPCs from a procedural cycle keyed on bone names, so an unrigged GLB is a statue
+that slides around the world.
+
+    pip install bpy
+    python3 tools/rig-character.py in.glb out.glb
+    node tools/compress-models.mjs
+
+`tools/rig-character.py` measures the mesh (arm span, hem, foot split, shoulder height) rather
+than carrying hand-tuned numbers, so it rigs the next character without re-tuning. It emits
+Mixamo-style bone names, `Idle` and `Walk` clips, and orients the model to face glTF +Z, which is
+what `player.rotation.y = atan2(moveX, moveZ)` assumes.
+
+Three things it works around, all found the hard way:
+
+- **Blender's bone-heat solver fails on generated meshes.** They are non-manifold and full of
+  interior geometry. It does not raise — it warns and leaves every vertex group empty, which
+  exports as an unskinned mesh that ignores the skeleton. Envelope parenting is not a fallback
+  either: it stores no vertex groups, so glTF has nothing to write. Weights are computed by bone
+  proximity instead.
+- **A robe tears in half if you bind it to the legs.** The skirt is one surface spanning both, so
+  it rips down the middle on the first stride. The script finds the hem by vertex density (width
+  does not work — the skirt flares wider than the feet are apart) and lets the legs claim only
+  what is below it.
+- **Limb swing axes must be derived, not assumed.** A pose bone rotates in its own space, and a
+  downward leg and a sideways A-pose arm swing about different axes. Getting this wrong is not
+  obvious by eye — it looks like a subtle shimmy — so verify by measuring vertex deflection, not
+  by watching it.
+
+Characters are normalised to `CHARACTER_HEIGHT` (`structures.js`). This measures the FULL
+bounding box, and a pointed wizard hat is ~28% of it, so the number is not the character's
+apparent height.

@@ -4,6 +4,11 @@
 // repo; the game never ships them in the deploy.
 //
 // Add a big model here after uploading it (higgsfield_upload) — key = local filename.
+//
+// A model listed here is fetched from the CDN FIRST (world.js falls back to the local copy on
+// failure), so an entry pointing at a stale upload silently wins over a newer local file. That is
+// why `player_wizard.glb` is absent: it was re-rigged locally, and leaving the old CloudFront URL
+// here would have kept serving the unrigged version. Re-add it after uploading the new one.
 export const CDN = {
   "enemy_skeleton.glb": "https://d2ol7oe51mr4n9.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/2f4d6644-839d-4d77-9233-b58875d9d98a.glb",
   "npc_mage.glb": "https://d2ol7oe51mr4n9.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/5faf27c0-10bd-47e8-91b9-b3589f43c567.glb",
@@ -14,7 +19,6 @@ export const CDN = {
   "trainer.glb": "https://d2ol7oe51mr4n9.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/88d5d371-5c80-40b3-be5e-a9ec4d06e6e0.glb",
   "student_pink.glb": "https://d2ol7oe51mr4n9.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/69a13d7d-08e3-4db7-9ac3-3a11d7d8c7ff.glb",
   "student_emerald.glb": "https://d2ol7oe51mr4n9.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/b91c8f77-66cf-4353-892b-870237f61732.glb",
-  "player_wizard.glb": "https://d2ol7oe51mr4n9.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/ce1dae54-c2ac-4834-85a5-a799e41d262f.glb",
   "merchant.glb": "https://d2ol7oe51mr4n9.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/ad1a304c-d2fa-4de9-b8e1-9c2cf65ba97e.glb",
   "nat_CommonTree_1.glb": "https://d2ol7oe51mr4n9.cloudfront.net/user_36MHNrl15jk9zlazEaTWSMthntm/1d74828d-6748-4589-89da-054bf90d13ec.glb",
 };

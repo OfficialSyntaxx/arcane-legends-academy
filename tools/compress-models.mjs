@@ -1,7 +1,8 @@
 // Compress generated GLBs: Draco geometry + high-quality WebP textures.
 //
-//   node tools/compress-models.mjs            compress everything in place
+//   node tools/compress-models.mjs            compress anything not already compressed
 //   node tools/compress-models.mjs --check    report sizes only
+//   node tools/compress-models.mjs --force    re-compress even already-compressed models
 //
 // Run after generating any new model.
 //
@@ -29,6 +30,18 @@ const DIRS = [
 const TEXTURE_SIZE = "2048";
 const WEBP_QUALITY = "92";
 const check = process.argv.includes("--check");
+const force = process.argv.includes("--force");
+
+// Compression is LOSSY and this script is not idempotent: the `webp` pass decodes Draco and
+// re-encodes the textures, so running it twice re-encodes an already-encoded texture and quality
+// drops again. Skip anything already compressed unless --force.
+function isCompressed(file){
+  const b = fs.readFileSync(file);
+  if (b.readUInt32LE(0) !== 0x46546C67) return false;                  // not a GLB
+  const json = JSON.parse(b.slice(20, 20 + b.readUInt32LE(12)).toString("utf8"));
+  const used = json.extensionsUsed || [];
+  return used.includes("EXT_texture_webp") && used.includes("KHR_draco_mesh_compression");
+}
 const mb = b => (b / 1048576).toFixed(2) + "MB";
 
 function run(args){ execFileSync("npx", args, { stdio:"pipe", cwd:ROOT }); }
@@ -39,7 +52,8 @@ for (const dir of DIRS){
   for (const f of fs.readdirSync(dir).filter(f => f.endsWith(".glb"))){
     const p = path.join(dir, f);
     const size0 = fs.statSync(p).size; before += size0; count++;
-    if (check){ after += size0; console.log(`  ${f.padEnd(24)} ${mb(size0)}`); continue; }
+    if (check){ after += size0; console.log(`  ${f.padEnd(24)} ${mb(size0)}${isCompressed(p) ? "" : "  (uncompressed)"}`); continue; }
+    if (!force && isCompressed(p)){ after += size0; console.log(`  ${f.padEnd(24)} ${mb(size0)}  already compressed, skipped`); continue; }
     const tmpA = p + ".a.glb", tmpB = p + ".b.glb";
     try {
       // ORDER MATTERS: the `webp` pass decodes Draco and does not re-apply it ("Decoded
@@ -47,12 +61,14 @@ for (const dir of DIRS){
       // Running them the other way round silently ships uncompressed geometry.
       // 1. textures, with real quality control
       run(["gltf-transform", "webp", p, tmpA, "--quality", WEBP_QUALITY]);
-      // 2. geometry — Draco, no simplification, textures already handled
-      run(["gltf-transform", "optimize", tmpA, tmpB,
-        "--compress", "draco",
-        "--simplify", "false",
-        "--texture-compress", "false",
-        "--texture-size", TEXTURE_SIZE]);
+      // 2. geometry — Draco only.
+      // NOT `optimize --compress draco`: `optimize` is a bundle, and its other passes corrupt
+      // ANIMATION data for three r128 — a rigged model compressed that way fails to load with
+      // "Cannot read properties of null (reading 'array')" while the same model through the
+      // standalone `draco` pass loads fine. We had already had to switch off `optimize`'s
+      // simplify and texture-compress, so there was nothing left in it that we wanted. Sizes
+      // are within 0.3% of each other.
+      run(["gltf-transform", "draco", tmpA, tmpB]);
       fs.renameSync(tmpB, p);
       fs.unlinkSync(tmpA);
       const size1 = fs.statSync(p).size; after += size1;

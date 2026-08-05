@@ -196,6 +196,31 @@ check("every character model also ships locally (CDN fallback is real)", (()=>{
   if (missing.length) console.log("   CDN-only (no local fallback):", missing.join(", "));
   return missing.length === 0;
 })());
+// The player model is a CONTRACT, not just an asset: world.js drives it from a mixer clip and
+// the procedural NPC cycle looks bones up by name. Both failure modes are silent — a model that
+// lost its skin during compression, or one rigged with different bone names, loads without error
+// and simply never moves. Both happened while integrating the re-rigged wizard.
+check("the player model is skinned and animated", (()=>{
+  const buf = fs.readFileSync(path.join(ROOT_PUBLIC, "assets/models/player_wizard.glb"));
+  const doc = JSON.parse(buf.slice(20, 20 + buf.readUInt32LE(12)).toString("utf8"));
+  const prim = doc.meshes[0].primitives[0];
+  const draco = prim.extensions && prim.extensions.KHR_draco_mesh_compression;
+  const attrs = new Set([...Object.keys(prim.attributes), ...(draco ? Object.keys(draco.attributes) : [])]);
+  const clips = (doc.animations || []).map(a => a.name.toLowerCase());
+  const joints = new Set((doc.skins && doc.skins[0] ? doc.skins[0].joints : []).map(i => doc.nodes[i].name));
+  // the names applyWalkCycle() in world.js reaches for
+  const needed = ["Hips", "Spine", "LeftLeg", "RightLeg", "LeftUpLeg", "RightUpLeg",
+                  "LeftArm", "RightArm", "LeftForeArm", "RightForeArm"];
+  const missing = needed.filter(n => !joints.has(n));
+  const problems = [];
+  if (!(doc.skins || []).length) problems.push("no skin");
+  if (!attrs.has("JOINTS_0") || !attrs.has("WEIGHTS_0")) problems.push("no skin weights on the mesh");
+  if (!clips.some(c => c.includes("walk"))) problems.push("no walk clip");
+  if (clips.length < 2) problems.push("needs an idle clip as well as a walk");
+  if (missing.length) problems.push("bones applyWalkCycle needs are missing: " + missing.join(", "));
+  if (problems.length) console.log("   " + problems.join("; "));
+  return problems.length === 0;
+})());
 check("every CDN entry is a real https URL", Object.values(CDN).every(u => /^https:\/\//.test(u)));
 check("solid props contribute collision", ST.PROPS.filter(p=>p.solid).every(p =>
   ST.OBSTACLES.some(o => o.id === "prop:" + p.url.split("/").pop())));

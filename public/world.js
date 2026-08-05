@@ -3,7 +3,7 @@
 // gathering nodes for every material, and NPCs that hand out quests and open the market.
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
 import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
-import { BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
+import { CHARACTER_HEIGHT, BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
 import { heightAt, isWater, flatsForZone, BIOMES } from "./terrain.js";
 import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS } from "./worldconfig.js";
@@ -436,7 +436,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     loader.load(url, gltf => {
       const model = gltf.scene;
       // Determine whether this is a skinned character (skeleton spans the real size) or a
-      // static mesh (the geometry box is the real size). Both are sized to ~1.8 units tall.
+      // static mesh (the geometry box is the real size). Both are sized to CHARACTER_HEIGHT.
       let isSkinned = false;
       const geoBox = new THREE.Box3();
       model.traverse(o => {
@@ -461,8 +461,8 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
         minZ = geoBox.min.z; maxZ = geoBox.max.z;
       }
       const height = maxY - minY;
-      let scale = 1.8;
-      if (height > 0.001) scale = 1.8 / height;
+      let scale = CHARACTER_HEIGHT;
+      if (height > 0.001) scale = CHARACTER_HEIGHT / height;
       scale = Math.max(0.001, Math.min(300, scale));
       model.scale.setScalar(scale);
       // center so feet rest at y=0
@@ -695,9 +695,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   let joy = { x:0, y:0 };
   let tapTarget = null, tapSet = false;
   // camera orbit (drag to rotate, pinch to zoom) — mobile open-world feel
-  // Tuned against the rescaled campus: close/low enough that the 1.8m player reads clearly,
-  // far enough back that the 9-10m halls and the 40m tower still tower over them.
-  let camYaw = 0, camDist = 10.5, camHeight = 4.6;
+  // Tuned against the rescaled campus: close/low enough that the player reads clearly, far
+  // enough back that the 9-10m halls and the 40m tower still tower over them. Pulled in with the
+  // move to CHARACTER_HEIGHT — a taller character at the old distance just filled less of a
+  // wider shot, which is not the same as looking bigger.
+  let camYaw = 0, camDist = 9.0, camHeight = 4.0;
   let playerMoving = false;
 
   // ---------- nearby ----------

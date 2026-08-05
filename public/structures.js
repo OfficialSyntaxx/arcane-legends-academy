@@ -118,6 +118,15 @@ export const PLAYER_SPAWN = { x:13, z:15 };
 // box: axis-aligned half-extents in the box's own frame, rotated by ry about its centre.
 // circle: a plain radius. Ponds are deliberately NOT solid — you stand in the shallows to fish.
 export const PLAYER_RADIUS = 0.5;
+// Every character GLB is normalised to this height (WORLDSPEC: 1 unit = 1 metre).
+//
+// It was 1.8 — anatomically right, and it made the cast look like miniatures. Two reasons. The
+// normalisation measures the model's FULL bounding box, and these wizards wear pointed hats worth
+// ~28% of that box, so a "1.8m" wizard is a 1.3m person in a tall hat. And the world around them
+// is not built to human scale: the halls are 9-10m and the tower is 40m, so a realistic figure
+// reads as a doll next to them. 2.6 is a deliberately heroic scale that matches the reference
+// (Wizard101 characters are large relative to their architecture).
+export const CHARACTER_HEIGHT = 2.6;
 export const WORLD_BOUND = 72;      // half-extent of the walkable area
 
 export const OBSTACLES = [
