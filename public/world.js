@@ -3,7 +3,7 @@
 // gathering nodes for every material, and NPCs that hand out quests and open the market.
 // Mobile-first: touch joystick + tap-to-move + auto-follow camera. The DOM UI drives the 2D panels.
 import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
-import { CHARACTER_HEIGHT, BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
+import { isClear, CHARACTER_HEIGHT, BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
 import { heightAt, isWater, flatsForZone, BIOMES } from "./terrain.js";
 import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS } from "./worldconfig.js";
@@ -41,7 +41,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.5));
   renderer.setSize(canvas.clientWidth, canvas.clientHeight);
   renderer.shadowMap.enabled = false;
-  renderer.setClearColor(0x1a1440);
+  renderer.setClearColor(ZONE.background != null ? ZONE.background : 0x1a1440);
   // COLOUR MANAGEMENT. Without this, glTF textures — which GLTFLoader correctly tags as sRGB —
   // are rendered as if they were linear, which is why generated models looked rich in the
   // Higgsfield/Tripo viewer and muddy here: the gold trim and saturated robes flattened out.
@@ -55,7 +55,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   renderer.toneMappingExposure = 1.15;
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x2a1a4a, 95, 250);
+  // Close fog is what sells "underground" for an interior. It also hides the fact that the rooms
+  // have no ceiling — the camera looks down into them, so a roof would just occlude the player.
+  scene.fog = ZONE.interior
+    ? new THREE.Fog(ZONE.background != null ? ZONE.background : 0x120c22, 18, 80)
+    : new THREE.Fog(0x2a1a4a, 95, 250);
   // Generated models are PBR (metallic/roughness). With no environment to reflect, metal renders
   // near-black and everything looks flat — this is the other half of why they lost their shine.
   // A tiny procedural sky/ground gradient costs no assets and gives them something to catch.
@@ -84,20 +88,30 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   camera.position.set(0, 8, 16);
 
   // ---- sky: solid clear color (reliable) ----
-  renderer.setClearColor(0x1a1440);
+  renderer.setClearColor(ZONE.background != null ? ZONE.background : 0x1a1440);
 
   // lights
   // NOTE: these intensities were retuned when colour management went in. The old values were
   // set against an uncorrected pipeline that rendered everything ~2 stops dark, so once gamma
   // was right they blew the generated models' pale stone out to flat lavender.
+  // Interiors (dungeons) are lit as caves: almost no sky, no sun, and close fog so the torches
+  // and the boss glow are what the player actually reads by. An outdoor rig inside a dungeon
+  // just makes a brightly-lit room with a ceiling missing.
+  const INTERIOR = !!ZONE.interior;
+  if (INTERIOR){
+    scene.add(new THREE.HemisphereLight(0x585070, 0x140e22, 0.30));
+    const fill = new THREE.DirectionalLight(0xa89ad0, 0.16);
+    fill.position.set(10, 30, 10); scene.add(fill);
+  } else {
   scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a1f4d, 0.42));
   const sun = new THREE.DirectionalLight(0xffd9a0, 0.55);
   sun.position.set(20, 40, 14);
   scene.add(sun);
   const moon = new THREE.DirectionalLight(0x9fb4ff, 0.15);
   moon.position.set(-20, 30, -20); scene.add(moon);
+  }
   // warm courtyard glow
-  const glow = new THREE.PointLight(0xff8844, 0.55, 90);
+  const glow = new THREE.PointLight(0xff8844, ZONE.interior ? 0 : 0.55, 90);
   glow.position.set(0, 12, 0); scene.add(glow);
 
   // Procedural colours are authored as sRGB hex, so they must be converted to linear now that
@@ -135,8 +149,30 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     pos.needsUpdate = true;
     groundGeo.computeVertexNormals();
   }
-  const ground = add(groundGeo, mat(biome.ground), groundCX, 0, groundCZ, {receive:true});
+  // Interiors get a dark cavern bed instead of a biome ground colour — the room floors sit on
+  // top of it, and anything past them reads as unlit rock rather than a green field.
+  const ground = add(groundGeo, mat(ZONE.interior ? 0x1b1526 : biome.ground), groundCX, 0, groundCZ, {receive:true});
   ground.rotation.x = -Math.PI/2;
+
+  // ---------- dungeon rooms (WORLDSPEC §6) ----------
+  // Floors, walls and corridors. Every position and every wall segment was computed by
+  // dungeons.js — nothing spatial is decided here, matching the rule that world.js renders what
+  // the pure modules hand it (§9b d).
+  if (ZONE.rooms && ZONE.rooms.length){
+    const floorMat = mat(0x3a3348), wallMat = mat(0x4a4160), bossFloorMat = mat(0x5a3a44);
+    const wallH = ZONE.wallHeight || 7;
+    for (const r of ZONE.rooms){
+      const f = add(new THREE.PlaneGeometry(r.w, r.d), r.boss ? bossFloorMat : floorMat, r.x, 0.02, r.z, {receive:true, cast:false});
+      f.rotation.x = -Math.PI/2;
+    }
+    for (const c of ZONE.corridors || []){
+      const f = add(new THREE.PlaneGeometry(c.w, c.d), floorMat, c.x, 0.02, c.z, {receive:true, cast:false});
+      f.rotation.x = -Math.PI/2;
+    }
+    for (const w of [...ZONE.rooms.flatMap(r => r.walls || []), ...(ZONE.corridorWalls || [])]){
+      add(new THREE.BoxGeometry(w.w, wallH, w.d), wallMat, w.x, wallH/2, w.z);
+    }
+  }
   // water, only where the zone declares a level
   if (ZONE.terrain.waterLevel != null){
     const wm = new THREE.MeshLambertMaterial({ color: biome.water, transparent:true, opacity:0.72 });
@@ -377,7 +413,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // ---------- NPCs (living academy) ----------
   const npcs = [];
   function makeNpc(x, z, main, hat, opts={}){
-    const g = makeWizard(main, hat, opts.skin||0xf0c8a0, opts);
+    // Colours are optional in the zone schema — a hand-authored zone can name an NPC's model and
+    // nothing else. Without defaults every one of those built materials with `color: undefined`
+    // (six THREE warnings per load in the forest) and the procedural stand-in rendered as an
+    // untinted blob whenever its GLB was slow or missing.
+    const g = makeWizard(main != null ? main : 0x5a4a8a, hat != null ? hat : 0x2a1f4d, opts.skin || 0xf0c8a0, opts);
     g.position.set(x, 0, z);
     scene.add(g);
     npcs.push({ mesh:g, tx:x, tz:z, t:0, pause:0, role:opts.role||'wander', key:opts.key });
@@ -571,6 +611,16 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     const pr = ZPROPS[i];
     const g = new THREE.Group(); scene.add(g);
     loadLandmarkModel('prop' + i, pr.url, g, { size:pr.h, fit:"height", x:pr.x, z:pr.z, ry:pr.ry || 0 });
+    // A prop may declare its own light. Dungeon torches do: without them an interior lit only by
+    // its dim ambient rig is a black room with a torch MODEL in it, which reads as broken rather
+    // than atmospheric. dungeons.js decides which props glow; this only renders the decision.
+    if (pr.light){
+      const l = new THREE.PointLight(pr.light.color, pr.light.intensity, pr.light.distance);
+      l.position.set(pr.x, pr.light.y != null ? pr.light.y : 2.6, pr.z);
+      scene.add(l);
+      const bulb = add(new THREE.SphereGeometry(0.28, 8, 6), mat(pr.light.color), pr.x, l.position.y, pr.z, {cast:false});
+      bulb.material.emissive = srgb(pr.light.color); bulb.material.emissiveIntensity = 1.0;
+    }
   }
   // Gathering nodes swap their procedural mesh for the CC0 model, keeping the procedural one as
   // the fallback (the node's interaction prompt is registered either way).
@@ -653,6 +703,38 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       { size:b.h, fit:"height", x:b.x, z:b.z, ry:b.ry + (b.modelRy || 0) });
   }
 
+  // ---------- dungeon entrances (WORLDSPEC §6) ----------
+  // An entrance is a doorway in an OUTDOOR zone that leads into an instanced interior. It is a
+  // separate interactable from a zone exit because it must be deliberate: a dungeon is a
+  // committed trip, so the player presses the prompt rather than falling through a trigger the
+  // way they do at a gateway.
+  for (const de of ZONE.dungeonEntrances || []){
+    const gy = groundY(de.x, de.z);
+    const g = new THREE.Group(); scene.add(g);
+    loadLandmarkModel('dungeon:' + de.id, de.model || './assets/models/dng_doorway.glb', g,
+      { size: 7, fit: "height", x: de.x, z: de.z, ry: de.ry || 0 });
+    // Procedural stand-in under the model, so the entrance is visible even if the GLB fails.
+    const arch = add(new THREE.TorusGeometry(2.6, 0.5, 6, 14, Math.PI), mat(0x4a3a5a), de.x, gy + 0.2, de.z);
+    arch.rotation.y = de.ry || 0;
+    const maw = add(new THREE.CircleGeometry(2.4, 18), mat(0x0a0612), de.x, gy + 2.4, de.z, {cast:false});
+    maw.rotation.y = (de.ry || 0) + Math.PI;
+    register('dungeon', de.x, de.z, de.id, (opts.zoneNames && opts.zoneNames[de.id]) || de.id, arch, 6.0);
+  }
+
+  // ---------- enemies (dungeon rooms; outdoor zones stream theirs per chunk) ----------
+  for (const en of ZONE.enemies || []){
+    if (en.x == null) continue;                     // count-based: handled by chunk streaming
+    const g = new THREE.Group(); scene.add(g);
+    loadLandmarkModel('enemy:' + en.room + ':' + en.name + ':' + en.x, './assets/models/' + en.model, g,
+      { size: en.size || 2.4, fit: "height", x: en.x, z: en.z, ry: Math.PI });
+    if (en.boss){
+      // The boss is the room's light source as well as its threat — a dark cave with an unlit
+      // dragon in it reads as an empty room.
+      const bl = new THREE.PointLight(0xff6a2a, 1.5, 46); bl.position.set(en.x, 5, en.z); scene.add(bl);
+    }
+    register('enemy', en.x, en.z, en.name, (en.boss ? '☠ ' : '') + en.name + ' (Lv ' + (en.level || 1) + ')', null, en.boss ? 7.0 : 4.6);
+  }
+
   // ---------- zone exits (WORLDSPEC step 4) ----------
   // A gateway arch marks each exit so the boundary is visible rather than an invisible trigger
   // the player falls through. The pad is emissive so it reads at distance in the forest's gloom.
@@ -720,6 +802,8 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     if (!nearby) return;
     if (nearby.kind === 'gather') callbacks.onGather && callbacks.onGather(nearby.data);
     else if (nearby.kind === 'station') callbacks.onStation && callbacks.onStation(nearby.data);
+    else if (nearby.kind === 'dungeon') callbacks.onDungeon && callbacks.onDungeon(nearby.data);
+    else if (nearby.kind === 'enemy') callbacks.onEnemy && callbacks.onEnemy(nearby.data);
   }
 
   // ---------- step each frame ----------
@@ -953,6 +1037,13 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       chars: Object.fromEntries(Object.entries(chars).map(([k,c])=>[k,{loaded:!!c.model, scale: c.model?+c.model.scale.x.toFixed(3):null, rawSize: c.rawSize?+c.rawSize.toFixed(3):null, meshWorldScale: c.meshWorldScale?+c.meshWorldScale.toFixed(4):null, computed: c.computedScale?+c.computedScale.toFixed(2):null, mixer: !!c.mixer, walk: !!c.walk, idle: !!c.idle}])),
       chunks: CHUNKS ? { loaded: CHUNKS.loaded.size, total: CHUNKS.buckets.size } : null,
       zone: ZONE.id, exits: (ZONE.exits||[]).map(e=>({to:e.toZone,x:e.x,z:e.z})), exitArmed,
+      interior: !!ZONE.interior,
+      dungeonEntrances: (ZONE.dungeonEntrances||[]).map(d=>({id:d.id,x:d.x,z:d.z})),
+      rooms: (ZONE.rooms||[]).length,
+      wallCount: (ZONE.obstacles||[]).filter(o=>String(o.id).startsWith("wall:")).length,
+      nearbyKind: nearby ? nearby.kind : null,
+      nearbyLabel: nearby ? nearby.label : null,
+      spawnClear: isClear(player.position.x, player.position.z, PLAYER_RADIUS, ZONE_OBSTACLES),
       inWater: wet(player.position.x, player.position.z),
       playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };
   };

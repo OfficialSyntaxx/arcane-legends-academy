@@ -8,11 +8,12 @@
     "test:engine": "node tools/test.mjs",
     "test:logic": "node tools/logic-test.mjs",
     "test:ui": "node tools/ui-smoke.mjs",
-    "test:browser": "node tools/browser-test.mjs",
+    "test:browser": "node tools/browser-test.mjs && node tools/model-check.mjs",
     "compress": "node tools/compress-models.mjs",
     "import": "node tools/import-asset.mjs",
     "serve": "python3 -m http.server 8080 --directory public",
-    "sync:zones": "node tools/sync-zones.mjs"
+    "sync:zones": "node tools/sync-zones.mjs",
+    "check:models": "node tools/model-check.mjs"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.4.2",

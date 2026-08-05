@@ -8,6 +8,7 @@ import { SFX as AUDIO_SFX } from "../public/audio.js";
 import { CDN } from "../public/cdn.js";
 import * as TER from "../public/terrain.js";
 import * as WC from "../public/worldconfig.js";
+import * as DG from "../public/dungeons.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -355,6 +356,112 @@ check("no arrival point sits in water", WORLD.zoneIds.every(id =>
     const t = WORLD.get(e.toZone), p = WC.entryPointFor(WORLD, e.toZone, id);
     return !TER.isWater(p.x, p.z, t.terrain, TER.flatsForZone(t));
   })));
+// ---- dungeons / instanced interiors (WORLDSPEC step 5) ----
+const dungeonDoc = JSON.parse(fs.readFileSync(path.join(ROOT_PUBLIC, "world", "dungeons.json"), "utf8"));
+const DUNGEONS = dungeonDoc.dungeons.map(DG.layoutDungeon);
+check("the shipped dungeons have no problems", (()=>{
+  const problems = DUNGEONS.flatMap(d => DG.validateDungeon(d, { zoneIds: WORLD.zoneIds, knownModels: [...knownModels] }));
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("overlapping rooms are caught", DG.validateDungeon(DG.layoutDungeon({
+  id:"x", name:"X", rooms:[{id:"a",x:0,z:0,w:20,d:20},{id:"b",x:5,z:0,w:20,d:20,boss:{model:"creature_Dragon.glb"}}],
+  connections:[]})).some(p => /overlap/.test(p)));
+check("an unreachable room is caught", DG.validateDungeon(DG.layoutDungeon({
+  id:"x", name:"X", rooms:[{id:"a",x:0,z:0,w:20,d:20},{id:"far",x:0,z:60,w:20,d:20,boss:{model:"creature_Dragon.glb"}}],
+  connections:[]})).some(p => /unreachable/.test(p)));
+check("a dungeon with no boss is caught", DG.validateDungeon(DG.layoutDungeon({
+  id:"x", name:"X", rooms:[{id:"a",x:0,z:0,w:20,d:20}], connections:[]})).some(p => /no boss/.test(p)));
+check("a connection that cannot be a straight corridor is caught", DG.validateDungeon(DG.layoutDungeon({
+  id:"x", name:"X", rooms:[{id:"a",x:0,z:0,w:20,d:20},{id:"b",x:40,z:40,w:20,d:20,boss:{model:"creature_Dragon.glb"}}],
+  connections:[{from:"a",to:"b"}]})).some(p => /straight corridor/.test(p)));
+check("every connection produced a corridor", DUNGEONS.every(d => d.corridors.length === d.connections.length));
+check("corridors bridge the gap exactly", DUNGEONS.every(d => d.corridors.every(c => c.w > 0 && c.d > 0)));
+// THE DOORWAY TEST. Walls are collision boxes, so a wall drawn straight across a doorway seals the
+// room and strands the player inside it. Assert every corridor mouth is actually open.
+check("corridors are not walled shut", (()=>{
+  const sealed = [];
+  for (const d of DUNGEONS){
+    const walls = [...d.rooms.flatMap(r => r.walls), ...d.corridorWalls];
+    for (const c of d.corridors){
+      // step along the corridor's centre line; no wall box may contain any point on it
+      for (let t = 0; t <= 1.0001; t += 0.1){
+        const x = c.axis === "x" ? c.x - c.w/2 + c.w*t : c.x;
+        const z = c.axis === "x" ? c.z : c.z - c.d/2 + c.d*t;
+        for (const w of walls){
+          if (Math.abs(x - w.x) < w.w/2 - 0.01 && Math.abs(z - w.z) < w.d/2 - 0.01){
+            sealed.push(`${d.id}: ${c.from}->${c.to} blocked by ${w.id}`); t = 2; break;
+          }
+        }
+      }
+    }
+  }
+  if (sealed.length) console.log("   " + [...new Set(sealed)].join("\n   "));
+  return sealed.length === 0;
+})());
+check("room walls enclose the room apart from its doorways", (()=>{
+  // the perimeter must be covered: sample it and require a wall OR a corridor at each point
+  for (const d of DUNGEONS){
+    for (const r of d.rooms){
+      const hw = r.w/2, hd = r.d/2;
+      for (let t = 0.02; t < 0.99; t += 0.02){
+        for (const [x, z] of [[r.x-hw+r.w*t, r.z+hd], [r.x-hw+r.w*t, r.z-hd],
+                              [r.x+hw, r.z-hd+r.d*t], [r.x-hw, r.z-hd+r.d*t]]){
+          const walled = r.walls.some(w => Math.abs(x-w.x) <= w.w/2+0.01 && Math.abs(z-w.z) <= w.d/2+0.01);
+          const door = d.corridors.some(c => Math.abs(x-c.x) <= c.w/2+0.01 && Math.abs(z-c.z) <= c.d/2+0.01);
+          if (!walled && !door){ console.log(`   ${d.id}/${r.id}: gap in the wall at ${x.toFixed(1)},${z.toFixed(1)}`); return false; }
+        }
+      }
+    }
+  }
+  return true;
+})());
+// A dungeon compiles to a zone, so it must satisfy every rule an outdoor zone does.
+check("each dungeon compiles to a valid zone", (()=>{
+  const problems = DUNGEONS.flatMap(d => WC.validateZone(WC.buildWorld({zones:[DG.dungeonZone(d)]}).get(d.id),
+    { knownModels:[...knownModels], zoneIds: [...WORLD.zoneIds, d.id] }));
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("the dungeon spawn is not inside a wall", DUNGEONS.every(d => {
+  const z = DG.dungeonZone(d);
+  return ST.isClear(z.spawn.x, z.spawn.z, ST.PLAYER_RADIUS, z.obstacles);
+}));
+check("a boss's footprint still leaves its arena walkable", DUNGEONS.every(d => {
+  const z = DG.dungeonZone(d);
+  for (const r of d.rooms.filter(x => x.boss)){
+    // you must be able to stand somewhere in the room and reach the boss's edge
+    const ring = [[r.w/2 - 3, 0], [-(r.w/2 - 3), 0], [0, r.d/2 - 3], [0, -(r.d/2 - 3)]];
+    if (!ring.every(([dx, dz]) => ST.isClear(r.x + dx, r.z + dz, ST.PLAYER_RADIUS, z.obstacles))) return false;
+  }
+  return true;
+}));
+check("the dungeon's exit back outdoors is reachable", DUNGEONS.every(d => {
+  const z = DG.dungeonZone(d);
+  return z.exits.every(e => ST.isClear(e.x, e.z, ST.PLAYER_RADIUS, z.obstacles));
+}));
+check("no enemy or boss is spawned inside a wall", DUNGEONS.every(d => {
+  const z = DG.dungeonZone(d);
+  // Walls only. A boss stands at the centre of its own collision circle, so testing it against
+  // every obstacle would report the boss as being stuck inside itself.
+  const walls = z.obstacles.filter(o => String(o.id).startsWith("wall:"));
+  const bad = z.enemies.filter(e => !ST.isClear(e.x, e.z, ST.PLAYER_RADIUS, walls));
+  if (bad.length) console.log("   in a wall:", bad.map(e=>e.name).join(", "));
+  return bad.length === 0;
+}));
+check("every dungeon entrance in a zone names a real dungeon", (()=>{
+  const ids = new Set(DUNGEONS.map(d => d.id));
+  const bad = WORLD.zoneIds.flatMap(id => WORLD.get(id).dungeonEntrances.filter(e => !ids.has(e.id)).map(e => `${id} -> ${e.id}`));
+  if (bad.length) console.log("   unknown dungeon:", bad.join(", "));
+  return bad.length === 0;
+})());
+check("every dungeon's entranceZone actually places its entrance", (()=>{
+  const missing = DUNGEONS.filter(d => d.entranceZone &&
+    !(WORLD.get(d.entranceZone) || {dungeonEntrances:[]}).dungeonEntrances.some(e => e.id === d.id));
+  if (missing.length) console.log("   no entrance placed for:", missing.map(d=>d.id).join(", "));
+  return missing.length === 0;
+})());
+
 // chunk helpers (the coordinate convention step 3 will build on)
 check("chunk coords are stable across the origin", WC.chunkCoord(-1, 32) === -1 && WC.chunkCoord(0, 32) === 0 && WC.chunkCoord(33, 32) === 1);
 check("chunk centre is inside its own chunk", (()=>{

@@ -1,0 +1,215 @@
+{
+  "dungeons": [
+    {
+      "id": "cinderhollow_caverns",
+      "name": "Cinderhollow Caverns",
+      "entranceZone": "whispering_forest",
+      "entranceX": 60,
+      "entranceZ": -40,
+      "background": 1643072,
+      "wallHeight": 8,
+      "corridorWidth": 6,
+      "spawnRoom": "entry",
+      "rooms": [
+        {
+          "id": "entry",
+          "x": 0,
+          "z": 0,
+          "w": 24,
+          "d": 20,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -9,
+              "z": 7,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 9,
+              "z": 7,
+              "size": 2.6
+            },
+            {
+              "model": "dng_doorway.glb",
+              "x": 0,
+              "z": -7,
+              "size": 5,
+              "ry": 0
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Slime.glb",
+              "name": "Cinder Slime",
+              "level": 3,
+              "x": -6,
+              "z": -3,
+              "size": 1.5
+            },
+            {
+              "model": "creature_Slime.glb",
+              "name": "Cinder Slime",
+              "level": 3,
+              "x": 6,
+              "z": -4,
+              "size": 1.5
+            }
+          ]
+        },
+        {
+          "id": "gallery",
+          "x": 0,
+          "z": 34,
+          "w": 30,
+          "d": 22,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -12,
+              "z": -8,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 12,
+              "z": -8,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": -12,
+              "z": 8,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 12,
+              "z": 8,
+              "size": 2.6
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Cinder Skeleton",
+              "level": 5,
+              "x": -8,
+              "z": 2,
+              "size": 2.4
+            },
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Cinder Skeleton",
+              "level": 5,
+              "x": 8,
+              "z": 3,
+              "size": 2.4
+            },
+            {
+              "model": "creature_Bat.glb",
+              "name": "Hollow Bat",
+              "level": 4,
+              "x": 0,
+              "z": -6,
+              "size": 1.3
+            }
+          ]
+        },
+        {
+          "id": "roost",
+          "x": 38,
+          "z": 34,
+          "w": 20,
+          "d": 18,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -7,
+              "z": 6,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 7,
+              "z": 6,
+              "size": 2.6
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Bat.glb",
+              "name": "Hollow Bat",
+              "level": 4,
+              "x": -5,
+              "z": 0,
+              "size": 1.3
+            },
+            {
+              "model": "creature_Bat.glb",
+              "name": "Hollow Bat",
+              "level": 4,
+              "x": 5,
+              "z": -2,
+              "size": 1.3
+            }
+          ]
+        },
+        {
+          "id": "wyrmhall",
+          "x": 0,
+          "z": 74,
+          "w": 34,
+          "d": 30,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -14,
+              "z": -11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 14,
+              "z": -11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": -14,
+              "z": 11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 14,
+              "z": 11,
+              "size": 3.2
+            }
+          ],
+          "boss": {
+            "model": "creature_Dragon.glb",
+            "name": "The Cinder Wyrm",
+            "level": 10,
+            "hp": 200,
+            "size": 7.0
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "entry",
+          "to": "gallery"
+        },
+        {
+          "from": "gallery",
+          "to": "roost"
+        },
+        {
+          "from": "gallery",
+          "to": "wyrmhall"
+        }
+      ]
+    }
+  ]
+}

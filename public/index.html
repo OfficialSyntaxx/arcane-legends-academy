@@ -307,6 +307,7 @@ import { createWorld } from "./world.js";
 import { createAudio, SFX } from "./audio.js";
 import { createBattle3d } from "./battle3d.js";
 import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
+import { loadDungeons, dungeonZone } from "./dungeons.js";
 
 // ================= state =================
 let S = G.load();
@@ -1046,8 +1047,19 @@ window.__EV.duelAgain = ()=>{
   const qIdx = battle && battle.questIdx;
   const gear = G.equipStats(S);
   const bonus = amt => Math.round(amt * gear.gold/100);
+  const dungeonBoss = battle && battle.dungeonBoss;
   if (over.winner==="you"){
     G.dailyProgress(S, "win");
+    if (dungeonBoss){
+      // WORLDSPEC §6: boss kills persist, so a cleared dungeon stays cleared across sessions.
+      const st = (S.worldState.dungeons[dungeonBoss.zone] = S.worldState.dungeons[dungeonBoss.zone] || { cleared: [], bossDead: false });
+      if (!st.bossDead){
+        st.bossDead = true;
+        G.gainGold(S, 400);
+        G.dropCards(S, 3);
+        toast("☠ Boss defeated! +400g +3 cards");
+      }
+    }
     if (isQuest && !G.questDone(S, qIdx)){
       const qq = G.QUESTS[qIdx];
       const r = G.completeQuest(S, qIdx);
@@ -1220,6 +1232,8 @@ function spawnWorld(canvas, zone, spawnAt){
       else { screen = stationTarget(station); render(); }
     },
     onZoneExit(e){ changeZone(e.toZone, e.fromZone); },
+    onDungeon(id){ enterDungeon(id); },
+    onEnemy(name){ startDungeonFight(name); },
   }, zone, {
     spawnAt,
     zoneNames: worldCfg ? Object.fromEntries(worldCfg.zoneIds.map(id => [id, worldCfg.get(id).name])) : {},
@@ -1230,6 +1244,26 @@ function spawnWorld(canvas, zone, spawnAt){
 // player at the reciprocal exit so the two zones join up. Guarded by `zoning` because the world
 // keeps running (and can fire the trigger again) during the rebuild.
 let zoning = false;
+// WORLDSPEC step 5. Dungeons are compiled into ZONES (see dungeons.js) and registered alongside
+// the outdoor ones, so entering and leaving one is the step-4 transition path — no separate
+// suspend/restore machinery, and the save already records which zone the player is in.
+function enterDungeon(id){
+  if (!worldCfg || !worldCfg.get(id)){ console.warn("unknown dungeon", id); return; }
+  S.worldState.dungeons = S.worldState.dungeons || {};
+  S.worldState.dungeons[id] = S.worldState.dungeons[id] || { cleared: [], bossDead: false };
+  changeZone(id, activeZone && activeZone.id);
+}
+// Bumping into a dungeon enemy starts a duel. The enemy's level picks the quest deck it fights
+// with, so a Lv3 slime is not shuffling the Archon's endgame list.
+function startDungeonFight(name){
+  const zone = activeZone;
+  const foe = (zone && zone.enemies || []).find(e => e.name === name);
+  if (!foe) return;
+  const tier = Math.max(0, Math.min(G.QUESTS.length - 1, Math.floor((foe.level || 1) / 2)));
+  const q = G.QUESTS[tier];
+  startLocalDuel(q.deck, q.gear, foe.name, tier, false);
+  if (foe.boss) battle.dungeonBoss = { zone: zone.id };
+}
 function changeZone(toZoneId, fromZoneId){
   if (zoning || !worldCfg) return;
   const target = worldCfg.get(toZoneId);
@@ -1265,6 +1299,16 @@ async function initWorld(){
   const canvas = $("world");
   try {
     worldCfg = await loadWorldConfig();
+    // Dungeons are compiled to zones and merged into the same lookup, so `changeZone`,
+    // `entryPointFor` and the zone-name labels all work on them without knowing they are
+    // interiors. Failing to load them must not take the outdoor world down with it.
+    try {
+      for (const d of await loadDungeons()){
+        const z = dungeonZone(d);
+        worldCfg.zones[z.id] = z;
+        if (!worldCfg.zoneIds.includes(z.id)) worldCfg.zoneIds.push(z.id);
+      }
+    } catch(e){ console.warn("dungeons unavailable:", e && e.message); }
     // ?zone= wins, then wherever the player last logged out, then the hub.
     const wanted = new URLSearchParams(location.search).get("zone") || (S.worldState && S.worldState.zone);
     activeZone = (wanted && worldCfg.get(wanted)) || worldCfg.get(worldCfg.hub);

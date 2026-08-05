@@ -58,9 +58,9 @@
 
 - [ ] Enemy levels and archetypes
 - [ ] Better AI deck archetypes
-- [ ] Boss battles — WORLDSPEC step 5 (dungeon instancing)
+- [~] Boss battles — the Cinder Wyrm fights via the duel engine; multi-phase/abilities pending
 - [ ] Multi-phase bosses
-- [ ] Dungeon progression — WORLDSPEC step 5
+- [~] Dungeon progression — Cinderhollow Caverns is playable end to end; `worldState.dungeons` persists boss kills. Room-clear gating and more dungeons pending
 - [ ] Spell VFX — costs nothing, see `docs/DESIGN-DECISIONS.md` §2 phase 1
 - [~] Attack / summon / death animations — `battle3d.js` exists; procedural walk cycle already added for NPCs
 - [ ] Reusable combat effect system
@@ -192,8 +192,9 @@ camera collision, and the character-model fix — the player and every NPC were 
 retry, so any CDN failure silently replaced the whole cast with the procedural stand-in. They now
 ship locally as a fallback, guarded by a test.
 
-**Next step:** WORLDSPEC step 4 (zone transitions), which unblocks §3 Open World, and then the
-two §1 items that need no new art — spell VFX (§4) and the onboarding chain (§1).
+**Next step:** WORLDSPEC steps 1-5 are done. Remaining world work is step 6 (content pass).
+The two §1 items that need no new art are the best value next: spell VFX (§4) and the onboarding
+chain (§1). The forest also still needs quests and NPCs of its own.
 
 
 ---

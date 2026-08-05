@@ -213,7 +213,7 @@ Dungeons and boss rooms are **interior instances** — separate scenes, not part
    `quiet` so they do not drive the boot progress HUD. `?zone=<id>` picks a starting zone.
 4. ✅ **Zone transitions** — walkable `exits` that switch the active zone, arriving at the
    target's *reciprocal* exit so the two zones join up geographically.
-5. **Dungeon instancing** — entrance → suspend zone → load interior → rooms/corridors → boss room → exit restores zone (§6).
+5. ✅ **Dungeon instancing** — entrance → suspend zone → load interior → rooms/corridors → boss room → exit restores zone (§6).
 6. **Content pass** — author the first 2–3 zones (Academy, Whispering Forest, Cinderhollow) + one dungeon, using imported CC0 models.
 
 ---
@@ -310,3 +310,27 @@ enough. While easing back out the camera sits between its old and new positions,
 building can sweep that arc through a corner even when both endpoints are clear — an
 intermittent failure that predates step 4. The camera is now re-clamped along its own bearing
 after the lerp.
+
+
+**q. A dungeon IS a zone.** Step 5 does not add a parallel instance system. `dungeons.js` compiles
+a dungeon config into the zone shape `world.js` already renders (bounds, flat terrain, obstacles,
+props, enemies, exits) and registers it in the same lookup, so entering one is a step-4
+transition and everything step 4 already tested applies unchanged. `interior: true` swaps the
+outdoor light rig and sky for a cave rig and close fog.
+
+**r. Walls are collision boxes, so a doorway must be a GAP, not a hole.** `wallsForRoom` emits
+each side as up to two boxes either side of its doorways. One box spanning a doorway would seal
+the room and strand the player — tested by walking the centre line of every corridor and
+asserting no wall box contains it, and by sampling every room perimeter for gaps.
+
+**s. Bosses need a footprint.** A 7m dragon with no collision lets the player walk inside it, and
+the follow camera goes with them — the boss room renders as a wall of dark red. Bosses contribute
+a collision circle; a test asserts the arena around it is still walkable and the boss is still
+close enough to engage.
+
+**t. Compression can corrupt a model in two different ways, both invisible.** Four models shipped
+broken: two failed to PARSE and two parsed but threw on every frame once the GPU uploaded them.
+world.js catches a load failure and silently keeps the procedural stand-in, and a render failure
+is only console spam, so neither showed up in play or in any test. `tools/model-check.mjs` now
+loads and renders every GLB in a real browser — and renders TWICE, because a corrupt attribute
+only throws on upload, not on the frame the model is added.

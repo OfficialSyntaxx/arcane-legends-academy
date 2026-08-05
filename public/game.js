@@ -29,7 +29,7 @@ export function newGame(){
     stats:{ packs:0, graded:0, won:0, slabs:0 },
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
-    worldState:{ zone:"academy", visited:["academy"] },
+    worldState:{ zone:"academy", visited:["academy"], dungeons:{} },
     auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false },
   };
 }
@@ -55,8 +55,10 @@ function migrate(s){
   // quit during character creation never saw the picker again and was silently stuck on Balance.
   if (s.flags.schoolPicked === undefined) s.flags.schoolPicked = true;
   if (!s.auctions) s.auctions = [];
-  if (!s.worldState) s.worldState = { zone:"academy", visited:["academy"] };
+  if (!s.worldState) s.worldState = { zone:"academy", visited:["academy"], dungeons:{} };
   if (!Array.isArray(s.worldState.visited)) s.worldState.visited = ["academy"];
+  // WORLDSPEC §6: per-dungeon progress (cleared rooms, boss kills) lives in the save.
+  if (!s.worldState.dungeons || typeof s.worldState.dungeons !== "object") s.worldState.dungeons = {};
   if (s.deck && s.deck.length > MAX_DECK) s.deck = s.deck.slice(0, MAX_DECK);
   return s;
 }

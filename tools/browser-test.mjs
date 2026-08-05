@@ -204,8 +204,16 @@ if (hasWorld){
 
   // --- tap to move ---
   const tapBefore = (await dbg()).playerExact;
-  await page.locator("#world").dispatchEvent("pointerdown", { pointerId:4, clientX:120, clientY:300, isPrimary:true });
-  await page.locator("#world").dispatchEvent("pointerup", { pointerId:4, clientX:121, clientY:301, isPrimary:true });
+  // Both events in ONE evaluate. A tap is only a tap if press and release are within TAP_MS
+  // (350ms), and two Playwright round-trips can exceed that on a loaded machine — which made
+  // this test fail intermittently for a reason that had nothing to do with the game.
+  await page.evaluate(() => {
+    const c = document.getElementById("world");
+    const ev = (type, x, y) => c.dispatchEvent(new PointerEvent(type, {
+      pointerId: 4, clientX: x, clientY: y, isPrimary: true, bubbles: true }));
+    ev("pointerdown", 120, 300);
+    ev("pointerup", 121, 301);
+  });
   await page.waitForTimeout(900);
   const tapAfter = (await dbg()).playerExact;
   const tapMoved = Math.hypot(tapAfter[0]-tapBefore[0], tapAfter[2]-tapBefore[2]);
@@ -361,6 +369,57 @@ if (hasWorld){
         `${trip.after1} -> ${trip.stillThere}`);
   check("the arrival point is clear of the return trigger", trip.arrivalClear === true, JSON.stringify(trip.arrival));
   check("the way back works too", trip.after2 === trip.start, `${trip.after1} -> ${trip.after2}`);
+
+  // --- dungeon instancing (WORLDSPEC step 5) ---
+  // Drive the real path: hop to the forest, walk onto the dungeon entrance, press the prompt,
+  // then verify the interior actually built (rooms, walls, a boss) and that the way out works.
+  const dung = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    const log = {};
+    // get into the forest, which is where the entrance lives
+    if (dbg().zone !== "whispering_forest"){
+      const e = (dbg().exits || [])[0];
+      window.__world.teleport(e.x, e.z);
+      await settle(900);
+    }
+    log.zoneBefore = dbg().zone;
+    const ent = dbg().dungeonEntrances || [];
+    log.entrances = ent.length;
+    if (!ent.length) return log;
+    window.__world.teleport(ent[0].x, ent[0].z + 3);
+    await settle(500);
+    log.prompt = dbg().nearbyKind;
+    window.__world.trigger();                       // press "Enter Dungeon"
+    await settle(1600);
+    log.zoneInside = dbg().zone;
+    const d = dbg();
+    log.rooms = d.rooms;
+    log.wallObstacles = d.wallCount;
+    log.interior = d.interior;
+    log.spawnClear = d.spawnClear;
+    // Walk up to the boss. A dungeon whose boss cannot be engaged is not a dungeon — and the
+    // boss now has a collision footprint, so "can still get close enough to fight" is exactly
+    // the thing that footprint could break.
+    window.__world.teleport(0, 70);
+    await settle(500);
+    log.bossPrompt = dbg().nearbyKind;
+    log.bossLabel = dbg().nearbyLabel;
+    // and back out
+    const back = (dbg().exits || [])[0];
+    if (back){ window.__world.teleport(back.x, back.z); await settle(1400); }
+    log.zoneAfter = dbg().zone;
+    return log;
+  });
+  check("the forest places a dungeon entrance", dung.entrances > 0, `${dung.entrances} found`);
+  check("the entrance prompts to enter", dung.prompt === "dungeon", String(dung.prompt));
+  check("entering builds the dungeon interior", dung.zoneInside === "cinderhollow_caverns", `${dung.zoneBefore} -> ${dung.zoneInside}`);
+  check("the dungeon has rooms and wall collision", dung.rooms >= 4 && dung.wallObstacles > 10,
+        `${dung.rooms} rooms, ${dung.wallObstacles} wall boxes`);
+  check("the dungeon is lit as an interior", dung.interior === true);
+  check("the player does not spawn inside a dungeon wall", dung.spawnClear === true);
+  check("the boss can be approached and engaged", dung.bossPrompt === "enemy", `${dung.bossPrompt} / ${dung.bossLabel}`);
+  check("leaving the dungeon returns outdoors", dung.zoneAfter === "whispering_forest", String(dung.zoneAfter));
 
   // --- water is solid (WORLDSPEC §9b k) ---
   const wet = await page.evaluate(async () => {
