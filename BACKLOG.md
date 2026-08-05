@@ -61,7 +61,7 @@
 - [~] Boss battles — the Cinder Wyrm fights via the duel engine; multi-phase/abilities pending
 - [ ] Multi-phase bosses
 - [~] Dungeon progression — Cinderhollow Caverns is playable end to end; kills, cleared rooms and boss defeat all persist and enemies stay dead. Locked doors / key gating and more dungeons pending
-- [ ] Spell VFX — costs nothing, see `docs/DESIGN-DECISIONS.md` §2 phase 1
+- [x] Spell VFX — six procedural archetypes (bolt/burst/rain/aura/beam/glyph) driven from each card's own effects and school; zero assets
 - [~] Attack / summon / death animations — `battle3d.js` exists; procedural walk cycle already added for NPCs
 - [ ] Reusable combat effect system
 - [ ] School-specific mechanics

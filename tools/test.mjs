@@ -10,6 +10,7 @@ import * as TER from "../public/terrain.js";
 import * as WC from "../public/worldconfig.js";
 import * as DG from "../public/dungeons.js";
 import * as OB from "../public/onboarding.js";
+import * as VFX from "../public/vfx.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -1236,6 +1237,54 @@ check("a finished chain has no active step", (()=>{
   s.stats.graded = 1; s.stats.won = 1;
   return OB.currentStep(s) === null && OB.checklist(s).every(x => !x.active);
 })());
+
+// ---- spell VFX (BACKLOG §4) ----
+// The whole point of deciding effects in a pure module is that "this card plays nothing" is a
+// test failure rather than a spell that quietly does not appear.
+check("every effect kind in the catalog has a visual", (()=>{
+  const missing = VFX.unmappedKinds(CARDS);
+  if (missing.length) console.log("   no VFX mapped for:", missing.join(", "));
+  return missing.length === 0;
+})());
+check("every card resolves to an effect", (()=>{
+  const none = CARDS.filter(c => !VFX.effectFor(c)).map(c => c.id + " (" + c.type + ")");
+  if (none.length) console.log("   no effect:", none.join(", "));
+  return none.length === 0;
+})());
+check("every effect names a known archetype",
+  CARDS.every(c => VFX.ARCHETYPES.includes(VFX.effectFor(c).archetype)));
+check("every school has its own VFX palette", (()=>{
+  const schools = [...new Set(CARDS.map(c => c.school))];
+  const missing = schools.filter(s => !VFX.SCHOOL_VFX[s]);
+  if (missing.length) console.log("   no palette for:", missing.join(", "));
+  return missing.length === 0;
+})());
+check("school palettes are visually distinct", (()=>{
+  const cores = Object.values(VFX.SCHOOL_VFX).map(p => p.trail);
+  return new Set(cores).size === cores.length;
+})());
+check("effect durations stay short enough not to stall a turn",
+  CARDS.every(c => { const e = VFX.effectFor(c); return e.duration > 0.2 && e.duration <= 1.7; }));
+check("an area spell reads as area, not a single bolt", (()=>{
+  // meteor is dmgAll + dmgWiz; the area strike must win, or the headline effect is invisible
+  const e = VFX.effectFor(CARD_MAP.meteor);
+  return e.archetype === "rain" && e.origin === VFX.ORIGIN.SKY;
+})());
+check("a plain damage spell is a bolt from the caster", (()=>{
+  const e = VFX.effectFor(CARD_MAP.firebolt);
+  return e.archetype === "bolt" && e.origin === VFX.ORIGIN.CASTER && e.targeted;
+})());
+check("a shield spell plays on the caster, not the target", (()=>{
+  const e = VFX.effectFor(CARD_MAP.ice_armor);
+  return e.archetype === "aura" && e.origin === VFX.ORIGIN.CASTER;
+})());
+check("creature keywords are not mistaken for cast effects", (()=>{
+  // creature fx are bare strings ("taunt"), unlike spell fx objects ({k:"dmg"})
+  const kws = VFX.keywordsFor(CARD_MAP.vampire);
+  return kws.includes("drain") && VFX.effectFor(CARD_MAP.vampire).kind === "summon";
+})());
+check("a bigger spell lasts longer than a small one of the same shape",
+  VFX.effectFor(CARD_MAP.fireball).duration > VFX.effectFor(CARD_MAP.firebolt).duration);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

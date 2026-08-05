@@ -319,6 +319,7 @@ import * as G from "./game.js";
 import { createWorld } from "./world.js";
 import { createAudio, SFX } from "./audio.js";
 import { createBattle3d } from "./battle3d.js";
+import * as VFX from "./vfx.js";
 import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
 import { loadDungeons, dungeonZone } from "./dungeons.js";
 import * as ONBOARD from "./onboarding.js";
@@ -938,7 +939,7 @@ function syncBattle3d(){
     if (!battle) return;
     const cv = $("battle3d");
     if (!cv) return;
-    if (!battle3d) battle3d = createBattle3d(cv);
+    if (!battle3d) window.__battle3d = battle3d = createBattle3d(cv);
     const r = cv.parentElement.getBoundingClientRect();
     battle3d.setSize(r.width, r.height);
     battle3d.sync(battle.you.board, battle.enemy.board);
@@ -1041,19 +1042,49 @@ function renderDuel(el){
   }
   // if it's enemy turn and not over, run AI
   if (!over.over && battle.turn==="enemy"){
-    setTimeout(()=>{ if (battle && battle.turn==="enemy"){ G.aiTurn(battle); render(); } }, 500);
+    setTimeout(()=>{ if (battle && battle.turn==="enemy"){
+      // Watch the log rather than reimplementing the AI: aiTurn appends "<who> plays <name>" for
+      // every card it casts, which is the only record of what it actually did.
+      const before = battle.log.length;
+      G.aiTurn(battle);
+      for (const line of battle.log.slice(before)){
+        const m = /plays (.+)$/.exec(line);
+        if (!m) continue;
+        const card = CARDS.find(c => c.name === m[1]);
+        if (card) castVfx(card.id, "enemy", null);
+      }
+      render();
+    } }, 500);
   }
 }
-window.__EV.play = (idx)=>{ const r=G.playCard(battle, battle.you, idx, null); if(r.ok) AUDIO.play("card"); render(); };
+// Spell VFX. The card has to be captured BEFORE playCard, because playing it removes it from
+// hand — reading hand[idx] afterwards gets whatever slid into that slot.
+function castVfx(cardId, side, targetIdx){
+  if (!battle3d || !cardId) return;
+  try { battle3d.playSpell(CARD_MAP[cardId], side, targetIdx); }
+  catch(e){ console.warn("spell vfx failed:", e && e.message); }
+}
+window.__EV.play = (idx)=>{
+  const cid = battle.you.hand[idx];
+  const r=G.playCard(battle, battle.you, idx, null);
+  if(r.ok){ AUDIO.play("card"); castVfx(cid, "you", null); }
+  render();
+};
 window.__EV.cast = (idx)=>{
   const c = CARD_MAP[battle.you.hand[idx]];
   if (c.fx.some(f=>f.k==="dmg")){ pendingTarget = {kind:"spell", idx}; render(); }
-  else { G.playCard(battle, battle.you, idx, null); render(); }
+  else {
+    const cid = battle.you.hand[idx];
+    const r = G.playCard(battle, battle.you, idx, null);
+    if (r.ok) castVfx(cid, "you", null);
+    render();
+  }
 };
 window.__EV.dmgTarget = (ti)=>{
   if (pendingTarget && pendingTarget.kind==="spell"){
+    const cid = battle.you.hand[pendingTarget.idx];
     const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"creature", idx:ti});
-    pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
+    pendingTarget = null; if(r.ok){ sfx(dmgSfx); castVfx(cid, "you", ti); } render();
   } else if (pendingTarget && pendingTarget.kind==="attack"){
     const r = G.attack(battle, pendingTarget.idx, "creature", ti);
     pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
@@ -1061,8 +1092,9 @@ window.__EV.dmgTarget = (ti)=>{
 };
 window.__EV.dmgWiz = ()=>{
   if (pendingTarget && pendingTarget.kind==="spell"){
+    const cid = battle.you.hand[pendingTarget.idx];
     const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"wiz"});
-    pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
+    pendingTarget = null; if(r.ok){ sfx(dmgSfx); castVfx(cid, "you", null); } render();
   } else if (pendingTarget && pendingTarget.kind==="attack"){
     const r = G.attack(battle, pendingTarget.idx, "wiz", -1);
     pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
@@ -1526,6 +1558,23 @@ window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
 // them, so the test cannot pass against a path the game does not actually use.
 window.__testBattle = ()=> battle;
 window.__testGather = ()=>{ const m = MATERIALS.find(x=>x.id==="oak_log"); G.gather(S, m); save(); };
+window.__testDuel = ()=>{ startPracticeDuel(); };
+window.__testBoard = ()=>{
+  battle.you.pips = 9; battle.enemy.pips = 9;
+  battle.you.hand[0] = "fire_dragon"; window.__ev("play|0");
+  battle.you.hand[0] = "fire_cat"; window.__ev("play|0");
+  battle.enemy.hand[0] = "ice_golem"; G.playCard(battle, battle.enemy, 0, null);
+  syncBattle3d();
+  return { you: battle.you.board.length, enemy: battle.enemy.board.length };
+};
+// Force a specific card into hand and cast it — used to photograph and test each VFX archetype
+// without having to play a real duel until the right card is drawn.
+window.__testCast = (cardId, targetIdx)=>{
+  if (!battle) return false;
+  battle.you.hand[0] = cardId; battle.you.pips = 9;
+  castVfx(cardId, "you", targetIdx == null ? null : targetIdx);
+  return true;
+};
 window.__testKill = ()=>{ if (battle && battle.dungeonFoe){ recordDungeonKill(battle.dungeonFoe); save(); } };
 window.__EV.toggleMute = ()=>{
   AUDIO.unlock();

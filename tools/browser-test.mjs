@@ -534,6 +534,48 @@ if (hasWorld){
   check("the objective bar can be dismissed", ob.hiddenAfter === "none", ob.hiddenAfter);
 }
 
+// ---------------- spell VFX (BACKLOG §4) ----------------
+// Verified by reading PIXELS, not by taking a screenshot. Playwright's element screenshots of a
+// WebGL canvas can come back stale — which is exactly how these effects looked "invisible" while
+// they were in fact rendering — so the check draws the canvas into a 2D context and counts lit
+// pixels against a baseline with no effect running.
+{
+  const vfx = await page.evaluate(async () => {
+    const lit = () => {
+      window.__battle3d.renderOnce();
+      const cv = document.getElementById("battle3d");
+      const d = document.createElement("canvas"); d.width = cv.width; d.height = cv.height;
+      d.getContext("2d").drawImage(cv, 0, 0);
+      const px = d.getContext("2d").getImageData(0, 0, d.width, d.height).data;
+      let n = 0;
+      for (let i = 0; i < px.length; i += 4) if (px[i] + px[i+1] + px[i+2] > 560) n++;
+      return n;
+    };
+    window.__testDuel();
+    await new Promise(r => setTimeout(r, 900));
+    window.__testBoard();
+    await new Promise(r => setTimeout(r, 900));
+    const out = { canvas: (() => { const c = document.getElementById("battle3d"); return { w: c.width, h: c.height }; })() };
+    await new Promise(r => setTimeout(r, 2200));      // let every summon glyph finish
+    out.baseline = lit();
+    out.cards = {};
+    for (const [card, tag] of [["firebolt","bolt"],["meteor","rain"],["ice_armor","aura"],["blizzard","burst"],["balance_blade","glyph"]]){
+      window.__testCast(card, 0);
+      await new Promise(r => setTimeout(r, 320));
+      out.cards[tag] = lit();
+      await new Promise(r => setTimeout(r, 1500));    // let it expire before the next one
+    }
+    out.leaked = window.__battle3d.activeFx();
+    return out;
+  });
+  check("the duel canvas has a real size", vfx.canvas.w > 200 && vfx.canvas.h > 80, JSON.stringify(vfx.canvas));
+  for (const tag of ["bolt","rain","aura","burst","glyph"]){
+    check(`the ${tag} spell effect renders`, vfx.cards[tag] > vfx.baseline * 1.15,
+          `${vfx.cards[tag]} lit px vs ${vfx.baseline} baseline`);
+  }
+  check("spell effects clean themselves up", vfx.leaked === 0, `${vfx.leaked} still alive`);
+}
+
 check("no uncaught page errors", errs.length === 0, errs.slice(0,3).join(" | "));
 
 // ---------------- desktop: joystick hidden, zoom buttons hidden ----------------
