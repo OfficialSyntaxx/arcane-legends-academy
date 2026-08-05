@@ -57,15 +57,15 @@ export function creatureFor(modelFile) {
 // onPlayDraw, healOnHit, freezeOnHit.
 export const RULES = {
   slime:        { regen: 1 },
+  dragon:       { haste: true, onPlayDmgAll: 1 },
   bat:          { haste: true },
   skeleton:     {},
-  dragon:       { haste: true, onPlayDmgAll: 2 },
   chicken:      {},
   panda:        { taunt: true },
   deer:         { evade: true },
   ghost:        { regen: 1, spellImmune: true },
   mushroom:     { regen: 1, onPlayHealAll: 1 },
-  yeti:         { taunt: true, freezeOnHit: true },
+  yeti:         { taunt: true },   // balance: freeze-on-hit removed (taunt wall was oppressive)
   dino:         { onAttackDmgAll: 1 },
   orc:          { warband: true },
   orc_skull:    { drain: true },
@@ -74,13 +74,13 @@ export const RULES = {
   frog:         { onPlayBuffAll: 1 },
   mushroomking: { regen: 2, onPlayBuffAll: 1 },
   mushnub:      { regen: 2, onPlayHealAll: 1 },
-  mushnub_evolved: { regen: 2, onPlayHealAll: 2, taunt: true },
+  mushnub_evolved: { regen: 2, onPlayHealAll: 1 },   // balance: taunt + heal-all 2 removed
   fish:         { spellImmune: true },
   bunny:        { haste: true, evade: true },
   alien:        { spellImmune: true },
   wizard:       { onPlayDmgWiz: 2 },
   ninja:        { evade: true },
-  monkroose:    { healOnHit: 3, freezeImmune: true },
+  monkroose:    { healOnHit: 2 },   // balance: 3 -> 2
   birb:         { haste: true, wizardDmg: 1 },
   cactoro:      { thorns: 1, regen: 1 },
   cat:          { haste: true, survive: true },

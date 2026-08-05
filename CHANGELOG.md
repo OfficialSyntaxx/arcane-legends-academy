@@ -2,6 +2,10 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-05 — Creature balance pass + regression tests
+- **Balanced strong passives:** Dragon on-play AoE 2→1; **Yeti** freeze-on-hit removed (taunt wall was oppressive); Mushnub_Evolved taunt + heal-all 2 removed; Monkroose heal-on-hit 3→2.
+- Added **`tools/creature-rule-test.mjs`** — 28 regression tests, one per battle mechanic (Taunt, Haste, Drain, Regen, Poison, Thorns, Evade, Shield, Survive, Spell/Freeze-immune, WizardDmg, on-attack AoE/debuff, HealOnHit, FreezeOnHit, Warband, dragon on-play AoE) + the balance assertions. Wired into `npm test`. All 252 engine / 34 logic / UI-smoke / 28 creature-rule tests pass. Deployed + pushed.
+
 ## 2026-08-05 — Creature combat pass
 **All 39 creature passives wired into the duel engine battle math** (`game.js` + `creatures.js`):
 - Added `RULES` (mechanical effects per creature) + `traitForCard()` (pure card→creature resolver).
