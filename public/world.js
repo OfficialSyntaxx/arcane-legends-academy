@@ -1085,6 +1085,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       wallCount: (ZONE.obstacles||[]).filter(o=>String(o.id).startsWith("wall:")).length,
       nearbyKind: nearby ? nearby.kind : null,
       nearbyLabel: nearby ? nearby.label : null,
+      npcs: (ZONE.npcs||[]).map(n=>({key:n.key, station:n.station, x:n.x, z:n.z})),
       enemies: Object.keys(enemyGroups).length,
       enemyList: (ZONE.enemies||[]).filter(e=>e.x!=null && enemyGroups[e.id||e.name]).map(e=>({id:e.id,x:e.x,z:e.z,boss:!!e.boss})),
       spawnClear: isClear(player.position.x, player.position.z, PLAYER_RADIUS, ZONE_OBSTACLES),

@@ -30,6 +30,9 @@ export function newGame(){
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
     worldState:{ zone:"academy", visited:["academy"], dungeons:{} },
+    // Quests given by NPCs out in the world (zonequests.js). Only the player's CHOICES live
+    // here — progress is derived from inventory/dungeon state every time it is read.
+    zoneQuests:{ accepted:[], done:[] },
     auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false },
   };
 }
@@ -63,6 +66,9 @@ function migrate(s){
   if (!Array.isArray(s.worldState.visited)) s.worldState.visited = ["academy"];
   // WORLDSPEC §6: per-dungeon progress (cleared rooms, boss kills) lives in the save.
   if (!s.worldState.dungeons || typeof s.worldState.dungeons !== "object") s.worldState.dungeons = {};
+  if (!s.zoneQuests) s.zoneQuests = { accepted: [], done: [] };
+  if (!Array.isArray(s.zoneQuests.accepted)) s.zoneQuests.accepted = [];
+  if (!Array.isArray(s.zoneQuests.done)) s.zoneQuests.done = [];
   // `defeated` arrived after `cleared`/`bossDead`, so older saves have the object but not the list.
   for (const d of Object.values(s.worldState.dungeons)){
     if (!Array.isArray(d.defeated)) d.defeated = [];

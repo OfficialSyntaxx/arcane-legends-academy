@@ -610,6 +610,67 @@ if (hasWorld){
         `${vfx.slowExpiry} survived a low frame rate`);
 }
 
+// ---------------- zone quests (BACKLOG §2) ----------------
+// Drives the real dialogue path: walk to the giver in the forest, press the prompt, accept from
+// the dialogue's own button, gather, then hand in — and check the reward actually landed.
+{
+  const q = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    const out = {};
+    // get to the forest
+    if (dbg().zone !== "whispering_forest"){
+      const e = (dbg().exits || []).find(x => x.to === "whispering_forest") || (dbg().exits || [])[0];
+      window.__world.teleport(e.x, e.z); await settle(1500);
+    }
+    out.zone = dbg().zone;
+    const giver = dbg().npcs.find(n => n.station === "forest_sage");
+    out.foundGiver = !!giver;
+    if (!giver) return out;
+    window.__world.teleport(giver.x, giver.z + 2.5);
+    await settle(450);
+    out.prompt = dbg().nearbyKind;
+    window.__ev("worldGo");                     // opens the dialogue
+    await settle(250);
+    const dlg = document.getElementById("dialogue");
+    out.dialogueOpen = getComputedStyle(dlg).display !== "none";
+    out.buttons = [...document.querySelectorAll("#dlgBtns button")].map(b => b.textContent);
+    const acceptIdx = out.buttons.findIndex(t => /Accept/.test(t));
+    out.hasOffer = acceptIdx >= 0;
+    if (acceptIdx < 0) return out;
+    document.querySelectorAll("#dlgBtns button")[acceptIdx].click();
+    await settle(250);
+    out.accepted = JSON.parse(localStorage.getItem("arcane_legends_save_v1")).zoneQuests.accepted.slice();
+    // complete it the honest way is slow (8 logs), so grant the materials and hand in via the
+    // dialogue button, which is the path a player takes
+    out.goldBefore = window.__testGold();
+    window.__testGrant(out.accepted[0]);
+    window.__ev("worldGo");
+    await settle(250);
+    const btns2 = [...document.querySelectorAll("#dlgBtns button")];
+    const handIdx = btns2.findIndex(b => /Hand in/.test(b.textContent));
+    out.hasTurnIn = handIdx >= 0;
+    if (handIdx < 0) return out;
+    btns2[handIdx].click();
+    await settle(300);
+    const save = JSON.parse(localStorage.getItem("arcane_legends_save_v1"));
+    out.done = save.zoneQuests.done.slice();
+    out.stillAccepted = save.zoneQuests.accepted.slice();
+    out.goldAfter = window.__testGold();
+    out.leftovers = save.inventory.willow_log || 0;
+    return out;
+  });
+  check("the forest has a quest giver standing in it", q.foundGiver === true, q.zone);
+  check("approaching the giver prompts a conversation", q.prompt === "station", String(q.prompt));
+  check("the giver offers a quest", q.hasOffer === true, (q.buttons || []).join(" | "));
+  check("accepting records the quest", (q.accepted || []).length === 1, JSON.stringify(q.accepted));
+  check("a completed quest can be handed in", q.hasTurnIn === true);
+  check("handing in pays out and closes the quest",
+        (q.done || []).length === 1 && (q.stillAccepted || []).length === 0 && q.goldAfter > q.goldBefore,
+        `done=${JSON.stringify(q.done)} gold ${q.goldBefore}->${q.goldAfter}`);
+  check("handing in consumes the materials", q.leftovers === 0, `${q.leftovers} left`);
+}
+
 check("no uncaught page errors", errs.length === 0, errs.slice(0,3).join(" | "));
 
 // ---------------- desktop: joystick hidden, zoom buttons hidden ----------------

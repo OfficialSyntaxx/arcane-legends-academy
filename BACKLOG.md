@@ -32,7 +32,7 @@
 - [~] School identity / specialization — 7 schools, starter decks, +1 affinity and the elemental ring all live; per-school *visuals* not yet
 - [ ] Academy classes and curriculum
 - [ ] NPC reputation
-- [ ] Main story + side quests
+- [~] Main story + side quests — five field quests in the Whispering Forest from two NPCs (`zonequests.js`), with gather/slay/clear/boss objectives, prerequisites and a quest log. The main story is still to write.
 - [ ] Visual equipment on 3D character
 - [ ] Dorm customization
 - [ ] Card/slab display cases
@@ -42,7 +42,7 @@
 ## 3. Open World
 
 - [ ] Expand beyond the Academy
-- [~] Whispering Forest — streams, and is now reachable through the academy's north gateway; needs its own quests/enemies/NPCs
+- [x] Whispering Forest — streams, reachable through the academy's north gateway, three NPCs and five quests that lead into Cinderhollow
 - [ ] Lake Arcanum
 - [ ] Ashen Mountains
 - [ ] Cinderhollow Caverns

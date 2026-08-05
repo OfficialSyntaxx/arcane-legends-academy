@@ -11,6 +11,7 @@ import * as WC from "../public/worldconfig.js";
 import * as DG from "../public/dungeons.js";
 import * as OB from "../public/onboarding.js";
 import * as VFX from "../public/vfx.js";
+import * as ZQ from "../public/zonequests.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -1285,6 +1286,108 @@ check("creature keywords are not mistaken for cast effects", (()=>{
 })());
 check("a bigger spell lasts longer than a small one of the same shape",
   VFX.effectFor(CARD_MAP.fireball).duration > VFX.effectFor(CARD_MAP.firebolt).duration);
+
+// ---- zone quests (BACKLOG §2) ----
+check("every zone quest names a real zone and giver", (()=>{
+  const zoneIds = new Set(WORLD.zoneIds);
+  const bad = [];
+  for (const q of ZQ.ZONE_QUESTS){
+    if (!zoneIds.has(q.zone)) bad.push(`${q.id}: unknown zone ${q.zone}`);
+    const z = WORLD.get(q.zone);
+    if (z && !z.npcs.some(n => n.station === q.giver || n.key === q.giver))
+      bad.push(`${q.id}: no NPC "${q.giver}" stands in ${q.zone}`);
+  }
+  if (bad.length) console.log("   " + bad.join("\n   "));
+  return bad.length === 0;
+})());
+check("zone quest ids are unique", new Set(ZQ.ZONE_QUESTS.map(q => q.id)).size === ZQ.ZONE_QUESTS.length);
+check("every quest objective is a kind the code handles", (()=>{
+  const known = ["gather", "slay", "boss", "clear", "visit"];
+  const bad = ZQ.ZONE_QUESTS.filter(q => !known.includes(q.objective.kind)).map(q => q.id + ":" + q.objective.kind);
+  if (bad.length) console.log("   unknown objective:", bad.join(", "));
+  return bad.length === 0;
+})());
+check("gather quests ask for materials that exist and can be gathered", (()=>{
+  const bad = ZQ.ZONE_QUESTS.filter(q => q.objective.kind === "gather" && !GATHERABLE.includes(q.objective.id))
+    .map(q => q.id + " wants " + q.objective.id);
+  if (bad.length) console.log("   ungatherable:", bad.join(", "));
+  return bad.length === 0;
+})());
+check("dungeon quests reference real dungeons and rooms", (()=>{
+  const byId = new Map(DUNGEONS.map(d => [d.id, d]));
+  const bad = [];
+  for (const q of ZQ.ZONE_QUESTS){
+    const o = q.objective;
+    if (!o.dungeon) continue;
+    const d = byId.get(o.dungeon);
+    if (!d){ bad.push(`${q.id}: unknown dungeon ${o.dungeon}`); continue; }
+    if (o.kind === "clear" && !d.rooms.some(r => r.id === o.room)) bad.push(`${q.id}: ${o.dungeon} has no room "${o.room}"`);
+    if (o.kind === "slay"){
+      const total = DG.dungeonZone(d).enemies.length;
+      if (o.n > total) bad.push(`${q.id}: asks for ${o.n} kills but ${o.dungeon} only holds ${total}`);
+    }
+    if (o.kind === "boss" && !d.rooms.some(r => r.boss)) bad.push(`${q.id}: ${o.dungeon} has no boss`);
+  }
+  if (bad.length) console.log("   " + bad.join("\n   "));
+  return bad.length === 0;
+})());
+check("quest prerequisites cannot deadlock", (()=>{
+  // every quest must be reachable by completing prerequisites in some order
+  const done = new Set();
+  let moved = true;
+  while (moved){
+    moved = false;
+    for (const q of ZQ.ZONE_QUESTS){
+      if (done.has(q.id)) continue;
+      if ((q.requires || []).every(r => done.has(r))){ done.add(q.id); moved = true; }
+    }
+  }
+  const stuck = ZQ.ZONE_QUESTS.filter(q => !done.has(q.id)).map(q => q.id);
+  if (stuck.length) console.log("   unreachable quests:", stuck.join(", "));
+  return stuck.length === 0;
+})());
+check("a gather quest can be accepted, completed and handed in", (()=>{
+  const s = G.newGame();
+  const q = ZQ.ZONE_QUESTS.find(x => x.objective.kind === "gather");
+  if (!ZQ.accept(s, q.id).ok){ console.log("   accept failed"); return false; }
+  if (ZQ.progressOf(s, q).done){ console.log("   complete before gathering anything"); return false; }
+  if (ZQ.turnIn(s, q.id).ok){ console.log("   handed in while incomplete"); return false; }
+  s.inventory[q.objective.id] = q.objective.n;
+  const r = ZQ.turnIn(s, q.id);
+  return r.ok && ZQ.isDone(s, q.id) && !ZQ.isAccepted(s, q.id)
+      && !(s.inventory[q.objective.id] > 0);      // the materials were consumed
+})());
+check("a quest cannot be handed in twice", (()=>{
+  const s = G.newGame();
+  const q = ZQ.ZONE_QUESTS.find(x => x.objective.kind === "gather");
+  ZQ.accept(s, q.id); s.inventory[q.objective.id] = q.objective.n * 2;
+  ZQ.turnIn(s, q.id);
+  return ZQ.turnIn(s, q.id).ok === false;
+})());
+check("a locked quest is not offered", (()=>{
+  const s = G.newGame();
+  const gated = ZQ.ZONE_QUESTS.find(q => (q.requires || []).length);
+  return !ZQ.offeredBy(s, gated.giver).some(q => q.id === gated.id);
+})());
+check("finishing the prerequisite unlocks the next quest", (()=>{
+  const s = G.newGame();
+  const gated = ZQ.ZONE_QUESTS.find(q => (q.requires || []).length);
+  s.zoneQuests.done.push(...gated.requires);
+  return ZQ.offeredBy(s, gated.giver).some(q => q.id === gated.id);
+})());
+check("dungeon progress drives slay and boss quests", (()=>{
+  const s = G.newGame();
+  const slay = ZQ.ZONE_QUESTS.find(q => q.objective.kind === "slay");
+  const boss = ZQ.ZONE_QUESTS.find(q => q.objective.kind === "boss");
+  s.worldState.dungeons[slay.objective.dungeon] = { defeated: ["a", "b", "c"], cleared: [], bossDead: true };
+  return ZQ.progressOf(s, slay).done && ZQ.progressOf(s, boss).done;
+})());
+check("every quest pays something", ZQ.ZONE_QUESTS.every(q => (q.reward.gold || 0) > 0 || (q.reward.cards || 0) > 0));
+check("a fresh save has at least one quest available somewhere", (()=>{
+  const s = G.newGame();
+  const givers = [...new Set(ZQ.ZONE_QUESTS.map(q => q.giver))];
+  return givers.some(g => ZQ.offeredBy(s, g).length > 0);
+})());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

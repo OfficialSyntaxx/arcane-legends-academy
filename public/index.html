@@ -331,6 +331,7 @@ import * as VFX from "./vfx.js";
 import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
 import { loadDungeons, dungeonZone } from "./dungeons.js";
 import * as ONBOARD from "./onboarding.js";
+import * as ZQ from "./zonequests.js";
 
 // ================= state =================
 let S = G.load();
@@ -895,7 +896,28 @@ window.__EV.listA = (uid)=>{ const r=G.listAuction(S,uid, cardValue(G.cardInstan
 
 // ================= QUESTS =================
 function renderQuests(el){
-  let h = `<h2>${STR.quests_title}</h2><p class="sub">Defeat rising wizard bosses to earn gold, XP, and card drops.</p>`;
+  let h = `<h2>${STR.quests_title}</h2>`;
+  // Zone quests first: they are the ones with progress ticking away in the world, and the player
+  // needs to see that without walking back to the NPC who gave it to them.
+  const active = ZQ.activeQuests(S);
+  const doneZq = ZQ.ZONE_QUESTS.filter(q => ZQ.isDone(S, q.id));
+  if (active.length || doneZq.length){
+    h += `<h3>🌲 Field Quests</h3>`;
+    for (const q of active){
+      const p = ZQ.progressOf(S, q);
+      const pct = Math.round((p.have / p.need) * 100);
+      h += `<div class="lrow">
+        <div class="ic">${p.done ? "✅" : "📜"}</div>
+        <div class="grow"><div class="t">${q.title}</div>
+          <div class="s">${ZQ.objectiveText(q, matName(q))} — ${p.have}/${p.need}${p.done ? " · return to the giver" : ""}</div>
+          <div style="height:5px;border-radius:3px;background:rgba(255,255,255,.1);margin-top:5px">
+            <div style="height:100%;width:${pct}%;border-radius:3px;background:var(--gold)"></div></div>
+        </div></div>`;
+    }
+    for (const q of doneZq) h += `<div class="lrow"><div class="ic">✅</div><div class="grow"><div class="t">${q.title}</div><div class="s">Complete</div></div></div>`;
+    h += `<h3>⚔️ Rival Duels</h3>`;
+  }
+  h += `<p class="sub">Defeat rising wizard bosses to earn gold, XP, and card drops.</p>`;
   for (let i=0;i<G.QUESTS.length;i++){
     const qq = G.QUESTS[i];
     const unlocked = G.canDoQuest(S,i);
@@ -1256,6 +1278,56 @@ let world = null, worldPrompt = null;
 function stationTarget(station){
   return { scribe:"skills", smith:"skills", market:"market", duel:"pvp", quests:"quests", home:"home" }[station] || "home";
 }
+// Quest-giving NPCs out in the world. Their dialogue is BUILT from zonequests.js rather than
+// written per NPC, so adding a quest to the data adds it to the right NPC's conversation with no
+// UI change — and an NPC can never end up offering a quest that no longer exists.
+const QUEST_GIVERS = {
+  forest_sage:   { name: "Sage Rowan",  role: "Keeper of the Whispering Wood",
+                   idle: ["The wood remembers every spell cast under it.", "Walk softly and it will show you what grows here."] },
+  forest_warden: { name: "Warden Brisk", role: "Warden of Cinderhollow",
+                   idle: ["I watch the cavern mouth so the village does not have to.", "Whatever is down there, it is getting bolder."] },
+};
+function questDialogue(giver){
+  const g = QUEST_GIVERS[giver];
+  if (!g) return null;
+  const offers = ZQ.offeredBy(S, giver);
+  const turnIns = ZQ.turnInsFor(S, giver);
+  const active = ZQ.activeQuests(S).filter(q => q.giver === giver);
+  const lines = [];
+  for (const q of turnIns) lines.push(`<b style="color:var(--gold)">${q.title}</b> — done. Well fought.`);
+  for (const q of active.filter(q => !turnIns.includes(q))){
+    const p = ZQ.progressOf(S, q);
+    lines.push(`<b>${q.title}</b> — ${ZQ.objectiveText(q, matName(q))} <span style="color:var(--muted)">(${p.have}/${p.need})</span>`);
+  }
+  for (const q of offers) lines.push(`<b style="color:var(--gold)">${q.title}</b><br>${q.brief}`);
+  if (!lines.length) lines.push(...g.idle);
+  const buttons = [];
+  for (const q of turnIns) buttons.push({ label: `✅ Hand in: ${q.title}`, primary: true, action: ()=>turnInQuest(q.id) });
+  for (const q of offers) buttons.push({ label: `📜 Accept: ${q.title}`, primary: !turnIns.length, action: ()=>acceptQuest(q.id) });
+  buttons.push({ label: "Leave", action: ()=>closeDialogue() });
+  return { name: g.name, role: g.role, lines, buttons };
+}
+const matName = q => q.objective.kind === "gather"
+  ? ((MATERIALS.find(m => m.id === q.objective.id) || {}).name || q.objective.id) : null;
+function acceptQuest(id){
+  const r = ZQ.accept(S, id);
+  if (!r.ok) return;
+  save(); closeDialogue();
+  toast(`📜 Quest accepted: ${r.quest.title}`);
+  AUDIO.play("ui");
+}
+function turnInQuest(id){
+  const r = ZQ.turnIn(S, id);
+  if (!r.ok){ err(r.err === "incomplete" ? "Not finished yet." : "That quest is not active."); return; }
+  G.gainGold(S, r.reward.gold || 0);
+  if (r.reward.xp) G.addWizardXp(S, r.reward.xp);
+  if (r.reward.cards) G.dropCards(S, r.reward.cards);
+  save(); closeDialogue();
+  toast(`✅ ${r.quest.title} complete! +${r.reward.gold}g${r.reward.cards ? ` +${r.reward.cards} cards` : ""}`);
+  winSfx();
+  render();
+}
+
 const NPC_DIALOGUE = {
   quests: { name:"Professor Echo", role:"Dean of the Arcanum", lines:["Welcome to the Arcanum Academy, young spellwright.","The rivals of the seven schools await. Defeat them to earn renown, gold, and rare cards."], buttons:[{label:"📜 View Quests", primary:true, action:()=>{screen="quests";render();}}] },
   market: { name:"Merchant Vell", role:"Arcade Stalls", lines:["Fresh goods from the Merchant Arcade!","Cards, materials, and rare finds — coin well spent."], buttons:[{label:"🛒 Open Market", primary:true, action:()=>{screen="market";render();}}] },
@@ -1312,6 +1384,8 @@ function spawnWorld(canvas, zone, spawnAt){
       }
     },
     onStation(station){
+      const quest = questDialogue(station);
+      if (quest){ showDialogue(quest.name, quest.role, quest.lines, quest.buttons); return; }
       const dlg = NPC_DIALOGUE[station];
       if (dlg){ showDialogue(dlg.name, dlg.role, dlg.lines, dlg.buttons); }
       else { screen = stationTarget(station); render(); }
@@ -1567,6 +1641,15 @@ window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
 window.__testBattle = ()=> battle;
 window.__testGather = ()=>{ const m = MATERIALS.find(x=>x.id==="oak_log"); G.gather(S, m); save(); };
 window.__testDuel = ()=>{ startPracticeDuel(); };
+window.__testGold = ()=> S.gold;
+// Grant exactly the materials a gather quest asks for — the alternative is mining eight logs in
+// a browser test, which tests the gather loop rather than the quest turn-in.
+window.__testGrant = (questId)=>{
+  const q = ZQ.ZONE_QUESTS.find(x=>x.id===questId);
+  if (!q || q.objective.kind !== "gather") return false;
+  S.inventory[q.objective.id] = (S.inventory[q.objective.id]||0) + q.objective.n;
+  save(); return true;
+};
 window.__testBoard = ()=>{
   battle.you.pips = 9; battle.enemy.pips = 9;
   battle.you.hand[0] = "fire_dragon"; window.__ev("play|0");

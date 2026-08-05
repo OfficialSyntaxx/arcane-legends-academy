@@ -4,7 +4,7 @@
       "id": "academy",
       "name": "The Arcanum Academy",
       "hub": true,
-      "generated": "tools/sync-zones.mjs — do not hand-edit; edit structures.js/nodes.js and re-run",
+      "generated": "tools/sync-zones.mjs \u2014 do not hand-edit; edit structures.js/nodes.js and re-run",
       "spawn": {
         "x": 13,
         "z": 15
@@ -242,7 +242,7 @@
           "key": "quest",
           "role": "quest",
           "station": "quests",
-          "label": "Professor — Quests",
+          "label": "Professor \u2014 Quests",
           "x": -22,
           "z": 17,
           "main": 10133688,
@@ -266,7 +266,7 @@
           "key": "duel",
           "role": "duel",
           "station": "duel",
-          "label": "Referee — Duel",
+          "label": "Referee \u2014 Duel",
           "x": 9,
           "z": -21,
           "main": 4864634,
@@ -278,7 +278,7 @@
           "key": "trainer",
           "role": "trainer",
           "station": "trainer",
-          "label": "Trainer — Practice",
+          "label": "Trainer \u2014 Practice",
           "x": 17,
           "z": 24,
           "main": 3828696,
@@ -290,7 +290,7 @@
           "key": "librarian",
           "role": "librarian",
           "station": "librarian",
-          "label": "Librarian — Lore",
+          "label": "Librarian \u2014 Lore",
           "x": -31,
           "z": 22,
           "main": 6970270,
@@ -889,11 +889,29 @@
         {
           "key": "forest_sage",
           "role": "quest",
-          "station": "quests",
-          "label": "Forest Sage",
+          "station": "forest_sage",
+          "label": "Sage Rowan",
           "x": 12,
           "z": 52,
           "model": "npc_mage.glb"
+        },
+        {
+          "key": "forest_warden",
+          "role": "quest",
+          "station": "forest_warden",
+          "label": "Warden Brisk",
+          "x": 42,
+          "z": -24,
+          "model": "trainer.glb"
+        },
+        {
+          "key": "forest_trader",
+          "role": "quest",
+          "station": "market",
+          "label": "Pedlar Ilse",
+          "x": -26,
+          "z": 44,
+          "model": "merchant.glb"
         }
       ],
       "enemies": [
