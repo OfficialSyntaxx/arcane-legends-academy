@@ -2,6 +2,14 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-06 — Wire the baked GLB maps in as zone visuals
+The 4 fixed maps (`assets/blender/maps/*.glb`) are now the environment for 4 zones:
+- **Zone map base layer** (`ZONE_MAPS` in worldconfig.js): a zone with a `mapModel` loads the GLB map as its terrain/structures visual. The map is **centered on its configured position** (the baked GLBs carry large local offsets — e.g. the forest at x=220 — so the loader recenters the model before placing it, which is what previously parked each map far from the player) and **grounded** at y=0; entities (NPCs, nodes, props) sit on the map rather than the procedural heightmap.
+- **Wired**: `academy` → Plains/Academy map, `whispering_forest` → Forest map, `ashen_mountains` → Mountains map, and a **new `snow` zone** (Frostborne Peaks) → Snow map, connected to/from the Ashen Mountains.
+- **Brighter lighting for map zones** (×1.9 hemisphere/sun/moon): the PBR bakes were authored in a bright renderer and read as black/grey under the dim procedural rig.
+- Central-structure placement offsets the map so the player never spawns inside a tower/spire; the hub's duplicate tower landmark is hidden for the map-backed academy.
+- **Verified in-game** by rendering each zone in Chromium — all four maps render correctly (green plains + academy towers, forest + shrine, grey mountains + watchtower, snow + ice spires). 256 engine tests pass (incl. a new ZONE_MAPS test). Deployed + pushed.
+
 ## 2026-08-06 — Fix the 4 baked zone maps (materials + scale)
 Repaired `assets/blender/maps/*.glb` (Plains/Academy, Forest, Mountains, Snow) programmatically with `gltf-transform` — no Blender re-export needed:
 - **Black scatter props fixed**: rocks/wood/foliage/mushrooms/path-stones had `baseColorFactor [0,0,0]` (black) with no texture → gave each a stylized color (rock grey, foliage green, wood brown, etc.).

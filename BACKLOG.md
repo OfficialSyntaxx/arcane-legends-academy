@@ -43,7 +43,7 @@
 
 ## 3. Open World
 
-- [~] Expand beyond the Academy — Whispering Forest + Ashen Mountains (+2 dungeons) ship; Lake Arcanum next
+- [x] Expand beyond the Academy — Whispering Forest + Ashen Mountains (+2 dungeons) ship; **the 4 baked GLB maps (Plains/Academy, Forest, Mountains, Snow) are now wired in as the zone visuals** (`ZONE_MAPS`); Lake Arcanum next
 - [x] Whispering Forest — streams, reachable through the academy's north gateway, three NPCs and five quests that lead into Cinderhollow
 - [x] Ashen Mountains — mining zone (iron/gold/mithril/runite), 2 NPCs, Cinder Bats/Ashen Skeletons, leads into Ashen Caverns
 - [ ] Lake Arcanum

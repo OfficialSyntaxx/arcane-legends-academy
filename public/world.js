@@ -6,7 +6,7 @@ import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
 import { isClear, CHARACTER_HEIGHT, BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
 import { heightAt, isWater, flatsForZone, groundColorAt, BIOMES } from "./terrain.js";
-import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS } from "./worldconfig.js";
+import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS, ZONE_MAPS } from "./worldconfig.js";
 
 // `zone` is an optional normalised zone config (see worldconfig.js). Omitted, the world falls
 // back to the academy tables in structures.js/nodes.js — the migration state described in
@@ -26,7 +26,10 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // Flat zones are derived from the zone's own content, so a landmark that exists is a landmark
   // that gets level ground — no separate list to keep in sync.
   const FLATS = flatsForZone(ZONE);
-  const groundY = (x, z) => heightAt(x, z, ZONE.terrain, FLATS);
+  // On a map-backed zone, entities sit on the map's nominal ground (y=0) rather than the
+  // procedural heightmap — the map is the terrain. (MAP is declared just below; this reads it at
+  // call time, so declaration order is fine.)
+  const groundY = (x, z) => (ZONE_MAPS[ZONE.id] ? 0 : heightAt(x, z, ZONE.terrain, FLATS));
   const wet = (x, z) => isWater(x, z, ZONE.terrain, FLATS);
   // Clamp to the ACTIVE ZONE's bounds, not a global constant — a zone with different bounds
   // would otherwise trap the player early or let them walk off the edge of its terrain.
@@ -36,6 +39,10 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // Collision comes from the zone when it supplies its own set, so a second zone is not silently
   // colliding with the academy's buildings.
   const ZONE_OBSTACLES = (ZONE.obstacles && ZONE.obstacles.length) ? ZONE.obstacles : OBSTACLES;
+  // A zone may be backed by a full baked GLB map (ZONE_MAPS in worldconfig.js). When present the
+  // map is the primary ground/structure visual; entities are still placed by the zone config,
+  // but on the map's nominal ground (y=0) rather than the procedural heightmap.
+  const MAP = ZONE_MAPS[ZONE.id] || null;
   const THREE = window.THREE;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.5));
@@ -103,11 +110,15 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     const fill = new THREE.DirectionalLight(0xa89ad0, 0.16);
     fill.position.set(10, 30, 10); scene.add(fill);
   } else {
-  scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a1f4d, 0.42));
-  const sun = new THREE.DirectionalLight(0xffd9a0, 0.55);
+  // Map-backed zones ship PBR-baked terrain that needs a brighter rig than the procedural
+  // world's flat material colours — same fixtures, higher output (the bakes were authored in a
+  // bright renderer; under the dim procedural rig they read as black/grey).
+  const boost = MAP ? 1.9 : 1;
+  scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a1f4d, 0.42 * boost));
+  const sun = new THREE.DirectionalLight(0xffd9a0, 0.55 * boost);
   sun.position.set(20, 40, 14);
   scene.add(sun);
-  const moon = new THREE.DirectionalLight(0x9fb4ff, 0.15);
+  const moon = new THREE.DirectionalLight(0x9fb4ff, 0.15 * boost);
   moon.position.set(-20, 30, -20); scene.add(moon);
   }
   // warm courtyard glow
@@ -761,6 +772,9 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   for (const [k, g] of Object.entries(landmarkGroups))
     if (!ZONE.landmarks.some(l => l.key === k)) scene.remove(g);
   for (const L of ZONE.landmarks){
+    // A zone map may ship its own version of a landmark (e.g. the Plains/Academy map has its own
+    // central tower); don't place the standalone model on top of it.
+    if (MAP && MAP.hideLandmarks && MAP.hideLandmarks.includes(L.key)) continue;
     const g = landmarkGroups[L.key];
     if (g) loadLandmarkModel(L.key, L.url, g, { size:L.size, fit:L.fit, x:L.x, z:L.z, ry:L.ry });
   }
@@ -861,6 +875,40 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     if (!b.model) continue;
     loadLandmarkModel('bld_' + b.id, b.model, buildingGroups[b.id],
       { size:b.h, fit:"height", x:b.x, z:b.z, ry:b.ry + (b.modelRy || 0) });
+  }
+
+  // ---------- zone map base layer (ZONE_MAPS) ----------
+  // A zone may be backed by a full baked GLB map (terrain + structures). The map loads as the
+  // primary ground/structures visual, set just above the procedural ground (which stays as the
+  // surrounding fallback floor where the map is smaller than the zone bounds, so the player can
+  // never walk into a void). If the map fails to load the zone is unchanged.
+  if (MAP) loadZoneMap(MAP);
+  function loadZoneMap(m){
+    const url = "./assets/maps/" + m.file;
+    const g = new THREE.Group(); scene.add(g);
+    const loader = new THREE.GLTFLoader();
+    const d = getDraco(); if (d) loader.setDRACOLoader(d);
+    loadState.total++;
+    loader.load(url, gltf => {
+      const model = gltf.scene;
+      model.scale.setScalar(m.scale || 1);
+      model.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+      // Center the map on (x, z) and ground it. The baked GLBs carry large local offsets (the
+      // source scene placed them at e.g. x=220), so the world position must recenter the model —
+      // adding m.x on top of that offset is what previously parked the map far from the player.
+      model.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(model);
+      const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
+      const minY = box.min.y;
+      model.position.set((m.x || 0) - cx, (m.y || 0) - minY, (m.z || 0) - cz);
+      g.add(model);
+      // track it like any other model so the loading HUD and __worldDebug see it
+      chars["map"] = { model, mixer:null, walk:null, idle:null, rawSize:box.getSize(new THREE.Vector3()).y, computedScale:m.scale || 1 };
+      loadState.done++; loadProgress();
+    }, undefined, err => {
+      console.warn("zone map failed to load:", url, err && err.message);
+      loadState.done++; loadState.failed.push("map"); loadProgress();
+    });
   }
 
   // ---------- dungeon entrances (WORLDSPEC §6) ----------

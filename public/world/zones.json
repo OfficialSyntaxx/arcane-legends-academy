@@ -4,7 +4,7 @@
       "id": "academy",
       "name": "The Arcanum Academy",
       "hub": true,
-      "generated": "tools/sync-zones.mjs — do not hand-edit; edit structures.js/nodes.js and re-run",
+      "generated": "tools/sync-zones.mjs \u2014 do not hand-edit; edit structures.js/nodes.js and re-run",
       "spawn": {
         "x": 13,
         "z": 15
@@ -242,7 +242,7 @@
           "key": "quest",
           "role": "quest",
           "station": "quests",
-          "label": "Professor — Quests",
+          "label": "Professor \u2014 Quests",
           "x": -22,
           "z": 17,
           "main": 10133688,
@@ -266,7 +266,7 @@
           "key": "duel",
           "role": "duel",
           "station": "duel",
-          "label": "Referee — Duel",
+          "label": "Referee \u2014 Duel",
           "x": 9,
           "z": -21,
           "main": 4864634,
@@ -278,7 +278,7 @@
           "key": "trainer",
           "role": "trainer",
           "station": "trainer",
-          "label": "Trainer — Practice",
+          "label": "Trainer \u2014 Practice",
           "x": 17,
           "z": 24,
           "main": 3828696,
@@ -290,7 +290,7 @@
           "key": "librarian",
           "role": "librarian",
           "station": "librarian",
-          "label": "Librarian — Lore",
+          "label": "Librarian \u2014 Lore",
           "x": -31,
           "z": 22,
           "main": 6970270,
@@ -1064,6 +1064,59 @@
           "toZone": "whispering_forest",
           "x": -118,
           "z": 0
+        },
+        {
+          "toZone": "snow",
+          "x": -110,
+          "z": -20
+        }
+      ]
+    },
+    {
+      "id": "snow",
+      "name": "Frostborne Peaks",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -40,
+        "maxX": 40,
+        "minZ": -40,
+        "maxZ": 40
+      },
+      "terrain": {
+        "seed": 20260806,
+        "scale": 32,
+        "amplitude": 1.5,
+        "baseHeight": 0,
+        "waterLevel": null,
+        "biome": "snow"
+      },
+      "exits": [
+        {
+          "toZone": "ashen_mountains",
+          "x": -30,
+          "z": 0
+        }
+      ],
+      "npcs": [
+        {
+          "key": "snow_keeper",
+          "role": "quest",
+          "station": "quests",
+          "label": "Frost Keeper",
+          "x": 0,
+          "z": 6,
+          "model": "npc_mage.glb"
+        }
+      ],
+      "wanderers": [
+        {
+          "key": "snow_walker",
+          "main": 10485631,
+          "hat": 14676213,
+          "model": "student_emerald.glb"
         }
       ]
     }

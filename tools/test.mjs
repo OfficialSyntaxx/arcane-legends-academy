@@ -1469,6 +1469,16 @@ check("a locked class (higher year) is refused", (()=>{
   return G.attendClass(s, "archmagistery").err === "locked";
 })());
 
+// ---- zone map base layers (BACKLOG "wire baked GLB maps as zone visuals") ----
+check("every ZONE_MAPS entry points at a real zone and an existing map file", (()=>{
+  for (const [zid, m] of Object.entries(WC.ZONE_MAPS)){
+    if (!WORLD.get(zid)) return false;                       // zone must exist
+    const p = path.join(ROOT_PUBLIC, "assets", "maps", m.file);
+    if (!fs.existsSync(p)) return false;                     // map file must be deployed
+  }
+  return true;
+})());
+
 // ---- NPC reputation (BACKLOG "NPC reputation") ----
 check("reputation starts at Stranger with no bonus", (()=>{
   const s = G.newGame();
