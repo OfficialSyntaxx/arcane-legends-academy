@@ -2,6 +2,14 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-06 — Fix the 4 baked zone maps (materials + scale)
+Repaired `assets/blender/maps/*.glb` (Plains/Academy, Forest, Mountains, Snow) programmatically with `gltf-transform` — no Blender re-export needed:
+- **Black scatter props fixed**: rocks/wood/foliage/mushrooms/path-stones had `baseColorFactor [0,0,0]` (black) with no texture → gave each a stylized color (rock grey, foliage green, wood brown, etc.).
+- **Black baked textures removed**: the Stone/Roof bakes in Plains and the Roof bake in Mountains were exported as empty black images (the bake missed those nodes) → unbound and replaced with clean fallback colors (grey stone, terracotta roof), keeping all good bakes (ground/water/door-wood/shrine/ice).
+- **Glow materials** (lamps, shrine, ice) given visible color + emissive so they read as lights.
+- **Scale normalized**: Forest/Mountains already open-zone scale (128w, matches the 144-unit world) kept at 1×; compact Plains (×2) and Snow (×2.5) scaled up so the ground is walkable.
+- **Visually verified by rendering each GLB** in Chromium (SwiftShader) + three.js and reviewing the screenshots — all four render as proper colored maps with no black/glitched areas.
+
 ## 2026-08-05 — Display Case
 - Added a **Display Case** (Collection → 🖼️) that showcases the player's slabbed **Mint / Gem Mint** cards (grade 80+/90+) with their serial numbers, school, grade, and value — a trophy shelf for the prestige collection. Deployed + pushed.
 
