@@ -36,8 +36,8 @@
 - [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
 - [~] Main story + side quests — five field quests in the Whispering Forest from two NPCs (`zonequests.js`), with gather/slay/clear/boss objectives, prerequisites and a quest log. The main story is still to write.
 - [~] Visual equipment on 3D character — the equipped wand-slot weapon is shown on the player's hand (by metal tier); hats/robes/boots visuals still pending
-- [ ] Dorm customization
-- [ ] Card/slab display cases
+- [ ] Dorm customization — design proposed (see below)
+- [x] Card/slab display cases — the Display Case showcases slabbed Mint/Gem Mint cards with serials (Collection → 🖼️)
 - [ ] Trophy room
 - [ ] Achievements and player titles
 

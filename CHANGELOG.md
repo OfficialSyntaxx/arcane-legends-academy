@@ -2,6 +2,9 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-05 — Display Case
+- Added a **Display Case** (Collection → 🖼️) that showcases the player's slabbed **Mint / Gem Mint** cards (grade 80+/90+) with their serial numbers, school, grade, and value — a trophy shelf for the prestige collection. Deployed + pushed.
+
 ## 2026-08-05 — Visual equipment + Academy classes
 - **Visual equipment:** the equipped wand-slot weapon is now shown on the 3D player's right hand (`world.setWeapon` attaches the matching weapon GLB by metal tier — bronze→wand, iron/gold→staffs, mithril→sword, rune→axe). `syncPlayerWeapon` updates it on world entry and on equip/unequip.
 - **Academy classes (real curriculum content):** 7 classes (Dueling→Archmagistery) unlocked by year, each costing gold and granting academy-rank progress — **one class per day** (a stored `academyBonus` added to `academyScore`). Attendable from the Hall screen. 3 new regression tests. All 255 engine / 34 logic / UI-smoke / 36 creature-rule tests pass. Deployed + pushed.

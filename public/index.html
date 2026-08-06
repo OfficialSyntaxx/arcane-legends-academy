@@ -514,6 +514,30 @@ function renderCodex(filter){
   showOverlay("🐾 Creature Codex", h);
 }
 if (window.__EV){ window.__EV.codexFilter = (f)=>renderCodex(f); window.__EV.openCodex = ()=>renderCodex(""); }
+// ---- Display Case: showcase the player's slabbed (Mint/Gem Mint) cards ----
+function renderDisplayCases(){
+  const slabs = S.cards.filter(c => c.graded && gradeForRoll(c.roll).slab)
+    .sort((a,b)=>gradeForRoll(b.roll).g - gradeForRoll(a.roll).g || (b.serial||0)-(a.serial||0));
+  let h = `<div class="sub" style="margin-bottom:10px">${slabs.length} slabbed masterpiece${slabs.length===1?"":"s"} · Mint & Gem Mint cards with serial numbers</div>`;
+  if (slabs.length === 0){
+    h += `<div class="panel" style="text-align:center;padding:30px">No slabs yet — grade a card to 💎 <b>Mint</b> (80+) or 💠 <b>Gem Mint</b> (90+) to put it on display.</div>`;
+  } else {
+    h += `<div class="row" style="flex-wrap:wrap;justify-content:center;gap:14px">`;
+    for (const c of slabs){
+      const g = gradeForRoll(c.roll), def = CARD_MAP[c.id];
+      h += `<div class="panel" style="width:210px;text-align:center;border-top:3px solid ${RARITY[def.rarity].color}">
+        <div style="font-size:34px;margin-top:4px">${SCHOOL_ICON[def.school]}</div>
+        <div style="font-weight:800;font-size:16px">${def.name}</div>
+        <div style="font-size:26px;margin:6px 0">${g.icon} <span style="color:var(--gold)">${g.name}</span></div>
+        <div class="sub">Serial <b style="color:var(--gold)">#${c.serial}</b></div>
+        <div class="sub" style="color:var(--gold)">🪙 ${cardValue(def.id, c.roll)}</div>
+      </div>`;
+    }
+    h += `</div>`;
+  }
+  showOverlay("🖼️ Display Case", h);
+}
+if (window.__EV){ window.__EV.openDisplayCase = ()=>renderDisplayCases(); }
 function buildScribing(){
   let h = `<p class="sub">Refine wood, fish, and ore into card materials, then scribe a spell card. Higher Scribing skill yields better grades.</p><div class="row">`;
   for (const cm of CARD_MATERIALS){
@@ -915,7 +939,8 @@ function renderCollection(el){
   h += `<div class="row" style="margin-bottom:10px">
     <button class="btn gold" onclick="window.__ev('pack')">🃏 Open Pack (${G.PACK_COST}g)</button>
     <button class="btn" onclick="window.__ev('toLoadout')">🗡️ ${STR.nav_loadout}</button>
-    <button class="btn" onclick="window.__ev('openCodex')">🐾 Creature Codex</button></div>`;
+    <button class="btn" onclick="window.__ev('openCodex')">🐾 Creature Codex</button>
+    <button class="btn" onclick="window.__ev('openDisplayCase')">🖼️ Display Case</button></div>`;
   h += `<div class="row">`;
   for (const c of S.cards){
     const def = CARD_MAP[c.id];
