@@ -1129,7 +1129,7 @@ function renderDuel(el){
   const myTurn = battle.turn==="you";
   let h = `<h2>⚔️ ${battle.enemyName||"Duel"}</h2>`;
   const resultText = over.draw ? STR.you_draw : (over.winner==="you" ? STR.you_win : STR.you_lose);
-  h += `<div id="duelStatus">${over.over ? resultText : (pendingTarget && pendingTarget.kind==="bolt" ? "🎯 Choose a target for Firespell!" : (myTurn?STR.your_turn:STR.enemy_turn))}</div>`;
+  h += `<div id="duelStatus">${over.over ? resultText : (pendingTarget && pendingTarget.kind==="bolt" ? "🎯 Choose a target for Firespell!" : (pendingTarget && pendingTarget.kind==="tongue" ? "👅 Choose an enemy to steal attack from!" : (myTurn?STR.your_turn:STR.enemy_turn)))}</div>`;
   if (over.over && over.reason === "turn limit") h += `<div style="text-align:center;font-size:12px;color:var(--muted)">${STR.turn_limit}</div>`;
   h += `<div id="duelTimer" style="text-align:center;font-size:20px;font-weight:800;color:${duelTimeLeft<=10?"var(--danger)":"var(--gold)"}">${myTurn&&!over.over?duelTimeLeft+"s":"—"}</div>`;
   h += `<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:6px">You: ${(you.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${(you.traps||[]).length?`· 🪤${you.traps.length}`:""} &nbsp;|&nbsp; Enemy: ${(enemy.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${(enemy.traps||[]).length?`· 🪤${enemy.traps.length}`:""}</div>`;
@@ -1231,6 +1231,7 @@ window.__EV.play = (idx)=>{
   // Firespell-type creatures: ask the player to pick a target first (AI keeps random fallback)
   const rules = (c && c.type === "creature" && (traitForCard(cid, c.name) || {}).rules) || {};
   if (rules.onPlayBolt){ pendingTarget = { kind:"bolt", idx }; render(); return; }
+  if (rules.onPlayStealAtk){ pendingTarget = { kind:"tongue", idx }; render(); return; }
   const r=G.playCard(battle, battle.you, idx, null);
   if(r.ok){ AUDIO.play("card"); castVfx(cid, "you", null); }
   render();
@@ -1254,6 +1255,10 @@ window.__EV.dmgTarget = (ti)=>{
     const cid = battle.you.hand[pendingTarget.idx];
     const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"creature", idx:ti});
     pendingTarget = null; if(r.ok){ sfx(dmgSfx); castVfx(cid, "you", ti); } render();
+  } else if (pendingTarget && pendingTarget.kind==="tongue"){
+    const cid = battle.you.hand[pendingTarget.idx];
+    const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"creature", idx:ti});
+    pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
   } else if (pendingTarget && pendingTarget.kind==="attack"){
     const r = G.attack(battle, pendingTarget.idx, "creature", ti);
     pendingTarget = null; if(r.ok) sfx(dmgSfx); render();

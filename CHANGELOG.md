@@ -2,6 +2,11 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-05 — Frog Tongue is now a targetable on-play action
+- Playing a Frog creature enters **targeting mode**: the player clicks which enemy creature to **steal +1 attack from** (AI keeps random fallback via `game.js` on-play steal honouring a supplied target).
+- UI: `__EV.play` detects Tongue creatures and prompts ("👅 Choose an enemy to steal attack from!"); enemy creatures become clickable. Wizard is *not* a valid Tongue target (you can't steal attack from a wizard).
+- Added a manual-targeting regression test (steals from the chosen creature only). `tools/creature-rule-test.mjs` now 36. All 252 engine / 34 logic / UI-smoke / 36 creature-rule tests pass. Deployed + pushed.
+
 ## 2026-08-05 — Wizard Firespell is now a targetable on-play action
 - Playing a Wizard creature enters **targeting mode**: the player clicks which enemy creature (or the enemy wizard) to bolt for 2. `game.js` on-play bolt honours a supplied target with a **random fallback for the AI / no-target** plays.
 - UI: `__EV.play` detects Firespell creatures and prompts ("🎯 Choose a target for Firespell!"); enemy board + wizard become clickable targets; `dmgTarget`/`dmgWiz` handle the bolt.

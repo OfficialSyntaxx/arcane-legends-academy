@@ -554,8 +554,11 @@ export function playCard(b, p, handIndex, target){
       }
     }
     if (R.onPlayStealAtk){
-      const live = enemy.board.filter(c=>c.hp>0);
-      if (live.length){ const t = live[(b.rand?Math.floor(b.rand()*live.length):0)]; const st = Math.min(R.onPlayStealAtk, t.atk); t.atk -= st; cr.atk += st; b.log.push(cr.name+" steals "+st+" atk from "+t.name); }
+      // honor a manual target (player picks which enemy creature to steal from); else random
+      let t = null;
+      if (target && target.kind === "creature" && enemy.board[target.idx] && enemy.board[target.idx].hp > 0) t = enemy.board[target.idx];
+      else { const live = enemy.board.filter(c=>c.hp>0); if (live.length) t = live[(b.rand?Math.floor(b.rand()*live.length):0)]; }
+      if (t){ const st = Math.min(R.onPlayStealAtk, t.atk); t.atk -= st; cr.atk += st; b.log.push(cr.name+" steals "+st+" atk from "+t.name); }
     }
     // enemy traps trigger on creature play
     if (enemy.traps && enemy.traps.length){

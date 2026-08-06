@@ -236,6 +236,16 @@ console.log('creature rule tests');
   const frog = b.you.board[0];
   ok('tongue steals +1 atk from an enemy creature', frog.atk === 2 && b.enemy.board[0].atk === 2);
 }
+// 21b. Tongue manual targeting — the player picks which enemy creature to steal from
+{
+  CARD_MAP._tf = { id:'_tf', name:'Test Frog', school:'life', type:'creature', cost:1, atk:1, hp:5, fx:[] };
+  const b = base(); b.you.pips = 10; b.turn = 'you';
+  b.enemy.board = [cr({ name:'Tank', hp:5, atk:0, owner:'enemy' }), cr({ name:'DPS', hp:5, atk:4, owner:'enemy' })];
+  b.you.hand = ['_tf'];
+  G.playCard(b, b.you, 0, { kind:'creature', idx:1 });   // player picks DPS
+  const frog = b.you.board[0];
+  ok('tongue steals from the chosen creature only', frog.atk === 2 && b.enemy.board[0].atk === 0 && b.enemy.board[1].atk === 3);
+}
 // 22. Rage threshold (orc: rageAtk) — +N atk while at/below half HP
 {
   const b = base(); b.turn = 'you';
