@@ -26,10 +26,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // Flat zones are derived from the zone's own content, so a landmark that exists is a landmark
   // that gets level ground — no separate list to keep in sync.
   const FLATS = flatsForZone(ZONE);
-  // On a map-backed zone, entities sit on the map's nominal ground (y=0) rather than the
-  // procedural heightmap — the map is the terrain. (MAP is declared just below; this reads it at
-  // call time, so declaration order is fine.)
-  const groundY = (x, z) => (ZONE_MAPS[ZONE.id] ? 0 : heightAt(x, z, ZONE.terrain, FLATS));
+  // On a map-backed zone, entities sit on the map's floor. Most baked grounds are flat planes,
+  // so a single floor height (sampled at the spawn via raycast once the map loads) is cheaper
+  // and safer than sampling the relief every frame; `mapFloorY` is populated by loadZoneMap.
+  let mapFloorY = 0;
+  const groundY = (x, z) => (ZONE_MAPS[ZONE.id] ? mapFloorY : heightAt(x, z, ZONE.terrain, FLATS));
   const wet = (x, z) => isWater(x, z, ZONE.terrain, FLATS);
   // Clamp to the ACTIVE ZONE's bounds, not a global constant — a zone with different bounds
   // would otherwise trap the player early or let them walk off the edge of its terrain.
@@ -773,8 +774,13 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     if (!ZONE.landmarks.some(l => l.key === k)) scene.remove(g);
   for (const L of ZONE.landmarks){
     // A zone map may ship its own version of a landmark (e.g. the Plains/Academy map has its own
-    // central tower); don't place the standalone model on top of it.
-    if (MAP && MAP.hideLandmarks && MAP.hideLandmarks.includes(L.key)) continue;
+    // central tower); remove it entirely (model AND procedural placeholder) rather than layering
+    // the standalone on top of the map's structure.
+    if (MAP && MAP.hideLandmarks && MAP.hideLandmarks.includes(L.key)){
+      const hg = landmarkGroups[L.key];
+      if (hg) scene.remove(hg);
+      continue;
+    }
     const g = landmarkGroups[L.key];
     if (g) loadLandmarkModel(L.key, L.url, g, { size:L.size, fit:L.fit, x:L.x, z:L.z, ry:L.ry });
   }
@@ -899,9 +905,47 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       model.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(model);
       const cx = (box.min.x + box.max.x) / 2, cz = (box.min.z + box.max.z) / 2;
-      const minY = box.min.y;
-      model.position.set((m.x || 0) - cx, (m.y || 0) - minY, (m.z || 0) - cz);
+      // Ground on the WALKABLE terrain, not the lowest water plane (which sits below the ground
+      // and would otherwise raise the whole map, sinking the player and NPCs through the floor).
+      let groundMinY = Infinity;
+      model.traverse(o => {
+        if (!o.isMesh) return;
+        if ((o.name || "").toLowerCase().includes("water")) return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        const b = o.geometry.boundingBox; if (!b) return;
+        const v = new THREE.Vector3(b.min.x, b.min.y, b.min.z).applyMatrix4(o.matrixWorld);
+        if (v.y < groundMinY) groundMinY = v.y;
+      });
+      if (!Number.isFinite(groundMinY)) groundMinY = box.min.y;
+      model.position.set((m.x || 0) - cx, (m.y || 0) - groundMinY, (m.z || 0) - cz);
       g.add(model);
+      // Sample the map's floor under the spawn so entities/player sit on the surface instead of
+      // sinking into hills (or hovering). One raycast at load; the floor is treated as flat.
+      try {
+        const sx = (ZONE.spawn && ZONE.spawn.x != null) ? ZONE.spawn.x : 0;
+        const sz = (ZONE.spawn && ZONE.spawn.z != null) ? ZONE.spawn.z : 0;
+        const ray = new THREE.Raycaster(
+          new THREE.Vector3(sx, 300, sz),
+          new THREE.Vector3(0, -1, 0)
+        );
+        const hits = ray.intersectObject(model, true);
+        for (const h of hits){
+          const nm = (h.object.name || "").toLowerCase();
+          if (nm.includes("water")) continue;          // land on walkable terrain, not water
+          mapFloorY = h.point.y;
+          break;
+        }
+      } catch(e){ /* keep mapFloorY = 0 */ }
+      // Entities were placed at y=0 before the floor was known — lift them onto the surface.
+      // (Their model Y was set relative to groundY=0 at build time, so raising each group by the
+      // floor height puts its base exactly on the map.)
+      if (mapFloorY !== 0){
+        for (const k in npcByKey) npcByKey[k].position.y = mapFloorY;
+        for (const k in nodeGroups) nodeGroups[k].position.y = mapFloorY;
+        for (const k in buildingGroups) buildingGroups[k].position.y = mapFloorY;
+        for (const k in wanderers) wanderers[k].position.y = mapFloorY;
+        player.position.y = mapFloorY;
+      }
       // track it like any other model so the loading HUD and __worldDebug see it
       chars["map"] = { model, mixer:null, walk:null, idle:null, rawSize:box.getSize(new THREE.Vector3()).y, computedScale:m.scale || 1 };
       loadState.done++; loadProgress();

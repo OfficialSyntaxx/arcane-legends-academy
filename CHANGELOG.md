@@ -2,6 +2,13 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-06 — Map zone positioning fixes (floor grounding, spawns, camera)
+Addressing in-game feedback on the baked map zones:
+- **Ground on the walkable floor, not the water plane**: the map was grounded on its lowest point (the water plane below the terrain), which raised the whole map and sank the player/NPCs through the floor. Now grounded on the walkable terrain (water excluded).
+- **Entities sit on the surface**: NPCs/nodes/buildings/player were placed at y=0 before the map's floor was known; they're now lifted onto the map's floor (sampled by raycast at the spawn) once the map loads — no more sinking into hills.
+- **Spawns moved off the central towers/spires** so the player starts on open ground with the landmark in the distance.
+- **Duplicate hub tower actually removed**: hideLandmarks now removes the landmark group (model AND procedural placeholder), which previously left the purple placeholder tower next to the spawn.
+
 ## 2026-08-06 — Wire the baked GLB maps in as zone visuals
 The 4 fixed maps (`assets/blender/maps/*.glb`) are now the environment for 4 zones:
 - **Zone map base layer** (`ZONE_MAPS` in worldconfig.js): a zone with a `mapModel` loads the GLB map as its terrain/structures visual. The map is **centered on its configured position** (the baked GLBs carry large local offsets — e.g. the forest at x=220 — so the loader recenters the model before placing it, which is what previously parked each map far from the player) and **grounded** at y=0; entities (NPCs, nodes, props) sit on the map rather than the procedural heightmap.
