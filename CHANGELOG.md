@@ -2,6 +2,9 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-05 — Target highlight on enemy creatures during targeting
+- Enemy creatures now glow with a **cyan target highlight** (`.card.target` — glowing outline + inner glow, brighter on hover) whenever a targeting mode is active (Frog Tongue, Firespell, targeted spells, attacks), so valid targets are clearly visible before clicking. Deployed + pushed.
+
 ## 2026-08-05 — Frog Tongue is now a targetable on-play action
 - Playing a Frog creature enters **targeting mode**: the player clicks which enemy creature to **steal +1 attack from** (AI keeps random fallback via `game.js` on-play steal honouring a supplied target).
 - UI: `__EV.play` detects Tongue creatures and prompts ("👅 Choose an enemy to steal attack from!"); enemy creatures become clickable. Wizard is *not* a valid Tongue target (you can't steal attack from a wizard).

@@ -105,6 +105,8 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .card .val{position:absolute;bottom:4px;right:4px;font-size:10px;color:var(--gold);background:rgba(0,0,0,.55);padding:1px 5px;border-radius:6px;}
 .card .slot{position:absolute;top:4px;right:4px;font-size:13px;background:rgba(0,0,0,.5);border-radius:8px;padding:1px 5px;}
 .card.sel{outline:3px solid var(--gold);transform:translateY(-6px);}
+.card.target{outline:3px solid #4fd0ff;box-shadow:0 0 16px rgba(79,208,255,.65), inset 0 0 12px rgba(79,208,255,.25);transform:translateY(-6px);}
+.card.target:hover{outline-color:#7fe0ff;box-shadow:0 0 22px rgba(79,208,255,.9), inset 0 0 14px rgba(79,208,255,.35);}
 .card.disabled{opacity:.45;cursor:not-allowed;}
 .card.tired{opacity:.6;}
 .card .tired-ic{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:20px;opacity:.9;text-shadow:0 0 6px #000;}
@@ -562,6 +564,7 @@ function cardFace(c, opts={}){
   const cls = ["card"];
   if (opts.wide) cls.push("wide");
   if (opts.sel) cls.push("sel");
+  if (opts.target) cls.push("target");
   if (opts.disabled) cls.push("disabled");
   if (opts.tired) cls.push("tired");
   if (opts.slab) cls.push("slab");
@@ -1142,7 +1145,7 @@ function renderDuel(el){
   h += `<div class="board">`;
   for (let i=0;i<enemy.board.length;i++){
     const c = enemy.board[i]; const def = CARD_MAP[c.id];
-    h += cardFace(def, { sel:false, tired:c.exhausted||c.summoning,
+    h += cardFace(def, { sel:false, target: !!pendingTarget, tired:c.exhausted||c.summoning,
       onclick: pendingTarget ? `dmgTarget|${i}` : "" });
   }
   h += `</div></div>`;
