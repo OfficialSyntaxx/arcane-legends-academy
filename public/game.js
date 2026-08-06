@@ -28,7 +28,7 @@ export function newGame(){
     home:{ owned:false, upgrades:{ treasury:0, library:0, armory:0, tavern:0 } },
     quests:{ current:0, done:[] },
     pvp:{ wins:0, losses:0 },
-    stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 },
+    stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 }, academyBonus:0,
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
     worldState:{ zone:"academy", visited:["academy"], dungeons:{} },
@@ -38,7 +38,7 @@ export function newGame(){
     // NPC reputation (reputation.js). Only quest givers earn any right now — see that module
     // for why this is a flat {npcKey: number} map rather than a richer per-NPC shape.
     reputation:{},
-    auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false },
+    auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false, lastClassDay:null },
   };
 }
 export function load(){
@@ -207,9 +207,30 @@ export function dailyLabel(s){
 // Score/tier names live in academy.js now (BACKLOG "Academy progression"), which also defines
 // what a rank actually UNLOCKS. This kept the exact formula and the seven names untouched, so an
 // existing save's rank does not shift under it — only what the rank DOES is new.
-export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won; }
+export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won + (s.academyBonus||0); }
 export function academyRank(s){ return ACADEMY.yearFor(academyScore(s)).name; }
 export function academyPerks(s){ return ACADEMY.perksFor(academyScore(s)); }
+// ---- Academy classes (real curriculum content) ----
+// Attending a class costs gold and grants academy-rank progress (stored bonus). One class per day.
+const today = () => new Date().toISOString().slice(0,10);
+export function classesState(s){
+  const sc = academyScore(s);
+  const usedToday = s.flags.lastClassDay === today();
+  return { classes: ACADEMY.classesFor(sc), usedToday, rank: ACADEMY.yearFor(sc).name };
+}
+export function attendClass(s, classId){
+  const def = ACADEMY.classDef(classId);
+  if (!def) return { ok:false, err:"no such class" };
+  const sc = academyScore(s);
+  const yi = ACADEMY.yearIndexFor(sc);
+  if (def.minYear > yi) return { ok:false, err:"locked" };
+  if (s.flags.lastClassDay === today()) return { ok:false, err:"today" };
+  if (s.gold < def.cost) return { ok:false, err:"gold" };
+  s.gold -= def.cost;
+  s.academyBonus = (s.academyBonus||0) + def.score;
+  s.flags.lastClassDay = today();
+  return { ok:true, gained: def.score, cost: def.cost, name: def.name };
+}
 
 // ---------- Equipment / loadout ----------
 export function equipStats(s){

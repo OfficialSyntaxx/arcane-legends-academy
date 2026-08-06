@@ -32,10 +32,10 @@
 
 - [x] Character creation — school questionnaire + picker with a live rotating 3D wizard preview tinted by school (free tinting version; per-school garments still open, see `docs/DESIGN-DECISIONS.md` §4)
 - [~] School identity / specialization — 7 schools, starter decks, +1 affinity and the elemental ring all live; per-school *visuals* not yet
-- [~] Academy classes and curriculum — see §1 above (`academy.js`); numeric perks only, no lesson content yet
+- [~] Academy classes and curriculum — see §1 above (`academy.js`); **7 attendable classes added** (Dueling→Archmagistery, one per day for academy-rank progress); still no per-year *story* lessons
 - [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
 - [~] Main story + side quests — five field quests in the Whispering Forest from two NPCs (`zonequests.js`), with gather/slay/clear/boss objectives, prerequisites and a quest log. The main story is still to write.
-- [ ] Visual equipment on 3D character
+- [~] Visual equipment on 3D character — the equipped wand-slot weapon is shown on the player's hand (by metal tier); hats/robes/boots visuals still pending
 - [ ] Dorm customization
 - [ ] Card/slab display cases
 - [ ] Trophy room

@@ -1448,6 +1448,27 @@ check("completeQuest pays out more gold and xp at a higher academy score", (()=>
       && (high.xp - xpBefore2) >= (low.xp - xpBefore1);
 })());
 
+// ---- Academy classes (BACKLOG "Academy classes/curriculum content") ----
+check("classes unlock by year and cost gold, grant academy rank, once per day", (()=>{
+  const s = G.newGame();
+  s.gold = 500;
+  const before = G.academyScore(s);
+  const avail = G.classesState(s).classes;
+  if (!avail.some(c => c.id === "dueling")) return false;   // Novice can attend Dueling
+  const r = G.attendClass(s, "dueling");
+  const after = G.academyScore(s);
+  return r.ok && after === before + 3 && G.classesState(s).usedToday;
+})());
+check("a second class the same day is refused", (()=>{
+  const s = G.newGame(); s.gold = 500;
+  G.attendClass(s, "dueling");
+  return G.attendClass(s, "dueling").err === "today";
+})());
+check("a locked class (higher year) is refused", (()=>{
+  const s = G.newGame(); s.gold = 500;
+  return G.attendClass(s, "archmagistery").err === "locked";
+})());
+
 // ---- NPC reputation (BACKLOG "NPC reputation") ----
 check("reputation starts at Stranger with no bonus", (()=>{
   const s = G.newGame();

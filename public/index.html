@@ -646,6 +646,13 @@ function buildNav(){
   $("nav").innerHTML = NAV.map(([id,ic,label])=>`<button class="navbtn ${id===screen?"on":""}" data-screen="${id}"><span class="ic">${ic}</span>${label}</button>`).join("");
   document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>{ screen=b.dataset.screen; render(); });
 }
+// Show the equipped wand-slot weapon on the 3D player (visual equipment).
+function syncPlayerWeapon(){
+  if (!world || !world.setWeapon) return;
+  const uid = S.loadout.wand;
+  const eq = uid ? S.equipment.find(e => e.uid === uid) : null;
+  world.setWeapon(eq ? eq.metal : null);
+}
 function render(){
   AUDIO.setContext(screen === "world" ? "world" : (screen === "duel" || screen === "online") ? "duel" : "menu");
   buildNav();
@@ -659,6 +666,7 @@ function render(){
     battleWrap.style.display = "none";
     if (battle3d) battle3d.stop();
     if (world) world.resize();
+    syncPlayerWeapon();
     refreshTop();
     return;
   }
@@ -761,6 +769,20 @@ function renderHome(el){
     <div class="grow"><b>${dl.text}</b> · ${dl.progress}/${dl.target} <span class="sub">${dl.claimed?"claimed":"reward: gold + 2 cards"}</span></div>
     <button class="btn gold ${(dl.claimed||dl.progress<dl.target)?"":"ok"}" ${(dl.claimed||dl.progress<dl.target)?"disabled":""} onclick="window.__ev('claimDaily')">${dl.claimed?"Claimed":"Claim"}</button>
   </div></div>`;
+  // academy classes (real curriculum content)
+  const cs = G.classesState(S);
+  h += `<div class="panel" style="margin-top:12px"><h3>🎓 Attend a Class</h3>`;
+  h += `<div class="sub" style="margin-bottom:8px">${cs.usedToday ? "You've attended a class today — come back tomorrow." : "Pick a class to study. One per day, each grants academy-rank progress."}</div>`;
+  h += `<div class="row" style="flex-wrap:wrap;gap:8px">`;
+  for (const c of cs.classes){
+    h += `<div class="panel" style="flex:1;min-width:170px">
+      <div style="font-weight:700">${c.icon} ${c.name}</div>
+      <div class="sub">${c.desc}</div>
+      <div class="sub" style="color:var(--gold)">+${c.score} rank · 🪙${c.cost}</div>
+      <button class="btn sm gold" ${(cs.usedToday || S.gold<c.cost)?"disabled":""} onclick="window.__ev('attendClass|${c.id}')">Attend</button>
+    </div>`;
+  }
+  h += `</div></div>`;
   // your school
   h += `<div class="panel" style="margin-top:12px"><h3>🎓 Your School: ${SCHOOLS[S.school].name}</h3><div class="row" style="align-items:center">
     <div class="grow sub">${SCHOOL_DESC[S.school]} Your school's creatures gain +1 attack, and your spells deal bonus damage against their counter-school.</div>
@@ -775,6 +797,7 @@ window.__EV.buyHome = ()=>{ const r=G.buyHome(S); r.ok?toast("🏰 Guild hall ac
 window.__EV.upgrade = (id)=>{ const r=G.upgradeHome(S,id); r.ok?toast("Upgraded!"):err(r.err==="gold"?"Not enough gold":r.err==="timber"?"Need timber (chop wood)":"Max"); render(); };
 window.__EV.toPvp = ()=>{ screen="pvp"; render(); };
 window.__EV.claimDaily = ()=>{ const r=G.claimDaily(S); if(r.ok){ toast(`📅 Daily complete! +${r.reward}g +${r.drops.length} cards`); winSfx(); } save(); render(); };
+window.__EV.attendClass = (id)=>{ const r=G.attendClass(S,id); if(r.ok){ toast(`🎓 Class complete! +${r.gained} academy rank`); winSfx(); } else err(r.err==="gold"?"Not enough gold":r.err==="today"?"You already attended a class today":r.err==="locked"?"That class isn't available yet":"Cannot attend"); save(); render(); };
 window.__EV.openSchoolPicker = ()=>{ showSchoolPicker(); };
 
 // ================= SKILLS =================
@@ -975,8 +998,8 @@ function renderLoadout(el){
   h += `</div></div>`;
   el.innerHTML = h;
 }
-window.__EV.equip = (uid)=>{ G.equip(S,uid); render(); };
-window.__EV.unequip = (slot)=>{ G.unequip(S,slot); render(); };
+window.__EV.equip = (uid)=>{ G.equip(S,uid); syncPlayerWeapon(); render(); };
+window.__EV.unequip = (slot)=>{ G.unequip(S,slot); syncPlayerWeapon(); render(); };
 window.__EV.sellEq = (uid)=>{ const r=G.sellEquipment(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
 window.__EV.deckAdd = (id)=>{ const r=G.addToDeck(S,id); if(!r.ok) err(r.err==="full"?"Deck full (20)":r.err==="max"?"Max 3 copies":r.err==="copies"?"You don't own that many":"Error"); render(); };
 window.__EV.deckRm = (id)=>{ G.removeFromDeck(S,id); render(); };

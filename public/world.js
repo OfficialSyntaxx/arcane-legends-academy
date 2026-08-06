@@ -1241,6 +1241,26 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       schoolColor = color;
       applyPlayerColor();
     },
+    // Show the equipped weapon on the player's right hand (visual equipment). `metal` is the
+    // equipment's metal tier (bronze/iron/gold/mithril/rune) -> a matching weapon GLB; null hides it.
+    setWeapon(metal){
+      const WEAPON_VIS = { bronze:'wpn_wand_A.glb', iron:'wpn_staff_A.glb', gold:'wpn_staff_B.glb', mithril:'wpn_sword_A.glb', rune:'wpn_axe_A.glb' };
+      const entry = chars['player'];
+      if (!entry || !entry.model) return;
+      if (entry.weaponMesh){ entry.weaponMesh.parent && entry.weaponMesh.parent.remove(entry.weaponMesh); entry.weaponMesh = null; }
+      const file = metal && WEAPON_VIS[metal];
+      if (!file) return;
+      const hand = entry.bones['RightHand'];
+      if (!hand) return;
+      new THREE.GLTFLoader().load(modelUrl(file), gltf => {
+        const m = gltf.scene;
+        m.scale.setScalar(0.5);
+        m.position.set(0.02, -0.05, 0.06);
+        m.rotation.set(0, 0, -0.4);
+        hand.add(m);
+        entry.weaponMesh = m;
+      });
+    },
     rotateCam(dx){ camYaw += dx * 0.006; },
     zoomCam(dy){ camDist = Math.max(6, Math.min(40, camDist + dy * 0.05)); },
     tapAt(clientX, clientY){
