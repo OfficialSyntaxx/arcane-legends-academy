@@ -67,18 +67,18 @@ export const RULES = {
   mushroom:     { regen: 1, onPlayHealAll: 1 },
   yeti:         { taunt: true },   // balance: freeze-on-hit removed (taunt wall was oppressive)
   dino:         { onAttackDmgAll: 1 },
-  orc:          { warband: true },
+  orc:          { warband: true, rageAtk: 2 },   // active: Rage — +2 atk while below half HP
   orc_skull:    { drain: true },
   demon:        { drain: true, wizardDmg: 1 },
   bluedemon:    { onPlayFreeze: true },
-  frog:         { onPlayBuffAll: 1 },
+  frog:         { onPlayStealAtk: 1 },   // active: Tongue — steal +1 atk from a random enemy creature
   mushroomking: { regen: 2, onPlayBuffAll: 1 },
   mushnub:      { regen: 2, onPlayHealAll: 1 },
   mushnub_evolved: { regen: 2, onPlayHealAll: 1 },   // balance: taunt + heal-all 2 removed
   fish:         { spellImmune: true },
   bunny:        { haste: true, evade: true },
   alien:        { spellImmune: true },
-  wizard:       { onPlayDmgWiz: 2 },
+  wizard:       { onPlayBolt: 2 },   // active: Firespell — deal 2 to a random enemy on play
   ninja:        { evade: true },
   monkroose:    { healOnHit: 2 },   // balance: 3 -> 2
   birb:         { haste: true, wizardDmg: 1 },

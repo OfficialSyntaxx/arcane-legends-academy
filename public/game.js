@@ -425,7 +425,8 @@ function makeCreature(cardId, p){
     shield0: tr.shield || 0, regen: tr.regen || 0, poison: tr.poison || 0, thorns: tr.thorns || 0,
     evade: !!tr.evade, survive: !!tr.survive, spellImmune: !!tr.spellImmune, freezeImmune: !!tr.freezeImmune,
     wizardDmg: tr.wizardDmg || 0, onAttackDmgAll: tr.onAttackDmgAll || 0, onAttackDebuff: tr.onAttackDebuff || 0,
-    healOnHit: tr.healOnHit || 0, freezeOnHit: !!tr.freezeOnHit, warband: !!tr.warband, _R: tr,
+    healOnHit: tr.healOnHit || 0, freezeOnHit: !!tr.freezeOnHit, warband: !!tr.warband, rageAtk: tr.rageAtk || 0,
+    onPlayBolt: tr.onPlayBolt || 0, onPlayStealAtk: tr.onPlayStealAtk || 0, _R: tr,
   };
   if (cr.multi > 1) cr.multi = tr.multi ? 2 : cr.multi;   // creature rule can force double-attack
   return cr;
@@ -538,6 +539,16 @@ export function playCard(b, p, handIndex, target){
     if (R.onPlayBuffAll){ for (const c2 of p.board) c2.atk += R.onPlayBuffAll; b.log.push(cr.name+" buffs allies +"+R.onPlayBuffAll+" atk"); }
     if (R.onPlayFreeze){ const live = enemy.board.filter(c=>c.hp>0); if (live.length){ live[(b.rand?Math.floor(b.rand()*live.length):0)].freeze = 1; b.log.push(cr.name+" freezes an enemy"); } }
     if (R.onPlayDraw){ for (let i=0;i<R.onPlayDraw;i++) draw(p); b.log.push(cr.name+" draws a card"); }
+    // active abilities: Firespell (random enemy bolt) & Tongue (steal attack from a random enemy creature)
+    if (R.onPlayBolt){
+      const live = enemy.board.filter(c=>c.hp>0);
+      if (live.length){ const t = live[(b.rand?Math.floor(b.rand()*live.length):0)]; creatureHit(t, R.onPlayBolt, b); b.log.push(cr.name+" fires at "+t.name+" for "+R.onPlayBolt); }
+      else { damageWizard(enemy, R.onPlayBolt, enemy.defBonus); b.log.push(cr.name+" fires at the enemy wizard for "+R.onPlayBolt); }
+    }
+    if (R.onPlayStealAtk){
+      const live = enemy.board.filter(c=>c.hp>0);
+      if (live.length){ const t = live[(b.rand?Math.floor(b.rand()*live.length):0)]; const st = Math.min(R.onPlayStealAtk, t.atk); t.atk -= st; cr.atk += st; b.log.push(cr.name+" steals "+st+" atk from "+t.name); }
+    }
     // enemy traps trigger on creature play
     if (enemy.traps && enemy.traps.length){
       const t = enemy.traps.shift();
@@ -570,8 +581,9 @@ export function attack(b, attackerIdx, targetKind, targetIdx){
   if (atk.exhausted || atk.summoning) return {ok:false,err:"tired"};
   if (atk.attacks >= atk.multi) return {ok:false,err:"tired"};
   const enemy = b.turn==="you" ? b.enemy : b.you;
-  // warband: +1 atk per friendly living creature (beyond itself)
-  const wbAtk = atk.warband ? Math.max(atk.atk, atk.atk + (p.board.filter(c=>c.hp>0).length - 1)) : atk.atk;
+  // warband: +1 atk per friendly living creature (beyond itself); rage: +N atk while below half HP
+  const rage = atk.rageAtk && atk.hp <= atk.maxHp / 2 ? atk.rageAtk : 0;
+  const wbAtk = (atk.warband ? Math.max(atk.atk, atk.atk + (p.board.filter(c=>c.hp>0).length - 1)) : atk.atk) + rage;
   // taunt check
   if (targetKind === "wiz" && enemy.board.some(c=>c.taunt && c.hp>0)) return {ok:false,err:"taunt"};
   // on-attack creature rules (AoE stomp, wizard snipe, venom)

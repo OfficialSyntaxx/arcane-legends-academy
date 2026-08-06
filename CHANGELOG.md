@@ -2,6 +2,12 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-05 — Creature active abilities implemented + locked in
+- **Wizard Firespell** (`onPlayBolt:2`) — on play, deal 2 to a random enemy creature (else the enemy wizard).
+- **Frog Tongue** (`onPlayStealAtk:1`) — on play, steal +1 attack from a random enemy creature.
+- **Orc Rage** (`rageAtk:2`) — +2 attack while the Orc is at/below half HP.
+- All three wired into the engine (`game.js` `makeCreature`/`playCard`/`attack`) and covered by regression tests in `tools/creature-rule-test.mjs` (now 33 total). All 252 engine / 34 logic / UI-smoke / 33 creature-rule tests pass. Deployed + pushed.
+
 ## 2026-08-05 — Creature balance pass + regression tests
 - **Balanced strong passives:** Dragon on-play AoE 2→1; **Yeti** freeze-on-hit removed (taunt wall was oppressive); Mushnub_Evolved taunt + heal-all 2 removed; Monkroose heal-on-hit 3→2.
 - Added **`tools/creature-rule-test.mjs`** — 28 regression tests, one per battle mechanic (Taunt, Haste, Drain, Regen, Poison, Thorns, Evade, Shield, Survive, Spell/Freeze-immune, WizardDmg, on-attack AoE/debuff, HealOnHit, FreezeOnHit, Warband, dragon on-play AoE) + the balance assertions. Wired into `npm test`. All 252 engine / 34 logic / UI-smoke / 28 creature-rule tests pass. Deployed + pushed.

@@ -3,6 +3,7 @@
 //   node tools/creature-rule-test.mjs
 import * as G from '../public/game.js';
 import { RULES, traitForCard } from '../public/creatures.js';
+import { CARD_MAP } from '../public/cards.js';
 
 let pass = 0, fail = 0;
 const ok = (n, c) => c ? (pass++, console.log('  PASS', n)) : (fail++, console.log('  FAIL', n));
@@ -195,6 +196,45 @@ console.log('creature rule tests');
   ok('dragon balanced (AoE 1)', RULES.dragon.onPlayDmgAll === 1);
   ok('mushnub_evolved balanced', RULES.mushnub_evolved.regen === 2 && RULES.mushnub_evolved.taunt === undefined);
   ok('monkroose balanced (heal 2)', RULES.monkroose.healOnHit === 2);
+}
+// ---- Active abilities (locked in before they become interactive) ----
+// 20. Firespell (wizard: onPlayBolt) — deal N to a random enemy creature, else the wizard
+{
+  CARD_MAP._tw = { id:'_tw', name:'Test Wizard', school:'fire', type:'creature', cost:1, atk:1, hp:5, fx:[] };
+  const b = base(); b.you.pips = 10; b.turn = 'you';
+  b.enemy.board = [cr({ name:'Mob', hp:5, atk:0, owner:'enemy' })];
+  b.you.hand = ['_tw'];
+  G.playCard(b, b.you, 0, null);
+  ok('firespell bolts a random enemy creature for 2', b.enemy.board[0].hp === 3);
+  // no enemy creatures -> hits the enemy wizard
+  const wiz = b.enemy.hp;
+  b.enemy.board = []; b.you.hand = ['_tw']; b.you.pips = 10;
+  G.playCard(b, b.you, 0, null);
+  ok('firespell hits the wizard when no creatures', b.enemy.hp === wiz - 2);
+}
+// 21. Tongue steal (frog: onPlayStealAtk) — steal +N atk from a random enemy creature
+{
+  CARD_MAP._tf = { id:'_tf', name:'Test Frog', school:'life', type:'creature', cost:1, atk:1, hp:5, fx:[] };
+  const b = base(); b.you.pips = 10; b.turn = 'you';
+  b.enemy.board = [cr({ name:'Knight', hp:5, atk:3, owner:'enemy' })];
+  b.you.hand = ['_tf'];
+  G.playCard(b, b.you, 0, null);
+  const frog = b.you.board[0];
+  ok('tongue steals +1 atk from an enemy creature', frog.atk === 2 && b.enemy.board[0].atk === 2);
+}
+// 22. Rage threshold (orc: rageAtk) — +N atk while at/below half HP
+{
+  const b = base(); b.turn = 'you';
+  const orc = cr({ name:'Orc', atk:3, hp:2, maxHp:6, rageAtk:2, owner:'you' }); b.you.board = [orc];
+  b.enemy.board = [cr({ name:'Target', hp:20, atk:0, owner:'enemy' })];
+  G.attack(b, 0, 'creature', 0);
+  ok('rage +2 atk while below half HP', b.enemy.board[0].hp === 20 - (3 + 2));
+  // above half HP -> no rage bonus
+  const b2 = base(); b2.turn = 'you';
+  const orc2 = cr({ name:'Orc', atk:3, hp:5, maxHp:6, rageAtk:2, owner:'you' }); b2.you.board = [orc2];
+  b2.enemy.board = [cr({ name:'Target', hp:20, atk:0, owner:'enemy' })];
+  G.attack(b2, 0, 'creature', 0);
+  ok('no rage above half HP', b2.enemy.board[0].hp === 20 - 3);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
