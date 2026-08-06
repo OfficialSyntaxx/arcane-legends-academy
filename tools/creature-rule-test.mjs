@@ -212,6 +212,20 @@ console.log('creature rule tests');
   G.playCard(b, b.you, 0, null);
   ok('firespell hits the wizard when no creatures', b.enemy.hp === wiz - 2);
 }
+// 20b. Firespell manual targeting — the player picks which enemy (creature or wizard) to bolt
+{
+  CARD_MAP._tw = { id:'_tw', name:'Test Wizard', school:'fire', type:'creature', cost:1, atk:1, hp:5, fx:[] };
+  const b = base(); b.you.pips = 10; b.turn = 'you';
+  b.enemy.board = [cr({ name:'A', hp:5, atk:0, owner:'enemy' }), cr({ name:'B', hp:5, atk:0, owner:'enemy' })];
+  b.you.hand = ['_tw'];
+  G.playCard(b, b.you, 0, { kind:'creature', idx:1 });   // player picks B
+  ok('manual bolt hits the chosen creature only', b.enemy.board[0].hp === 5 && b.enemy.board[1].hp === 3);
+  // player targets the wizard directly (creatures present, but wizard chosen)
+  const wiz = b.enemy.hp;
+  b.you.hand = ['_tw']; b.you.pips = 10;
+  G.playCard(b, b.you, 0, { kind:'wiz' });
+  ok('manual bolt can hit the wizard directly', b.enemy.hp === wiz - 2 && b.enemy.board[0].hp === 5 && b.enemy.board[1].hp === 3);
+}
 // 21. Tongue steal (frog: onPlayStealAtk) — steal +N atk from a random enemy creature
 {
   CARD_MAP._tf = { id:'_tf', name:'Test Frog', school:'life', type:'creature', cost:1, atk:1, hp:5, fx:[] };

@@ -2,6 +2,11 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-05 — Wizard Firespell is now a targetable on-play action
+- Playing a Wizard creature enters **targeting mode**: the player clicks which enemy creature (or the enemy wizard) to bolt for 2. `game.js` on-play bolt honours a supplied target with a **random fallback for the AI / no-target** plays.
+- UI: `__EV.play` detects Firespell creatures and prompts ("🎯 Choose a target for Firespell!"); enemy board + wizard become clickable targets; `dmgTarget`/`dmgWiz` handle the bolt.
+- Added regression tests for manual targeting (chosen creature only; wizard directly) while keeping the random-fallback tests. `tools/creature-rule-test.mjs` now 35. All 252 engine / 34 logic / UI-smoke / 35 creature-rule tests pass. Deployed + pushed.
+
 ## 2026-08-05 — Creature active abilities implemented + locked in
 - **Wizard Firespell** (`onPlayBolt:2`) — on play, deal 2 to a random enemy creature (else the enemy wizard).
 - **Frog Tongue** (`onPlayStealAtk:1`) — on play, steal +1 attack from a random enemy creature.

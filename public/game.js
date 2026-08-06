@@ -539,11 +539,19 @@ export function playCard(b, p, handIndex, target){
     if (R.onPlayBuffAll){ for (const c2 of p.board) c2.atk += R.onPlayBuffAll; b.log.push(cr.name+" buffs allies +"+R.onPlayBuffAll+" atk"); }
     if (R.onPlayFreeze){ const live = enemy.board.filter(c=>c.hp>0); if (live.length){ live[(b.rand?Math.floor(b.rand()*live.length):0)].freeze = 1; b.log.push(cr.name+" freezes an enemy"); } }
     if (R.onPlayDraw){ for (let i=0;i<R.onPlayDraw;i++) draw(p); b.log.push(cr.name+" draws a card"); }
-    // active abilities: Firespell (random enemy bolt) & Tongue (steal attack from a random enemy creature)
+    // active abilities: Firespell (targeted/random bolt) & Tongue (steal attack from a random enemy creature)
     if (R.onPlayBolt){
-      const live = enemy.board.filter(c=>c.hp>0);
-      if (live.length){ const t = live[(b.rand?Math.floor(b.rand()*live.length):0)]; creatureHit(t, R.onPlayBolt, b); b.log.push(cr.name+" fires at "+t.name+" for "+R.onPlayBolt); }
-      else { damageWizard(enemy, R.onPlayBolt, enemy.defBonus); b.log.push(cr.name+" fires at the enemy wizard for "+R.onPlayBolt); }
+      const targ = target;
+      if (targ && targ.kind === "creature" && enemy.board[targ.idx] && enemy.board[targ.idx].hp > 0){
+        creatureHit(enemy.board[targ.idx], R.onPlayBolt, b); b.log.push(cr.name+" fires at "+enemy.board[targ.idx].name+" for "+R.onPlayBolt);
+      } else if (targ && targ.kind === "wiz") {
+        damageWizard(enemy, R.onPlayBolt, enemy.defBonus); b.log.push(cr.name+" fires at the enemy wizard for "+R.onPlayBolt);
+      } else {
+        // random fallback (AI / no target supplied)
+        const live = enemy.board.filter(c=>c.hp>0);
+        if (live.length){ const t = live[(b.rand?Math.floor(b.rand()*live.length):0)]; creatureHit(t, R.onPlayBolt, b); b.log.push(cr.name+" fires at "+t.name+" for "+R.onPlayBolt); }
+        else { damageWizard(enemy, R.onPlayBolt, enemy.defBonus); b.log.push(cr.name+" fires at the enemy wizard for "+R.onPlayBolt); }
+      }
     }
     if (R.onPlayStealAtk){
       const live = enemy.board.filter(c=>c.hp>0);
