@@ -2,6 +2,13 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-07 — Player collision against the GLB map geometry
+Reusing the camera-collision raycasts, the player now collides with the baked maps:
+- **Can't walk through buildings**: `mapBlocks(x,z)` raycasts down onto the map and blocks the player where the surface is elevated (a building wall / steep terrain) OR where (x,z) sits inside a building's 2D footprint (so a hollow structure's interior also blocks). Integrated into movement with slide-along-wall behaviour, NPC wanderers, and teleport (a teleport into a building is rejected).
+- **Sits on the terrain surface**: for map zones the player's ground height now follows the map's actual surface (`mapSurfaceY`) instead of the spawn floor, so they no longer sink slightly into the ground.
+- Fixed a temporal-dead-zone bug (groundY referenced `chars` before its declaration) that initially broke the world boot.
+Verified in-game: teleporting into the academy tower's wall is rejected (player stays on open ground), and the player stands on the surface (Y=0.5). Deployed + pushed.
+
 ## 2026-08-07 — Camera collision against the GLB map geometry
 The camera now collides with the baked maps' buildings and terrain via raycasts against the loaded map model:
 - **Terrain**: the camera is always kept above the map surface (raycast down at the camera position), so it no longer sinks into hills or white-outs on the snow/mountains maps.

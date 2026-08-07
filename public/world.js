@@ -30,7 +30,17 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // so a single floor height (sampled at the spawn via raycast once the map loads) is cheaper
   // and safer than sampling the relief every frame; `mapFloorY` is populated by loadZoneMap.
   let mapFloorY = 0;
-  const groundY = (x, z) => (ZONE_MAPS[ZONE.id] ? mapFloorY : heightAt(x, z, ZONE.terrain, FLATS));
+  let mapObstacleBoxes = [];                 // 2D [minX,maxX,minZ,maxZ] footprints of structures
+  // On a map-backed zone the player sits on the map's actual surface (raycast down), so they
+  // never sink into a raised area; `mapFloorY` is the fallback until the map loads.
+  const groundY = (x, z) => {
+    if (!ZONE_MAPS[ZONE.id]) return heightAt(x, z, ZONE.terrain, FLATS);
+    if (chars && chars.map && chars.map.model){
+      const s = mapSurfaceY(x, z);
+      if (Number.isFinite(s)) return s;
+    }
+    return mapFloorY;
+  };
   const wet = (x, z) => isWater(x, z, ZONE.terrain, FLATS);
   // Clamp to the ACTIVE ZONE's bounds, not a global constant — a zone with different bounds
   // would otherwise trap the player early or let them walk off the edge of its terrain.
@@ -597,7 +607,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   }
 
   // ---------- load GLB character models (replace procedural wizards) ----------
-  const chars = {}; // entityKey -> {model, mixer, walk, idle}
+  var chars = {}; // entityKey -> {model, mixer, walk, idle}  (var: groundY reads it before init)
   // Loading progress, so the UI can show a state instead of a silently-empty world.
   const loadState = { total:0, done:0, failed:[] };
   function loadProgress(){
@@ -919,6 +929,22 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       if (!Number.isFinite(groundMinY)) groundMinY = box.min.y;
       model.position.set((m.x || 0) - cx, (m.y || 0) - groundMinY, (m.z || 0) - cz);
       g.add(model);
+      // Collect 2D footprints of the map's structures (not ground/water/decor) so a hollow
+      // building's interior also blocks the player, not just its elevated walls.
+      mapObstacleBoxes = [];
+      model.updateMatrixWorld(true);
+      model.traverse(o => {
+        if (!o.isMesh) return;
+        const nm = (o.name || "").toLowerCase();
+        if (nm.includes("ground") || nm.includes("water")) return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        const b = o.geometry.boundingBox; if (!b) return;
+        const vmin = new THREE.Vector3(b.min.x, b.min.y, b.min.z).applyMatrix4(o.matrixWorld);
+        const vmax = new THREE.Vector3(b.max.x, b.max.y, b.max.z).applyMatrix4(o.matrixWorld);
+        const w = vmax.x - vmin.x, d = vmax.z - vmin.z;
+        if (Math.min(w, d) < 2) return;        // trees/rocks/decor are too small to block
+        mapObstacleBoxes.push([vmin.x, vmax.x, vmin.z, vmax.z]);
+      });
       // Sample the map's floor under the spawn so entities/player sit on the surface instead of
       // sinking into hills (or hovering). One raycast at load; the floor is treated as flat.
       try {
@@ -1106,6 +1132,15 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
         else if (!wet(axisZ.x, axisZ.z)) hit = axisZ;
         else hit = { x: player.position.x, z: player.position.z };
       }
+      // MAP GEOMETRY IS SOLID (buildings / steep terrain). Same slide-along-wall behaviour so a
+      // diagonal into a tower slides you around it instead of sticking or clipping through.
+      if (mapBlocks(hit.x, hit.z)){
+        const axisX = resolveCollisions(nx, player.position.z, PLAYER_RADIUS, ZONE_OBSTACLES);
+        const axisZ = resolveCollisions(player.position.x, nz, PLAYER_RADIUS, ZONE_OBSTACLES);
+        if (!mapBlocks(axisX.x, axisX.z) && !wet(axisX.x, axisX.z)) hit = axisX;
+        else if (!mapBlocks(axisZ.x, axisZ.z) && !wet(axisZ.x, axisZ.z)) hit = axisZ;
+        else hit = { x: player.position.x, z: player.position.z };
+      }
       player.position.x = hit.x; player.position.z = hit.z;
       player.position.y = groundY(hit.x, hit.z);      // walk the heightmap (WORLDSPEC §5)
       updateChunks(false);
@@ -1142,11 +1177,12 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
         if (d>0.8){
           const wnx = n.mesh.position.x + (dx/d)*4.0*dt, wnz = n.mesh.position.z + (dz/d)*4.0*dt;
           const wh = resolveCollisions(wnx, wnz, PLAYER_RADIUS, ZONE_OBSTACLES);
+          const blocked = mapBlocks(wh.x, wh.z);          // map buildings/steep terrain
           n.mesh.position.x = wh.x; n.mesh.position.z = wh.z;
           n.mesh.position.y = groundY(wh.x, wh.z);
           n.mesh.rotation.y = Math.atan2(dx,dz);
-          // walked into a wall: pick a fresh destination rather than grinding against it
-          if (Math.hypot(wh.x-wnx, wh.z-wnz) > 0.001){
+          // walked into a wall (or a map building): pick a fresh destination rather than grinding
+          if (blocked || Math.hypot(wh.x-wnx, wh.z-wnz) > 0.001){
             n.stuck = (n.stuck||0) + dt;
             if (n.stuck > 0.8){ n.stuck = 0; n.t = 0; n.pause = 0.4; const a2=Math.random()*Math.PI*2, r2=26+Math.random()*22; n.tx=Math.cos(a2)*r2; n.tz=Math.sin(a2)*r2; }
           } else n.stuck = 0;
@@ -1161,7 +1197,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
               const a=Math.random()*Math.PI*2, r=26+Math.random()*22;
               const cx=Math.cos(a)*r, cz=Math.sin(a)*r;
               const c2=resolveCollisions(cx, cz, PLAYER_RADIUS, ZONE_OBSTACLES);
-              if (Math.hypot(c2.x-cx, c2.z-cz) < 0.001 || k===5){ n.tx=c2.x; n.tz=c2.z; break; }
+              if (!mapBlocks(c2.x, c2.z) && (Math.hypot(c2.x-cx, c2.z-cz) < 0.001 || k===5)){ n.tx=c2.x; n.tz=c2.z; break; }
             }
           }
           if (c) c.walking = false;
@@ -1247,6 +1283,28 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       return h.point.y;
     }
     return -Infinity;
+  }
+  // Does the map block the player standing at (x, z)? True when the topmost surface there is
+  // well above the walkable floor (a building/terrain step) OR (x,z) sits inside a building's
+  // 2D footprint (so a hollow structure's interior also blocks, not just its elevated walls).
+  function mapBlocks(x, z){
+    const m = mapModel();
+    // 1) footprint of a building structure
+    if (m && mapObstacleBoxes.length){
+      for (const b of mapObstacleBoxes){
+        if (x > b[0] && x < b[1] && z > b[2] && z < b[3]) return true;
+      }
+    }
+    // 2) elevated surface (steep terrain / walls)
+    if (m){
+      const ray = new THREE.Raycaster(new THREE.Vector3(x, 400, z), new THREE.Vector3(0, -1, 0));
+      const hits = ray.intersectObject(m, true);
+      for (const h of hits){
+        if ((h.object.name || "").toLowerCase().includes("water")) continue;
+        return h.point.y > mapFloorY + 0.9;
+      }
+    }
+    return false;
   }
   function updateCamera(){
     const px = player.position.x, pz = player.position.z, py = player.position.y;
@@ -1415,9 +1473,9 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       const p = resolveCollisions(
         clampX(x), clampZ(z),
         PLAYER_RADIUS, ZONE_OBSTACLES);
-      // A teleport into water would drop the player somewhere they cannot walk out of, now that
-      // water is solid — keep them where they are rather than stranding them mid-lake.
-      if (wet(p.x, p.z)) return { x:player.position.x, y:player.position.y, z:player.position.z };
+      // A teleport into water or into a map building would strand/clip the player — keep them
+      // where they are instead.
+      if (wet(p.x, p.z) || mapBlocks(p.x, p.z)) return { x:player.position.x, y:player.position.y, z:player.position.z };
       player.position.x = p.x; player.position.z = p.z;
       player.position.y = groundY(p.x, p.z);   // land on the surface, not at y=0
       tapTarget = null; tapSet = false;
