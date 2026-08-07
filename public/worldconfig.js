@@ -25,13 +25,13 @@ export const ZONE_DEFAULTS = {
 // (e.g. the Plains/Academy map ships its own central tower, so the hub's tower landmark is
 // hidden to avoid a duplicate).
 export const ZONE_MAPS = {
-  // Each map's central structure sits at the map centre; the map is placed so that structure is
-  // well away from the zone spawn, so the player starts on open ground with the tower/spire as a
-  // distant landmark rather than spawning at its base.
-  academy:           { file: "map_plains_academy.glb", scale: 1, x: 13, z: 60, hideLandmarks: ["tower"] },
+  // Each map is ~56 units wide (±28 around its centre). Position it so the zone spawn lands ON
+  // the map, with the central structure offset within the map so the player starts on open ground
+  // with the tower/spire as a landmark rather than at its base.
+  academy:           { file: "map_plains_academy.glb", scale: 1, x: 13, z: 30, hideLandmarks: ["tower"] },
   whispering_forest: { file: "map_forest.glb",         scale: 1, x: 0,  z: 60 },
-  ashen_mountains:   { file: "map_mountains.glb",      scale: 1, x: -100, z: 45 },
-  snow:              { file: "map_snow.glb",           scale: 1, x: 0,  z: 40 },
+  ashen_mountains:   { file: "map_mountains.glb",      scale: 1, x: -100, z: 20 },
+  snow:              { file: "map_snow.glb",           scale: 1, x: 0,  z: 20 },
 };
 
 // Deep-ish merge that only fills in missing keys — an author who sets one terrain field should
