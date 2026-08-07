@@ -2,6 +2,12 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-07 — Camera collision against the GLB map geometry
+The camera now collides with the baked maps' buildings and terrain via raycasts against the loaded map model:
+- **Terrain**: the camera is always kept above the map surface (raycast down at the camera position), so it no longer sinks into hills or white-outs on the snow/mountains maps.
+- **Buildings**: the player→camera view ray is raycast against the map, pulling the camera in before any structure it would clip through (both on the main follow step and the post-step orbit correction).
+Verified in-game: the previously-broken snow and mountains zones now show clean follow-cam views on the surface. Deployed + pushed.
+
 ## 2026-08-07 — Bring in the re-exported Blender maps
 The 4 maps were re-exported from Blender (right-sized ~56u, recentered at origin, saturated ground colours, no black bakes). Wired into all 4 zones and repositioned so each zone spawn lands **on** its map with the central structure offset from spawn. Deployed + pushed.
 

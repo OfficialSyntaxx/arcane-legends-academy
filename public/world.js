@@ -1219,21 +1219,57 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
 
   // ---------- camera ----------
   const _camTarget = new THREE.Vector3();     // hoisted: this runs every frame
+  // Map-geometry collision. The GLB maps' buildings/terrain aren't in ZONE_OBSTACLES (which only
+  // knows the procedural boxes), so without these the camera pulls straight through a map tower
+  // or sinks into a map hillside. Both are one raycast against the loaded map model.
+  const mapModel = () => (chars.map && chars.map.model) || null;
+  // Distance along a horizontal ray from the player's eye to the first map blocker (excl. water).
+  function mapBlockDist(dirX, dirZ, maxDist){
+    const m = mapModel(); if (!m || !maxDist) return maxDist;
+    const o = new THREE.Vector3(player.position.x, player.position.y + 2.2, player.position.z);
+    const ray = new THREE.Raycaster(o, new THREE.Vector3(dirX, 0, dirZ).normalize());
+    ray.far = maxDist;
+    const hits = ray.intersectObject(m, true);
+    let d = maxDist;
+    for (const h of hits){
+      if ((h.object.name || "").toLowerCase().includes("water")) continue;
+      if (h.distance < d) d = h.distance;
+    }
+    return d;
+  }
+  // Height of the map's walkable surface at (x, z), or -Infinity if not on the map.
+  function mapSurfaceY(x, z){
+    const m = mapModel(); if (!m) return -Infinity;
+    const ray = new THREE.Raycaster(new THREE.Vector3(x, 400, z), new THREE.Vector3(0, -1, 0));
+    const hits = ray.intersectObject(m, true);
+    for (const h of hits){
+      if ((h.object.name || "").toLowerCase().includes("water")) continue;
+      return h.point.y;
+    }
+    return -Infinity;
+  }
   function updateCamera(){
     const px = player.position.x, pz = player.position.z, py = player.position.y;
     // CAMERA COLLISION. Without this the camera sits inside whatever is behind the player —
     // the arena canopy's black interior, a hall's backfaces — which is trivial to hit now that
     // buildings are 8-40m. Pull in to the first blocker along the ray.
-    const want = cameraDistanceLimit(px, pz, camYaw, camDist, ZONE_OBSTACLES, CAMERA_RADIUS);
+    const want = Math.min(
+      cameraDistanceLimit(px, pz, camYaw, camDist, ZONE_OBSTACLES, CAMERA_RADIUS),
+      mapBlockDist(Math.sin(camYaw), Math.cos(camYaw), camDist)   // map buildings/terrain
+    );
     const ox = Math.sin(camYaw)*want, oz = Math.cos(camYaw)*want;
     const cx = px + ox, cz = pz + oz;
     // Height is relative to the player's own ground, not absolute — on a slope an absolute Y
     // lets the player climb above the camera. Also stay clear of the terrain under the camera,
-    // so it does not sink into a hillside behind them.
+    // so it does not sink into a hillside behind them (procedural OR the GLB map's surface).
     // The more the camera is forced in, the higher it rises — so a blocked shot becomes a
     // look-down over the obstruction instead of a face full of wall.
     const pulled = Math.max(0, camDist - want) / Math.max(1, camDist);
-    const y = Math.max(py + camHeight + pulled * camDist * 0.75, groundY(cx, cz) + 1.8);
+    const y = Math.max(
+      py + camHeight + pulled * camDist * 0.75,
+      groundY(cx, cz) + 1.8,
+      mapSurfaceY(cx, cz) + 1.8
+    );
     _camTarget.set(cx, y, cz);
     // Pull IN instantly, ease back OUT. Easing both ways means the camera spends a moment
     // travelling through whatever it is avoiding, which is exactly the artefact this fixes.
@@ -1248,13 +1284,20 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     const aDist = Math.hypot(ax, az);
     if (aDist > 1e-4){
       const aYaw = Math.atan2(ax, az);
-      const safe = cameraDistanceLimit(px, pz, aYaw, aDist, ZONE_OBSTACLES, CAMERA_RADIUS);
+      const safe = Math.min(
+        cameraDistanceLimit(px, pz, aYaw, aDist, ZONE_OBSTACLES, CAMERA_RADIUS),
+        mapBlockDist(Math.sin(aYaw), Math.cos(aYaw), aDist)
+      );
       if (safe < aDist){
         camera.position.x = px + Math.sin(aYaw) * safe;
         camera.position.z = pz + Math.cos(aYaw) * safe;
-        camera.position.y = Math.max(camera.position.y, groundY(camera.position.x, camera.position.z) + 1.8);
+        camera.position.y = Math.max(camera.position.y, groundY(camera.position.x, camera.position.z) + 1.8,
+          mapSurfaceY(camera.position.x, camera.position.z) + 1.8);
       }
     }
+    // Always keep the camera above the map's surface (a low eased position can sit under a hill).
+    const ms = mapSurfaceY(camera.position.x, camera.position.z);
+    if (ms > -Infinity) camera.position.y = Math.max(camera.position.y, ms + 1.8);
     camera.lookAt(px, py + 2.2, pz);
   }
 
