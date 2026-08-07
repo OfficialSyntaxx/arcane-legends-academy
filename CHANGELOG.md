@@ -2,6 +2,9 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-07 — Bring in the re-exported Blender maps
+The 4 maps were re-exported from Blender (right-sized ~56u, recentered at origin, saturated ground colours, no black bakes). Wired into all 4 zones and repositioned so each zone spawn lands **on** its map with the central structure offset from spawn. Deployed + pushed.
+
 ## 2026-08-06 — Map zone positioning fixes (floor grounding, spawns, camera)
 Addressing in-game feedback on the baked map zones:
 - **Ground on the walkable floor, not the water plane**: the map was grounded on its lowest point (the water plane below the terrain), which raised the whole map and sank the player/NPCs through the floor. Now grounded on the walkable terrain (water excluded).
