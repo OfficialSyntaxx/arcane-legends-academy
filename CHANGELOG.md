@@ -2,6 +2,12 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-08 — Analytics dashboard + richer debug tracking
+- **Dashboard UI** at **`GET /api/dashboard`** (HTML): KPI cards (events, sessions, unique players, avg session, active days), a 14-day sessions bar chart, zone-visit / tab-click / event-type bars, recent errors, and a recent-events table. (Note: `/dashboard` is intercepted by the platform's SPA fallback — it must live under `/api/`.)
+- **Richer client tracking** (`analytics.js`): `session_meta` (device type, screen, DPR, locale, WebGL renderer), `world` events (`map_loaded`/`map_failed` with zone+model), low-FPS sampling (`fps` < 30), and opportunistic `debug` breadcrumbs via `window.__analytics.debug(k, v)`.
+- **`memory.md`** added to the repo root — durable, version-controlled project/operations notes (deploy, analytics endpoints/schema, asset pipeline, conventions) so the agent doesn't rely on the memory store.
+- Deployed + pushed.
+
 ## 2026-08-08 — Client analytics (session, zones, tabs, errors)
 Added lightweight client-side analytics to the live build so play-testers' behaviour is visible:
 - **`analytics.js`** — tracks session start/end (with duration seconds), UI tab clicks, zone visits, uncaught JS errors, and movement "stuck" events. Events are batched and POSTed to the worker's `/api/analytics` (sendBeacon, flushed on a timer and on page-hide).

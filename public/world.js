@@ -974,9 +974,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       }
       // track it like any other model so the loading HUD and __worldDebug see it
       chars["map"] = { model, mixer:null, walk:null, idle:null, rawSize:box.getSize(new THREE.Vector3()).y, computedScale:m.scale || 1 };
+      if (window.__analytics) window.__analytics.track("world", { event: "map_loaded", zone: ZONE.id, model: m.file });
       loadState.done++; loadProgress();
     }, undefined, err => {
       console.warn("zone map failed to load:", url, err && err.message);
+      if (window.__analytics) window.__analytics.track("world", { event: "map_failed", zone: ZONE.id, model: m.file, err: (err && err.message || "").slice(0, 120) });
       loadState.done++; loadState.failed.push("map"); loadProgress();
     });
   }
