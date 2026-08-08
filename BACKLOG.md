@@ -112,8 +112,12 @@
 ## 5. Cards & Collection
 
 - [ ] Card evolution
-- [ ] Foil / holo / special variants
-- [ ] First editions
+- [x] Foil / holo / special variants — `variants.js`: Foil ✨ ×2.2, Holographic 🌈 ×4.5,
+  Prismatic 💠 ×12, rolled rarest-first with per-source luck (packs are the lucky path). Coloured
+  border, diagonal sheen and a badge on the card face; rare printings sort to the top of the
+  collection.
+- [x] First editions — ① ×1.6 on the first copy of each type the player obtains, multiplying with
+  the printing. Existing saves are grandfathered one per type owned, once.
 - [x] Serialized cards — grades 9–10 mint slabs with unique serials
 - [ ] Card lore / encyclopedia
 - [ ] Collection achievements
@@ -171,7 +175,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 343 engine / 34 online / 109 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 360 engine / 34 online / 113 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -233,7 +237,8 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Academy class content** (`lessons.js` — 21 classes, four
+**Changes made, most recent first:** **card printings + first editions** (`variants.js`, and
+`mintCard()` consolidating five copies of the card-instance literal) → **Academy class content** (`lessons.js` — 21 classes, four
 techniques hooked into real systems) → **visible equipment on the 3D character** (`equipment3d.js`)
 → **character creation + per-school appearance**
 (`charcreate.js` / `tint.js` / `preview3d.js`) and **`BLENDERTODO.md`** → **WORLDSPEC step 6, the content pass** (Lake Arcanum + the
@@ -254,7 +259,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Academy class content is done** — 21 classes across the seven years, each teaching
+**Next step:** **card printings are done** — foil/holo/prismatic and first editions
+(`CLAUDEREADME.md` §6.12), which closes the "foil" third of design pillar 3 that had never been
+built. Collection depth continues with card evolution, an encyclopedia, achievements and filters
+(§5 below); the other large untouched area is the social layer (§8).
+
+Before that, **Academy class content was done** — 21 classes across the seven years, each teaching
 a technique that changes grading, scribing, gathering or selling (`CLAUDEREADME.md` §6.11). That
 closes the last of the "numeric bonuses only" criticisms in this file.
 

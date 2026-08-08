@@ -3,6 +3,7 @@ import { CARDS, CARD_MAP, SCHOOLS, RARITY, SCHOOL_BONUS, GRADES, gradeForRoll, c
 import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS } from "./items.js";
 import * as ACADEMY from "./academy.js";
 import * as LESSONS from "./lessons.js";
+import * as VAR from "./variants.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
 export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
@@ -16,8 +17,15 @@ export function newGame(){
   const starterTypes = ["fire_dragon","storm_titan","ice_golem","firebolt","lightning","pixie","elixir","fire_elf","novice","myth_walker"];
   const deck = [];
   for (const id of starterTypes) for (let i=0;i<2;i++) deck.push(id); // 20-card deck format
+  // Starters can't go through mintCard (there is no save yet), so they mirror its shape by hand:
+  // always a normal printing — a free deck should not also hand out the rarest thing in the game
+  // — and the FIRST copy of each type carries the first-edition stamp, which is true.
   const cards = [];
-  for (const id of starterTypes) for (let i=0;i<3;i++) cards.push({ uid: uid(), id, roll: Math.floor(rng()*101), graded:false });
+  for (const id of starterTypes) for (let i=0;i<3;i++){
+    const inst = { uid: uid(), id, roll: Math.floor(rng()*101), graded:false, variant:"normal" };
+    if (i === 0) inst.fe = true;
+    cards.push(inst);
+  }
   return {
     version:1, school:"balance", gold:START_GOLD, xp:0, level:1,
     skills:{ mining:1, fishing:1, woodcutting:1, smithing:1, alchemy:1, scribing:1 },
@@ -106,9 +114,45 @@ function migrate(s){
     if (!Array.isArray(d.defeated)) d.defeated = [];
     if (!Array.isArray(d.cleared)) d.cleared = [];
   }
+  // Printings (variants.js). An absent `variant` already reads as "normal", so no backfill is
+  // needed there. First edition is different: without a stamp, a long-standing player could never
+  // earn one for anything already in their collection and the feature would be dead for them. So
+  // grandfather the first copy of each type they own, once. `feStamped` makes it once-only —
+  // re-running it after they sold and re-bought a card would mint a second "first" edition.
+  if (!s.flags.feStamped){
+    const seen = new Set();
+    for (const c of s.cards || []){
+      if (c.variant == null) c.variant = "normal";
+      if (!seen.has(c.id)){ seen.add(c.id); if (c.fe == null) c.fe = true; }
+    }
+    s.flags.feStamped = true;
+  }
   if (s.deck && s.deck.length > MAX_DECK) s.deck = s.deck.slice(0, MAX_DECK);
   return s;
 }
+/**
+ * Mint one card instance. THE only place a card enters the collection.
+ *
+ * There were four near-identical copies of this line (scribe, buyPack, dropCards, buyCard) plus a
+ * fifth in newGame, and adding printings to a card meant getting the same three fields right in
+ * five places — exactly the drift that put the logic.js catalog out of sync with cards.js. One
+ * function, and a printing can no longer be applied inconsistently.
+ *
+ * `luck` scales the odds of a rare printing: packs are luckier than a card bought off the shelf.
+ * First edition is decided BEFORE the push, so a card is never its own predecessor.
+ */
+export function mintCard(s, cardId, roll, opts = {}){
+  const inst = {
+    uid: uid(), id: cardId, roll, graded: false,
+    variant: opts.variant || VAR.rollVariant(rng, opts.luck || 1),
+  };
+  if (VAR.firstEditionFor(s.cards, cardId)) inst.fe = true;
+  s.cards.push(inst);
+  return inst;
+}
+/** A card instance's value, including its printing and first-edition stamp. */
+export function instanceValue(c){ return VAR.valueOf(c, cardValue(c.id, c.roll)); }
+
 let _uid = 0; export function uid(){ return "c" + (Date.now().toString(36)) + (++_uid).toString(36) + Math.floor(rng()*1000); }
 
 // ---------- Leveling ----------
@@ -126,7 +170,7 @@ export const SCHOOL_STARTER = {
 export function issueSchoolStarter(s, school){
   const ids = SCHOOL_STARTER[school] || [];
   for (const id of ids){
-    for (let i=0;i<3;i++) s.cards.push({ uid: uid(), id, roll: Math.floor(rng()*101), graded:false });
+    for (let i=0;i<3;i++) mintCard(s, id, Math.floor(rng()*101), { variant:"normal" });
   }
 }
 export function xpForLevel(l){ return Math.floor(50*l + l*l*2.5); }
@@ -197,8 +241,8 @@ export function scribe(s){
   const bonus = Math.min(30, Math.floor(lvl * 0.3)) + masteries(s).scribeBonus;
   const roll = Math.min(100, Math.max(0, Math.floor(rng()*100) + bonus));
   const c = randomCardOfRarity(rollRarity());
-  const inst = { uid:uid(), id:c.id, roll, graded:false };
-  s.cards.push(inst);
+  // Scribed cards are slightly luckier than shop stock — the player made this one.
+  const inst = mintCard(s, c.id, roll, { luck: 1.25 });
   s.stats.scribed = (s.stats.scribed || 0) + 1;
   addSkillXp(s, "scribing", 30);
   dailyProgress(s, "scribe");
@@ -277,8 +321,8 @@ export function openPack(s){
   const drops = [];
   for (let i=0;i<5;i++){
     const c = randomCardOfRarity(rollRarity());
-    const inst = { uid:uid(), id:c.id, roll:Math.floor(rng()*101), graded:false };
-    s.cards.push(inst); drops.push(inst);
+    // A pack is where a foil is SUPPOSED to come from, so it carries the best odds in the game.
+    drops.push(mintCard(s, c.id, Math.floor(rng()*101), { luck: 2 }));
   }
   return { ok:true, drops };
 }
@@ -286,8 +330,7 @@ export function dropCards(s, n=3){
   const drops = [];
   for (let i=0;i<n;i++){
     const c = randomCardOfRarity(rollRarity());
-    const inst = { uid:uid(), id:c.id, roll:Math.floor(rng()*101), graded:false };
-    s.cards.push(inst); drops.push(inst);
+    drops.push(mintCard(s, c.id, Math.floor(rng()*101), { luck: 1.4 }));
   }
   return drops;
 }
@@ -325,7 +368,7 @@ export function sellCard(s, uidC){
   const i = s.cards.findIndex(x=>x.uid===uidC); if (i<0) return {ok:false};
   const c = s.cards[i];
   // "Haggling", from the market and duelling classes.
-  const value = ACADEMY.applyBonus(cardValue(c.id, c.roll), masteries(s).sellBonus);
+  const value = ACADEMY.applyBonus(instanceValue(c), masteries(s).sellBonus);
   s.gold += value; s.cards.splice(i,1);
   return { ok:true, value };
 }
@@ -336,7 +379,8 @@ export function buyCard(s, id){
   const price = Math.max(1, ACADEMY.applyBonus(base, -academyPerks(s).market));
   if (s.gold < price) return { ok:false, err:"gold" };
   s.gold -= price;
-  s.cards.push({ uid:uid(), id, roll:Math.floor(rng()*101), graded:false });
+  // Bought off the shelf: no luck bonus. A guaranteed card should not also be a lottery ticket.
+  mintCard(s, id, Math.floor(rng()*101));
   return { ok:true, price };
 }
 export function sellItem(s, itemId, qty=1){
@@ -743,7 +787,7 @@ export function runSelfTest(){
 
 // ---------- getters for UI ----------
 export function totalCollectionValue(s){
-  return s.cards.reduce((m,c)=>m+cardValue(c.id,c.roll),0);
+  return s.cards.reduce((m,c)=>m+instanceValue(c),0);
 }
 export function ownedCount(s, id){ return s.cards.filter(c=>c.id===id).length; }
 export function cardInstance(s, uidC){ return s.cards.find(c=>c.uid===uidC); }

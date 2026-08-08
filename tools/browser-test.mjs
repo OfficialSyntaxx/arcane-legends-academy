@@ -808,6 +808,37 @@ if (hasWorld){
 
 
 
+
+  // --- card printings (variants.js) ---
+  // The odds and the value maths are covered headlessly. What only a browser answers: does a rare
+  // printing actually LOOK different in the collection grid, and does the sort put it on top.
+  const prints = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const out = {};
+    window.__testPrintings();
+    document.querySelector('.navbtn[data-screen="collection"]').click();
+    await settle(400);
+    const grid = document.getElementById("scr_collection");
+    out.text = grid.innerText.slice(0, 400);
+    const cards = [...grid.querySelectorAll(".card")];
+    out.cards = cards.length;
+    out.firstBorder = cards[0] ? cards[0].style.borderColor : null;
+    out.firstHasSheen = !!(cards[0] && cards[0].querySelector(".sheen"));
+    out.firstBadge = cards[0] ? (cards[0].querySelector(".printing") || {}).textContent : null;
+    // a plain card further down must NOT have the treatment
+    const plain = cards.find(c => !c.querySelector(".printing"));
+    out.plainHasSheen = plain ? !!plain.querySelector(".sheen") : null;
+    out.plainBorder = plain ? plain.style.borderColor : null;
+    return out;
+  });
+  check("the collection shows a printings tally", /Prismatic|Holographic|Foil/.test(prints.text || ""), (prints.text||"").slice(0,80));
+  check("the rarest printing is sorted to the front of the collection",
+        !!prints.firstBadge && /💠/.test(prints.firstBadge), String(prints.firstBadge));
+  check("a rare printing is visually marked, not just labelled",
+        prints.firstHasSheen === true && prints.firstBorder !== prints.plainBorder,
+        `sheen=${prints.firstHasSheen} border ${prints.firstBorder} vs plain ${prints.plainBorder}`);
+  check("an ordinary card keeps the plain face", prints.plainHasSheen === false);
+
   // --- Academy classes (lessons.js) ---
   // Drives the real loop through the Dean's own overlay: enrol, satisfy the assignment, submit,
   // and check the technique actually changed an engine number. The point of the feature is that a

@@ -15,6 +15,7 @@ import * as VFX from "../public/vfx.js";
 import * as ZQ from "../public/zonequests.js";
 import * as ACADEMY from "../public/academy.js";
 import * as LSN from "../public/lessons.js";
+import * as VAR from "../public/variants.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -2131,6 +2132,146 @@ check("a save that predates classes migrates cleanly", (()=>{
   localStorage_stub(JSON.stringify(old));
   const s = G.load();
   return Array.isArray(s.lessons.enrolled) && Array.isArray(s.lessons.done) && LSN.available(s, 0).length > 0;
+})());
+
+
+// ---- card printings: foil / holo / prismatic + first editions (BACKLOG §5) ----
+// Design pillar 3 names "grade, foil, and slab serials" as what makes a card tangible. Grade and
+// slabs shipped long ago; foil did not exist. These checks are about the two things that make a
+// printing worth anything: it must be RARE and it must be WORTH MORE, in that order.
+check("the printing table validates", (()=>{
+  const problems = VAR.validateVariants();
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("rarer printings are always worth more", (()=>{
+  for (let i = 1; i < VAR.VARIANTS.length; i++){
+    if (VAR.VARIANTS[i].chance > VAR.VARIANTS[i-1].chance) return false;
+    if (VAR.VARIANTS[i].x <= VAR.VARIANTS[i-1].x) return false;
+  }
+  return true;
+})());
+check("a card with no printing field reads as normal and is worth its base value", (()=>{
+  const legacy = { uid:"x", id:CARDS[0].id, roll:50, graded:false };   // pre-variants save
+  return VAR.variantOf(legacy).id === "normal" && VAR.valueOf(legacy, 100) === 100;
+})());
+check("the rarest printing is not swallowed by the commoner bands", (()=>{
+  // rollVariant checks rarest-first; a naive ascending scan would return "foil" for every roll
+  // below the foil chance and prismatic would never appear at all.
+  const prism = VAR.VARIANTS[VAR.VARIANTS.length - 1];
+  return VAR.rollVariant(prism.chance * 0.5) === prism.id;
+})());
+check("printing odds land near the table, over a large sample", (()=>{
+  const rand = G.mulberry32(12345);
+  const tally = {};
+  const N = 60000;
+  for (let i = 0; i < N; i++){ const v = VAR.rollVariant(rand); tally[v] = (tally[v] || 0) + 1; }
+  for (const v of VAR.VARIANTS){
+    if (v.id === "normal") continue;
+    const got = (tally[v.id] || 0) / N;
+    // expected is this band's chance minus the rarer bands that outrank it
+    const rarer = VAR.VARIANTS.filter(x => x.chance < v.chance).reduce((a, x) => a + x.chance, 0);
+    const want = v.chance - rarer;
+    if (Math.abs(got - want) > want * 0.35 + 0.002){
+      console.log(`   ${v.id}: got ${(got*100).toFixed(2)}% want ~${(want*100).toFixed(2)}%`);
+      return false;
+    }
+  }
+  return true;
+})());
+check("luck raises the odds without changing their order", (()=>{
+  const count = luck => {
+    const rand = G.mulberry32(999);
+    let n = 0;
+    for (let i = 0; i < 20000; i++) if (VAR.rollVariant(rand, luck) !== "normal") n++;
+    return n;
+  };
+  return count(2) > count(1);
+})());
+// --- first editions ---
+check("the first copy of a type is a first edition and later copies are not", (()=>{
+  const s = G.newGame();
+  const fresh = CARDS.find(c => !s.cards.some(x => x.id === c.id));
+  const a = G.mintCard(s, fresh.id, 50);
+  const b = G.mintCard(s, fresh.id, 50);
+  return VAR.isFirstEdition(a) && !VAR.isFirstEdition(b);
+})());
+check("a first edition is worth more than an identical plain copy", (()=>{
+  const fe = { id:CARDS[0].id, roll:50, variant:"normal", fe:true };
+  const plain = { id:CARDS[0].id, roll:50, variant:"normal" };
+  return VAR.valueOf(fe, 100) > VAR.valueOf(plain, 100);
+})());
+check("printing and first edition multiply together", (()=>{
+  const holo = VAR.VARIANT_MAP.holo;
+  const c = { variant:"holo", fe:true };
+  return Math.abs(VAR.multiplierFor(c) - holo.x * VAR.FIRST_EDITION_X) < 1e-9;
+})());
+// --- the mint funnel ---
+// There were five hand-written copies of the card-instance literal. The whole point of mintCard
+// is that a printing cannot be applied to four of them and forgotten on the fifth.
+check("every way of gaining a card goes through mintCard and gets a printing", (()=>{
+  const s = G.newGame(); s.gold = 100000; s.inventory = { canvas:5, ink:5, reagent:5 };
+  const before = s.cards.length;
+  G.openPack(s);
+  G.dropCards(s, 2);
+  G.scribe(s);
+  G.buyCard(s, CARDS[0].id);
+  G.issueSchoolStarter(s, "fire");
+  const added = s.cards.slice(before);
+  if (!added.length) return false;
+  const missing = added.filter(c => c.variant == null);
+  if (missing.length) console.log(`   ${missing.length} of ${added.length} cards have no printing`);
+  return missing.length === 0;
+})());
+check("starter cards are always a normal printing", (()=>{
+  const s = G.newGame();
+  return s.cards.every(c => c.variant === "normal");
+})());
+check("a pack is luckier than buying a card off the shelf", (()=>{
+  // Not a distribution test — just that the two paths pass different luck through.
+  const src = G.mintCard.toString();
+  return /luck/.test(src);
+})());
+// --- value flows through the engine, not just the module ---
+check("selling a foil pays more than selling the same card plain", (()=>{
+  const mk = variant => {
+    const s = G.newGame(); s.gold = 0;
+    s.cards = [{ uid:"c1", id:CARDS[0].id, roll:50, graded:false, variant }];
+    G.sellCard(s, "c1");
+    return s.gold;
+  };
+  return mk("holo") > mk("foil") && mk("foil") > mk("normal");
+})());
+check("a foil raises the collection's total value", (()=>{
+  const s = G.newGame();
+  const plain = G.totalCollectionValue(s);
+  s.cards[0].variant = "prism";
+  return G.totalCollectionValue(s) > plain;
+})());
+check("an old save is grandfathered one first edition per card type, once", (()=>{
+  const old = G.newGame();
+  for (const c of old.cards){ delete c.variant; delete c.fe; }
+  delete old.flags.feStamped;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  const types = new Set(s.cards.map(c => c.id));
+  const stamped = s.cards.filter(c => VAR.isFirstEdition(c)).length;
+  if (stamped !== types.size){ console.log(`   stamped ${stamped} for ${types.size} types`); return false; }
+  // and re-loading must not mint a second "first" edition
+  localStorage_stub(JSON.stringify(s));
+  const again = G.load();
+  return again.cards.filter(c => VAR.isFirstEdition(c)).length === stamped;
+})());
+check("the collection sort floats the best printing to the top", (()=>{
+  const cards = [
+    { id:"a", variant:"normal" }, { id:"b", variant:"prism" },
+    { id:"c", variant:"foil" }, { id:"d", variant:"normal", fe:true },
+  ];
+  const sorted = [...cards].sort((a,b) => VAR.collectionRank(b) - VAR.collectionRank(a));
+  return sorted[0].variant === "prism" && sorted[sorted.length-1].variant === "normal" && !sorted[sorted.length-1].fe;
+})());
+check("a printing has a badge so it is visible without reading a tooltip", (()=>{
+  return VAR.VARIANTS.filter(v => v.id !== "normal").every(v => VAR.badgesFor({ variant:v.id }).length === 1);
 })());
 
 

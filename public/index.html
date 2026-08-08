@@ -100,6 +100,11 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .card .tx{font-size:10px;color:var(--muted);line-height:1.2;margin-top:2px;min-height:26px;}
 .card .grade{position:absolute;top:4px;right:4px;font-size:14px;background:rgba(0,0,0,.5);border-radius:8px;padding:1px 5px;}
 .card .serial{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--gold);background:rgba(0,0,0,.6);border-radius:6px;padding:1px 6px;letter-spacing:1px;font-weight:700;white-space:nowrap;}
+/* Printings (variants.js). The badge row sits top-LEFT because the grade already owns top-right
+   and the two must be readable at once — a Gem Mint holo is the whole point of the system. */
+.card .printing{position:absolute;top:4px;left:4px;font-size:12px;background:rgba(0,0,0,.55);border-radius:8px;padding:1px 5px;letter-spacing:1px;}
+/* A diagonal sheen across the art, so a foil reads as a foil in a grid without any text. */
+.card .sheen{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;}
 .card.slab{border-image:linear-gradient(135deg,#e8c36a,#fff,#7be0ff,#e8c36a) 1;box-shadow:0 0 14px rgba(255,201,77,.55),0 4px 12px rgba(0,0,0,.5);}
 .card.slab .art{outline:1px solid rgba(255,215,120,.6);}
 .card .val{position:absolute;bottom:4px;right:4px;font-size:10px;color:var(--gold);background:rgba(0,0,0,.55);padding:1px 5px;border-radius:6px;}
@@ -352,6 +357,7 @@ import * as ZQ from "./zonequests.js";
 import * as REP from "./reputation.js";
 import * as ACADEMY from "./academy.js";
 import * as LSN from "./lessons.js";
+import * as VAR from "./variants.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -560,11 +566,23 @@ function cardFace(c, opts={}){
   if (opts.tired) flag = `<div class="tired-ic">😴</div>`;
   let attrs = "";
   if (opts.onclick) attrs = ` onclick="window.__ev('${opts.onclick}')"`;
-  return `<div class="${cls.join(" ")}" style="border-color:${rarity.color}" ${attrs}>
+  // Printings (variants.js). `opts.inst` is the card INSTANCE, so the face can show what this
+  // particular copy is — a foil border sheen and the badges. Passing nothing keeps the plain
+  // catalog face, which is what the deckbuilder and the duel want.
+  const badges = opts.inst ? VAR.badgesFor(opts.inst) : [];
+  const printing = opts.inst ? VAR.variantOf(opts.inst) : null;
+  // The border is the printing's colour when it has one: a rare printing has to be visible in a
+  // grid of ninety cards without reading every badge.
+  const border = printing && printing.color != null ? "#" + printing.color.toString(16).padStart(6,"0") : rarity.color;
+  const sheen = printing && printing.glow
+    ? `<div class="sheen" style="opacity:${(0.18 + printing.glow * 0.3).toFixed(2)};background:linear-gradient(115deg,transparent 30%,${border} 50%,transparent 70%)"></div>` : "";
+  return `<div class="${cls.join(" ")}" style="border-color:${border}${printing&&printing.glow?`;box-shadow:0 0 ${Math.round(6+printing.glow*10)}px ${border}66`:""}" ${attrs}>
     <div class="art" style="background-image:url(./assets/${art})">
+      ${sheen}
       <div class="cost">${c.cost}</div>
       ${c.type==="creature" ? `<div class="atk">${c.atk}</div><div class="hp">${c.hp}</div>` : ""}
       ${grade ? `<div class="grade" title="${grade.name}">${grade.icon}</div>` : ""}
+      ${badges.length ? `<div class="printing" title="${VAR.labelFor(opts.inst)}">${badges.map(b=>b.badge).join("")}</div>` : ""}
       ${opts.slab ? `<div class="serial">#${opts.serial}</div>` : ""}
       ${opts.value!=null ? `<div class="val">🪙${val}</div>` : ""}
       ${flag}
@@ -1109,12 +1127,24 @@ function renderCollection(el){
   h += `<div class="row" style="margin-bottom:10px">
     <button class="btn gold" onclick="window.__ev('pack')">🃏 Open Pack (${G.PACK_COST}g)</button>
     <button class="btn" onclick="window.__ev('toLoadout')">🗡️ ${STR.nav_loadout}</button></div>`;
+  // Printings tally, so a collection is something to look at and not just a pile. Derived from
+  // the cards every render — nothing about it is stored.
+  const tally = VAR.tallyFor(S.cards);
+  const tallyRow = VAR.VARIANTS.filter(v => v.id !== "normal" && tally[v.id])
+    .map(v => `<div class="kpi"><div class="lv" style="font-size:16px">${v.badge} ${tally[v.id]}</div><div class="nm">${v.name}</div></div>`).join("");
+  if (tallyRow || tally.firstEditions){
+    h += `<div class="row" style="margin-bottom:8px">${tallyRow}` +
+      (tally.firstEditions ? `<div class="kpi"><div class="lv" style="font-size:16px">${VAR.FIRST_EDITION_BADGE} ${tally.firstEditions}</div><div class="nm">First Editions</div></div>` : "") +
+      `</div>`;
+  }
   h += `<div class="row">`;
-  for (const c of S.cards){
+  // Rare printings and first editions float to the top: the best thing you own should not be
+  // ninety cards down a scroll.
+  for (const c of [...S.cards].sort((a,b) => VAR.collectionRank(b) - VAR.collectionRank(a))){
     const def = CARD_MAP[c.id];
-    const val = cardValue(c.id, c.roll);
+    const val = G.instanceValue(c);          // printing + first edition, not just the grade
     const g = c.graded ? gradeForRoll(c.roll) : null;
-    h += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">${cardFace(def, { grade:c.graded?c.roll:null, value:val, slab:g&&g.slab, serial:c.serial })}
+    h += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">${cardFace(def, { inst:c, grade:c.graded?c.roll:null, value:val, slab:g&&g.slab, serial:c.serial })}
       <div class="row" style="gap:4px">
         <button class="btn sm ok" ${c.graded?"disabled":""} onclick="window.__ev('grade|${c.uid}')">${c.graded?`<span style="font-size:10px">${g.icon} ${g.name}</span>`:"Grade"}</button>
         ${c.graded?`<button class="btn sm" onclick="window.__ev('regrade|${c.uid}')">Regrade</button>`:""}
@@ -1244,14 +1274,14 @@ function renderMarket(el){
   h += `<div class="panel"><h3>List a card for auction</h3><div class="row">`;
   for (const c of S.cards.slice(0,40)){
     const def = CARD_MAP[c.id];
-    h += cardFace(def, { grade:c.graded?c.roll:null, value:cardValue(c.id,c.roll), onclick:`listA|${c.uid}` });
+    h += cardFace(def, { inst:c, grade:c.graded?c.roll:null, value:G.instanceValue(c), onclick:`listA|${c.uid}` });
   }
   h += `</div></div>`;
   el.innerHTML = h;
 }
 window.__EV.buy = (id)=>{ const r=G.buyCard(S,id); r.ok?toast("Purchased!"):err("Not enough gold"); render(); };
 window.__EV.sellItem = (id)=>{ const r=G.sellItem(S,id); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
-window.__EV.listA = (uid)=>{ const r=G.listAuction(S,uid, cardValue(G.cardInstance(S,uid)?.id||"", 100)); r.ok?toast("Listed for auction!"):null; render(); };
+window.__EV.listA = (uid)=>{ const c=G.cardInstance(S,uid); const r=G.listAuction(S,uid, c?G.instanceValue(c):0); r.ok?toast("Listed for auction!"):null; render(); };
 
 // ================= QUESTS =================
 function renderQuests(el){
@@ -2111,6 +2141,12 @@ window.__testLessonReady = (id)=>{
   save(); return true;
 };
 window.__testMastery = ()=> LSN.masteryFor(S);
+// Give the player one of each printing so the collection grid can be inspected. Uses mintCard so
+// the instances are shaped exactly as the game makes them.
+window.__testPrintings = ()=>{
+  for (const v of VAR.VARIANTS) G.mintCard(S, CARDS[0].id, 55, { variant: v.id });
+  save(); return VAR.tallyFor(S.cards);
+};
 // Forge and equip a full set at one metal tier, then re-derive the attachments. Uses the real
 // engine functions so the test cannot pass against a path the game does not take.
 window.__testGear = (metal)=>{

@@ -63,6 +63,7 @@ wizard-tcg/                 (the repo root)
 │   ├── onboarding.js       the guided first-session chain — PURE, every step derived from the save
 │   ├── academy.js          curriculum years + perks (quest gold / market discount / XP) — PURE
 │   ├── lessons.js          the class syllabus: assignments + techniques taught — PURE
+│   ├── variants.js         card printings (foil/holo/prismatic) + first editions — PURE
 │   ├── reputation.js       per-NPC standing + reward bonuses — PURE
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
@@ -223,6 +224,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 
 ### 6.5 Quests & PvP
 - **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
+- **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
 - **Visible equipment** (`equipment3d.js`) — the equipped wand and amulet hang off real skeleton bones; the other three slots are stats-only and say so. See §6.10.
 - **Character creation** (`charcreate.js`) — name, school and look with a live 3D preview; the per-school appearance is a shader hue-shift plus a coloured aura, not a per-part outfit. See §6.9 for why.
@@ -359,7 +361,38 @@ migration and no stored total that can drift from the classes that produced it.
 Taken from **Professor Echo** in the world, or the Classes button on the Dorm curriculum panel —
 one builder for both, since a syllabus that reads differently in two places will drift.
 
-### 6.12 Retention
+### 6.12 Card printings (`variants.js`)
+Design pillar 3 says *"grade, foil, and slab serials make each card feel tangible"*. Grade and
+slabs shipped long ago; **foil did not exist** — two identical Fire Dragons at the same grade were
+indistinguishable, so grade was the only axis of collection value.
+
+- **Four printings**: Normal, Foil (✨ ×2.2), Holographic (🌈 ×4.5), Prismatic (💠 ×12), rolled
+  **rarest-first** — a naive ascending scan returns "foil" for every roll under the foil chance and
+  prismatic never appears at all. There is a test for exactly that.
+- **First edition** (① ×1.6) stamps the first copy of a type the player ever obtains, and
+  multiplies with the printing.
+- **`luck` per source**: a pack is where a foil is *supposed* to come from (×2), a scribed card is
+  slightly lucky (×1.25), a card bought off the shelf gets nothing — a guaranteed card should not
+  also be a lottery ticket.
+
+**This is the one place the codebase deliberately STORES instead of deriving**, and the comment at
+the top of the module says why: a printing is the outcome of a dice roll at mint time and there is
+nothing to re-derive it from — exactly like `roll`, the grade seed, which has been stored since the
+beginning. Everything *downstream* (multiplier, label, badges, sort order, collection total) is
+still derived on every read.
+
+**`mintCard()` is now the only way a card enters the collection.** There were five hand-written
+copies of the instance literal (scribe, openPack, dropCards, buyCard, newGame's starters), and
+adding a field to a card meant getting it right in five places — the same shape of drift that put
+the `logic.js` catalog out of sync with `cards.js`. A browser test asserts every acquisition path
+produces a printing.
+
+**Migration grandfathers one first edition per card type owned**, once, behind a `feStamped` flag.
+Without it a long-standing player could never earn a first edition for anything already in their
+collection and the feature would be dead for them; without the flag, selling and re-buying would
+mint a second "first" edition.
+
+### 6.13 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -478,7 +511,31 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Academy class content** (§6.11) — the last of the "numeric bonuses only" criticisms
+**Last landed: card printings** (§6.12) — foil, holographic and prismatic cards, plus first
+editions. Design pillar 3 has always read *"grade, foil, and slab serials make each card feel
+tangible"*; grade and slabs shipped long ago and **foil simply did not exist**, so grade was the
+only axis of collection value and two identical cards were identical.
+
+Four printings rolled **rarest-first** (a naive ascending scan returns "foil" for every roll under
+the foil chance and prismatic never drops at all — there is a test for it), each source carrying
+its own `luck`: a pack is where a foil is supposed to come from, a card bought off the shelf gets
+nothing. Rare printings get a coloured border, a diagonal sheen and a badge, and sort to the top of
+the collection, because the best thing you own should not be ninety cards down a scroll.
+
+Two structural notes:
+- **This is the one place the codebase deliberately stores instead of deriving**, and the module
+  says why: a printing is a dice roll at mint time with nothing to re-derive it from — exactly like
+  `roll`, the grade seed. Everything downstream of it is still derived.
+- **`mintCard()` is now the only way a card enters the collection.** There were five hand-written
+  copies of the instance literal, and adding a field meant getting it right in five places — the
+  same drift that once put the `logic.js` catalog out of sync with `cards.js`.
+
+Migration grandfathers one first edition per card type already owned, once, behind a flag —
+otherwise the feature is dead on arrival for anyone with an existing collection.
+
+Tests: **360 engine / 34 online-rules / 113 browser / 8 viewports / model-check clean.**
+
+**Before that: Academy class content** (§6.11) — the last of the "numeric bonuses only" criticisms
 in the backlog. `lessons.js` adds a **syllabus**: 21 classes, three per curriculum year, each with
 a brief, an assignment, and a **named technique** that changes an existing system — Appraisal
 (cheaper grading), Penmanship (better scribe rolls), Husbandry (a chance of a second gather),
@@ -740,7 +797,8 @@ as part of the dorm work rather than left as notes:
    per-part geometry rather than tinting or bone attachment — `BLENDERTODO.md` Tier 5.
 4. ~~**Deepen the Academy curriculum**~~ — ✅ done (§6.11): 21 classes with assignments and taught
    techniques.
-5. **Collection depth** — card evolution, foil/holo variants, an encyclopedia (`BACKLOG.md` §5).
+5. **Collection depth** — ~~foil/holo variants~~ ✅ (§6.12). Still open: card evolution, a card
+   encyclopedia, collection achievements and filters (`BACKLOG.md` §5).
 6. **Social layer** — PvP ranking, guilds, leaderboards (`BACKLOG.md` §8).
 7. **Endgame** — pets/mounts, prestige, seasonal content (`BACKLOG.md` §10).
 
