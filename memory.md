@@ -15,7 +15,7 @@
 - 2026-08-08 — Phase A connector: `advice.js` "Adventurer's Path" — the objective bar shows the
   onboarding chain first, then an ongoing next-step advisor (scribe→housing→grade→duel→refine→pack→
   gather→explore), derived from the save. `flags.adviceHidden` toggles it. Add new suggestions by
-  editing `nextAdvice()` priority order.
+  editing `nextAdvice()` priority order. Tracks `advice_shown`/`advice_click` → dashboard panel.
 - 2026-08-08 — Analytics dashboard is at `/api/dashboard` (bare `/dashboard` is intercepted by the
   platform SPA fallback). Worker routes: `/api/analytics` (POST/GET), `/api/dashboard` (HTML).
 - 2026-08-08 — `memory.md` established as the durable project memory; agent memory store holds only

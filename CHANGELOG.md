@@ -5,6 +5,7 @@
 ## 2026-08-08 — Phase A: Adventurer's Path (connect the loop)
 - **`advice.js`** — ongoing "next step" guidance that keeps the core loop connected after onboarding. The objective bar becomes a persistent advisor suggesting the next meaningful action, derived from the save (no tracked step): **scribe → housing (buy/upgrade) → grade → duel → refine → pack → gather → explore**. Every action has a Go button that jumps you to the right screen.
 - The bar shows the guided onboarding chain first, then hands off to the advisor once onboarding completes; a `flags.adviceHidden` toggle (with migration) hides it.
+- **Advice analytics**: track `advice_shown` (once per suggestion per session) and `advice_click`, and the analytics dashboard now has an **"Adventurer's Path"** panel showing shown→click per suggestion — so we can see which loop steps players actually follow.
 - 6 new regression tests (one per advice branch). 262 engine tests pass.
 - Deployed + pushed.
 
