@@ -1246,6 +1246,18 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
         camera.position.y = Math.max(camera.position.y, groundY(camera.position.x, camera.position.z) + 1.8);
       }
     }
+    // FINAL SAFETY NET. Both clamps above solve along the RAY from the player to the camera, and
+    // that is the weakest possible geometry for a NEAR-TANGENT pass: brushing the side of a
+    // circle barely changes the ray solution, so the camera can end a frame a few centimetres
+    // inside an obstacle with the distance clamp seeing nothing wrong. Both intermittent failures
+    // of the orbit check were exactly that — 8.56 and 8.69 from the tower's centre against a
+    // clamp radius of 8.7, while orbiting the campus.
+    //
+    // So finish with the same resolver everything else uses: push the camera straight out of
+    // whatever it is touching, perpendicular to the surface rather than along the ray. This runs
+    // every frame and is a no-op in the overwhelmingly common case.
+    const fixed = resolveCollisions(camera.position.x, camera.position.z, CAMERA_RADIUS, ZONE_OBSTACLES);
+    camera.position.x = fixed.x; camera.position.z = fixed.z;
     camera.lookAt(px, py + 2.2, pz);
   }
 

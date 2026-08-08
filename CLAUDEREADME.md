@@ -87,10 +87,10 @@ wizard-tcg/                 (the repo root)
 ├── tools/                  headless test suites + asset pipeline
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
 │   ├── sync-zones.mjs      regenerates the academy zone in zones.json (--check in CI)
-│   ├── test.mjs            engine tests (326 checks)
+│   ├── test.mjs            engine tests (343 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
-│   ├── browser-test.mjs    real-Chromium responsive + input-gesture + world/quest/dorm/lake/creation/gear/VFX suite (102 checks)
+│   ├── browser-test.mjs    real-Chromium responsive + input-gesture + world/quest/dorm/lake/creation/gear/class/VFX suite (109 checks)
 │   ├── model-check.mjs     loads AND renders every shipped GLB in a real browser (npm run check:models)
 │   ├── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
 │   └── rig-character.py    Blender-as-a-module auto-rigger for unrigged generated characters
@@ -393,10 +393,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 326 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 343 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 34 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (102 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (109 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -431,7 +431,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 326 engine / 34 online-rules / 102 real-browser (layout + gestures + world +
+**All tests green:** 343 engine / 34 online-rules / 109 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -523,14 +523,24 @@ short** — Draco decoding the staff takes several seconds under swiftshader. Me
 "fixing" anything. And `browser-test.mjs` now binds to **port 0** instead of a fixed 8099; two runs
 overlapping produced an `EADDRINUSE` crash that reads exactly like a test failure, twice.
 
-**Known intermittent, not fixed here:** `the camera never ends up inside geometry while orbiting`
-failed once (1/16 positions) during this work. It could not be reproduced afterwards — **0 bad
-samples out of 208** across three different settle timings in a focused harness — and nothing in
-this change touches the camera or the collision resolver. Worth remembering that the check is
-**2D**: it tests `isClear(x, z, CAMERA_RADIUS)` and knows nothing about camera height, so a camera
-that has been forced in *and raised to look down over* an obstruction reads as "inside" even when
-it visibly is not. If this recurs, that is the first thing to rule out before chasing the
-collision code.
+**Camera-orbit intermittent — now closed, but read how.** `the camera never ends up inside
+geometry while orbiting` failed in two of three full runs, at `(5.47,-6.76)` and `(3.2,-7.94)`.
+Both are **grazing the tower's collision circle by under 15 cm** (8.56 and 8.69 from its centre,
+against a clamp radius of 8.7) — a real overlap, not a 2D-check artefact.
+
+The cause is geometric: both existing clamps solve **along the ray from the player to the camera**,
+which is the weakest possible arrangement for a **near-tangent pass**. Brushing the side of a
+circle barely changes the ray solution, so the distance clamp sees nothing wrong while the camera
+sits a few centimetres inside. `updateCamera` now finishes with `resolveCollisions` — the same
+resolver `isClear` uses — pushing the camera out **perpendicular to the surface** instead of along
+the ray. It runs every frame and is a no-op in the common case.
+
+**What could not be shown:** a focused harness — four standing spots, 16 bearings each, several
+settle timings — produced **0 bad samples out of 192 with the fix AND 0 out of 192 without it**.
+The failure only appears inside the full suite, after the gesture tests have left their own camera
+state behind. So this is not "reproduced, fixed, re-verified". The case for it is that it closes
+the invariant *directly* rather than guessing at a cause: after every frame the camera position
+satisfies the exact predicate the check tests, however it got there.
 
 Tests: **326 engine / 34 online-rules / 102 browser / 8 viewports / model-check clean.**
 
