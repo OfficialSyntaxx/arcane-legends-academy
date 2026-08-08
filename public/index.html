@@ -351,6 +351,7 @@ import * as ONBOARD from "./onboarding.js";
 import * as ZQ from "./zonequests.js";
 import * as REP from "./reputation.js";
 import * as ACADEMY from "./academy.js";
+import * as LSN from "./lessons.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -444,6 +445,63 @@ function renderSPAll(){
   }).join("") + `</div>`;
 }
 function showOverlay(title, html){ $("ovTitle").textContent = title; $("ovBody").innerHTML = html; $("overlay").style.display = "block"; }
+// ================= CLASSES (lessons.js) =================
+// One builder, used both by the Dean's dialogue in the world and by the Hall panel — the syllabus
+// must read identically wherever it is opened, and two renderers would drift.
+function yearIndex(){ return ACADEMY.yearIndexFor(G.academyScore(S)); }
+function lessonRow(l, kind){
+  const p = LSN.progressOf(S, l);
+  const skill = SKILLS[l.assign.id];
+  const teach = Object.entries(l.teaches).map(([k,v]) =>
+    `${LSN.TECHNIQUES[k].name} +${v}${LSN.TECHNIQUES[k].unit}`).join(", ");
+  const bar = `<div class="pbar" style="margin:6px 0"><div style="width:${Math.round(p.have/p.need*100)}%"></div></div>`;
+  let action = "";
+  if (kind === "available") action = `<button class="btn sm gold" onclick="window.__ev('lsnEnroll|${l.id}')">Enrol</button>`;
+  else if (kind === "active") action = p.done
+    ? `<button class="btn sm ok" onclick="window.__ev('lsnSubmit|${l.id}')">Submit</button>`
+    : `<span class="sub">${p.have}/${p.need}</span>`;
+  else if (kind === "done") action = `<span class="sub" style="color:var(--ok)">✔ passed</span>`;
+  else action = `<span class="sub">Year ${l.year + 1}</span>`;
+  return `<div class="panel" style="margin-bottom:8px;${kind==="locked"?"opacity:.55":""}">
+    <div class="row" style="align-items:center">
+      <div class="grow">
+        <div style="font-weight:700">${l.title} <span class="sub">· ${ACADEMY.YEARS[l.year].name}</span></div>
+        <div class="sub" style="margin:2px 0">${l.brief}</div>
+        <div class="sub"><b>Assignment:</b> ${LSN.assignText(l, skill && skill.name)}${kind==="done"?"":` · <b>Teaches:</b> ${teach}`}</div>
+        ${kind==="active"?bar:""}
+      </div>
+      <div style="text-align:right;min-width:88px">${action}
+        ${kind==="done"?"":`<div class="sub" style="font-size:11px">🪙${l.reward.gold}${l.reward.cards?` · ${l.reward.cards}🃏`:""}</div>`}</div>
+    </div></div>`;
+}
+function buildClasses(){
+  const yi = yearIndex();
+  const m = LSN.masteryFor(S);
+  const yp = LSN.yearProgress(S, yi);
+  let h = `<p class="sub">You are in <b>${ACADEMY.YEARS[yi].name}</b> year — ${yp.done}/${yp.total} of its classes passed.
+    Classes are taken deliberately and teach a technique that changes how something already in the
+    game behaves; your <i>year</i> arrives on its own and gives a flat bonus. They are not the same thing.</p>`;
+  // what you have learned
+  const learned = Object.entries(m).filter(([,v]) => v > 0);
+  h += `<div class="panel"><h3>🎓 Techniques learned</h3>` + (learned.length
+    ? `<div class="row">` + learned.map(([k,v]) =>
+        `<div class="kpi"><div class="lv" style="font-size:16px">+${v}${LSN.TECHNIQUES[k].unit}</div><div class="nm">${LSN.TECHNIQUES[k].name}</div><div style="font-size:10px;color:var(--muted)">${LSN.TECHNIQUES[k].desc}</div></div>`).join("") + `</div>`
+    : `<p class="sub">Nothing yet. Pass a class and it will show here.</p>`) + `</div>`;
+
+  const sections = [
+    ["Ready to submit", LSN.submittable(S), "active"],
+    ["In progress", LSN.active(S).filter(l => !LSN.progressOf(S, l).done), "active"],
+    ["Open to enrol", LSN.available(S, yi), "available"],
+    ["Later years", LSN.locked(S, yi), "locked"],
+    ["Passed", LSN.LESSONS.filter(l => LSN.isDone(S, l.id)), "done"],
+  ];
+  for (const [title, list, kind] of sections){
+    if (!list.length) continue;
+    h += `<h3 style="margin-top:14px">${title}</h3>` + list.map(l => lessonRow(l, kind)).join("");
+  }
+  return h;
+}
+
 function buildScribing(){
   let h = `<p class="sub">Refine wood, fish, and ore into card materials, then scribe a spell card. Higher Scribing skill yields better grades.</p><div class="row">`;
   for (const cm of CARD_MATERIALS){
@@ -721,14 +779,49 @@ function renderCurriculum(){
   const prog = ACADEMY.progressToNext(score);
   const perkRow = (label, pct) => pct > 0
     ? `<div class="kpi"><div class="lv" style="font-size:16px">+${pct}%</div><div class="nm">${label}</div></div>` : "";
+  // Classes are the content half of the curriculum; the perks below are the passive half. Both
+  // live on this panel so the player is never told about one without the other.
+  const yi = ACADEMY.yearIndexFor(score);
+  const yp = LSN.yearProgress(S, yi);
+  const ready = LSN.submittable(S).length, doing = LSN.active(S).length, open = LSN.available(S, yi).length;
+  const classLine = `<div class="row" style="align-items:center;margin-top:8px">
+    <div class="grow sub">Classes this year: <b>${yp.done}/${yp.total}</b>${
+      ready ? ` · <span style="color:var(--ok)">${ready} ready to submit</span>` : doing ? ` · ${doing} in progress` : open ? ` · ${open} open to enrol` : ""}</div>
+    <button class="btn sm ${ready?"ok":""}" onclick="window.__ev('openClasses')">🎓 Classes</button></div>`;
   return `<div class="panel" style="margin-top:12px"><h3>📖 Curriculum — ${year.name}, ${year.subtitle}</h3>
     <div class="row">${perkRow("Quest Gold", year.perks.questGold)}${perkRow("Market Discount", year.perks.market)}${perkRow("XP Gain", year.perks.xp)}</div>
     ${prog.maxed
       ? `<p class="sub" style="margin-top:8px">You have completed the curriculum. There is nothing left to teach you here.</p>`
       : `<p class="sub" style="margin-top:8px">${prog.have}/${prog.need} toward ${prog.next.name}</p>
          <div class="pbar"><div style="width:${prog.pct}%"></div></div>`}
+    ${classLine}
   </div>`;
 }
+window.__EV.openClasses = ()=>{ showOverlay("The Arcanum Curriculum", buildClasses()); };
+window.__EV.lsnEnroll = (id)=>{
+  const r = LSN.enroll(S, id);
+  if (r.ok) toast(`📚 Enrolled: ${r.lesson.title}`);
+  save(); refreshClasses();
+};
+window.__EV.lsnSubmit = (id)=>{
+  const r = LSN.submit(S, id);
+  if (!r.ok){ err(r.err === "unfinished" ? "That assignment is not finished" : "Not enrolled"); return; }
+  // lessons.js stays pure and hands the reward back; applying it is the engine's job — the same
+  // split zonequests.js uses.
+  const gold = ACADEMY.applyBonus(r.reward.gold, G.academyPerks(S).questGold);
+  S.gold += gold; G.addWizardXp(S, ACADEMY.applyBonus(r.reward.xp, G.academyPerks(S).xp));
+  const drops = r.reward.cards ? G.dropCards(S, r.reward.cards) : [];
+  toast(`🎓 Passed ${r.lesson.title}! +${gold}g${drops.length?` +${drops.length} cards`:""}`);
+  winSfx();
+  save(); refreshClasses();
+};
+// The syllabus can be open as an overlay (from the Dean) or as a Hall panel. Refresh whichever
+// is actually on screen rather than assuming.
+function refreshClasses(){
+  if ($("overlay").style.display === "block") showOverlay("The Arcanum Curriculum", buildClasses());
+  render();
+}
+
 // Reputation with the NPCs the player has actually quested for. Empty until the first field
 // quest is accepted, rather than listing every giver in the game with zero standing.
 function renderReputationPanel(){
@@ -1610,7 +1703,12 @@ function turnInQuest(id){
 }
 
 const NPC_DIALOGUE = {
-  quests: { name:"Professor Echo", role:"Dean of the Arcanum", lines:["Welcome to the Arcanum Academy, young spellwright.","The rivals of the seven schools await. Defeat them to earn renown, gold, and rare cards."], buttons:[{label:"📜 View Quests", primary:true, action:()=>{screen="quests";render();}}] },
+  // The Dean is where CLASSES are taken (lessons.js). She reports what is submittable first,
+  // because a finished class the player has to go hunting for is the same as no class at all.
+  quests: { name:"Professor Echo", role:"Dean of the Arcanum",
+    lines:["Welcome to the Arcanum Academy, young spellwright.","The rivals of the seven schools await — and so does your coursework."],
+    buttons:[{label:"🎓 Classes", primary:true, action:()=>{ showOverlay("The Arcanum Curriculum", buildClasses()); }},
+             {label:"📜 View Quests", action:()=>{screen="quests";render();}}] },
   market: { name:"Merchant Vell", role:"Arcade Stalls", lines:["Fresh goods from the Merchant Arcade!","Cards, materials, and rare finds — coin well spent."], buttons:[{label:"🛒 Open Market", primary:true, action:()=>{screen="market";render();}}] },
   duel: { name:"Referee Kael", role:"Arena Master", lines:["The arena is open. Challenge an AI rival or duel a real player for glory."], buttons:[{label:"⚔️ Enter the Arena", primary:true, action:()=>{screen="pvp";render();}}] },
   scribe: { name:"Scribing Hall", role:"Card Creation", lines:["Refine wood, fish, and ore into canvas, ink, and reagent, then scribe spell cards."], buttons:[{label:"🪶 Scribe & Refine", primary:true, action:()=>{ showOverlay("Scribing Hall", buildScribing()); }}] },
@@ -2001,6 +2099,18 @@ window.__testDorm = ()=>{
 };
 window.__testEnterDorm = ()=>{ enterDorm(); };
 window.__testPreview = ()=> preview;
+// Satisfy one class's assignment by writing the counter it reads, so the browser test can drive
+// the real enrol -> submit -> technique-applied loop without playing an hour of economy first.
+window.__testLessonReady = (id)=>{
+  const l = LSN.byId(id); if (!l) return false;
+  const a = l.assign;
+  if (a.kind === "skill") S.skills[a.id] = a.level;
+  else if (a.kind === "level") S.level = a.n;
+  else if (a.kind === "collect") while (S.cards.length < a.n) S.cards.push({ uid:G.uid(), id:S.cards[0].id, roll:1, graded:false });
+  else S.stats[{ scribe:"scribed", refine:"refined", grade:"graded", slabs:"slabs", win:"won", packs:"packs" }[a.kind]] = a.n;
+  save(); return true;
+};
+window.__testMastery = ()=> LSN.masteryFor(S);
 // Forge and equip a full set at one metal tier, then re-derive the attachments. Uses the real
 // engine functions so the test cannot pass against a path the game does not take.
 window.__testGear = (metal)=>{

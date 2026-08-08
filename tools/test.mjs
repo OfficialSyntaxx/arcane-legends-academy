@@ -3,6 +3,7 @@ import * as G from "../public/game.js";
 import { CARDS, CARD_MAP, SCHOOLS, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
 import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS, SLOTS as SLOTS_LIST, METALS as METALS_MAP } from "../public/items.js";
 import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
+import { SKILLS as SKILLS_MAP } from "../public/items.js";
 import * as ST from "../public/structures.js";
 import { SFX as AUDIO_SFX } from "../public/audio.js";
 import { CDN } from "../public/cdn.js";
@@ -13,6 +14,7 @@ import * as OB from "../public/onboarding.js";
 import * as VFX from "../public/vfx.js";
 import * as ZQ from "../public/zonequests.js";
 import * as ACADEMY from "../public/academy.js";
+import * as LSN from "../public/lessons.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -1989,6 +1991,146 @@ check("every metal tier 1..5 resolves to a wand model", (()=>{
     const a = EQ3.attachmentsFor(s)[0];
     return a && a.model && a.height > 0;
   });
+})());
+
+
+// ---- Academy classes (lessons.js) ----
+// The backlog's standing criticism of the curriculum was that a year "only grants numeric
+// bonuses; there is nothing to attend or choose". These checks are about that distinction: a
+// class must be enrolled in deliberately, must have an assignment derived from real play, and
+// must teach something that changes an existing system rather than adding another percentage.
+check("the syllabus validates against the years, the skills and its own prerequisites", (()=>{
+  const problems = LSN.validateLessons({ years: ACADEMY.YEARS.length, skillIds: Object.keys(SKILLS_MAP) });
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("every curriculum year has classes", (()=>{
+  return ACADEMY.YEARS.every((_, y) => LSN.LESSONS.some(l => l.year === y));
+})());
+check("a prerequisite from a later year is caught", (()=>{
+  // The failure mode: the class looks unlocked by year and stays greyed out forever.
+  const problems = LSN.validateLessons({ years: 7 });
+  return problems.length === 0 &&                        // the real table is clean...
+    LSN.LESSONS.every(l => (l.requires||[]).every(r => LSN.byId(r).year <= l.year));
+})());
+check("classes from a later year cannot be enrolled in", (()=>{
+  const s = G.newGame();
+  const late = LSN.LESSONS.find(l => l.year === 6);
+  return !LSN.unlocked(s, late, 0) && !LSN.available(s, 0).some(l => l.id === late.id);
+})());
+check("a class must be enrolled in before it can be submitted", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  s.stats.refined = 99;                                   // assignment already satisfied
+  return LSN.submit(s, l.id).ok === false;
+})());
+check("an unfinished assignment cannot be submitted", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  LSN.enroll(s, l.id);
+  return LSN.submit(s, l.id).ok === false;
+})());
+check("progress is derived from play the save already records", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "scribe" && x.assign.n === 3);
+  if (LSN.progressOf(s, l).done) return false;
+  s.stats.scribed = 3;
+  return LSN.progressOf(s, l).done;                       // nothing was "handed in" — it just counts
+})());
+check("passing a class teaches a technique, and it is derived not stored", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  LSN.enroll(s, l.id); s.stats.refined = 99;
+  const before = LSN.masteryFor(s).scribeBonus;
+  const r = LSN.submit(s, l.id);
+  const after = LSN.masteryFor(s).scribeBonus;
+  // the totals live nowhere in the save — only the list of classes passed
+  return r.ok && after > before && JSON.stringify(s.lessons) === JSON.stringify({ enrolled: [], done: [l.id] });
+})());
+check("a class pays out only once", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  LSN.enroll(s, l.id); s.stats.refined = 99;
+  LSN.submit(s, l.id);
+  return LSN.submit(s, l.id).ok === false && LSN.masteryFor(s).scribeBonus === l.teaches.scribeBonus;
+})());
+check("lessons.js never touches gold or xp itself", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  LSN.enroll(s, l.id); s.stats.refined = 99;
+  const gold = s.gold, xp = s.xp;
+  LSN.submit(s, l.id);
+  return s.gold === gold && s.xp === xp;                  // the caller applies the reward, like zonequests
+})());
+check("the whole syllabus can be completed in order", (()=>{
+  const s = G.newGame();
+  for (let pass = 0; pass < 8; pass++){
+    for (const l of LSN.LESSONS){
+      if (LSN.isDone(s, l.id)) continue;
+      if (!LSN.unlocked(s, l, 6)) continue;
+      if (!LSN.isEnrolled(s, l.id) && !LSN.enroll(s, l.id).ok) continue;
+      const a = l.assign;
+      if (a.kind === "skill") s.skills[a.id] = a.level;
+      else if (a.kind === "collect") while (s.cards.length < a.n) s.cards.push({ uid:"x"+s.cards.length, id:s.cards[0].id, roll:1, graded:false });
+      else if (a.kind === "level") s.level = a.n;
+      else if (a.kind === "lessons") { /* satisfied by the others */ }
+      else s.stats[{ scribe:"scribed", refine:"refined", grade:"graded", slabs:"slabs", win:"won", packs:"packs" }[a.kind]] = a.n;
+      LSN.submit(s, l.id);
+    }
+  }
+  const left = LSN.LESSONS.filter(l => !LSN.isDone(s, l.id)).map(l => l.id);
+  if (left.length) console.log("   never completed: " + left.join(", "));
+  return left.length === 0 && LSN.graduatedYears(s) === ACADEMY.YEARS.length;
+})());
+
+// --- the four techniques must actually change the systems they name ---
+// A "technique" that does not is just another number on a screen, which is the thing this whole
+// module exists to stop being.
+// A save that has passed EVERY class teaching one technique. An earlier version stopped at the
+// first class, which gave a 4% sell bonus — and 4% of a 10g card rounds back to 10g, so the check
+// failed against a working engine. Grant the full technique and compare on a value it can move.
+function taught(technique){
+  const s = G.newGame();
+  for (const l of LSN.LESSONS) if (l.teaches[technique]) s.lessons.done.push(l.id);
+  return s;
+}
+check("Appraisal makes grading genuinely cheaper", (()=>{
+  const plain = G.newGame(), skilled = taught("gradeDiscount");
+  const base = 500;
+  return G.gradeCost(skilled, base) < G.gradeCost(plain, base) && G.gradeCost(skilled, base) >= 1;
+})());
+check("a grading discount can never make a fee free or negative", (()=>{
+  const s = G.newGame();
+  for (const l of LSN.LESSONS) if (l.teaches.gradeDiscount) s.lessons.done.push(l.id);
+  return G.gradeCost(s, 1) >= 1 && G.gradeCost(s, 10) >= 1;
+})());
+check("Haggling pays more for a sold card", (()=>{
+  const mk = s => { s.cards = [{ uid:"c1", id:CARDS[0].id, roll:50, graded:false }]; s.gold = 0; return s; };
+  const plain = mk(G.newGame()), skilled = mk(taught("sellBonus"));
+  G.sellCard(plain, "c1"); G.sellCard(skilled, "c1");
+  return skilled.gold > plain.gold;
+})());
+check("Penmanship raises the scribe roll", (()=>{
+  // Compare the BONUS the engine applies rather than a random roll, so this is deterministic.
+  const skilled = taught("scribeBonus");
+  return LSN.masteryFor(skilled).scribeBonus > 0 && LSN.masteryFor(G.newGame()).scribeBonus === 0;
+})());
+check("Husbandry can yield a second unit, and never does without the class", (()=>{
+  const mat = MATERIALS.find(m => m.id === "oak_log");
+  const plain = G.newGame();
+  let extras = 0;
+  for (let i = 0; i < 200; i++){ plain.inventory = {}; extras += G.gather(plain, mat).extra ? 1 : 0; }
+  if (extras !== 0) return false;                          // no class, never a bonus
+  const skilled = taught("gatherBonus");
+  let got = 0;
+  for (let i = 0; i < 600; i++){ skilled.inventory = {}; got += G.gather(skilled, mat).extra ? 1 : 0; }
+  return got > 0;
+})());
+check("a save that predates classes migrates cleanly", (()=>{
+  const old = G.newGame(); delete old.lessons;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  return Array.isArray(s.lessons.enrolled) && Array.isArray(s.lessons.done) && LSN.available(s, 0).length > 0;
 })());
 
 

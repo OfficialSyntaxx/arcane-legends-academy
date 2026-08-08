@@ -796,6 +796,63 @@ if (hasWorld){
         `${JSON.stringify(grew.before)} -> ${JSON.stringify(grew.after)}`);
 
 
+
+  // --- Academy classes (lessons.js) ---
+  // Drives the real loop through the Dean's own overlay: enrol, satisfy the assignment, submit,
+  // and check the technique actually changed an engine number. The point of the feature is that a
+  // class is something you DO, so a test that only pokes the module would miss the whole thing.
+  const cls = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const out = {};
+    out.masteryBefore = window.__testMastery();
+    // open the syllabus the way a player does
+    window.__ev("openClasses");
+    await settle(300);
+    const body = () => document.getElementById("ovBody");
+    out.opens = /Techniques learned/.test(body().innerText);
+    const enrolBtn = body().querySelector('button[onclick*="lsnEnroll|"]');
+    out.hasEnrol = !!enrolBtn;
+    if (!enrolBtn) return out;
+    out.lessonId = enrolBtn.getAttribute("onclick").match(/lsnEnroll\|([a-z_]+)/)[1];
+    enrolBtn.click();
+    await settle(300);
+    out.enrolled = JSON.parse(localStorage.getItem("arcane_legends_save_v1")).lessons.enrolled.slice();
+    // an unfinished class must not be submittable
+    out.submitBeforeReady = !!body().querySelector(`button[onclick*="lsnSubmit|${out.lessonId}"]`);
+    window.__testLessonReady(out.lessonId);
+    window.__ev("openClasses");
+    await settle(300);
+    const submitBtn = body().querySelector(`button[onclick*="lsnSubmit|${out.lessonId}"]`);
+    out.hasSubmit = !!submitBtn;
+    if (!submitBtn) return out;
+    out.goldBefore = window.__testGold();
+    submitBtn.click();
+    await settle(400);
+    const save = JSON.parse(localStorage.getItem("arcane_legends_save_v1"));
+    out.done = save.lessons.done.slice();
+    out.stillEnrolled = save.lessons.enrolled.slice();
+    out.goldAfter = window.__testGold();
+    out.masteryAfter = window.__testMastery();
+    // and it shows on the Dorm screen
+    document.querySelector('.navbtn[data-screen="home"]').click();
+    await settle(250);
+    out.hallText = document.getElementById("scr_home").innerText;
+    document.getElementById("overlay").style.display = "none";
+    return out;
+  });
+  check("the Dean's syllabus opens", cls.opens === true);
+  check("a class can be enrolled in from the world", (cls.enrolled || []).length === 1, JSON.stringify(cls.enrolled));
+  check("an unfinished class offers no submit button", cls.submitBeforeReady === false);
+  check("a finished class can be submitted", cls.hasSubmit === true);
+  check("submitting passes the class and pays out",
+        (cls.done || []).length === 1 && (cls.stillEnrolled || []).length === 0 && cls.goldAfter > cls.goldBefore,
+        `done=${JSON.stringify(cls.done)} gold ${cls.goldBefore}->${cls.goldAfter}`);
+  check("passing a class teaches a technique", (()=>{
+    const a = cls.masteryAfter || {}, b = cls.masteryBefore || {};
+    return Object.keys(a).some(k => a[k] > b[k]);
+  })(), `${JSON.stringify(cls.masteryBefore)} -> ${JSON.stringify(cls.masteryAfter)}`);
+  check("the Dorm curriculum panel reports class progress", /Classes this year/.test(cls.hallText || ""));
+
   // --- visible equipment on the 3D character (BACKLOG §2) ---
   // Only a browser can answer the question that matters here: does the weapon actually end up
   // parented to a bone, at a sane size, moving with the character? Bone axes on a generated rig

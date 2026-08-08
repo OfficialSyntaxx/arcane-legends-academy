@@ -62,6 +62,7 @@ wizard-tcg/                 (the repo root)
 │   ├── zonequests.js       field quests given by world NPCs — PURE, save-derived progress
 │   ├── onboarding.js       the guided first-session chain — PURE, every step derived from the save
 │   ├── academy.js          curriculum years + perks (quest gold / market discount / XP) — PURE
+│   ├── lessons.js          the class syllabus: assignments + techniques taught — PURE
 │   ├── reputation.js       per-NPC standing + reward bonuses — PURE
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
@@ -222,6 +223,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 
 ### 6.5 Quests & PvP
 - **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
+- **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
 - **Visible equipment** (`equipment3d.js`) — the equipped wand and amulet hang off real skeleton bones; the other three slots are stats-only and say so. See §6.10.
 - **Character creation** (`charcreate.js`) — name, school and look with a live 3D preview; the per-school appearance is a shader hue-shift plus a coloured aura, not a per-part outfit. See §6.9 for why.
 - **Field quests** (`zonequests.js`) — separate from the duel ladder: things to do in a *place*, given by NPCs out in the world (gather/slay/clear/boss objectives, prerequisites, a quest log). Ten ship: five in the Whispering Forest leading into Cinderhollow Caverns, and five at Lake Arcanum leading into the Drowned Vault, gated behind killing the Cinder Wyrm so the zones are met in order. `validateQuests` proves the chain is completable and that no prerequisite is missing or cyclic.
@@ -323,7 +325,41 @@ Equipped gear shows on the 3D character, in the world and in the creation previe
 - Fully derived: sell an equipped wand and it vanishes from the hand, because nothing about the
   visual is stored.
 
-### 6.11 Retention
+### 6.11 Academy classes (`lessons.js`)
+`academy.js` gave the curriculum seven years with real perks, and the backlog's criticism of it
+stood anyway: *a year only grants numeric bonuses; there is nothing to attend or choose.* A year
+that arrives on its own when a score crosses a threshold is a progress bar, not a school. This adds
+the thing a school actually has — a **syllabus**: 21 classes, three per year, each with a brief, an
+assignment, and a technique taught.
+
+**The distinction the module is built around:**
+- A **year** is earned passively and gives a flat percentage.
+- A **class** is enrolled in deliberately, has an assignment you must go and do, and teaches a
+  **named technique that changes how an existing system behaves**.
+
+The four techniques hook things that already ship, rather than inventing another number to add up
+— this is `BACKLOG.md` §1 "connect existing systems", done where the game tells you to go learn:
+
+| Technique | Hook |
+|---|---|
+| **Appraisal** | `gradeCost()` — cheaper grading and regrading |
+| **Penmanship** | the scribe roll bonus in `scribe()` |
+| **Husbandry** | a chance of a second unit in `gather()` |
+| **Haggling** | more gold in `sellCard()` |
+
+**Assignments read counters the save already keeps** (`stats.scribed/refined/graded/slabs/won/packs`,
+skills, cards owned, wizard level, classes passed). Deliberately *not* "gather 8 willow and hand
+them in" — `zonequests.js` already does that, consumes the materials and pays for it, and a class
+doing the same would be one errand with two names on it.
+
+State split as everywhere: `enrolled` and `done` are stored; **what each class taught is recomputed
+from `done` on every read**, so re-tuning a technique applies to every existing save with no
+migration and no stored total that can drift from the classes that produced it.
+
+Taken from **Professor Echo** in the world, or the Classes button on the Dorm curriculum panel —
+one builder for both, since a syllabus that reads differently in two places will drift.
+
+### 6.12 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -442,7 +478,29 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: visible equipment on the 3D character** (§6.10). The equipped wand and amulet are
+**Last landed: Academy class content** (§6.11) — the last of the "numeric bonuses only" criticisms
+in the backlog. `lessons.js` adds a **syllabus**: 21 classes, three per curriculum year, each with
+a brief, an assignment, and a **named technique** that changes an existing system — Appraisal
+(cheaper grading), Penmanship (better scribe rolls), Husbandry (a chance of a second gather),
+Haggling (better card sales). All four are real hooks in `game.js`, not another percentage on a
+panel; the engine tests assert each one actually moves the number it claims to.
+
+The design rule: a **year** is earned passively and gives a flat percentage; a **class** is
+enrolled in deliberately and teaches a technique. Assignments read counters the save already keeps
+rather than consuming materials, because `zonequests.js` already does gather-and-hand-in and a
+class doing the same would be one errand under two names. What each class taught is derived from
+the list of classes passed, never stored.
+
+Taken from Professor Echo in the world or the Dorm's curriculum panel — one builder for both.
+
+One test bug worth noting because it looked like an engine bug: `Haggling pays more for a sold
+card` failed against a **working** engine. The helper granted only the first class teaching the
+technique (+4%), and 4% of a 10g card rounds back to 10g. The engine was doing 10 → 13 the whole
+time. Fixed the helper, not the code.
+
+Tests: **343 engine / 34 online-rules / 109 browser / 8 viewports / model-check clean.**
+
+**Before that: visible equipment on the 3D character** (§6.10). The equipped wand and amulet are
 parented to the rig's real `RightHand` and `Neck` bones, so they inherit the character's animation
 with no extra update path. Tier picks the silhouette (wand → staff → greater staff), metal picks
 the colour, and all of it uses CC0 KayKit weapons already in the repo — no new asset bytes.
@@ -670,8 +728,8 @@ as part of the dorm work rather than left as notes:
 3. ~~**Character creation, 3D preview, visible equipment**~~ — ✅ done (§6.9, §6.10). Still open
    from this line: **per-school garments** and visible **hat/robe/boots**, both of which need
    per-part geometry rather than tinting or bone attachment — `BLENDERTODO.md` Tier 5.
-4. **Deepen the Academy curriculum** — actual class/lesson content, not just the numeric perks
-   `academy.js` already grants.
+4. ~~**Deepen the Academy curriculum**~~ — ✅ done (§6.11): 21 classes with assignments and taught
+   techniques.
 5. **Collection depth** — card evolution, foil/holo variants, an encyclopedia (`BACKLOG.md` §5).
 6. **Social layer** — PvP ranking, guilds, leaderboards (`BACKLOG.md` §8).
 7. **Endgame** — pets/mounts, prestige, seasonal content (`BACKLOG.md` §10).

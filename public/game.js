@@ -2,6 +2,7 @@
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, SCHOOL_BONUS, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
 import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS } from "./items.js";
 import * as ACADEMY from "./academy.js";
+import * as LESSONS from "./lessons.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
 export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
@@ -37,6 +38,9 @@ export function newGame(){
     // Quests given by NPCs out in the world (zonequests.js). Only the player's CHOICES live
     // here — progress is derived from inventory/dungeon state every time it is read.
     zoneQuests:{ accepted:[], done:[] },
+    // Academy classes (lessons.js). Only the CHOICES: enrolled and passed. What each class taught
+    // is recomputed from `done` on every read.
+    lessons:{ enrolled:[], done:[] },
     // NPC reputation (reputation.js). Only quest givers earn any right now — see that module
     // for why this is a flat {npcKey: number} map rather than a richer per-NPC shape.
     reputation:{},
@@ -77,6 +81,9 @@ function migrate(s){
   if (!Array.isArray(s.zoneQuests.accepted)) s.zoneQuests.accepted = [];
   if (!Array.isArray(s.zoneQuests.done)) s.zoneQuests.done = [];
   if (!s.reputation || typeof s.reputation !== "object") s.reputation = {};
+  if (!s.lessons) s.lessons = { enrolled: [], done: [] };
+  if (!Array.isArray(s.lessons.enrolled)) s.lessons.enrolled = [];
+  if (!Array.isArray(s.lessons.done)) s.lessons.done = [];
   // The Dorm phases. `stock` is what the player has BOUGHT, `furniture` is slot -> item id, and
   // `cases` is slot -> card uid. Nothing derived is stored: the room's size and slot count come
   // from the upgrade levels, a displayed slab's grade is read off the live card, and trophies are
@@ -141,9 +148,13 @@ export function gainGold(s, amt){ s.gold += Math.round(amt); }
 export function canGather(s, mat){ return skillLevel(s, mat.skill) >= mat.lvl; }
 export function gather(s, mat){
   if (!canGather(s, mat)) return { ok:false, err:"level" };
-  addItem(s, mat.id, 1); addSkillXp(s, mat.skill, mat.xp);
+  // "Husbandry", taught in the field-studies classes: a chance at a second unit. One of the four
+  // places a lesson changes an existing system rather than adding a number to a screen.
+  const bonus = masteries(s).gatherBonus;
+  const extra = bonus > 0 && rng() * 100 < bonus ? 1 : 0;
+  addItem(s, mat.id, 1 + extra); addSkillXp(s, mat.skill, mat.xp);
   dailyProgress(s, "gather");
-  return { ok:true, item:mat, xp:mat.xp };
+  return { ok:true, item:mat, xp:mat.xp, extra };
 }
 export function canCraft(s, spec){ return skillLevel(s,"smithing") >= spec.lvl && hasItems(s, spec.req); }
 export function smelt(s, bar){
@@ -182,7 +193,8 @@ export function scribe(s){
   if ((s.inventory.canvas||0) < 1 || (s.inventory.ink||0) < 1 || (s.inventory.reagent||0) < 1) return { ok:false, err:"materials" };
   s.inventory.canvas--; s.inventory.ink--; s.inventory.reagent--;
   const lvl = skillLevel(s,"scribing");
-  const bonus = Math.min(30, Math.floor(lvl * 0.3));   // skilled player -> higher average roll
+  // Skill sets the floor; "Penmanship" from the scribing classes adds on top of it.
+  const bonus = Math.min(30, Math.floor(lvl * 0.3)) + masteries(s).scribeBonus;
   const roll = Math.min(100, Math.max(0, Math.floor(rng()*100) + bonus));
   const c = randomCardOfRarity(rollRarity());
   const inst = { uid:uid(), id:c.id, roll, graded:false };
@@ -229,6 +241,9 @@ export function dailyLabel(s){
 export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won; }
 export function academyRank(s){ return ACADEMY.yearFor(academyScore(s)).name; }
 export function academyPerks(s){ return ACADEMY.perksFor(academyScore(s)); }
+// Techniques learned in class (lessons.js). Derived from the classes PASSED, never stored, so
+// re-tuning what a class teaches applies to every existing save with no migration.
+export function masteries(s){ return LESSONS.masteryFor(s); }
 
 // ---------- Equipment / loadout ----------
 export function equipStats(s){
@@ -276,9 +291,17 @@ export function dropCards(s, n=3){
   }
   return drops;
 }
+/** A grading fee after the Appraisal discount. Floored at 1 so a fee never becomes free or negative. */
+export function gradeCost(s, base){
+  const pct = Math.min(90, masteries(s).gradeDiscount);
+  return Math.max(1, Math.round(base * (1 - pct / 100)));
+}
 export function gradeCard(s, uidC){
   const c = s.cards.find(x=>x.uid===uidC); if (!c || c.graded) return {ok:false};
-  const fee = gradeFee(c.id);
+  // "Appraisal", from the grading classes: a discount, so it SUBTRACTS. applyBonus() is built for
+  // rewards (which go up) and using it here would make a better-taught wizard pay more — the same
+  // trap buyCard's market discount already documents.
+  const fee = gradeCost(s, gradeFee(c.id));
   if (s.gold < fee) return { ok:false, err:"gold" };
   s.gold -= fee; c.graded = true; s.stats.graded++;
   const g = gradeForRoll(c.roll);
@@ -288,7 +311,7 @@ export function gradeCard(s, uidC){
 // Regrade: risk/reward — re-roll an already-graded card's grade for a higher fee (could go up or down).
 export function regradeCard(s, uidC){
   const c = s.cards.find(x=>x.uid===uidC); if (!c || !c.graded) return {ok:false};
-  const fee = Math.round(gradeFee(c.id) * 1.5);
+  const fee = gradeCost(s, Math.round(gradeFee(c.id) * 1.5));
   if (s.gold < fee) return { ok:false, err:"gold" };
   s.gold -= fee;
   const old = gradeForRoll(c.roll);
@@ -300,8 +323,11 @@ export function regradeCard(s, uidC){
 }
 export function sellCard(s, uidC){
   const i = s.cards.findIndex(x=>x.uid===uidC); if (i<0) return {ok:false};
-  const c = s.cards[i]; s.gold += cardValue(c.id, c.roll); s.cards.splice(i,1);
-  return { ok:true, value: cardValue(c.id, c.roll) };
+  const c = s.cards[i];
+  // "Haggling", from the market and duelling classes.
+  const value = ACADEMY.applyBonus(cardValue(c.id, c.roll), masteries(s).sellBonus);
+  s.gold += value; s.cards.splice(i,1);
+  return { ok:true, value };
 }
 export function buyCard(s, id){
   const c = CARD_MAP[id]; const base = RARITY[c.rarity].base * 2;

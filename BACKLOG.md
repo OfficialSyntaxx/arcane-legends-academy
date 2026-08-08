@@ -12,17 +12,24 @@
 
 ## 1. Highest Priority
 
-- [~] **Academy progression / curriculum**
+- [x] **Academy progression / curriculum**
   - `academy.js`: 7 curriculum years (Novice → Archmage) each unlocking real perks — bonus quest
-    gold, a market discount, bonus wizard XP — applied at `completeQuest`/`buyCard`. Shown on the
-    Hall screen (current year, perks, progress to next). Still missing: actual class/lesson
-    *content* — right now a year only grants numeric bonuses, there's nothing to attend or choose.
+    gold, a market discount, bonus wizard XP — applied at `completeQuest`/`buyCard`.
+  - `lessons.js`: **21 classes**, three per year, each with a brief, an assignment derived from
+    counters the save already keeps, and a **named technique** that changes an existing system —
+    Appraisal (cheaper grading), Penmanship (better scribe rolls), Husbandry (a chance of a second
+    gather), Haggling (better card sales). Taken from Professor Echo in the world or the Dorm's
+    curriculum panel. A *year* is passive and flat; a *class* is chosen and teaches something.
 
 - [~] **First 10 minutes / onboarding**
   - A 7-step guided chain (`onboarding.js`) with a persistent objective bar: school → gather → refine → scribe → grade → deck → first duel. Every step is DERIVED from the save, so playing out of order cannot desync it. A full character-creation screen is still pending.
 
-- [ ] **Connect existing systems**
-  - Make exploration, gathering, crafting, cards, grading, quests, equipment, combat, and housing feel like one game loop.
+- [~] **Connect existing systems**
+  - Make exploration, gathering, crafting, cards, grading, quests, equipment, combat, and housing
+    feel like one game loop. Biggest step so far: the class techniques (`lessons.js`) reach into
+    grading, scribing, gathering and selling rather than adding standalone numbers, and the dorm's
+    display cases surface graded slabs and boss kills. Combat and equipment are still the loosest
+    joins.
 
 - [~] **Combat rules cleanup**
   - Create one source of truth for card/combat rules.
@@ -40,7 +47,7 @@
   school-coloured ground aura. Genuinely different *garments* are still open: the player GLB is a
   single mesh with a single white-based material, so there is nothing to recolour per part —
   see `BLENDERTODO.md` Tier 5 and `docs/DESIGN-DECISIONS.md` §4.
-- [~] Academy classes and curriculum — see §1 above (`academy.js`); numeric perks only, no lesson content yet
+- [x] Academy classes and curriculum — see §1 above (`academy.js` + `lessons.js`): 21 classes with real assignments and taught techniques
 - [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
 - [~] Main story + side quests — ten field quests across two zones (`zonequests.js`): five in the
   Whispering Forest, five at Lake Arcanum gated behind the Cinder Wyrm, with gather/slay/clear/boss
@@ -164,7 +171,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 326 engine / 34 online / 102 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 343 engine / 34 online / 109 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -226,7 +233,8 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **visible equipment on the 3D character** (`equipment3d.js`)
+**Changes made, most recent first:** **Academy class content** (`lessons.js` — 21 classes, four
+techniques hooked into real systems) → **visible equipment on the 3D character** (`equipment3d.js`)
 → **character creation + per-school appearance**
 (`charcreate.js` / `tint.js` / `preview3d.js`) and **`BLENDERTODO.md`** → **WORLDSPEC step 6, the content pass** (Lake Arcanum + the
 Drowned Vault, five new quests, per-dungeon palettes, `nearWater` scatter) → the **Dorm phases D1–D4** (`dorm.js` — walk-in interior
@@ -246,7 +254,11 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **visible equipment is done** — the equipped wand and amulet hang off the rig's real
+**Next step:** **Academy class content is done** — 21 classes across the seven years, each teaching
+a technique that changes grading, scribing, gathering or selling (`CLAUDEREADME.md` §6.11). That
+closes the last of the "numeric bonuses only" criticisms in this file.
+
+Before that, **visible equipment was done** — the equipped wand and amulet hang off the rig's real
 bones, tier picks the silhouette and metal picks the colour; the three slots that cannot be shown
 say so instead of silently doing nothing (`CLAUDEREADME.md` §6.10).
 
