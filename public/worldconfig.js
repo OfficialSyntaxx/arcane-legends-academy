@@ -233,6 +233,19 @@ export function scatterZone(zone, opts = {}){
     return true;
   };
 
+  // A fishing spot on a hilltop is not a fishing spot. `nearWater` asks for a position within
+  // `shoreBand` metres of open water, which is the shoreline — it cannot simply be "in the water",
+  // because the player has to stand on land to reach the prompt. Only meaningful in a zone that
+  // declares a waterLevel; elsewhere the flag is ignored rather than silently placing nothing.
+  const SHORE_BAND = opts.shoreBand != null ? opts.shoreBand : 9;
+  const onShore = (x, z) => {
+    if (water == null) return true;
+    for (let a = -SHORE_BAND; a <= SHORE_BAND; a += 3)
+      for (let b = -SHORE_BAND; b <= SHORE_BAND; b += 3)
+        if (Math.hypot(a, b) <= SHORE_BAND && heightAt(x + a, z + b, zone.terrain, flats) < water) return true;
+    return false;
+  };
+
   const expand = (list, defaultR) => {
     const out = [];
     for (const entry of list || []){
@@ -247,6 +260,7 @@ export function scatterZone(zone, opts = {}){
           const z = minZ + rand() * (maxZ - minZ);
           if (Math.hypot(x - (zone.spawn ? zone.spawn.x : 0), z - (zone.spawn ? zone.spawn.z : 0)) < clear) continue;
           if (!groundOk(x, z)) continue;
+          if (entry.nearWater && !onShore(x, z)) continue;
           if (!fits(x, z, r)) continue;
           const item = { ...entry, x: +x.toFixed(3), z: +z.toFixed(3) };
           delete item.count;

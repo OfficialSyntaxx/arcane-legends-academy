@@ -210,6 +210,279 @@
           "to": "wyrmhall"
         }
       ]
+    },
+    {
+      "id": "drowned_vault",
+      "name": "The Drowned Vault",
+      "entranceZone": "lake_arcanum",
+      "entranceX": -46,
+      "entranceZ": -74,
+      "background": 661026,
+      "wallHeight": 8,
+      "corridorWidth": 6,
+      "spawnRoom": "sluice",
+      "rooms": [
+        {
+          "id": "sluice",
+          "x": 0,
+          "z": 0,
+          "w": 24,
+          "d": 20,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -9,
+              "z": 7,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 9,
+              "z": 7,
+              "size": 2.6
+            },
+            {
+              "model": "dng_doorway.glb",
+              "x": 0,
+              "z": -7,
+              "size": 5,
+              "ry": 0
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Slime.glb",
+              "name": "Silt Slime",
+              "level": 6,
+              "x": -6,
+              "z": -2,
+              "size": 1.6
+            },
+            {
+              "model": "creature_Slime.glb",
+              "name": "Silt Slime",
+              "level": 6,
+              "x": 6,
+              "z": -3,
+              "size": 1.6
+            }
+          ]
+        },
+        {
+          "id": "cistern",
+          "x": 0,
+          "z": 34,
+          "w": 28,
+          "d": 24,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -11,
+              "z": -9,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 11,
+              "z": -9,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": -11,
+              "z": 9,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 11,
+              "z": 9,
+              "size": 2.6
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Drowned Sentry",
+              "level": 8,
+              "x": -9,
+              "z": 2,
+              "size": 2.4
+            },
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Drowned Sentry",
+              "level": 8,
+              "x": 9,
+              "z": 3,
+              "size": 2.4
+            },
+            {
+              "model": "creature_Bat.glb",
+              "name": "Cave Wraith",
+              "level": 7,
+              "x": 0,
+              "z": -7,
+              "size": 1.4
+            }
+          ]
+        },
+        {
+          "id": "reliquary",
+          "x": 40,
+          "z": 34,
+          "w": 22,
+          "d": 18,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -8,
+              "z": 6,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 8,
+              "z": 6,
+              "size": 2.6
+            },
+            {
+              "model": "fur_book_set.glb",
+              "x": 0,
+              "z": 5,
+              "size": 1.2
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Vault Warden",
+              "level": 9,
+              "x": -6,
+              "z": -2,
+              "size": 2.6
+            },
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Vault Warden",
+              "level": 9,
+              "x": 6,
+              "z": -2,
+              "size": 2.6
+            }
+          ]
+        },
+        {
+          "id": "spillway",
+          "x": -40,
+          "z": 34,
+          "w": 20,
+          "d": 18,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -7,
+              "z": 6,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 7,
+              "z": 6,
+              "size": 2.6
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Bat.glb",
+              "name": "Cave Wraith",
+              "level": 7,
+              "x": -5,
+              "z": 0,
+              "size": 1.4
+            },
+            {
+              "model": "creature_Bat.glb",
+              "name": "Cave Wraith",
+              "level": 7,
+              "x": 5,
+              "z": -2,
+              "size": 1.4
+            },
+            {
+              "model": "creature_Slime.glb",
+              "name": "Silt Slime",
+              "level": 6,
+              "x": 0,
+              "z": 4,
+              "size": 1.6
+            }
+          ]
+        },
+        {
+          "id": "deepvault",
+          "x": 0,
+          "z": 78,
+          "w": 34,
+          "d": 30,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -14,
+              "z": -11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 14,
+              "z": -11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": -14,
+              "z": 11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 14,
+              "z": 11,
+              "size": 3.2
+            }
+          ],
+          "boss": {
+            "model": "creature_Dragon.glb",
+            "name": "The Drowned Archon",
+            "level": 14,
+            "hp": 280,
+            "size": 7.0
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "sluice",
+          "to": "cistern"
+        },
+        {
+          "from": "cistern",
+          "to": "spillway"
+        },
+        {
+          "from": "cistern",
+          "to": "reliquary"
+        },
+        {
+          "from": "cistern",
+          "to": "deepvault"
+        }
+      ],
+      "floorColor": 2308676,
+      "wallColor": 2902616,
+      "bossFloorColor": 1919562,
+      "lightTint": 4881038,
+      "lightScale": 1.2
     }
   ]
 }

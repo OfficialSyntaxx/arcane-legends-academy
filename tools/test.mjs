@@ -1687,5 +1687,121 @@ check("structures.js exposes the interior seam generically, not as a dorm specia
 })());
 
 
+// ---- WORLDSPEC step 6: the content pass (Lake Arcanum + the Drowned Vault) ----
+// These are authored against schemas that already existed, so the value of these checks is
+// content correctness, not engine correctness: a zone you drown in on arrival, a fishing spot on
+// a hilltop, or a quest chain gated behind something in a zone you cannot reach yet.
+const LAKE = WORLD.get("lake_arcanum");
+check("the third zone ships and validates", !!LAKE && WC.validateZone(LAKE, { zoneIds: WORLD.zoneIds }).length === 0);
+check("every zone is mutually reachable (no one-way exits anywhere)", WC.validateExits(WORLD).length === 0);
+check("the lake is reachable from the forest and back", (()=>{
+  const forest = WORLD.get("whispering_forest");
+  return forest.exits.some(e => e.toZone === "lake_arcanum") && LAKE.exits.some(e => e.toZone === "whispering_forest");
+})());
+// The trap this zone is built around: flattened areas are pinned to `baseHeight`, so a lake whose
+// surface rose above it would open the zone with the player, the NPCs and the dungeon mouth all
+// standing underwater. Nothing about that is caught by the schema.
+check("nothing in the lake zone spawns underwater", (()=>{
+  const flats = TER.flatsForZone(LAKE);
+  const h = (x, z) => TER.heightAt(x, z, LAKE.terrain, flats);
+  const wl = LAKE.terrain.waterLevel;
+  const pts = [[LAKE.spawn.x, LAKE.spawn.z], ...LAKE.npcs.map(n => [n.x, n.z]),
+               ...LAKE.dungeonEntrances.map(d => [d.x, d.z]), ...LAKE.exits.map(e => [e.x, e.z])];
+  const bad = pts.filter(([x, z]) => h(x, z) <= wl);
+  if (bad.length) console.log("   underwater: " + JSON.stringify(bad));
+  return bad.length === 0;
+})());
+check("the lake is actually a lake, not puddles", (()=>{
+  const flats = TER.flatsForZone(LAKE);
+  let wet = 0, n = 0;
+  for (let x = LAKE.bounds.minX; x <= LAKE.bounds.maxX; x += 8)
+    for (let z = LAKE.bounds.minZ; z <= LAKE.bounds.maxZ; z += 8){
+      n++; if (TER.heightAt(x, z, LAKE.terrain, flats) < LAKE.terrain.waterLevel) wet++;
+    }
+  const pct = 100 * wet / n;
+  if (pct < 12 || pct > 55) console.log(`   water coverage ${pct.toFixed(1)}%`);
+  return pct >= 12 && pct <= 55;                       // enough to swim in, not so much there is nowhere to walk
+})());
+check("every fishing spot lands on the shore, not on a hilltop", (()=>{
+  const flats = TER.flatsForZone(LAKE);
+  const h = (x, z) => TER.heightAt(x, z, LAKE.terrain, flats);
+  const ponds = WC.scatterZone(LAKE).resourceNodes.filter(r => r.kind === "pond");
+  if (!ponds.length) return false;
+  return ponds.every(p => {
+    for (let a = -12; a <= 12; a += 2) for (let b = -12; b <= 12; b += 2)
+      if (h(p.x + a, p.z + b) < LAKE.terrain.waterLevel) return true;
+    return false;
+  });
+})());
+check("nearWater is ignored in a zone with no water rather than placing nothing", (()=>{
+  const dry = WC.buildWorld({ zones:[{ id:"dry", spawn:{x:0,z:0}, bounds:{minX:-60,maxX:60,minZ:-60,maxZ:60},
+    terrain:{ seed:5, amplitude:1 }, resourceNodes:[{ kind:"pond", id:"raw_shrimp", count:4, nearWater:true }] }] }).get("dry");
+  return WC.scatterZone(dry).resourceNodes.length === 4;
+})());
+const VAULT = DUNGEONS.find(d => d.id === "drowned_vault");
+check("the second dungeon ships", !!VAULT && VAULT.rooms.length >= 5);
+check("the second dungeon's rooms are all reachable and it has a boss",
+      !!VAULT && DG.validateDungeon(VAULT, { zoneIds: WORLD.zoneIds, knownModels: [...knownModels] }).length === 0);
+check("a dungeon can carry its own palette, and one that does not keeps the default", (()=>{
+  const vault = DG.dungeonZone(VAULT);
+  const cinder = DG.dungeonZone(DUNGEONS.find(d => d.id === "cinderhollow_caverns"));
+  // The point of a content pass is that the second dungeon is not the first one reskinned.
+  return vault.floorColor != null && vault.wallColor != null && vault.lightTint != null &&
+         cinder.floorColor == null && vault.floorColor !== cinder.floorColor;
+})());
+check("the two dungeons do not share enemy ids", (()=>{
+  const ids = DUNGEONS.flatMap(d => DG.dungeonZone(d).enemies.map(e => d.id + "/" + e.id));
+  return new Set(ids).size === ids.length;
+})());
+check("each dungeon's entrance is declared by the zone that holds it", (()=>{
+  return DUNGEONS.every(d => {
+    const z = WORLD.get(d.entranceZone);
+    return z && z.dungeonEntrances.some(e => e.id === d.id);
+  });
+})());
+check("the quest table validates against the zones, dungeons and materials that exist", (()=>{
+  const rooms = Object.fromEntries(DUNGEONS.map(d => [d.id, d.rooms.map(r => r.id)]));
+  const problems = ZQ.validateQuests({ zoneIds: WORLD.zoneIds, dungeonIds: DUNGEONS.map(d => d.id),
+                                       dungeonRooms: rooms, gatherable: GATHERABLE });
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("a quest requiring a quest that does not exist is caught",
+      ZQ.validateQuests({ zoneIds: ["nope"] }).some(p => /does not exist/.test(p)));
+check("objective text names the right dungeon now that there are two", (()=>{
+  const a = ZQ.ZONE_QUESTS.find(q => q.objective.dungeon === "cinderhollow_caverns" && q.objective.kind === "boss");
+  const b = ZQ.ZONE_QUESTS.find(q => q.objective.dungeon === "drowned_vault" && q.objective.kind === "boss");
+  return ZQ.objectiveText(a) !== ZQ.objectiveText(b) && /Vault/.test(ZQ.objectiveText(b));
+})());
+check("the lake chain is gated behind finishing the forest chain", (()=>{
+  const s = G.newGame();
+  const first = ZQ.ZONE_QUESTS.find(q => q.zone === "lake_arcanum" && !(q.requires||[]).some(r =>
+    ZQ.ZONE_QUESTS.find(x => x.id === r).zone === "lake_arcanum"));
+  return !ZQ.unlocked(s, first);
+})());
+check("the whole lake chain can be completed in order", (()=>{
+  const s = G.newGame();
+  // finish the forest chain the honest way first
+  const order = ZQ.ZONE_QUESTS.slice();
+  for (let pass = 0; pass < 4; pass++) for (const q of order){
+    if (ZQ.isDone(s, q.id) || !ZQ.unlocked(s, q)) continue;
+    if (!ZQ.accept(s, q.id).ok) continue;
+    const o = q.objective;
+    if (o.kind === "gather") s.inventory[o.id] = (s.inventory[o.id] || 0) + o.n;
+    else {
+      const st = (s.worldState.dungeons[o.dungeon] = s.worldState.dungeons[o.dungeon] || { cleared:[], defeated:[], bossDead:false });
+      if (o.kind === "slay") for (let i = st.defeated.length; i < o.n; i++) st.defeated.push("x" + i);
+      if (o.kind === "boss") st.bossDead = true;
+      if (o.kind === "clear") st.cleared.push(o.room);
+      if (o.kind === "visit") s.worldState.visited.push(o.zone);
+    }
+    ZQ.turnIn(s, q.id);
+  }
+  const left = ZQ.ZONE_QUESTS.filter(q => !ZQ.isDone(s, q.id)).map(q => q.id);
+  if (left.length) console.log("   never completed: " + left.join(", "));
+  return left.length === 0;
+})());
+
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -214,11 +214,13 @@ Dungeons and boss rooms are **interior instances** — separate scenes, not part
 4. ✅ **Zone transitions** — walkable `exits` that switch the active zone, arriving at the
    target's *reciprocal* exit so the two zones join up geographically.
 5. ✅ **Dungeon instancing** — entrance → suspend zone → load interior → rooms/corridors → boss room → exit restores zone (§6). `cinderhollow_caverns` (4 rooms + boss) ships, reachable from `whispering_forest`; kills/cleared-rooms/boss-defeat persist in `worldState.dungeons` and defeated enemies do not respawn.
-6. **Content pass — in progress.** The first zone pair + one dungeon are done: `academy` (hub),
-   `whispering_forest` (streaming outdoor zone, 3 NPCs, 5 field quests via `zonequests.js`), and
-   `cinderhollow_caverns` (the dungeon those quests lead into). **Still to author:** a second
-   dungeon and a third outdoor zone — the schemas in §3/§6 need no engine change, so this is
-   content-authoring against `zones.json`/`dungeons.json`, not new code.
+6. ✅ **Content pass.** Three outdoor zones and two dungeons ship, chained end to end:
+   `academy` (hub) → `whispering_forest` (3 NPCs, 5 field quests) → `cinderhollow_caverns`
+   (4 rooms + the Cinder Wyrm) → `lake_arcanum` (3 NPCs, 5 more quests, a real lake at 29% water
+   coverage with shoreline fishing) → `drowned_vault` (5 rooms + the Drowned Archon). The lake
+   chain is gated behind killing the Cinder Wyrm, so a player arrives having finished the forest
+   rather than meeting a level-14 boss at level 1. Authored against the existing schemas; the two
+   engine additions it did need are noted in §9b w and x.
 
 **Interiors that are not dungeons.** `public/dorm.js` (the Dorm phases, `CLAUDEREADME.md` §6.8)
 compiles the player's dorm into a zone by calling `layoutDungeon` + `dungeonZone` directly: a dorm
@@ -376,3 +378,26 @@ existed, and a Playwright screenshot of the world canvas comes back blank becaus
 buffer is cleared after compositing. `world.renderOnce()` exists so a test can draw one frame and
 read pixels off it; `browser-test.mjs` now asserts mean brightness inside the dorm. Any future
 interior should carry the same check.
+
+**w. Scatter needs to know what a thing wants to be near, not only what to avoid.**
+`scatterZone` already refused water and steep slopes. That is enough for trees and ore and wrong
+for a fishing spot, which must be *on the shore* — the first pass put fourteen of them up to 40m
+inland on hilltops, all of them technically valid. A resource node can now ask for `nearWater`,
+and `scatterZone` checks a shore band around each candidate. The flag is ignored (not failed) in a
+zone with no `waterLevel`, so a dry zone re-using the same node table places them normally.
+
+**x. A zone whose water rises above `baseHeight` drowns everything flattened into it.**
+Flattening (§9b b) pins the spawn, every NPC, every landmark and every dungeon mouth to
+`baseHeight`. `lake_arcanum` therefore sets `baseHeight: 4.0` **above** its `waterLevel: 3.2`
+rather than the usual 0 — with the usual 0 the zone opens with the player, all three NPCs and the
+vault entrance standing underwater, and nothing in `validateZone` says a word about it. There is
+now a test asserting every authored point in a zone sits above its own water line, plus one
+asserting the lake covers 12–55% of the zone (below that it is puddles, above it there is nowhere
+to walk).
+
+**y. A second dungeon must not be the first one reskinned.**
+`dungeonZone` passes optional `floorColor` / `wallColor` / `bossFloorColor` / `lightScale` /
+`lightTint` through to `world.js`, which falls back to the original palette when a dungeon does
+not declare them — so `cinderhollow_caverns` is unchanged and `drowned_vault` reads as cold
+flooded stone instead of the same warm cave with different creatures in it. Same mechanism as the
+dorm's lighting (§9b v); one seam, two users.

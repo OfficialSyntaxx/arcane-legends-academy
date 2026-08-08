@@ -66,8 +66,8 @@ wizard-tcg/                 (the repo root)
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
 │   ├── vfx.js              spell visual-effect archetypes, chosen from a card's own fx — PURE
-│   ├── world/zones.json    the zone catalog (academy, whispering_forest)
-│   ├── world/dungeons.json the dungeon catalog (cinderhollow_caverns)
+│   ├── world/zones.json    the zone catalog (academy, whispering_forest, lake_arcanum)
+│   ├── world/dungeons.json the dungeon catalog (cinderhollow_caverns, drowned_vault)
 │   ├── audio.js            procedural WebAudio: SFX, ambience, music (no asset files)
 │   ├── game.js             engine: skills, economy, market, auctions, housing, duels, AI
 │   ├── world.js            the 3D world (Three.js scene, movement, camera, NPCs, zones, dungeons)
@@ -81,10 +81,10 @@ wizard-tcg/                 (the repo root)
 ├── tools/                  headless test suites + asset pipeline
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
 │   ├── sync-zones.mjs      regenerates the academy zone in zones.json (--check in CI)
-│   ├── test.mjs            engine tests (280 checks)
+│   ├── test.mjs            engine tests (297 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
-│   ├── browser-test.mjs    real-Chromium responsive + input-gesture + world/quest/dorm/VFX suite (75 checks)
+│   ├── browser-test.mjs    real-Chromium responsive + input-gesture + world/quest/dorm/lake/VFX suite (86 checks)
 │   ├── model-check.mjs     loads AND renders every shipped GLB in a real browser (npm run check:models)
 │   ├── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
 │   └── rig-character.py    Blender-as-a-module auto-rigger for unrigged generated characters
@@ -104,15 +104,16 @@ wizard-tcg/                 (the repo root)
 
 > **World expansion blueprint:** see [`WORLDSPEC.md`](WORLDSPEC.md) — zone-based architecture, zone config schema, chunk streaming, procedural terrain, and dungeon instancing. **All five implementation steps in WORLDSPEC §9 are done** (config/data model, terrain, chunk streaming, zone transitions, dungeon instancing); step 6, the content pass, is in progress — see §9 below for what's left.
 
-The world is **multi-zone**: a hub campus (`academy`) plus a streaming outdoor zone (`whispering_forest`) reachable through a walkable gateway, plus an instanced dungeon (`cinderhollow_caverns`) reachable through a doorway inside the forest. All three are built in Three.js — procedural terrain/geometry plus generated GLB characters and landmarks. Key facts:
+The world is **multi-zone** and chains end to end: a hub campus (`academy`) → `whispering_forest` (streaming outdoor zone, through a walkable gateway) → `cinderhollow_caverns` (instanced dungeon, through a doorway in the forest) → `lake_arcanum` (third outdoor zone, through the forest's west gateway) → `drowned_vault` (second dungeon, under the lake). All five are built in Three.js — procedural terrain/geometry plus generated GLB characters and landmarks. Key facts:
 
 - **Camera:** auto-follow, **drag-to-rotate** (orbit), **pinch-to-zoom**, camera-relative movement, and **collision** (re-clamped along its own bearing after the follow lerp, or an orbit around a building can sweep the camera through a corner even when both endpoints are clear). Touch joystick on the left, drag on the right, tap-to-move.
 - **Movement:** WASD/arrow keys (bound to `event.code`), touch joystick, gamepad thumbstick, tap-to-move. The player walks the terrain heightmap (`groundY`), and **water is solid** — movement retries each axis alone so the player slides along a shoreline instead of stopping dead.
-- **Zones** are data (`public/world/zones.json`), validated by `worldconfig.js` (`validateZone`, `validateExits`): bounds, terrain params (seed/biome/amplitude/waterLevel), buildings/landmarks/props/NPCs/resource nodes/exits. `academy` is *generated* from `structures.js`/`nodes.js` by `tools/sync-zones.mjs` (`npm test` fails if stale); `whispering_forest` is hand-authored pure JSON, proof that a new zone needs no engine change.
+- **Zones** are data (`public/world/zones.json`), validated by `worldconfig.js` (`validateZone`, `validateExits`): bounds, terrain params (seed/biome/amplitude/waterLevel), buildings/landmarks/props/NPCs/resource nodes/exits. `academy` is *generated* from `structures.js`/`nodes.js` by `tools/sync-zones.mjs` (`npm test` fails if stale); `whispering_forest` and `lake_arcanum` are hand-authored pure JSON, proof that a new zone needs no engine change.
 - **Zone transitions:** walking onto an exit rebuilds the world for the target zone and drops the player at the *reciprocal* exit, so the two zones join up geographically. Two anti-ping-pong guards: the arrival point is offset inward, and the trigger arrives disarmed until the player walks clear.
 - **Chunk streaming:** each zone's scattered content (props/nodes/enemies with a `count`) is bucketed into chunks once and only load/unload deltas are applied on each chunk-boundary crossing, with load/unload hysteresis and GPU disposal on unload.
+- **Water:** a zone with a `waterLevel` must set `baseHeight` **above** it. Flattening pins the spawn, NPCs, landmarks and dungeon mouths to `baseHeight`, so a lake that rises past it opens the zone with everything standing underwater — and `validateZone` will not say a word (`lake_arcanum`: `baseHeight 4.0` against `waterLevel 3.2`). A resource node may ask for `nearWater`, which makes `scatterZone` place it on the shoreline; fishing spots otherwise land on hilltops, technically valid and completely wrong.
 - **Ground colour:** the terrain is painted with vertex colours per point (height bands, bare rock on steep slopes, a shoreline band, low-frequency mottling) — no textures, so nothing to author or compress. See `terrain.js groundColorAt`.
-- **Dungeons** (`dungeons.js` + `world/dungeons.json`): a dungeon *compiles to a zone* — rooms/corridors/walls become the zone's obstacles and floor meshes, so entering one is just another zone transition and every zone-transition guarantee (reachability, no ping-pong, saved position) applies for free. Enemy kills, cleared rooms and boss defeat persist in `worldState.dungeons[id]` and defeated enemies do not respawn. `cinderhollow_caverns` (4 rooms + a boss, reachable from the forest) is the first one.
+- **Dungeons** (`dungeons.js` + `world/dungeons.json`): a dungeon *compiles to a zone* — rooms/corridors/walls become the zone's obstacles and floor meshes, so entering one is just another zone transition and every zone-transition guarantee (reachability, no ping-pong, saved position) applies for free. Enemy kills, cleared rooms and boss defeat persist in `worldState.dungeons[id]` and defeated enemies do not respawn. `cinderhollow_caverns` (4 rooms + the Cinder Wyrm, from the forest) and `drowned_vault` (5 rooms + the Drowned Archon, from the lake) ship. A dungeon may declare its own `floorColor` / `wallColor` / `bossFloorColor` / `lightScale` / `lightTint`, defaulting to the original palette — so the second dungeon is not the first one reskinned.
 - **Field quests** (`zonequests.js`): NPC-given quests out in a zone (gather/slay/clear/boss/visit objectives), separate from the duel-ladder `QUESTS` in `game.js`. State split: what the player *chose* (`accepted`/`done`) is saved, what they *achieved* is derived from inventory/dungeon state every time it's read — the same pattern as onboarding, below.
 - **Stations** (each opens an in-world overlay or dialogue):
   - Scribing Hall → Scribing overlay (refine + scribe cards)
@@ -216,7 +217,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 
 ### 6.5 Quests & PvP
 - **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
-- **Field quests** (`zonequests.js`) — separate from the duel ladder: things to do in a *place*, given by NPCs out in the world (gather/slay/clear/boss objectives, prerequisites, a quest log). Five ship in the Whispering Forest, leading into Cinderhollow Caverns.
+- **Field quests** (`zonequests.js`) — separate from the duel ladder: things to do in a *place*, given by NPCs out in the world (gather/slay/clear/boss objectives, prerequisites, a quest log). Ten ship: five in the Whispering Forest leading into Cinderhollow Caverns, and five at Lake Arcanum leading into the Drowned Vault, gated behind killing the Cinder Wyrm so the zones are met in order. `validateQuests` proves the chain is completable and that no prerequisite is missing or cyclic.
 - **Local PvP:** dueling AI wizards (and a practice duel with the Trainer).
 - **Online PvP:** real players via `logic.js` — create a room, share the invite link (two tabs = two players).
 
@@ -296,10 +297,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 280 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 297 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 34 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (75 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (86 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -334,7 +335,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 280 engine / 34 online-rules / 75 real-browser (layout + gestures + world +
+**All tests green:** 297 engine / 34 online-rules / 86 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -381,7 +382,34 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: the Dorm phases D1–D4, all four, shipped together.** The Student Dorms stopped
+**Last landed: WORLDSPEC step 6, the content pass — the world is now a chain, not a pair of rooms.**
+`lake_arcanum` (third outdoor zone) and `drowned_vault` (second dungeon, 5 rooms + the Drowned
+Archon) ship, plus five new field quests, so the route runs academy → Whispering Forest →
+Cinderhollow Caverns → Lake Arcanum → the Drowned Vault. **All six WORLDSPEC steps are now done**;
+further world work is content and polish against settled schemas, not architecture.
+
+Almost all of it was authoring against existing schemas. The three things that were not:
+- **`nearWater` on a resource node.** `scatterZone` knew what to *avoid* (water, steep slopes) but
+  not what a thing wants to be *near*. The first pass put all fourteen fishing spots up to 40m
+  inland on hilltops — every one of them "valid". Ignored, not failed, in a zone with no water.
+- **`baseHeight` above `waterLevel`.** Flattening pins the spawn, the NPCs and the dungeon mouth
+  to `baseHeight`, so a lake whose surface rose above it opens the zone with everyone standing
+  underwater — and nothing in `validateZone` says a word. The lake sets `baseHeight: 4.0` against
+  `waterLevel: 3.2`, and there is now a test asserting every authored point is above its own water
+  line, plus one asserting the lake covers 12–55% of the zone.
+- **Per-dungeon palettes.** `floorColor` / `wallColor` / `bossFloorColor` / `lightScale` /
+  `lightTint` pass through `dungeonZone`, defaulting to the original look, so the Drowned Vault
+  reads as cold flooded stone rather than Cinderhollow with different creatures in it. Same seam
+  the dorm's lighting added — one mechanism, two users.
+
+Also fixed here: **a flaky VFX check**, not caused by this work. `the bolt spell effect renders`
+sampled lit pixels once at a fixed 320ms delay, which is racy for a travelling projectile — it
+came in at 1.14x against a 1.15x threshold with nothing actually wrong. It now takes the *peak*
+over the effect's life, which is what "did it render" means.
+
+Tests: **297 engine / 34 online-rules / 86 browser / 8 viewports / model-check clean.**
+
+**Before that: the Dorm phases D1–D4, all four, shipped together.** The Student Dorms stopped
 being a menu and became a place you walk into, furnish, and display things in — see §6.8 for the
 architecture. New pure module `dorm.js`; the interior seam in `structures.js` is generic
 (`interior:` + `interiorFor`) so the Scribing Hall and Smithy can follow with no new entry-path
@@ -397,7 +425,7 @@ of a WebGL canvas comes back blank); and the trophy landed on top of the bed aft
 attempts (fixed by moving trophies to the corners, the one band no slot reaches, plus a test that
 tries every slot filled at every tier).
 
-Tests: **280 engine / 34 online-rules / 75 browser (was 62) / 8 viewports / model-check clean.**
+
 
 Before that, a user-provided model swapped in as the outdoor **Duel Arena landmark**
 (`public/assets/buildings/arena.glb`) — a Tripo "magic circle" platform (rune floor, pillar ring,
@@ -509,8 +537,7 @@ as part of the dorm work rather than left as notes:
 ## 10. Roadmap (in priority order)
 
 1. ~~**Dorm phases D1–D4**~~ — ✅ done; architecture in §6.8.
-2. **WORLDSPEC step 6 — content pass.** Second dungeon, third outdoor zone. The engine is ready;
-   this is authoring work against the schemas in `WORLDSPEC.md` §3/§6.
+2. ~~**WORLDSPEC step 6 — content pass**~~ — ✅ done; all six steps complete.
 3. **Character creation & visuals.** 3D preview at character creation, per-school outfit
    visuals, visible equipment on the 3D model — `BACKLOG.md` §2, `docs/DESIGN-DECISIONS.md` §4.
 4. **Deepen the Academy curriculum** — actual class/lesson content, not just the numeric perks

@@ -180,7 +180,9 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // dungeons.js — nothing spatial is decided here, matching the rule that world.js renders what
   // the pure modules hand it (§9b d).
   if (ZONE.rooms && ZONE.rooms.length){
-    const floorMat = mat(0x3a3348), wallMat = mat(0x4a4160), bossFloorMat = mat(0x5a3a44);
+    const floorMat = mat(ZONE.floorColor != null ? ZONE.floorColor : 0x3a3348);
+    const wallMat  = mat(ZONE.wallColor  != null ? ZONE.wallColor  : 0x4a4160);
+    const bossFloorMat = mat(ZONE.bossFloorColor != null ? ZONE.bossFloorColor : 0x5a3a44);
     const wallH = ZONE.wallHeight || 7;
     for (const r of ZONE.rooms){
       const f = add(new THREE.PlaneGeometry(r.w, r.d), r.boss ? bossFloorMat : floorMat, r.x, 0.02, r.z, {receive:true, cast:false});

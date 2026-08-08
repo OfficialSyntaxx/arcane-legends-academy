@@ -936,6 +936,162 @@
           "toZone": "academy",
           "x": 0,
           "z": 158
+        },
+        {
+          "toZone": "lake_arcanum",
+          "x": -158,
+          "z": 0
+        }
+      ]
+    },
+    {
+      "id": "lake_arcanum",
+      "name": "Lake Arcanum",
+      "spawn": {
+        "x": 120,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -160,
+        "maxX": 160,
+        "minZ": -160,
+        "maxZ": 160
+      },
+      "terrain": {
+        "seed": 51877,
+        "scale": 58,
+        "amplitude": 9,
+        "baseHeight": 4.0,
+        "waterLevel": 3.2,
+        "biome": "plains"
+      },
+      "chunkSize": 32,
+      "loadRadius": 70,
+      "unloadRadius": 100,
+      "props": [
+        {
+          "url": "./assets/models/nat_CommonTree_1.glb",
+          "count": 45,
+          "h": 9,
+          "solid": 1.4,
+          "minDistFromSpawn": 16
+        },
+        {
+          "url": "./assets/models/nat_Flower_3_Single.glb",
+          "count": 70,
+          "h": 0.8
+        },
+        {
+          "url": "./assets/models/kaykit_rock.glb",
+          "count": 30,
+          "h": 2.4
+        }
+      ],
+      "resourceNodes": [
+        {
+          "kind": "pond",
+          "id": "raw_salmon",
+          "label": "Fish Salmon",
+          "count": 6,
+          "nearWater": true
+        },
+        {
+          "kind": "pond",
+          "id": "raw_lobster",
+          "label": "Fish Lobster",
+          "count": 5,
+          "nearWater": true
+        },
+        {
+          "kind": "pond",
+          "id": "raw_shark",
+          "label": "Fish Shark",
+          "count": 3,
+          "deep": true,
+          "nearWater": true
+        },
+        {
+          "kind": "crystal",
+          "id": "silver",
+          "label": "Mine Silver",
+          "count": 6,
+          "color": 13224416
+        },
+        {
+          "kind": "crystal",
+          "id": "mithril",
+          "label": "Mine Mithril",
+          "count": 4,
+          "color": 4886745
+        },
+        {
+          "kind": "wood",
+          "id": "magic_log",
+          "label": "Chop Magic Tree",
+          "count": 4,
+          "magic": true
+        }
+      ],
+      "nodeModels": {
+        "wood": {
+          "url": "./assets/models/kaykit_tree.glb",
+          "h": 9
+        },
+        "crystal": {
+          "url": "./assets/models/kaykit_rock.glb",
+          "h": 2.2
+        }
+      },
+      "npcs": [
+        {
+          "key": "lake_hermit",
+          "role": "quest",
+          "station": "lake_hermit",
+          "label": "Hermit Calder",
+          "x": 104,
+          "z": 26,
+          "model": "librarian.glb"
+        },
+        {
+          "key": "lake_diver",
+          "role": "quest",
+          "station": "lake_diver",
+          "label": "Diver Nell",
+          "x": 46,
+          "z": -62,
+          "model": "student_emerald.glb"
+        },
+        {
+          "key": "lake_trader",
+          "role": "quest",
+          "station": "market",
+          "label": "Bargeman Orin",
+          "x": 92,
+          "z": -30,
+          "model": "merchant.glb"
+        }
+      ],
+      "enemies": [
+        {
+          "model": "enemy_skeleton.glb",
+          "name": "Drowned Sentry",
+          "count": 7,
+          "level": 6
+        }
+      ],
+      "dungeonEntrances": [
+        {
+          "id": "drowned_vault",
+          "x": -46,
+          "z": -74,
+          "model": "./assets/models/dng_doorway.glb"
+        }
+      ],
+      "exits": [
+        {
+          "toZone": "whispering_forest",
+          "x": 158,
+          "z": 0
         }
       ]
     }

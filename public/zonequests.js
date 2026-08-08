@@ -70,6 +70,61 @@ export const ZONE_QUESTS = [
     reward: { gold: 800, xp: 600, cards: 2 },
     requires: ["scouting"],
   },
+
+  // ---- Lake Arcanum (WORLDSPEC step 6, second content zone) ----
+  // The lake gates on the forest: `shores` requires the Cinder Wyrm, so a player arrives here
+  // having finished the forest chain rather than wandering in at level 1 and meeting a level-14
+  // boss. The gate is on the FIRST lake quest only — once you are here, the zone is yours.
+  {
+    id: "shores",
+    zone: "lake_arcanum",
+    giver: "lake_hermit",
+    title: "The Silver Shore",
+    brief: "The lake gives up silver when it is calm. Bring me some and I will tell you what sank here.",
+    objective: { kind: "gather", id: "silver", n: 10 },
+    reward: { gold: 420, xp: 260 },
+    requires: ["wyrm"],
+  },
+  {
+    id: "deepcatch",
+    zone: "lake_arcanum",
+    giver: "lake_hermit",
+    title: "Deep Catch",
+    brief: "There are sharks under the far shelf. Land four and the barge crews will believe you.",
+    objective: { kind: "gather", id: "raw_shark", n: 4 },
+    reward: { gold: 480, xp: 300 },
+    requires: ["shores"],
+  },
+  {
+    id: "vaultmouth",
+    zone: "lake_arcanum",
+    giver: "lake_diver",
+    title: "What the Water Took",
+    brief: "There is a vault down there the lake swallowed. Get inside and put down whatever is still moving.",
+    objective: { kind: "slay", dungeon: "drowned_vault", n: 4 },
+    reward: { gold: 520, xp: 340 },
+    requires: ["shores"],
+  },
+  {
+    id: "reliquary",
+    zone: "lake_arcanum",
+    giver: "lake_diver",
+    title: "The Reliquary",
+    brief: "The wardens guard a side room. Whatever they are guarding, I want the room empty.",
+    objective: { kind: "clear", dungeon: "drowned_vault", room: "reliquary" },
+    reward: { gold: 600, xp: 400 },
+    requires: ["vaultmouth"],
+  },
+  {
+    id: "archon",
+    zone: "lake_arcanum",
+    giver: "lake_diver",
+    title: "The Drowned Archon",
+    brief: "Something at the bottom keeps the water black. Finish it and the lake clears.",
+    objective: { kind: "boss", dungeon: "drowned_vault" },
+    reward: { gold: 1400, xp: 1000, cards: 3 },
+    requires: ["vaultmouth"],
+  },
 ];
 
 const state = s => (s && s.zoneQuests) || { accepted: [], done: [] };
@@ -95,12 +150,24 @@ export function progressOf(s, q){
   return { have: Math.min(have, need), need, done: have >= need };
 }
 
+/**
+ * Display names for the dungeons quests refer to. Kept here rather than read from dungeons.json
+ * so this module stays pure and synchronous; `validateQuests` asserts the two agree.
+ */
+export const DUNGEON_NAMES = {
+  cinderhollow_caverns: "Cinderhollow Caverns",
+  drowned_vault: "the Drowned Vault",
+};
+const dungeonName = id => DUNGEON_NAMES[id] || id;
+
 /** A one-line description of what the objective asks for. */
 export function objectiveText(q, materialName){
   const o = q.objective;
   if (o.kind === "gather") return `Gather ${o.n} × ${materialName || o.id}`;
-  if (o.kind === "slay") return `Defeat ${o.n} creatures in the caverns`;
-  if (o.kind === "boss") return `Defeat the boss of the caverns`;
+  // Named from the quest's own dungeon. This used to say "the caverns" unconditionally, which was
+  // fine while one dungeon existed and became a lie the moment a second one shipped.
+  if (o.kind === "slay") return `Defeat ${o.n} creatures in ${dungeonName(o.dungeon)}`;
+  if (o.kind === "boss") return `Defeat the boss of ${dungeonName(o.dungeon)}`;
   if (o.kind === "clear") return `Clear the ${o.room}`;
   if (o.kind === "visit") return `Travel to ${o.zone}`;
   return "";
@@ -144,4 +211,45 @@ export function turnIn(s, id){
   s.zoneQuests.accepted = s.zoneQuests.accepted.filter(x => x !== id);
   s.zoneQuests.done.push(id);
   return { ok: true, quest: q, reward: q.reward };
+}
+
+/**
+ * Problems with the quest table, human-readable — same contract as validateZone/validateDungeon.
+ * Catches the things that break a chain silently: a prerequisite that does not exist, a cycle
+ * (nothing in the chain would ever unlock), a quest pointing at a zone or dungeon that is not
+ * real, and an unnamed dungeon (which would surface to the player as a raw id).
+ */
+export function validateQuests(opts = {}){
+  const problems = [];
+  const byId = new Map();
+  for (const q of ZONE_QUESTS){
+    if (byId.has(q.id)) problems.push(`duplicate quest id "${q.id}"`);
+    byId.set(q.id, q);
+    if (!q.giver) problems.push(`${q.id}: no giver`);
+    if (!q.reward || !(q.reward.gold > 0)) problems.push(`${q.id}: no reward`);
+    for (const r of q.requires || []) if (!ZONE_QUESTS.some(x => x.id === r))
+      problems.push(`${q.id}: requires "${r}", which is not a quest`);
+    const o = q.objective;
+    if (o.dungeon && !DUNGEON_NAMES[o.dungeon]) problems.push(`${q.id}: dungeon "${o.dungeon}" has no display name`);
+    if (opts.zoneIds && !opts.zoneIds.includes(q.zone)) problems.push(`${q.id}: zone "${q.zone}" does not exist`);
+    if (opts.dungeonIds && o.dungeon && !opts.dungeonIds.includes(o.dungeon))
+      problems.push(`${q.id}: dungeon "${o.dungeon}" does not exist`);
+    if (opts.dungeonRooms && o.kind === "clear" && !(opts.dungeonRooms[o.dungeon] || []).includes(o.room))
+      problems.push(`${q.id}: room "${o.room}" is not in ${o.dungeon}`);
+    if (opts.gatherable && o.kind === "gather" && !opts.gatherable.includes(o.id))
+      problems.push(`${q.id}: asks for "${o.id}", which cannot be gathered anywhere`);
+  }
+  // reachability: walk from the quests with no prerequisites
+  const done = new Set();
+  let grew = true;
+  while (grew){
+    grew = false;
+    for (const q of ZONE_QUESTS){
+      if (done.has(q.id)) continue;
+      if ((q.requires || []).every(r => done.has(r))){ done.add(q.id); grew = true; }
+    }
+  }
+  for (const q of ZONE_QUESTS) if (!done.has(q.id))
+    problems.push(`${q.id} can never be unlocked (its prerequisite chain is unsatisfiable or cyclic)`);
+  return problems;
 }

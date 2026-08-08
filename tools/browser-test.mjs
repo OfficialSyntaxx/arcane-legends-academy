@@ -574,9 +574,17 @@ if (hasWorld){
     out.cards = {};
     for (const [card, tag] of [["firebolt","bolt"],["meteor","rain"],["ice_armor","aura"],["blizzard","burst"],["balance_blade","glyph"]]){
       window.__testCast(card, 0);
-      await new Promise(r => setTimeout(r, 320));
-      out.cards[tag] = lit();
-      await new Promise(r => setTimeout(r, 1500));    // let it expire before the next one
+      // PEAK over the effect's life, not a single instant. Sampling once at a fixed delay is racy
+      // for the travelling archetypes — a bolt is a small moving sprite, and where it is 320ms in
+      // depends on frame pacing, so the check flaked at ~1.14x against a 1.15x threshold with
+      // nothing wrong. Peak brightness is what "did it render at all" actually means.
+      let peak = 0;
+      for (let i = 0; i < 8; i++){
+        await new Promise(r => setTimeout(r, 110));
+        peak = Math.max(peak, lit());
+      }
+      out.cards[tag] = peak;
+      await new Promise(r => setTimeout(r, 1200));    // let it expire before the next one
     }
     out.leaked = window.__battle3d.activeFx();
     // Starve the loop: block the main thread so almost no frames run, then check the effect has
@@ -770,9 +778,70 @@ if (hasWorld){
     if (back){ window.__world.teleport(back.x, back.z); await settle(1500); }
     return { before, after };
   });
+
   check("buying hall upgrades physically grows the dorm (D4)",
         grew.after && grew.after[0] > grew.before[0] && grew.after[1] > grew.before[1],
         `${JSON.stringify(grew.before)} -> ${JSON.stringify(grew.after)}`);
+
+  // --- WORLDSPEC step 6 content: the third zone and the second dungeon ---
+  // Data-level correctness is covered headlessly; what only a browser can answer is whether the
+  // zone actually BUILDS — chunk streaming, the water plane, a second dungeon entrance, and
+  // whether the player is standing on land when they arrive.
+  const lake = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    const out = {};
+    // hop academy -> forest -> lake through the real gateways
+    for (let hop = 0; hop < 3 && dbg().zone !== "lake_arcanum"; hop++){
+      const here = dbg();
+      const want = here.zone === "academy" ? "whispering_forest" : "lake_arcanum";
+      const e = (here.exits || []).find(x => x.to === want) || (here.exits || [])[0];
+      if (!e) break;
+      window.__world.teleport(e.x, e.z);
+      await settle(1600);
+    }
+    const d = dbg();
+    out.zone = d.zone;
+    out.inWater = d.inWater;
+    out.spawnClear = d.spawnClear;
+    out.chunks = d.chunks;
+    out.entrances = (d.dungeonEntrances || []).map(x => x.id);
+    out.npcs = (d.npcs || []).map(n => n.key);
+    // into the vault
+    const ent = (d.dungeonEntrances || [])[0];
+    if (ent){
+      window.__world.teleport(ent.x, ent.z + 3);
+      await settle(500);
+      out.entrancePrompt = dbg().nearbyKind;
+      window.__world.trigger();
+      await settle(1800);
+      const v = dbg();
+      out.vaultZone = v.zone;
+      out.vaultRooms = v.rooms;
+      out.vaultWalls = v.wallCount;
+      out.vaultSpawnClear = v.spawnClear;
+      out.vaultEnemies = v.enemies;
+      const back = (v.exits || [])[0];
+      if (back){ window.__world.teleport(back.x, back.z); await settle(1600); }
+      out.zoneAfter = dbg().zone;
+    }
+    return out;
+  });
+  check("the third zone builds and can be walked into", lake.zone === "lake_arcanum", String(lake.zone));
+  check("the player does not arrive in the lake", lake.inWater === false && lake.spawnClear === true,
+        `inWater=${lake.inWater} clear=${lake.spawnClear}`);
+  check("the lake streams chunks", !!lake.chunks && lake.chunks.total > 0, JSON.stringify(lake.chunks));
+  check("the lake's quest givers are standing in it",
+        (lake.npcs || []).includes("lake_hermit") && (lake.npcs || []).includes("lake_diver"), JSON.stringify(lake.npcs));
+  check("the lake holds the second dungeon's entrance", (lake.entrances || [])[0] === "drowned_vault", JSON.stringify(lake.entrances));
+  check("the second dungeon's entrance prompts", lake.entrancePrompt === "dungeon", String(lake.entrancePrompt));
+  check("the second dungeon builds", lake.vaultZone === "drowned_vault", String(lake.vaultZone));
+  check("the second dungeon has its five rooms and wall collision",
+        lake.vaultRooms >= 5 && lake.vaultWalls > 10, `${lake.vaultRooms} rooms, ${lake.vaultWalls} wall boxes`);
+  check("the player does not spawn inside a wall of the second dungeon", lake.vaultSpawnClear === true);
+  check("the second dungeon is populated", lake.vaultEnemies > 0, String(lake.vaultEnemies));
+  check("leaving the second dungeon returns to the lake", lake.zoneAfter === "lake_arcanum", String(lake.zoneAfter));
+
 }
 
 check("no uncaught page errors", errs.length === 0, errs.slice(0,3).join(" | "));

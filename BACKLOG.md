@@ -34,7 +34,10 @@
 - [~] School identity / specialization — 7 schools, starter decks, +1 affinity and the elemental ring all live; per-school *visuals* not yet
 - [~] Academy classes and curriculum — see §1 above (`academy.js`); numeric perks only, no lesson content yet
 - [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
-- [~] Main story + side quests — five field quests in the Whispering Forest from two NPCs (`zonequests.js`), with gather/slay/clear/boss objectives, prerequisites and a quest log. The main story is still to write.
+- [~] Main story + side quests — ten field quests across two zones (`zonequests.js`): five in the
+  Whispering Forest, five at Lake Arcanum gated behind the Cinder Wyrm, with gather/slay/clear/boss
+  objectives, prerequisites and a quest log. `validateQuests` proves the whole chain is completable
+  and that no prerequisite is missing or cyclic. The main story is still to write.
 - [ ] Visual equipment on 3D character
 - [x] **Dorm customization — DONE (D1–D4).** The Student Dorms is no longer a menu. Walking up and
   pressing the prompt builds a real interior *zone* (`dorm.js`, pure; it reuses `dungeons.js` to
@@ -53,11 +56,14 @@
 
 ## 3. Open World
 
-- [ ] Expand beyond the Academy
+- [x] Expand beyond the Academy — three outdoor zones now chain academy → forest → lake
 - [x] Whispering Forest — streams, reachable through the academy's north gateway, three NPCs and five quests that lead into Cinderhollow
-- [ ] Lake Arcanum
+- [x] Lake Arcanum — a real lake (29% water) reached through the forest's west gateway; shoreline
+  fishing (salmon/lobster/shark), silver + mithril + magic trees, 3 NPCs, 5 quests gated behind
+  the Cinder Wyrm, and the Drowned Vault entrance
 - [ ] Ashen Mountains
 - [x] Cinderhollow Caverns — 4-room dungeon reachable from the Whispering Forest, boss + persistent kill/room/boss progress
+- [x] The Drowned Vault — 5-room dungeon under Lake Arcanum, cold flooded palette, the Drowned Archon (Lv14) at the bottom
 - [x] Zone transitions — walkable gateways, reciprocal arrival, world state persisted in the save
 - [x] Chunk streaming — scatter-once/bucket-once with load/unload hysteresis and GPU disposal
 - [ ] Fast travel
@@ -72,7 +78,10 @@
 - [ ] Better AI deck archetypes
 - [~] Boss battles — the Cinder Wyrm fights via the duel engine; multi-phase/abilities pending
 - [ ] Multi-phase bosses
-- [~] Dungeon progression — Cinderhollow Caverns is playable end to end; kills, cleared rooms and boss defeat all persist and enemies stay dead. Locked doors / key gating and more dungeons pending
+- [~] Dungeon progression — two dungeons playable end to end (Cinderhollow Caverns, the Drowned
+  Vault); kills, cleared rooms and boss defeat all persist and enemies stay dead, and each dungeon
+  carries its own palette/lighting so the second is not the first reskinned. Locked doors / key
+  gating still pending
 - [x] Spell VFX — six procedural archetypes (bolt/burst/rain/aura/beam/glyph) driven from each card's own effects and school; zero assets
 - [~] Attack / summon / death animations — `battle3d.js` exists; procedural walk cycle already added for NPCs
 - [ ] Reusable combat effect system
@@ -141,7 +150,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 280 engine / 34 online / 75 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 297 engine / 34 online / 85 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -203,7 +212,8 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** the **Dorm phases D1–D4** (`dorm.js` — walk-in interior
+**Changes made, most recent first:** **WORLDSPEC step 6, the content pass** (Lake Arcanum + the
+Drowned Vault, five new quests, per-dungeon palettes, `nearWater` scatter) → the **Dorm phases D1–D4** (`dorm.js` — walk-in interior
 zone, furniture placement, display cases, boss trophies, upgrade-driven room tiers) → the outdoor
 **Duel Arena landmark** swapped for a
 user-provided Tripo model (`public/assets/buildings/arena.glb`, rune-floor platform with a pillar
@@ -220,18 +230,22 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** the Dorm phases (D1–D4) are **done** — the Student Dorms is a walk-in interior with
+**Next step:** WORLDSPEC **step 6 (the content pass) is done** — Lake Arcanum and the Drowned
+Vault ship, so the world now chains academy → forest → Cinderhollow → lake → vault with ten field
+quests across the two outdoor zones. All six WORLDSPEC steps are complete. What remains for the
+world is polish rather than architecture: fast travel, day/night, weather, hidden areas, and the
+Ashen Mountains as a fourth zone.
+
+Before that, the Dorm phases (D1–D4) were **done** — the Student Dorms is a walk-in interior with
 furniture placement, display cases, trophies and upgrade-driven room tiers (§2 above,
 `CLAUDEREADME.md` §6.8). Landed alongside it from the docs review: the home/hall/dorm naming
 collision resolved to "Dorm" everywhere user-facing, `docs/plan.md` marked historical, and §7's
 duplicated housing entries pointed at §2.
 
-**After that:** WORLDSPEC steps 1–5 are all done. Remaining world work is **step 6, the content
-pass** — a second dungeon and a third outdoor zone, mostly authoring against the schemas already
-built (§3/§6 in WORLDSPEC.md). In parallel, the §2 Academy items that still need real work:
-a character-creation screen with a 3D preview + per-school outfit visuals
-(`docs/DESIGN-DECISIONS.md` §4), visual equipment on the 3D character, and actual
-class/lesson *content* for the curriculum (right now a year only grants numeric bonuses).
+**After that**, the §2 Academy items that still need real work: a character-creation screen with a
+3D preview + per-school outfit visuals (`docs/DESIGN-DECISIONS.md` §4), visual equipment on the 3D
+character, and actual class/lesson *content* for the curriculum (right now a year only grants
+numeric bonuses). Then §5 collection depth and §8 the social layer.
 See `CLAUDEREADME.md` §9 "Where we left off" for the fuller narrative version of this note,
 including suggestions flagged during the arena swap (re-measuring its collision circle against
 the new mesh, and a longer-term idea to make the outdoor landmark the actual duel space instead
@@ -244,6 +258,7 @@ of two disconnected scenes).
 `WORLDSPEC.md` is the detailed plan for **§3 Open World** and the world half of **§4 PvE**.
 This backlog is the wider game. When the two disagree, WORLDSPEC wins for world architecture.
 
-**Status:** WORLDSPEC steps 1–5 (zone config, procedural terrain, chunk streaming, zone
-transitions, dungeon instancing) are **all complete**. Step 6 (content pass — a second dungeon,
-a third zone) is next; see WORLDSPEC.md §9 for the exact schemas to author against.
+**Status:** **all six WORLDSPEC steps are complete** — zone config, procedural terrain, chunk
+streaming, zone transitions, dungeon instancing, and the content pass (three outdoor zones, two
+dungeons). Further world work is now content and polish against settled schemas, not architecture:
+a fourth zone (Ashen Mountains), fast travel, day/night, weather.
