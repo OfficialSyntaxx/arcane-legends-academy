@@ -13,12 +13,12 @@
 <title>Arcane Legends — Wizard TCG</title>
 <style>
 :root{
-  --gold:#ffc94d; --gold2:#e8a33d; --violet:#2a1f4d; --panel:#1a1430; --panel2:#241c44;
-  --ink:#f2ecff; --muted:#a99fc9; --line:rgba(255,201,77,.25);
-  --danger:#ff6b6b; --ok:#6ee7a0; --info:#7aa8ff;
+  --gold:#c9a86a; --gold2:#a88750; --violet:#1a1d26; --panel:#1b1f29; --panel2:#232836;
+  --ink:#e8eaf0; --muted:#8b92a3; --line:rgba(255,255,255,.09);
+  --danger:#e06c6c; --ok:#6fbf97; --info:#6f9fd0;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-html,body{margin:0;height:100%;background:#0d0a1f;color:var(--ink);
+html,body{margin:0;height:100%;background:#12141a;color:var(--ink);
   font-family:"Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden;
   overscroll-behavior:none;text-size-adjust:100%;-webkit-text-size-adjust:100%;}
 /* safe-area insets, so nothing hides under a notch or the home indicator */
@@ -32,7 +32,7 @@ html,body{margin:0;height:100%;background:#0d0a1f;color:var(--ink);
 
 /* top bar */
 #topbar{display:flex;align-items:center;gap:8px;padding:calc(10px + var(--sat)) 14px 10px;
-  background:linear-gradient(180deg,rgba(20,14,40,.95),rgba(20,14,40,.7));
+  background:linear-gradient(180deg,rgba(18,20,26,.95),rgba(18,20,26,.8));
   border-bottom:1px solid var(--line);z-index:5;flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
 #topbar::-webkit-scrollbar{display:none;}
 #topbar .logo{font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--gold);
@@ -43,15 +43,17 @@ html,body{margin:0;height:100%;background:#0d0a1f;color:var(--ink);
 .statbtn{cursor:pointer;font-family:inherit;color:var(--ink);min-height:34px;min-width:44px;
   justify-content:center;font-size:17px;line-height:1;touch-action:manipulation;}
 
-/* nav */
-#nav{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;background:rgba(20,14,40,.9);border-bottom:1px solid var(--line);
-  z-index:5;flex-shrink:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+/* nav — bottom tab bar (mobile RPG convention) */
+#nav{display:flex;gap:4px;padding:8px calc(10px + var(--sal)) calc(8px + var(--sab)) calc(10px + var(--sar));
+  background:rgba(18,20,26,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);
+  flex-shrink:0;overflow-x:auto;scrollbar-width:none;z-index:6;}
 #nav::-webkit-scrollbar{display:none;}
-.navbtn{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 12px;border-radius:10px;
-  border:1px solid transparent;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;min-width:64px;min-height:48px;}
-.navbtn .ic{font-size:20px;}
+.navbtn{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px 4px;border-radius:12px;
+  border:1px solid transparent;background:transparent;color:var(--muted);font-size:10px;cursor:pointer;min-width:44px;min-height:52px;transition:color .15s,background .15s;}
+.navbtn .ic{font-size:19px;transition:transform .15s;}
 @media (hover:hover){ .navbtn:hover{background:var(--panel2);color:var(--ink);} }
 .navbtn.on{background:var(--panel2);color:var(--gold);border-color:var(--line);}
+.navbtn.on .ic{transform:translateY(-1px);}
 
 /* screens */
 /* The duel arena is a BAND, not a half-screen. It used to be flex:1 alongside #screen, so the
@@ -71,10 +73,10 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .row{display:flex;gap:10px;flex-wrap:wrap;}
 
 /* buttons */
-.btn{background:linear-gradient(180deg,#3a2d6e,#241c44);color:var(--ink);border:1px solid var(--line);border-radius:10px;
+.btn{background:linear-gradient(180deg,#2a3040,#1c2029);color:var(--ink);border:1px solid var(--line);border-radius:10px;
   padding:10px 16px;font-size:14px;cursor:pointer;font-weight:600;min-height:44px;touch-action:manipulation;}
 @media (hover:hover){ .btn:hover{filter:brightness(1.15);} }
-.btn.gold{background:linear-gradient(180deg,#e8a33d,#b97a1e);color:#24170a;border-color:#ffd98a;}
+.btn.gold{background:linear-gradient(180deg,#c9a86a,#a88750);color:#241a0d;border-color:#dcc397;}
 .btn.ok{background:linear-gradient(180deg,#2f9e63,#1f6b42);border-color:#6ee7a0;}
 .btn.danger{background:linear-gradient(180deg,#b33,#6e1f1f);border-color:#ff6b6b;}
 .btn:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.4);}
@@ -186,8 +188,8 @@ body.has-touch .worldbtn{display:flex;}
 
 /* modals: keep them inside the safe area and off the screen edges on small phones */
 #objective{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:0 8px 6px;
-  background:linear-gradient(90deg,rgba(122,92,255,.22),rgba(122,92,255,.06));
-  border:1px solid rgba(160,130,255,.45);border-radius:12px;font-size:13px;}
+  background:linear-gradient(90deg,rgba(201,168,106,.14),rgba(201,168,106,.04));
+  border:1px solid rgba(220,195,151,.35);border-radius:12px;font-size:13px;}
 #objective .obj-tick{font-size:15px;flex:0 0 auto}
 #objective .obj-main{flex:1;min-width:0}
 #objective .obj-title{font-weight:700;color:var(--gold)}
@@ -207,7 +209,7 @@ body.has-touch .worldbtn{display:flex;}
   #topbar{gap:6px;padding-left:10px;padding-right:10px;}
   #topbar .logo{font-size:16px;}
   .stat{font-size:13px;padding:4px 10px;}
-  .navbtn{min-width:56px;font-size:11px;padding:6px 9px;}
+  .navbtn{min-width:44px;font-size:10px;padding:6px 4px;}
   .navbtn .ic{font-size:18px;}
   #screen{padding:12px 10px calc(36px + var(--sab));}
   .panel{padding:12px;border-radius:12px;}
@@ -223,7 +225,7 @@ body.has-touch .worldbtn{display:flex;}
   #topbar .logo{font-size:0;margin-right:auto;}
   #topbar .logo::before{content:"✦";font-size:20px;}
   .stat{font-size:12px;padding:3px 8px;gap:4px;}
-  .navbtn{min-width:50px;font-size:10px;padding:5px 7px;}
+  .navbtn{min-width:38px;font-size:9px;padding:5px 3px;}
   #screen{padding:10px 8px calc(32px + var(--sab));}
   .row{gap:8px;}
   .btn{padding:9px 12px;font-size:13px;}
@@ -272,7 +274,6 @@ body.has-touch .worldbtn{display:flex;}
     <div class="stat">🧙 <b id="sXp">0</b></div>
     <button id="muteBtn" class="stat statbtn" aria-label="Toggle sound" onclick="window.__ev('toggleMute')">🔊</button>
   </div>
-  <div id="nav"></div>
   <!-- Onboarding objective bar. Present on every screen including the 3D world, because the
        chain sends the player back and forth between them and an objective you can only see on
        one screen is an objective you lose track of. -->
@@ -283,7 +284,7 @@ body.has-touch .worldbtn{display:flex;}
     <canvas id="battle3d"></canvas>
   </div>
   <div id="screen"></div>
-  <div id="worldWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#1a1440">
+  <div id="worldWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#14161c">
     <canvas id="world"></canvas>
     <div id="worldHud"></div>
     <div id="joy"><div id="joyKnob"></div></div>
@@ -291,6 +292,7 @@ body.has-touch .worldbtn{display:flex;}
     <button id="zoomIn" class="worldbtn" aria-label="Zoom in">+</button>
     <button id="zoomOut" class="worldbtn" aria-label="Zoom out">−</button>
   </div>
+  <div id="nav"></div>
 </div>
 <div id="toast"></div>
 <div id="err"></div>

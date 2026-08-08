@@ -2,6 +2,11 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-08 — UI redesign: bottom nav + muted palette
+- **Bottom navigation bar** (mobile-RPG convention) replacing the top nav — the tabs (World, Hall, Skills, Collection, Loadout, Market, Quests, Duel) now sit at the bottom of the screen, above the safe area, evenly spaced and fully visible on mobile (verified at 412px).
+- **Softer, more elegant palette** replacing the cartoonish bright purple + saturated gold: deep charcoal/slate backgrounds with a muted champagne-gold accent, softer borders and buttons, and a gold-tinted quest bar (no more purple banners or pillars).
+- All 8 nav tabs fit on mobile (min-width tuning so nothing is cut off).
+
 ## 2026-08-07 — Input, camera, and noclip fixes
 - **Input controls no longer inverted**: the touch joystick's Y axis was mapping screen-down (positive) to *forward*, so pushing the stick UP moved the player backward. Negated the touch-joystick Y so pushing up moves forward (away from the camera). Keyboard/gamepad were already correct.
 - **Smoother camera**: the follow used a fixed `0.12`/frame lerp (frame-rate dependent — sluggish at low fps, wavy during fast rotation). Replaced with a time-based exponential ease (`1-exp(-dt*k)`): pulls in quickly on collision, eases out smoothly, frame-rate independent.
