@@ -65,6 +65,10 @@ wizard-tcg/                 (the repo root)
 │   ├── reputation.js       per-NPC standing + reward bonuses — PURE
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
+│   ├── charcreate.js       character creation + per-school appearance numbers — PURE
+│   ├── tint.js             the per-school hue shift, as a fragment-shader patch (shared by
+│   │                       world.js and preview3d.js so the preview cannot drift from the world)
+│   ├── preview3d.js        the rotating 3D character preview on the creation screen
 │   ├── vfx.js              spell visual-effect archetypes, chosen from a card's own fx — PURE
 │   ├── world/zones.json    the zone catalog (academy, whispering_forest, lake_arcanum)
 │   ├── world/dungeons.json the dungeon catalog (cinderhollow_caverns, drowned_vault)
@@ -217,6 +221,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 
 ### 6.5 Quests & PvP
 - **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
+- **Character creation** (`charcreate.js`) — name, school and look with a live 3D preview; the per-school appearance is a shader hue-shift plus a coloured aura, not a per-part outfit. See §6.9 for why.
 - **Field quests** (`zonequests.js`) — separate from the duel ladder: things to do in a *place*, given by NPCs out in the world (gather/slay/clear/boss objectives, prerequisites, a quest log). Ten ship: five in the Whispering Forest leading into Cinderhollow Caverns, and five at Lake Arcanum leading into the Drowned Vault, gated behind killing the Cinder Wyrm so the zones are met in order. `validateQuests` proves the chain is completable and that no prerequisite is missing or cyclic.
 - **Local PvP:** dueling AI wizards (and a practice duel with the Trainer).
 - **Online PvP:** real players via `logic.js` — create a room, share the invite link (two tabs = two players).
@@ -263,7 +268,36 @@ stats page plus four numeric upgrade tracks. It is now a place.
   **rendering a frame and reading pixels** — `world.renderOnce()` exists for that, because a
   Playwright screenshot of a WebGL canvas comes back blank once the drawing buffer is cleared.
 
-### 6.9 Retention
+### 6.9 Character creation & per-school appearance (`charcreate.js`, `tint.js`, `preview3d.js`)
+A three-step creation screen — name, school, look — with a **live rotating 3D preview**. Each step's
+`done` is DERIVED from the save (same rule as onboarding/dorm), so backing out, reloading or
+changing school later cannot desync a step cursor, because there isn't one.
+
+**The constraint that shapes everything here:** `player_wizard.glb` is **one mesh, one material,
+one texture**, and that material's Base Color is **white** — all of its colour lives in the map.
+So:
+- There is no robe/hat/trim submesh to recolour. Per-part outfits are impossible without new
+  geometry (see `BLENDERTODO.md` Tier 5).
+- `material.color` **cannot rotate a hue** — multiplying white by orange darkens, it does not
+  re-hue a purple robe. The old `setPlayerColor` lerped 45% toward a flat school colour, which is
+  why every school came out the same washed purple.
+- The shift therefore happens in the **fragment shader** (`tint.js` patches `<map_fragment>`):
+  each sampled texel goes to HSL, its hue rotates toward the school's **the short way round the
+  wheel**, saturation scales, lightness is *preserved* (so the painted shading survives), and
+  near-grey texels are left alone so the face does not become a mask.
+- **`strength` must stay ≥ 0.75.** Tuned to 0.4–0.85 first, and rendering it showed why that is
+  wrong: from a purple base, a 70% rotation toward Fire's 16° *stops at magenta*. Every school
+  landed between purple and its own colour and none arrived. `validateLooks` enforces the floor.
+- Variants (Standard/Deep/Pale/Worn) vary **saturation and lightness only** — never hue. Hue is
+  the school's identity and a blue Fire wizard makes the school unreadable.
+- A **school-coloured ground aura** (off / ring / drifting motes) does the unambiguous half of the
+  job: a hue shift on a dark robe is subtle at camera distance, a coloured rune ring is not.
+
+`preview3d.js` is its own tiny renderer, not world.js with the scenery removed — creation runs
+before the world exists and can be reopened from the Dorm while a world is already running. It
+imports the **same `tint.js`**; two copies of that maths would drift and make the preview a lie.
+
+### 6.10 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -382,7 +416,42 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: WORLDSPEC step 6, the content pass — the world is now a chain, not a pair of rooms.**
+**Last landed: character creation + per-school appearance, and `BLENDERTODO.md`.**
+
+`BLENDERTODO.md` is new and is the file to hand a Blender agent: a complete modelling brief for
+**every asset in the game that is still a procedural primitive** — all eight pieces of dorm
+furniture, both boss trophies, the fountain, street lamps, crystal spires, the fishing-spot node
+(the only gathering-node kind with no model at all, and there are 14 of them in Lake Arcanum), a
+zone gateway arch, a modular dungeon wall/floor kit, and the duel arena's pillars and banners.
+Each brief carries exact dimensions, hex colours, triangle budget, origin placement, and the exact
+table row in this repo to edit afterwards — plus the shared rules (scale, style, export settings)
+and the pipeline traps this project has already paid for. `docs/ASSET-BUDGET.md` §1 was corrected
+while writing it: it still claimed the Library/Smithy/Market/Dorms were procedural, which stopped
+being true at the CC0 import pass.
+
+**Character creation** (§6.9) is a three-step screen — name, school, look — with a live rotating
+3D preview. The headline finding, and the reason this took a shader rather than a colour
+assignment: **`player_wizard.glb` is one mesh with one material whose Base Color is white**, so
+`material.color` can only darken, never re-hue. The old `setPlayerColor` lerped 45% toward a flat
+school colour, which is why all seven schools looked like the same washed purple. `tint.js` now
+patches `<map_fragment>` and rotates each sampled texel's hue in HSL, the short way round the
+wheel, preserving lightness. Shared by `world.js` and `preview3d.js` so the preview cannot lie.
+
+Two bugs here were only visible in a render, and both are now covered by browser checks:
+- **Fire came out magenta.** `strength` was tuned to 0.4–0.85 on the theory that a partial
+  rotation looks more natural. From a purple base, 70% of the way to Fire's 16° *stops at
+  magenta* — every school landed short of its own colour. Floor is now 0.75 and `validateLooks`
+  enforces it.
+- **My new full-screen creation modal swallowed the mouse wheel**, breaking "wheel zooms the
+  camera" in the gesture suite. A real regression, caught by the suite, not by me.
+
+Also fixed: the header read "step 3 of 3" above an empty name box, because `progress()` returned
+the *count of finished steps* where the UI wanted the *position of the current one* — the same
+confusion `onboarding.js` had already been fixed for.
+
+Tests: **316 engine / 34 online-rules / 95 browser / 8 viewports / model-check clean.**
+
+**Before that: WORLDSPEC step 6, the content pass — the world is now a chain, not a pair of rooms.**
 `lake_arcanum` (third outdoor zone) and `drowned_vault` (second dungeon, 5 rooms + the Drowned
 Archon) ship, plus five new field quests, so the route runs academy → Whispering Forest →
 Cinderhollow Caverns → Lake Arcanum → the Drowned Vault. **All six WORLDSPEC steps are now done**;
@@ -538,8 +607,10 @@ as part of the dorm work rather than left as notes:
 
 1. ~~**Dorm phases D1–D4**~~ — ✅ done; architecture in §6.8.
 2. ~~**WORLDSPEC step 6 — content pass**~~ — ✅ done; all six steps complete.
-3. **Character creation & visuals.** 3D preview at character creation, per-school outfit
-   visuals, visible equipment on the 3D model — `BACKLOG.md` §2, `docs/DESIGN-DECISIONS.md` §4.
+3. ~~**Character creation & 3D preview**~~ — ✅ done (§6.9). Still open from this line: **visible
+   equipment on the 3D model** (unblocked — the rig exposes `RightHand`/`LeftHand`, and the repo
+   already ships CC0 KayKit weapons) and genuinely different **per-school garments**, which needs
+   new geometry rather than tinting — `BLENDERTODO.md` Tier 5.
 4. **Deepen the Academy curriculum** — actual class/lesson content, not just the numeric perks
    `academy.js` already grants.
 5. **Collection depth** — card evolution, foil/holo variants, an encyclopedia (`BACKLOG.md` §5).

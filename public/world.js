@@ -5,6 +5,7 @@
 import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
 import { isClear, CHARACTER_HEIGHT, BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
+import { tintTree } from "./tint.js";
 import { heightAt, isWater, flatsForZone, groundColorAt, BIOMES } from "./terrain.js";
 import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS } from "./worldconfig.js";
 
@@ -424,27 +425,62 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     g.position.y = base + Math.abs(Math.sin(t*9))*0.09*speed;
   }
 
-  // ---------- player ----------
-  let schoolColor = null;
-  function applyPlayerColor(){
-    if (schoolColor == null) return;
+  // ---------- player appearance (BACKLOG §2, charcreate.js) ----------
+  //
+  // `player_wizard.glb` is ONE mesh with ONE material, so there is nothing to recolour per part.
+  // The old version lerped that single material 45% toward a flat school colour, which dragged
+  // the face, hands and boots toward it too and washed the painted texture into a single hue.
+  //
+  // This rotates HUE while keeping each material's own LIGHTNESS, so the painting survives and
+  // the school still reads instantly. charcreate.js decides the numbers; this only applies them.
+  let appearance = null;         // { hue, sat, light, strength, aura, motes } or null
+  let auraGroup = null;
+  function applyPlayerAppearance(){
+    if (!appearance) return;
+    // The shift happens in the FRAGMENT SHADER (tint.js), not on material.color: the player GLB's
+    // Base Color is white and all of its colour is in the texture, so multiplying the material
+    // colour cannot rotate a hue — it can only darken. Found by rendering the preview and seeing
+    // a Fire wizard come out Storm purple while the numbers were correct.
     const ud = player.userData;
-    if (ud && ud.robe && ud.robe.parent){ ud.robe.material.color.set(schoolColor); ud.chest.material.color.set(schoolColor); }
+    if (ud && ud.robe && ud.robe.parent) tintTree(player, appearance);
     const pc = chars.player;
-    if (pc && pc.model){
-      // tint the loaded model with the school colour without flattening its texture
-      pc.model.traverse(o => {
-        if (o.isMesh && o.material && o.material.color && !o.userData._tintBase){
-          o.userData._tintBase = o.material.color.clone();
-        }
-      });
-      pc.model.traverse(o => {
-        if (o.isMesh && o.material && o.material.color){
-          const base = o.userData._tintBase;
-          o.material = o.material.clone();
-          o.material.color.copy(base).lerp(new THREE.Color(schoolColor), 0.45);
-        }
-      });
+    if (pc && pc.model) tintTree(pc.model, appearance);
+    buildAura();
+  }
+  // A school-coloured glow on the ground under the player. This is the half of the appearance
+  // system that is actually unambiguous at a glance — a hue shift on a dark robe is subtle at
+  // camera distance, a coloured rune ring is not.
+  function buildAura(){
+    if (auraGroup){
+      // Free the GPU memory rather than just detaching. The aura is rebuilt on every appearance
+      // change, and the character-creation screen changes it on every click of every swatch.
+      auraGroup.traverse(o => { if (o.isMesh){ o.geometry.dispose(); o.material.dispose(); } });
+      player.remove(auraGroup); auraGroup = null;
+    }
+    if (!appearance || appearance.aura == null) return;
+    auraGroup = new THREE.Group();
+    const glow = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.42,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.05, 28, 1), glow(appearance.aura));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03;
+    auraGroup.add(ring);
+    const inner = new THREE.Mesh(new THREE.RingGeometry(0.30, 0.38, 20, 1), glow(appearance.aura));
+    inner.rotation.x = -Math.PI / 2; inner.position.y = 0.03; inner.material.opacity = 0.3;
+    auraGroup.add(inner);
+    for (let i = 0; i < (appearance.motes || 0); i++){
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.075, 6, 5), glow(appearance.aura));
+      m.material.opacity = 0.8;
+      m.userData.phase = (i / appearance.motes) * Math.PI * 2;
+      auraGroup.add(m);
+    }
+    player.add(auraGroup);
+  }
+  function stepAura(t){
+    if (!auraGroup) return;
+    for (const m of auraGroup.children){
+      if (m.userData.phase == null) continue;
+      const a = m.userData.phase + t * 0.7;
+      m.position.set(Math.cos(a) * 0.95, 0.55 + Math.sin(a * 1.7) * 0.35, Math.sin(a) * 0.95);
     }
   }
   const player = makeWizard(0x3a6bd8, 0x2a1f4d);
@@ -664,7 +700,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     }
   }
   // Generated GLB character models — keys match NPC roles so the update loop uses the GLB mixer.
-  makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>applyPlayerColor());
+  makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>applyPlayerAppearance());
   for (const n of ZONE.npcs) makeCharModel(n.key, './assets/models/' + n.model, npcByKey[n.key]);
   for (let i=0;i<ZWANDER.length;i++) makeCharModel(ZWANDER[i].key, './assets/models/' + ZWANDER[i].model, wanderers[i]);
 
@@ -1138,6 +1174,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     updateChars(dt);
     updateNearby();
     updateExits();
+    stepAura(now / 1000);
     updateCamera();
     renderer.render(scene, camera);
   }
@@ -1192,11 +1229,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     // for the same reason.
     renderOnce(){ renderer.render(scene, camera); },
     setTouchMove(x, y){ joy.x = x; joy.y = y; },
-    setPlayerColor(color){
-      // Remembered, because this is usually called before the GLB finishes loading — and once
-      // it loads, userData.robe is no longer in the scene, so writing only there was a no-op.
-      schoolColor = color;
-      applyPlayerColor();
+    // Remembered, because this is usually called before the GLB finishes loading — and once
+    // it loads, userData.robe is no longer in the scene, so writing only there was a no-op.
+    setPlayerAppearance(look){
+      appearance = look;
+      applyPlayerAppearance();
     },
     rotateCam(dx){ camYaw += dx * 0.006; },
     zoomCam(dy){ camDist = Math.max(6, Math.min(40, camDist + dy * 0.05)); },

@@ -316,6 +316,23 @@ body.has-touch .worldbtn{display:flex;}
     <div id="spBody" style="margin-top:20px"></div>
   </div>
 </div>
+<!-- Character creation (BACKLOG §2). The 3D preview canvas lives here rather than reusing the
+     world canvas: creation runs BEFORE the world exists, and can be reopened later while a world
+     is already running on its own canvas. -->
+<div id="charCreate" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:100;overflow-y:auto">
+  <div style="max-width:820px;margin:5vh auto;background:var(--panel);border:1px solid var(--gold);border-radius:22px;padding:24px">
+    <div style="color:var(--gold);font-weight:800;font-size:24px;text-align:center" id="ccTitle">Create Your Wizard</div>
+    <div style="color:var(--muted);font-size:13px;margin-top:6px;text-align:center" id="ccSub"></div>
+    <div class="row" style="margin-top:16px;align-items:stretch;gap:16px;flex-wrap:wrap">
+      <div style="flex:0 0 240px;min-width:200px;display:flex;flex-direction:column;align-items:center">
+        <canvas id="ccPreview" style="width:100%;height:300px;border-radius:16px;background:radial-gradient(circle at 50% 35%, #2a2340, #14101f)"></canvas>
+        <div class="sub" style="margin-top:6px" id="ccLook"></div>
+      </div>
+      <div style="flex:1;min-width:280px;text-align:left" id="ccBody"></div>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-top:16px" id="ccNav"></div>
+  </div>
+</div>
 <script src="./vendor/three.min.js"></script>
 <script src="./vendor/GLTFLoader.js"></script>
 <script src="./vendor/DRACOLoader.js"></script>
@@ -336,6 +353,8 @@ import * as REP from "./reputation.js";
 import * as ACADEMY from "./academy.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
+import * as CC from "./charcreate.js";
+import { createPreview } from "./preview3d.js";
 
 // ================= state =================
 let S = G.load();
@@ -515,9 +534,109 @@ window.__EV.chooseSchool = (s)=>{
   G.issueSchoolStarter(S, s);
   save();
   $("schoolPicker").style.display = "none";
-  if (world) world.setPlayerColor(SCHOOLS[s].color);
+  if (world) world.setPlayerAppearance(CC.appearanceFor(S));
   toast(`Welcome to the ${SCHOOLS[s].name} School! Your school's cards were added to your collection.`); render();
+  // The school picker is now step 2 of character creation. If creation is still unfinished
+  // (no name yet, or no look chosen), fall back into it rather than dumping the player into the
+  // world half-created — the whole point of the flow is that it completes.
+  if (ccOpen && !CC.isComplete(S)) showCharCreate();
 };
+
+// ================= character creation (BACKLOG §2) =================
+// Three steps, each DERIVED from the save by charcreate.js — there is no step cursor to desync.
+// The live 3D preview applies the SAME appearance object world.js does, so what is shown here is
+// literally what gets rendered in the world.
+let preview = null, ccOpen = false, ccDraftName = "";
+function showCharCreate(){
+  ccOpen = true;
+  $("charCreate").style.display = "block";
+  ccDraftName = S.name || "";
+  if (!preview){
+    try { preview = createPreview($("ccPreview")); } catch(e){ console.warn("preview unavailable:", e && e.message); }
+  }
+  if (preview){ preview.resize(); preview.setAppearance(CC.appearanceFor(S)); preview.start(); }
+  renderCharCreate();
+}
+function closeCharCreate(){
+  ccOpen = false;
+  $("charCreate").style.display = "none";
+  if (preview) preview.stop();          // stop the loop; keep the context so reopening is instant
+  if (world) world.setPlayerAppearance(CC.appearanceFor(S));
+  render();
+}
+function renderCharCreate(){
+  if (!ccOpen) return;
+  const step = CC.currentStep(S) || CC.STEPS[CC.STEPS.length - 1];
+  const prog = CC.progress(S);
+  const look = CC.appearanceFor(S);
+  if (preview) preview.setAppearance(look);
+  $("ccSub").textContent = `${step.sub}  ·  step ${prog.index + 1} of ${prog.total}`;
+  $("ccLook").textContent = look.label;
+
+  let h = "";
+  // --- name ---
+  h += `<div class="panel" style="margin-bottom:10px"><div style="font-weight:700">1 · Your name</div>
+    <input id="ccName" type="text" maxlength="${CC.NAME_MAX}" value="${escapeAttr(ccDraftName)}"
+      placeholder="${CC.DEFAULT_NAME}" oninput="window.__ev('ccName')"
+      style="width:100%;margin-top:6px;padding:10px;border-radius:10px;border:1px solid var(--line);background:#12101c;color:var(--ink);font-size:15px">
+    <div class="sub" id="ccNameErr" style="margin-top:4px;min-height:16px"></div></div>`;
+  // --- school ---
+  const sc = SCHOOLS[S.school];
+  h += `<div class="panel" style="margin-bottom:10px"><div style="font-weight:700">2 · Your school</div>
+    <div class="sub" style="margin:4px 0">${SCHOOL_ICON[S.school]} <b style="color:${sc.color}">${sc.name}</b> — ${SCHOOL_DESC[S.school].split(".")[0]}.</div>
+    <div class="row" style="flex-wrap:wrap;gap:5px">` +
+    Object.keys(SCHOOLS).map(id=>`<button class="btn sm ${id===S.school?"gold":""}"
+      onclick="window.__ev('ccSchool|${id}')">${SCHOOL_ICON[id]} ${SCHOOLS[id].name}</button>`).join("") +
+    `</div><div class="sub" style="margin-top:6px">Changing school swaps your starter deck and your colours. Not sure? <a href="#" onclick="window.__ev('ccQuiz');return false;" style="color:var(--gold)">take the quiz</a>.</div></div>`;
+  // --- look ---
+  h += `<div class="panel"><div style="font-weight:700">3 · Your look</div>
+    <div class="sub" style="margin:6px 0 4px">Robe dye</div><div class="row" style="flex-wrap:wrap;gap:5px">` +
+    CC.VARIANTS.map(v=>`<button class="btn sm ${v.id===CC.variantFor(S).id?"gold":""}"
+      onclick="window.__ev('ccVariant|${v.id}')">${v.label}</button>`).join("") +
+    `</div><div class="sub" style="margin:10px 0 4px">Arcane aura</div><div class="row" style="flex-wrap:wrap;gap:5px">` +
+    CC.AURAS.map(a=>`<button class="btn sm ${a.id===CC.auraFor(S).id?"gold":""}"
+      onclick="window.__ev('ccAura|${a.id}')">${a.label}</button>`).join("") +
+    `</div></div>`;
+  $("ccBody").innerHTML = h;
+
+  const problem = CC.nameProblem(ccDraftName);
+  $("ccNameErr").textContent = ccDraftName ? (problem || "") : "";
+  $("ccNameErr").style.color = problem ? "var(--danger)" : "var(--muted)";
+  const ready = !problem;
+  $("ccNav").innerHTML = `<button class="btn" onclick="window.__ev('ccSpin')">🔄 Spin</button>
+    <button class="btn gold" ${ready?"":"disabled"} onclick="window.__ev('ccDone')">${ready?"Enter the Academy":"Choose a name first"}</button>`;
+}
+function esc(v){ return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function escapeAttr(v){ return String(v).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+window.__EV.ccName = ()=>{
+  // Re-render the whole panel on every keystroke would blow away focus, so only the error line
+  // and the confirm button update here.
+  ccDraftName = $("ccName").value;
+  const problem = CC.nameProblem(ccDraftName);
+  $("ccNameErr").textContent = ccDraftName ? (problem || "") : "";
+  $("ccNameErr").style.color = problem ? "var(--danger)" : "var(--muted)";
+  const btn = $("ccNav").querySelector(".btn.gold");
+  if (btn){ btn.disabled = !!problem; btn.textContent = problem ? "Choose a name first" : "Enter the Academy"; }
+};
+window.__EV.ccSchool = (id)=>{
+  if (!SCHOOLS[id]) return;
+  G.setSchool(S, id); S.flags.schoolPicked = true;
+  G.issueSchoolStarter(S, id);
+  save(); renderCharCreate();
+};
+window.__EV.ccVariant = (id)=>{ CC.applyAppearance(S, { variant:id }); save(); renderCharCreate(); };
+window.__EV.ccAura = (id)=>{ CC.applyAppearance(S, { aura:id }); save(); renderCharCreate(); };
+window.__EV.ccSpin = ()=>{ if (preview) preview.nudge(90); };
+window.__EV.ccQuiz = ()=>{ $("charCreate").style.display = "none"; showSchoolPicker(); };
+window.__EV.ccDone = ()=>{
+  const r = CC.applyAppearance(S, { name: ccDraftName });
+  if (!r.ok){ err(r.err); return; }
+  CC.applyAppearance(S, { variant: CC.variantFor(S).id, aura: CC.auraFor(S).id });  // pin the defaults
+  save();
+  closeCharCreate();
+  toast(`Welcome, ${S.name}.`);
+};
+window.__EV.openCharCreate = ()=>{ showCharCreate(); };
 
 // ================= navigation =================
 const NAV = [
@@ -716,7 +835,15 @@ window.__EV.dormDisplay = (slot,uid)=>{ const r = DORM.displayIn(S, slot, uid); 
 window.__EV.dormClearCase = (slot)=>{ DORM.clearCase(S, slot); save(); render(); };
 
 function renderHome(el){
-  let h = `<h2>${STR.hall_title}</h2>`;
+  // The player's name and school look are chosen at creation and never shown anywhere else, so
+  // the Dorm header is where they live — and where they can be changed.
+  const look = CC.appearanceFor(S);
+  let h = `<h2>${STR.hall_title}</h2>
+    <div class="panel" style="margin-bottom:10px"><div class="row" style="align-items:center">
+      <div class="grow"><div style="font-weight:800;font-size:17px">${esc(S.name || CC.DEFAULT_NAME)}</div>
+        <div class="sub">${SCHOOL_ICON[S.school]} ${SCHOOLS[S.school].name} · ${look.label}${look.aura==null?"":" · aura"}</div></div>
+      <button class="btn sm" onclick="window.__ev('openCharCreate')">✨ Appearance</button>
+    </div></div>`;
   if (!S.home.owned){
     h += `<div class="panel"><div class="t" style="font-weight:700;font-size:16px">🏰 ${STR.hall_locked}</div>
       <p class="sub">${STR.hall_prompt}</p>
@@ -1645,7 +1772,7 @@ function changeZone(toZoneId, fromZoneId, spawnOverride){
     activeZone = target;
     world = spawnWorld(canvas, target, spawnAt);
     window.__world = world;
-    world.setPlayerColor(SCHOOLS[S.school].color);
+    world.setPlayerAppearance(CC.appearanceFor(S));
     world.resize();
     S.worldState.zone = toZoneId;
     if (!S.worldState.visited.includes(toZoneId)) S.worldState.visited.push(toZoneId);
@@ -1862,6 +1989,8 @@ window.__testDorm = ()=>{
   return { tier: DORM.tierFor(S).id, placed: Object.keys(S.home.furniture).length };
 };
 window.__testEnterDorm = ()=>{ enterDorm(); };
+window.__testPreview = ()=> preview;
+window.__testAppearance = ()=> CC.appearanceFor(S);
 window.__testDormRoom = ()=>{ const r = DORM.dormRoom(S); return [r.w, r.d]; };
 window.__testDormUpgrade = ()=>{ S.gold += 5000; S.inventory.oak_log = (S.inventory.oak_log||0) + 60;
   for (const u of HOME_UPGRADES) G.upgradeHome(S, u.id); save(); return DORM.tierFor(S).id; };
@@ -1895,8 +2024,12 @@ window.__EV.toggleMute = ()=>{
 async function boot(){
   $("muteBtn").textContent = AUDIO.isMuted() ? "🔇" : "🔊";
   await initWorld();
-  if (world) world.setPlayerColor(SCHOOLS[S.school].color);
-  if (!S.flags.schoolPicked) showSchoolPicker();
+  if (world) world.setPlayerAppearance(CC.appearanceFor(S));
+  // Character creation replaces the bare school picker on a fresh save. It is skipped for any
+  // save that already finished it, and `CC.isComplete` is DERIVED, so an older save that has a
+  // school but no name is walked through the remaining steps rather than either re-doing the
+  // school or being left half-created.
+  if (!CC.isComplete(S)) showCharCreate();
   // online room from URL
   const roomParam = new URLSearchParams(location.search).get("room");
   if (roomParam){

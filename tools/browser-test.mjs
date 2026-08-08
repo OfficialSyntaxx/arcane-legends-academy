@@ -147,7 +147,13 @@ await page.waitForTimeout(1500);
 // inset:0, so it swallows every real pointer/wheel event — the dispatchEvent-based checks below
 // bypassed hit-testing and never noticed, but page.mouse.wheel did, and "wheel zooms the camera"
 // was passing only because the follow-lerp happened to move the camera for other reasons.
-await page.evaluate(() => { const e = document.getElementById("schoolPicker"); if (e) e.style.display = "none"; });
+// `charCreate` is the same trap and now shows FIRST on a fresh save, so hiding only the old
+// school picker left the gesture tests shooting through a full-screen modal again.
+await page.evaluate(() => {
+  for (const id of ["schoolPicker", "charCreate"]){
+    const e = document.getElementById(id); if (e) e.style.display = "none";
+  }
+});
 await page.waitForTimeout(200);
 
 const hasWorld = await page.evaluate(() => !!window.__worldDebug);
@@ -843,6 +849,88 @@ if (hasWorld){
   check("leaving the second dungeon returns to the lake", lake.zoneAfter === "lake_arcanum", String(lake.zoneAfter));
 
 }
+
+
+  // --- character creation + per-school appearance (BACKLOG §2) ---
+  // The numbers are covered headlessly. What only a browser proves: the creation screen opens on
+  // a fresh save, the 3D preview canvas actually renders something, and picking a school visibly
+  // changes the character rather than changing a number nobody can see.
+  {
+    // A genuinely fresh context: creation only shows once per save, and the page under test
+    // above has been played through a dorm, two dungeons and a quest chain.
+    const cctx = await browser.newContext({ viewport:{width:900,height:900}, hasTouch:false });
+    const p2 = await cctx.newPage();
+    await p2.goto(BASE + "/index.html", { waitUntil: "load" });
+    await p2.waitForTimeout(3500);
+    const r = await p2.evaluate(async () => {
+      const settle = ms => new Promise(r => setTimeout(r, ms));
+      const out = {};
+      const panel = document.getElementById("charCreate");
+      out.opensOnFreshSave = !!panel && getComputedStyle(panel).display !== "none";
+      const cv = document.getElementById("ccPreview");
+      out.canvas = cv ? [cv.width, cv.height] : null;
+      // Does the preview draw anything at all? Same pixel-reading approach the dorm uses, and for
+      // the same reason: a screenshot of a WebGL canvas comes back blank.
+      const lit = () => {
+        window.__testPreview().renderOnce();
+        const c2 = document.createElement("canvas"); c2.width = cv.width; c2.height = cv.height;
+        c2.getContext("2d").drawImage(cv, 0, 0);
+        const px = c2.getContext("2d").getImageData(0, 0, c2.width, c2.height).data;
+        let sum = 0, n = 0, hue = [0, 0, 0];
+        for (let i = 0; i < px.length; i += 4){
+          if (px[i+3] < 8) continue;                       // the canvas is alpha:true
+          sum += px[i] + px[i+1] + px[i+2]; n++;
+          hue[0] += px[i]; hue[1] += px[i+1]; hue[2] += px[i+2];
+        }
+        return { mean: n ? sum / n / 3 : 0, rgb: n ? hue.map(v => v / n) : [0,0,0], n };
+      };
+      out.blank = lit();
+      // pick Fire, then Ice, and compare the average colour of the rendered character
+      document.querySelector('#ccBody button[onclick*="ccSchool|fire"]').click();
+      await settle(900);
+      out.fire = lit();
+      document.querySelector('#ccBody button[onclick*="ccSchool|ice"]').click();
+      await settle(900);
+      out.ice = lit();
+      // aura on/off must change what is drawn
+      document.querySelector('#ccBody button[onclick*="ccAura|none"]').click();
+      await settle(600);
+      out.noAura = lit();
+      document.querySelector('#ccBody button[onclick*="ccAura|motes"]').click();
+      await settle(600);
+      out.motes = lit();
+      // name validation drives the confirm button
+      const input = document.getElementById("ccName");
+      const set = v => { input.value = v; window.__ev("ccName"); };
+      set("<script>");
+      out.badNameBlocks = document.querySelector("#ccNav .btn.gold").disabled;
+      set("Rowan the Bold");
+      out.goodNameAllows = !document.querySelector("#ccNav .btn.gold").disabled;
+      document.querySelector("#ccNav .btn.gold").click();
+      await settle(700);
+      out.closed = getComputedStyle(document.getElementById("charCreate")).display === "none";
+      out.savedName = JSON.parse(localStorage.getItem("arcane_legends_save_v1")).name;
+      out.previewLoadedModel = window.__testPreview().loaded();
+      return out;
+    });
+    check("character creation opens on a fresh save", r.opensOnFreshSave === true);
+    check("the preview canvas has a real size", !!r.canvas && r.canvas[0] > 50 && r.canvas[1] > 50, JSON.stringify(r.canvas));
+    check("the preview actually renders a character", r.fire.mean > 10 && r.fire.n > 2000,
+          `mean ${r.fire.mean.toFixed(1)} over ${r.fire.n} px`);
+    // The entire point of the appearance system: two schools must not look the same.
+    check("switching school visibly changes the character", (()=>{
+      const d = Math.hypot(r.fire.rgb[0]-r.ice.rgb[0], r.fire.rgb[1]-r.ice.rgb[1], r.fire.rgb[2]-r.ice.rgb[2]);
+      return d > 6;
+    })(), `fire ${r.fire.rgb.map(v=>v.toFixed(0))} vs ice ${r.ice.rgb.map(v=>v.toFixed(0))}`);
+    check("turning the aura on changes what is drawn",
+          Math.abs(r.motes.mean - r.noAura.mean) > 0.4,
+          `none ${r.noAura.mean.toFixed(2)} vs motes ${r.motes.mean.toFixed(2)}`);
+    check("an unusable name blocks the confirm button", r.badNameBlocks === true);
+    check("a valid name unblocks it", r.goodNameAllows === true);
+    check("confirming closes creation and saves the name", r.closed === true && r.savedName === "Rowan the Bold", String(r.savedName));
+    check("the preview loaded the real player model, not just the stand-in", r.previewLoadedModel === true);
+    await p2.close(); await cctx.close();
+  }
 
 check("no uncaught page errors", errs.length === 0, errs.slice(0,3).join(" | "));
 

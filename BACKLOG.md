@@ -5,6 +5,7 @@
 > - **`docs/DESIGN-DECISIONS.md`** — answers to open design questions (interiors, 3D duels, school outfits).
 > - **`docs/ASSET-BUDGET.md`** — asset platform costs, CC0 sources, licensing.
 > - **`docs/NEXT-PHASE-PLAN.md`** — the systems audit and phase tracker (Phases A–D).
+> - **`BLENDERTODO.md`** — modelling briefs for every asset still drawn as a procedural primitive.
 >
 > **Status markers below:** `[x]` done, `[~]` partly done. Items were re-checked against the
 > codebase on merge, since several were already complete.
@@ -30,15 +31,25 @@
 
 ## 2. Academy & Character
 
-- [~] Character creation — school questionnaire + picker exist; a full creation screen with 3D preview is designed but not built (`docs/DESIGN-DECISIONS.md` §4)
-- [~] School identity / specialization — 7 schools, starter decks, +1 affinity and the elemental ring all live; per-school *visuals* not yet
+- [x] Character creation — a three-step screen (name → school → look) with a **live rotating 3D
+  preview** (`charcreate.js` / `preview3d.js`). Every step is derived from the save, so backing
+  out or changing school later cannot desync it. Name validation is a correctness matter, not
+  taste: the name goes into `innerHTML` on the Dorm screen.
+- [~] School identity / specialization — 7 schools, starter decks, +1 affinity and the elemental
+  ring all live. Per-school **visuals** now ship as a fragment-shader hue shift (`tint.js`) plus a
+  school-coloured ground aura. Genuinely different *garments* are still open: the player GLB is a
+  single mesh with a single white-based material, so there is nothing to recolour per part —
+  see `BLENDERTODO.md` Tier 5 and `docs/DESIGN-DECISIONS.md` §4.
 - [~] Academy classes and curriculum — see §1 above (`academy.js`); numeric perks only, no lesson content yet
 - [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
 - [~] Main story + side quests — ten field quests across two zones (`zonequests.js`): five in the
   Whispering Forest, five at Lake Arcanum gated behind the Cinder Wyrm, with gather/slay/clear/boss
   objectives, prerequisites and a quest log. `validateQuests` proves the whole chain is completable
   and that no prerequisite is missing or cyclic. The main story is still to write.
-- [ ] Visual equipment on 3D character
+- [ ] Visual equipment on 3D character — **unblocked**: the auto-rigged player exposes
+  `RightHand`/`LeftHand` bones and the repo already ships CC0 KayKit weapons
+  (`wpn_sword_A`, `wpn_staff_A`, `wpn_wand_A`, …). What is missing is an attachment helper in
+  `world.js`; `S.loadout` already has the data. See `BLENDERTODO.md` Tier 5.
 - [x] **Dorm customization — DONE (D1–D4).** The Student Dorms is no longer a menu. Walking up and
   pressing the prompt builds a real interior *zone* (`dorm.js`, pure; it reuses `dungeons.js` to
   lay the room out, so a dorm is a one-room dungeon with no enemies and inherits zone transitions,
@@ -150,7 +161,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 297 engine / 34 online / 85 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 316 engine / 34 online / 95 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -212,7 +223,8 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **WORLDSPEC step 6, the content pass** (Lake Arcanum + the
+**Changes made, most recent first:** **character creation + per-school appearance**
+(`charcreate.js` / `tint.js` / `preview3d.js`) and **`BLENDERTODO.md`** → **WORLDSPEC step 6, the content pass** (Lake Arcanum + the
 Drowned Vault, five new quests, per-dungeon palettes, `nearWater` scatter) → the **Dorm phases D1–D4** (`dorm.js` — walk-in interior
 zone, furniture placement, display cases, boss trophies, upgrade-driven room tiers) → the outdoor
 **Duel Arena landmark** swapped for a
@@ -230,7 +242,13 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** WORLDSPEC **step 6 (the content pass) is done** — Lake Arcanum and the Drowned
+**Next step:** **character creation + per-school appearance are done** (a three-step screen with a
+live 3D preview; the school look is a shader hue-shift plus a coloured aura — see `CLAUDEREADME.md`
+§6.9 for why it could not be a colour assignment). **`BLENDERTODO.md` is new**: a full modelling
+brief for every asset still drawn as a procedural primitive, written for an AI agent driving
+Blender, each with dimensions, budgets and the exact table row to edit afterwards.
+
+Before that, WORLDSPEC **step 6 (the content pass) was done** — Lake Arcanum and the Drowned
 Vault ship, so the world now chains academy → forest → Cinderhollow → lake → vault with ten field
 quests across the two outdoor zones. All six WORLDSPEC steps are complete. What remains for the
 world is polish rather than architecture: fast travel, day/night, weather, hidden areas, and the

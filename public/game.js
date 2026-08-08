@@ -18,12 +18,15 @@ export function newGame(){
   const cards = [];
   for (const id of starterTypes) for (let i=0;i<3;i++) cards.push({ uid: uid(), id, roll: Math.floor(rng()*101), graded:false });
   return {
-    version:1, name:"Aspiring Wizard", school:"balance", gold:START_GOLD, xp:0, level:1,
+    version:1, school:"balance", gold:START_GOLD, xp:0, level:1,
     skills:{ mining:1, fishing:1, woodcutting:1, smithing:1, alchemy:1, scribing:1 },
     skillXp:{ mining:0, fishing:0, woodcutting:0, smithing:0, alchemy:0, scribing:0 },
     inventory:{}, cards, equipment:[],
     loadout:{ wand:null, hat:null, robe:null, boots:null, amulet:null },
     deck,
+    // `name` starts EMPTY on purpose: charcreate.js derives "creation unfinished" from a missing
+    // name, so a default here would skip the creation screen entirely on a fresh save.
+    name:"", appearance:{ variant:"standard", aura:"ring" },
     home:{ owned:false, upgrades:{ treasury:0, library:0, armory:0, tavern:0 }, stock:{}, furniture:{}, cases:{} },
     quests:{ current:0, done:[] },
     pvp:{ wins:0, losses:0 },
@@ -78,6 +81,16 @@ function migrate(s){
   // `cases` is slot -> card uid. Nothing derived is stored: the room's size and slot count come
   // from the upgrade levels, a displayed slab's grade is read off the live card, and trophies are
   // recomputed from boss kills — so none of that can drift out of sync with the save.
+  // Character creation (BACKLOG §2). `name` and `appearance` are CHOICES, so they are stored;
+  // the resolved hue/saturation/aura are derived by charcreate.js on every read and never saved,
+  // which is what lets the palette be retuned later without a migration.
+  //
+  // NOTE the asymmetry: `appearance` is defaulted here so every save renders, but `name` is left
+  // UNSET on purpose. charcreate.js derives "creation is unfinished" from a missing name, so
+  // filling one in here would silently skip the creation screen for every existing save.
+  if (!s.appearance || typeof s.appearance !== "object") s.appearance = { variant:"standard", aura:"ring" };
+  if (!s.appearance.variant) s.appearance.variant = "standard";
+  if (!s.appearance.aura) s.appearance.aura = "ring";
   if (!s.home.stock || typeof s.home.stock !== "object") s.home.stock = {};
   if (!s.home.furniture || typeof s.home.furniture !== "object") s.home.furniture = {};
   if (!s.home.cases || typeof s.home.cases !== "object") s.home.cases = {};

@@ -1,6 +1,6 @@
 // Engine smoke test — runs the card engine, economy, and economy-balance checks headlessly.
 import * as G from "../public/game.js";
-import { CARDS, CARD_MAP, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
+import { CARDS, CARD_MAP, SCHOOLS, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
 import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS } from "../public/items.js";
 import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
 import * as ST from "../public/structures.js";
@@ -15,6 +15,7 @@ import * as ZQ from "../public/zonequests.js";
 import * as ACADEMY from "../public/academy.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
+import * as CC from "../public/charcreate.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -1800,6 +1801,118 @@ check("the whole lake chain can be completed in order", (()=>{
   const left = ZQ.ZONE_QUESTS.filter(q => !ZQ.isDone(s, q.id)).map(q => q.id);
   if (left.length) console.log("   never completed: " + left.join(", "));
   return left.length === 0;
+})());
+
+
+// ---- character creation + per-school appearance (BACKLOG §2) ----
+// The whole appearance system is a set of NUMBERS derived from the save; world.js and
+// preview3d.js only apply them. That makes it fully checkable here, which matters because the
+// thing it is protecting against — two schools that look the same — is invisible in a unit test
+// unless something explicitly measures it.
+check("every school has a look, and no look invents a school", (()=>{
+  const problems = CC.validateLooks({ schoolIds: Object.keys(SCHOOLS) });
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("no two schools are close enough in hue to be confused", (()=>{
+  const ids = Object.keys(CC.SCHOOL_LOOKS);
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++){
+    const a = CC.SCHOOL_LOOKS[ids[i]].hue, b = CC.SCHOOL_LOOKS[ids[j]].hue;
+    const d = 180 - Math.abs(Math.abs(a - b) - 180);
+    if (d < 22){ console.log(`   ${ids[i]}/${ids[j]} only ${d}° apart`); return false; }
+  }
+  return true;
+})());
+check("appearance is fully derived — nothing resolved is written to the save", (()=>{
+  const s = G.newGame(); s.school = "fire";
+  const before = JSON.stringify(s);
+  CC.appearanceFor(s);
+  return JSON.stringify(s) === before;
+})());
+check("changing school changes the appearance without touching stored fields", (()=>{
+  const s = G.newGame();
+  s.school = "fire"; const a = CC.appearanceFor(s);
+  s.school = "ice";  const b = CC.appearanceFor(s);
+  return a.hue !== b.hue && a.aura !== b.aura && s.appearance.variant === "standard";
+})());
+check("a variant changes richness but never the school's hue", (()=>{
+  const s = G.newGame(); s.school = "storm";
+  const std = CC.appearanceFor(s);
+  CC.applyAppearance(s, { variant:"deep" });
+  const deep = CC.appearanceFor(s);
+  // hue is the school's identity; only saturation/lightness/strength may move
+  return deep.hue === std.hue && deep.sat > std.sat && deep.strength !== std.strength;
+})());
+check("tint strength stays inside 0..1 for every variant", CC.VARIANTS.every(v => v.strength >= 0 && v.strength <= 1));
+check("the aura can be switched off, and off means null", (()=>{
+  const s = G.newGame();
+  CC.applyAppearance(s, { aura:"none" });
+  return CC.appearanceFor(s).aura === null && CC.appearanceFor(s).motes === 0;
+})());
+check("an unknown variant or aura is rejected rather than stored", (()=>{
+  const s = G.newGame();
+  const a = CC.applyAppearance(s, { variant:"chartreuse" });
+  const b = CC.applyAppearance(s, { aura:"disco" });
+  return !a.ok && !b.ok && s.appearance.variant === "standard" && s.appearance.aura === "ring";
+})());
+// Names go straight into innerHTML on the Dorm screen, so this is a correctness check, not taste.
+check("names that would break the UI are rejected", (()=>{
+  const bad = ["", "   ", "<script>", "Bob & Alice", "a".repeat(CC.NAME_MAX + 1), "9Lives", "Sam\u0000"];
+  return bad.every(n => CC.nameProblem(n) !== null);
+})());
+check("ordinary names, including non-Latin ones, are accepted", (()=>{
+  const good = ["Rowan", "Nell O'Shea", "Jean-Luc", "Ada Lovelace", "Зарина", "さくら"];
+  const bad = good.filter(n => CC.nameProblem(n) !== null);
+  if (bad.length) console.log("   rejected: " + bad.join(", "));
+  return bad.length === 0;
+})());
+check("sloppy spacing is fixed, not refused", CC.nameProblem("Two  Spaces") === null && CC.sanitizeName("Two  Spaces") === "Two Spaces");
+check("a name is trimmed and collapsed rather than stored raw", (()=>{
+  const s = G.newGame();
+  CC.applyAppearance(s, { name: "  Rowan   the Green  " });
+  return s.name === "Rowan the Green";
+})());
+check("a rejected name is not written to the save", (()=>{
+  const s = G.newGame();
+  const r = CC.applyAppearance(s, { name: "<b>" });
+  return !r.ok && !s.name;
+})());
+// The step model, same derived-state contract as onboarding.js.
+check("a fresh save has creation unfinished, starting at the name", (()=>{
+  const s = G.newGame();
+  return !CC.isComplete(s) && CC.currentStep(s).id === "name";
+})());
+check("progress reports the step the player is ON, not the number finished", (()=>{
+  const s = G.newGame();
+  s.flags.schoolPicked = true;                       // school + look done, name is not
+  const p = CC.progress(s);
+  return p.done === 2 && p.index === 0 && CC.currentStep(s).id === "name";
+})());
+check("creation completes once name, school and look are all set", (()=>{
+  const s = G.newGame();
+  CC.applyAppearance(s, { name:"Rowan" });
+  s.flags.schoolPicked = true;
+  return CC.isComplete(s) && CC.progress(s).done === CC.STEPS.length;
+})());
+check("creation steps are derived, so doing them out of order still completes", (()=>{
+  const s = G.newGame();
+  s.flags.schoolPicked = true;                      // school first
+  CC.applyAppearance(s, { aura:"motes" });          // look second
+  if (CC.currentStep(s).id !== "name") return false;
+  CC.applyAppearance(s, { name:"Nell" });           // name last
+  return CC.isComplete(s);
+})());
+check("an older save with a school but no name is walked through the rest, not re-schooled", (()=>{
+  // The migration deliberately does NOT invent a name — this is the case that proves why.
+  localStorage_stub(JSON.stringify({ ...G.newGame(), name: undefined, school:"death", flags:{ schoolPicked:true } }));
+  const s = G.load();
+  return !CC.isComplete(s) && CC.currentStep(s).id === "name" && s.school === "death";
+})());
+check("migrate defaults the appearance so an old save still renders", (()=>{
+  const old = G.newGame(); delete old.appearance;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  return s.appearance.variant === "standard" && CC.appearanceFor(s).aura != null;
 })());
 
 
