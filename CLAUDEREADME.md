@@ -63,6 +63,8 @@ wizard-tcg/                 (the repo root)
 │   ├── onboarding.js       the guided first-session chain — PURE, every step derived from the save
 │   ├── academy.js          curriculum years + perks (quest gold / market discount / XP) — PURE
 │   ├── reputation.js       per-NPC standing + reward bonuses — PURE
+│   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
+│   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
 │   ├── vfx.js              spell visual-effect archetypes, chosen from a card's own fx — PURE
 │   ├── world/zones.json    the zone catalog (academy, whispering_forest)
 │   ├── world/dungeons.json the dungeon catalog (cinderhollow_caverns)
@@ -79,10 +81,10 @@ wizard-tcg/                 (the repo root)
 ├── tools/                  headless test suites + asset pipeline
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
 │   ├── sync-zones.mjs      regenerates the academy zone in zones.json (--check in CI)
-│   ├── test.mjs            engine tests (252 checks)
+│   ├── test.mjs            engine tests (280 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
-│   ├── browser-test.mjs    real-Chromium responsive + input-gesture + world/quest/VFX suite (62 checks)
+│   ├── browser-test.mjs    real-Chromium responsive + input-gesture + world/quest/dorm/VFX suite (75 checks)
 │   ├── model-check.mjs     loads AND renders every shipped GLB in a real browser (npm run check:models)
 │   ├── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
 │   └── rig-character.py    Blender-as-a-module auto-rigger for unrigged generated characters
@@ -226,7 +228,41 @@ A 7-step guided first session (`onboarding.js`): school → gather → refine �
 - **NPC reputation** (`reputation.js`): standing with quest-giving NPCs specifically (Stranger → Acquainted → Friendly → Trusted → Honored), raised by turning in that NPC's field quests, granting a reward bonus on top of the curriculum bonus. The two systems stack without knowing about each other — `zonequests.js` hands back a base reward and stays pure; the UI layer (`turnInQuest` in `index.html`) applies both bonuses and raises reputation.
 - Both show on the Hall screen: a Curriculum panel (current year, perks, progress to next) always, a Reputation panel once the player has any.
 
-### 6.8 Retention
+### 6.8 The dorm (`dorm.js`) — the Dorm phases D1–D4
+The Student Dorms used to be a *menu*: its station prompt set `screen="home"` and that screen was a
+stats page plus four numeric upgrade tracks. It is now a place.
+
+- **D1 — a real interior.** `dormZone(save)` compiles the room into the same ZONE shape `world.js`
+  already renders, by **reusing `dungeons.js`** (`layoutDungeon` + `dungeonZone`) rather than
+  repeating it: a dorm is a one-room dungeon with no enemies. Zone transitions, saved position,
+  interior lighting and camera collision therefore all work with **no new engine code**. The
+  doorway is a stub corridor to a small "porch" room — that corridor is what makes
+  `wallsForRoom` emit the south wall in two pieces instead of one box that would seal the player in.
+- **The interior seam is generic.** A building in `structures.js` declares `interior:"dorm"`, and
+  `interiorFor(stationId)` is what `index.html` consults. The Scribing Hall and Smithy get
+  interiors the same way (`docs/DESIGN-DECISIONS.md` §1) with no change to the entry path.
+- **The dorm is recompiled on every entry**, not registered once at boot, because its geometry
+  depends on the save (tier, furniture). Recompiling is pure maths over one room and removes a
+  whole class of staleness bug. It is *also* registered at boot when the player owns a dorm, so
+  quitting inside it does not silently teleport them to the hub on the next load.
+- **D2 — furniture.** A catalogue with slot *kinds* (floor / wall / case); slots are authored as
+  **fractions of the room** so the same table works at every tier. `placementProblem` enforces
+  kind, ownership and occupancy in the pure module, not in the UI. Bought with gold + timber —
+  existing sinks, no new currency. Every piece is a **procedural primitive**: zero new asset bytes.
+- **D3 — display cases and trophies.** The save stores only `slot -> card uid`; grade, serial and
+  name are read from the live card, so **selling a displayed slab empties its case** rather than
+  leaving a ghost (there is a test for exactly that). Trophies are *never stored at all* — they
+  are derived from `worldState.dungeons[...].bossDead`, so they cannot desync from the world.
+- **D4 — upgrades became visual.** Room size, wall/floor colour and slot count are derived from the
+  total `HOME_UPGRADES` levels already bought. The bars the player was filling now have a physical
+  readout instead of only a percentage.
+- **Interiors are not all caves.** The dungeon light rig assumes every room ships torches; the
+  first build of the dorm inherited it and rendered as a black box with a bed in it. Zones now
+  declare `lightScale`/`lightTint` instead of inferring darkness from `interior`. Checked by
+  **rendering a frame and reading pixels** — `world.renderOnce()` exists for that, because a
+  Playwright screenshot of a WebGL canvas comes back blank once the drawing buffer is cleared.
+
+### 6.9 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -260,10 +296,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 252 engine checks (economy, combat, world/zone/dungeon/quest data)
+node tools/test.mjs          # 280 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 34 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/VFX flows, real Chromium (62 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (75 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -298,7 +334,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 252 engine / 34 online-rules / 62 real-browser (layout + gestures + world +
+**All tests green:** 280 engine / 34 online-rules / 75 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -345,7 +381,25 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed:** a user-provided model swapped in as the outdoor **Duel Arena landmark**
+**Last landed: the Dorm phases D1–D4, all four, shipped together.** The Student Dorms stopped
+being a menu and became a place you walk into, furnish, and display things in — see §6.8 for the
+architecture. New pure module `dorm.js`; the interior seam in `structures.js` is generic
+(`interior:` + `interiorFor`) so the Scribing Hall and Smithy can follow with no new entry-path
+code. Also landed alongside it, from the docs review: the home/hall/dorm naming collision resolved
+in favour of **"Dorm"** everywhere user-facing (save keys deliberately unchanged — `S.home` stays,
+so no migration risk), `docs/plan.md` marked HISTORICAL in favour of `design/plan.md`, and the
+duplicated housing entries in `BACKLOG.md` §7 pointed at §2.
+
+Two bugs were found by *looking at the render*, not by a test, and both are now covered by one:
+the room inherited the dungeon light rig and came out a black box (fixed with per-zone
+`lightScale`, and `world.renderOnce()` added so a test can read pixels — a Playwright screenshot
+of a WebGL canvas comes back blank); and the trophy landed on top of the bed after two layout
+attempts (fixed by moving trophies to the corners, the one band no slot reaches, plus a test that
+tries every slot filled at every tier).
+
+Tests: **280 engine / 34 online-rules / 75 browser (was 62) / 8 viewports / model-check clean.**
+
+Before that, a user-provided model swapped in as the outdoor **Duel Arena landmark**
 (`public/assets/buildings/arena.glb`) — a Tripo "magic circle" platform (rune floor, pillar ring,
 braziers), compressed 1.12MB → 0.71MB through the existing pipeline. Verified before pushing:
 rendered standalone (raw upload and the compressed file separately, to catch any compression
@@ -364,16 +418,20 @@ above), field quests for the Whispering Forest, the onboarding chain, dungeon-en
 rigged player character with a standing pose, painted terrain, and WORLDSPEC steps 3–5 (chunk
 streaming, zone transitions, dungeon instancing).
 
-### Next up — the Dorm phases (D1–D4)
+### The Dorm phases (D1–D4) — ✅ DONE
 
-**Decided next**, ahead of the other candidates below. What exists today is *not* a dorm: it's an
-abstract menu. `Student Dorms` is a building in `structures.js` (id `home`, at 0,32) whose station
-prompt jumps straight to `screen = "home"`, and `renderHome()` is a stats-and-upgrades page — buy
-the hall for 200g (`buyHome`), then level four **numeric** upgrades (treasury / library / armory /
-tavern, `HOME_UPGRADES` in `game.js`), which feed bonuses elsewhere. There is **no interior, no
-furniture, no placement, no display, nothing spatial**. The building's door is a menu button.
+All four shipped. What follows is the plan as written; §6.8 is the architecture as built. What is
+deliberately *not* done: no furniture GLBs (every piece is a procedural primitive), no per-tier
+wall/floor *textures*, and the dorm is still the only interior — the seam for the Scribing Hall
+and Smithy exists but neither has been authored.
 
-The phases below are ordered smallest-playable-first, each independently shippable and testable:
+What existed before this was *not* a dorm: it was an abstract menu. `Student Dorms` was a building
+in `structures.js` (id `home`, at 0,32) whose station prompt jumped straight to `screen = "home"`,
+and `renderHome()` was a stats-and-upgrades page — buy the hall for 200g, then level four
+**numeric** upgrades. No interior, no furniture, no placement, no display, nothing spatial. The
+building's door was a menu button.
+
+The phases as planned, ordered smallest-playable-first — all four now shipped:
 
 - **D1 — Dorm interior as a real space.** Walk through the door into an actual interior *zone*
   rather than a menu. This is not new engine work: a dungeon already compiles to a zone
@@ -396,7 +454,7 @@ The phases below are ordered smallest-playable-first, each independently shippab
   room actually looks like (bigger room, more slots, better fittings per tier) so the numeric
   progression that already ships gains a physical readout instead of a progress bar.
 
-**Then, in order** (unchanged, just deprioritised behind the dorm work):
+**Next up, in order** (nothing below started):
 1. **WORLDSPEC step 6, the content pass** — a second dungeon and a third outdoor zone. This is
    mostly authoring `zones.json`/`dungeons.json` entries now that the engine work (terrain,
    streaming, transitions, instancing) is done; see WORLDSPEC §3/§6 schemas.
@@ -427,30 +485,30 @@ The phases below are ordered smallest-playable-first, each independently shippab
   a fresh screenshot proves anything on its own. Worth keeping as the default checklist for any
   future generated-model integration, character or landmark alike.
 
-**Refinements flagged during the docs review (2026-08-08):**
-- **Naming collision: "home" means two things.** `S.home` / `buyHome` / `HOME_UPGRADES` /
-  `screen="home"` are the *guild hall* meta-progression, while the building labelled "Student
-  Dorms" is the physical place. The nav tab reads "Hall", the NPC dialogue says "Your Home", and
-  the building says "Dorms" — three names for overlapping ideas. Before D1 adds a fourth,
-  decide whether the dorm and the guild hall are the same thing (rename to one term) or
-  deliberately different (a personal room vs. a guild-wide hall). Cheapest moment to fix is now,
-  while nothing spatial depends on it.
-- **The `home` station skips a step every other building takes.** `library` and `tavern` are
-  `noStation:true` (decorative); `scribe`/`smith`/`market` open a working screen. `home` opens a
-  screen too, so D1's interior transition is the *first* time a campus building becomes a place
-  you enter. Worth making that transition generic in `structures.js` (an `interior:` field) rather
-  than special-casing the dorm, since `docs/DESIGN-DECISIONS.md` §1 already wants interiors for
-  the Scribing Hall and Smithy — the two buildings players actually spend time in.
-- **Housing is listed twice in the backlog**, as §2 "Dorm customization / display cases / trophy
+**Refinements flagged during the docs review (2026-08-08)** — all four are now done, and were done
+as part of the dorm work rather than left as notes:
+- ✅ **Naming collision: "home" meant two things.** `S.home` / `buyHome` / `HOME_UPGRADES` /
+  `screen="home"` were the *guild hall* meta-progression while the building labelled "Student
+  Dorms" was the physical place — with the nav tab reading "Hall", the NPC saying "Your Home" and
+  the building saying "Dorms". Resolved in favour of **"Dorm"** everywhere user-facing. Save keys
+  were deliberately left alone (`S.home`, `buyHome`, `HOME_UPGRADES` all stay), so there is no
+  migration risk and no second name for the same field. "Guild hall" is gone — guilds are a
+  separate unstarted item (`BACKLOG.md` §8) and the old name was borrowing from it.
+- ✅ **The `home` station skipped a step every other building takes.** `library` and `tavern` are
+  `noStation:true` (decorative); `scribe`/`smith`/`market` open a working screen. `home` opened a
+  screen too, so the dorm interior is the *first* time a campus building became a place you enter.
+  Made generic rather than special-cased: a building declares `interior:"<id>"` and
+  `interiorFor(stationId)` is the seam the entry path reads, so the Scribing Hall and Smithy
+  (`docs/DESIGN-DECISIONS.md` §1) need only room content, not entry-path code.
+- ✅ **Housing is listed twice in the backlog**, as §2 "Dorm customization / display cases / trophy
   room" and again as §7 "Housing furniture / slab display cases / boss trophies". Same feature,
   two sections. §2 is now the canonical entry; §7's duplicates point at it.
-- **`docs/plan.md` and `design/plan.md` are near-identical copies** of the same original design
-  doc. One should be deleted or marked historical, or a future session will update the wrong one.
+- ✅ **`docs/plan.md` and `design/plan.md` are near-identical copies** of the same original design
+  doc. `docs/plan.md` now carries a HISTORICAL banner pointing at `design/plan.md` as the maintained one.
 
 ## 10. Roadmap (in priority order)
 
-1. **Dorm phases D1–D4** — interior as a real space, furniture placement, display cases + trophy
-   room, then visual upgrade tiers. See "Next up" in §9 for the phase breakdown.
+1. ~~**Dorm phases D1–D4**~~ — ✅ done; architecture in §6.8.
 2. **WORLDSPEC step 6 — content pass.** Second dungeon, third outdoor zone. The engine is ready;
    this is authoring work against the schemas in `WORLDSPEC.md` §3/§6.
 3. **Character creation & visuals.** 3D preview at character creation, per-school outfit

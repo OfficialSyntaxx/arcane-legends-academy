@@ -24,7 +24,7 @@ export function newGame(){
     inventory:{}, cards, equipment:[],
     loadout:{ wand:null, hat:null, robe:null, boots:null, amulet:null },
     deck,
-    home:{ owned:false, upgrades:{ treasury:0, library:0, armory:0, tavern:0 } },
+    home:{ owned:false, upgrades:{ treasury:0, library:0, armory:0, tavern:0 }, stock:{}, furniture:{}, cases:{} },
     quests:{ current:0, done:[] },
     pvp:{ wins:0, losses:0 },
     stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 },
@@ -74,6 +74,13 @@ function migrate(s){
   if (!Array.isArray(s.zoneQuests.accepted)) s.zoneQuests.accepted = [];
   if (!Array.isArray(s.zoneQuests.done)) s.zoneQuests.done = [];
   if (!s.reputation || typeof s.reputation !== "object") s.reputation = {};
+  // The Dorm phases. `stock` is what the player has BOUGHT, `furniture` is slot -> item id, and
+  // `cases` is slot -> card uid. Nothing derived is stored: the room's size and slot count come
+  // from the upgrade levels, a displayed slab's grade is read off the live card, and trophies are
+  // recomputed from boss kills — so none of that can drift out of sync with the save.
+  if (!s.home.stock || typeof s.home.stock !== "object") s.home.stock = {};
+  if (!s.home.furniture || typeof s.home.furniture !== "object") s.home.furniture = {};
+  if (!s.home.cases || typeof s.home.cases !== "object") s.home.cases = {};
   // `defeated` arrived after `cleared`/`bossDead`, so older saves have the object but not the list.
   for (const d of Object.values(s.worldState.dungeons)){
     if (!Array.isArray(d.defeated)) d.defeated = [];

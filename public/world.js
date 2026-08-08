@@ -97,10 +97,16 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // Interiors (dungeons) are lit as caves: almost no sky, no sun, and close fog so the torches
   // and the boss glow are what the player actually reads by. An outdoor rig inside a dungeon
   // just makes a brightly-lit room with a ceiling missing.
+  //
+  // Not every interior is a cave, though. A dungeon earns its darkness because it SHIPS torches
+  // in every room; a home does not, so the same rig makes a dorm a black box with a bed in it
+  // — which reads as broken, not atmospheric. `ZONE.lightScale` lets a zone say how lit it is
+  // instead of inferring it from `interior`, and the dorm asks for a warm, lived-in room.
   const INTERIOR = !!ZONE.interior;
   if (INTERIOR){
-    scene.add(new THREE.HemisphereLight(0x585070, 0x140e22, 0.30));
-    const fill = new THREE.DirectionalLight(0xa89ad0, 0.16);
+    const k = ZONE.lightScale || 1;
+    scene.add(new THREE.HemisphereLight(ZONE.lightTint || 0x585070, 0x140e22, 0.30 * k));
+    const fill = new THREE.DirectionalLight(0xa89ad0, 0.16 * k);
     fill.position.set(10, 30, 10); scene.add(fill);
   } else {
   scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a1f4d, 0.42));
@@ -186,6 +192,87 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     }
     for (const w of [...ZONE.rooms.flatMap(r => r.walls || []), ...(ZONE.corridorWalls || [])]){
       add(new THREE.BoxGeometry(w.w, wallH, w.d), wallMat, w.x, wallH/2, w.z);
+    }
+  }
+  // ---------- dorm furnishing (the Dorm phases, D2–D4) ----------
+  // Everything here is PROCEDURAL and every position was decided by dorm.js — this block only
+  // turns a resolved layout into primitives, the same contract the dungeon block above follows.
+  // Nothing in this file works out where a bed, a case or a trophy goes.
+  if (ZONE.dormLayout){
+    const L = ZONE.dormLayout;
+    for (const p of L.pieces){
+      const m = mat(p.color);
+      const put = (geo, y, h) => {
+        const o = add(geo, m, p.x, y, p.z);
+        o.rotation.y = p.ry || 0;
+        return o;
+      };
+      if (p.shape === "rug"){
+        const r = add(new THREE.PlaneGeometry(p.w, p.d), mat(p.color), p.x, 0.05, p.z, {receive:true, cast:false});
+        r.rotation.x = -Math.PI/2; r.rotation.z = p.ry || 0;
+      } else if (p.shape === "bed"){
+        put(new THREE.BoxGeometry(p.w, 0.45, p.d), 0.22);
+        const pillow = add(new THREE.BoxGeometry(p.w*0.8, 0.28, 0.7), mat(0xd8d0e8), p.x, 0.58, p.z);
+        pillow.rotation.y = p.ry || 0;
+        pillow.position.add(new THREE.Vector3(0, 0, p.d/2 - 0.6).applyAxisAngle(new THREE.Vector3(0,1,0), p.ry || 0));
+      } else if (p.shape === "desk"){
+        put(new THREE.BoxGeometry(p.w, 0.16, p.d), p.h);
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]){
+          const leg = add(new THREE.BoxGeometry(0.14, p.h, 0.14), m, p.x, p.h/2, p.z);
+          leg.position.add(new THREE.Vector3(sx*(p.w/2-0.2), 0, sz*(p.d/2-0.2)).applyAxisAngle(new THREE.Vector3(0,1,0), p.ry || 0));
+        }
+      } else if (p.shape === "brazier"){
+        put(new THREE.CylinderGeometry(p.w*0.16, p.w*0.34, p.h, 8), p.h/2);
+        const bowl = add(new THREE.CylinderGeometry(p.w*0.55, p.w*0.3, 0.4, 10), m, p.x, p.h + 0.2, p.z);
+        bowl.material = bowl.material.clone();
+      } else if (p.shape === "shelf"){
+        put(new THREE.BoxGeometry(p.w, p.h, p.d), p.h/2);
+        // Books pushed forward out of the carcass, or the shelf renders as a plain brown slab
+        // against the wall — which is exactly how it looked in the first render of the room.
+        for (let i = 1; i <= 3; i++){
+          const books = add(new THREE.BoxGeometry(p.w*0.86, 0.34, p.d*0.7), mat(0x8a3a2a), p.x, i * (p.h/4), p.z);
+          books.rotation.y = p.ry || 0;
+          books.position.add(new THREE.Vector3(0, 0, p.d*0.45).applyAxisAngle(new THREE.Vector3(0,1,0), p.ry || 0));
+        }
+      } else if (p.shape === "banner"){
+        const b = put(new THREE.PlaneGeometry(p.w, p.h), p.h/2 + 1.4);
+        b.material.side = THREE.DoubleSide;
+      } else if (p.shape === "sconce"){
+        put(new THREE.BoxGeometry(p.w, p.h, p.d), 2.3);
+      } else if (p.shape === "case"){
+        // Plinth + glass. The slab itself is drawn from `L.cases` below, so an empty case still
+        // reads as a case waiting to be filled rather than as missing geometry.
+        put(new THREE.BoxGeometry(p.w, 0.9, p.d), 0.45);
+        const glass = new THREE.MeshLambertMaterial({ color: 0x9fd8ff, transparent:true, opacity:0.22 });
+        glass.color.convertSRGBToLinear();
+        const g = add(new THREE.BoxGeometry(p.w, p.h - 0.9, p.d), glass, p.x, 0.9 + (p.h-0.9)/2, p.z, {cast:false});
+        g.rotation.y = p.ry || 0;
+      } else {
+        put(new THREE.BoxGeometry(p.w, p.h, p.d), p.h/2);
+      }
+      if (p.light){
+        const l = new THREE.PointLight(p.light.color, p.light.intensity, p.light.distance);
+        l.position.set(p.x, p.light.y, p.z); scene.add(l);
+        const bulb = add(new THREE.SphereGeometry(0.2, 8, 6), mat(p.light.color), p.x, p.light.y, p.z, {cast:false});
+        bulb.material.emissive = srgb(p.light.color); bulb.material.emissiveIntensity = 1.0;
+      }
+    }
+    // A displayed slab: a small glowing card standing inside its case. Its colour comes from the
+    // grade, so a 10 reads as gold across the room — which is the entire point of a display case.
+    for (const c of L.cases || []){
+      if (!c.card) continue;
+      const tint = c.card.roll >= 98 ? 0xffd766 : c.card.roll >= 92 ? 0xc9d4ff : 0x9fe6b0;
+      const slab = add(new THREE.BoxGeometry(0.62, 0.9, 0.07), mat(tint), c.x, 1.5, c.z, {cast:false});
+      slab.rotation.y = c.ry || 0;
+      slab.material.emissive = srgb(tint); slab.material.emissiveIntensity = 0.55;
+    }
+    // Trophies are DERIVED from boss kills (dorm.js), never stored — so one appears the moment
+    // the Cinder Wyrm goes down and can never disagree with the world.
+    for (const t of L.trophies || []){
+      const base = add(new THREE.CylinderGeometry(0.7, 0.9, 0.5, 8), mat(0x2a1f4d), t.x, 0.25, t.z);
+      const skull = add(new THREE.DodecahedronGeometry(t.h * 0.32), mat(t.color), t.x, 0.5 + t.h*0.4, t.z);
+      skull.rotation.y = t.ry || 0;
+      skull.material.emissive = srgb(t.color); skull.material.emissiveIntensity = 0.22;
     }
   }
   // water, only where the zone declares a level
@@ -1081,6 +1168,10 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       zone: ZONE.id, exits: (ZONE.exits||[]).map(e=>({to:e.toZone,x:e.x,z:e.z})), exitArmed,
       interior: !!ZONE.interior,
       dungeonEntrances: (ZONE.dungeonEntrances||[]).map(d=>({id:d.id,x:d.x,z:d.z})),
+      dorm: ZONE.dormLayout ? { pieces: ZONE.dormLayout.pieces.length,
+                                cases: (ZONE.dormLayout.cases||[]).filter(c=>c.card).length,
+                                trophies: (ZONE.dormLayout.trophies||[]).length,
+                                room: [ZONE.dormLayout.room.w, ZONE.dormLayout.room.d] } : null,
       rooms: (ZONE.rooms||[]).length,
       wallCount: (ZONE.obstacles||[]).filter(o=>String(o.id).startsWith("wall:")).length,
       nearbyKind: nearby ? nearby.kind : null,
@@ -1093,6 +1184,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };
   };
   return {
+    // Draw one frame on demand. Reading the world canvas from a test is otherwise unreliable:
+    // the drawing buffer is cleared after a composite, so a 2D drawImage of it comes back blank
+    // and a dark scene is indistinguishable from a broken one. battle3d.js exposes the same hook
+    // for the same reason.
+    renderOnce(){ renderer.render(scene, camera); },
     setTouchMove(x, y){ joy.x = x; joy.y = y; },
     setPlayerColor(color){
       // Remembered, because this is usually called before the GLB finishes loading — and once

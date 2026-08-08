@@ -678,6 +678,101 @@ if (hasWorld){
   check("handing in raises reputation with the giver", q.reputation === 12, `rep=${q.reputation}`);
   check("the Hall shows the curriculum panel", /Curriculum/.test(q.hallText));
   check("the Hall shows reputation once the player has some", /Reputation/.test(q.hallText) && /Sage Rowan/.test(q.hallText));
+
+  // --- the dorm (D1-D4): walk in, and check the room actually built ---
+  // The whole point of the Dorm phases is that the building stopped being a menu, so this drives
+  // the real path — furnish via the game's own functions, press the station prompt, then read the
+  // built scene rather than trusting the save.
+  const dorm = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    const out = {};
+    // Back to the world screen first. The previous block left the game on the Hall, and a hidden
+    // canvas has width/height 0 — which is how the brightness read below blew up the first time.
+    const worldTab = document.querySelector('.navbtn[data-screen="world"]');
+    if (worldTab) worldTab.click();
+    await settle(600);
+    // get back to the academy first
+    if (dbg().zone !== "academy"){
+      const e = (dbg().exits || []).find(x => x.to === "academy") || (dbg().exits || [])[0];
+      if (e){ window.__world.teleport(e.x, e.z); await settle(1400); }
+    }
+    if (dbg().zone !== "academy"){
+      const e = (dbg().exits || [])[0];
+      if (e){ window.__world.teleport(e.x, e.z); await settle(1400); }
+    }
+    out.zoneStart = dbg().zone;
+    out.furnished = window.__testDorm();
+    // walk to the dorm door and press the prompt — the real way in
+    window.__world.teleport(0, 25.4);
+    await settle(400);
+    out.doorPrompt = dbg().nearbyKind;
+    out.doorLabel = dbg().nearbyLabel;
+    window.__world.trigger();
+    await settle(1600);
+    out.zoneInside = dbg().zone;
+    const d = dbg();
+    out.interior = d.interior;
+    out.rooms = d.rooms;
+    out.walls = d.wallCount;
+    out.dorm = d.dorm;
+    // "Is this room actually visible" is not something the layout maths can answer, and the
+    // first build of it inherited the dungeon light rig and came out a black box with a bed in
+    // it. Measured by rendering one frame on demand and reading pixels — a plain screenshot of
+    // a WebGL canvas comes back blank because the drawing buffer is cleared after compositing.
+    window.__world.renderOnce();
+    {
+      const cv = document.getElementById("world");
+      out.canvas = [cv.width, cv.height];
+      if (!cv.width || !cv.height) out.brightness = -1; else {
+      const c2 = document.createElement("canvas"); c2.width = cv.width; c2.height = cv.height;
+      c2.getContext("2d").drawImage(cv, 0, 0);
+      const px = c2.getContext("2d").getImageData(0, 0, c2.width, c2.height).data;
+      let sum = 0, n = 0;
+      for (let i = 0; i < px.length; i += 4){ sum += px[i] + px[i+1] + px[i+2]; n++; }
+      out.brightness = sum / n / 3;
+      }
+    }
+    out.spawnClear = d.spawnClear;
+    out.enemies = d.enemies;
+    // the way out, and where it puts you
+    const back = (dbg().exits || [])[0];
+    out.exitDist = back ? Math.hypot(back.x - d.playerExact[0], back.z - d.playerExact[2]) : null;
+    if (back){ window.__world.teleport(back.x, back.z); await settle(1600); }
+    out.zoneAfter = dbg().zone;
+    out.exitPos = dbg().playerExact.map(n => Math.round(n));
+    return out;
+  });
+  check("the dorm door prompts a station, not a menu jump", dorm.doorPrompt === "station", `${dorm.doorPrompt} / ${dorm.doorLabel}`);
+  check("pressing the dorm door builds the interior", dorm.zoneInside === "dorm", `${dorm.zoneStart} -> ${dorm.zoneInside}`);
+  check("the dorm is lit and walled as an interior", dorm.interior === true && dorm.walls > 4, `${dorm.walls} wall boxes`);
+  check("the player does not spawn inside a dorm wall", dorm.spawnClear === true);
+  check("the player does not arrive standing on the way out", dorm.exitDist > 3, `${(dorm.exitDist||0).toFixed(1)}m from the exit`);
+  check("furniture placed in the Hall renders in the room", dorm.dorm && dorm.dorm.pieces === 4, JSON.stringify(dorm.dorm));
+  check("a displayed slab shows in its case", dorm.dorm && dorm.dorm.cases === 1, JSON.stringify(dorm.dorm && dorm.dorm.cases));
+  check("a beaten boss puts a trophy in the room", dorm.dorm && dorm.dorm.trophies === 1, JSON.stringify(dorm.dorm && dorm.dorm.trophies));
+  check("the dorm holds no enemies", dorm.enemies === 0, String(dorm.enemies));
+  check("the dorm is a lit room, not a black box", dorm.brightness > 25, `mean channel ${(dorm.brightness||0).toFixed(1)} on a ${JSON.stringify(dorm.canvas)} canvas`);
+  check("leaving the dorm returns to the academy", dorm.zoneAfter === "academy", String(dorm.zoneAfter));
+  check("leaving puts the player back at the dorm door, not the default spawn",
+        Math.abs(dorm.exitPos[0]) < 4 && dorm.exitPos[2] > 12 && dorm.exitPos[2] < 28, JSON.stringify(dorm.exitPos));
+
+  // Buying an upgrade must grow the room — that is the whole of D4.
+  const grew = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const before = window.__testDormRoom();
+    window.__testDormUpgrade();
+    window.__testEnterDorm();
+    await settle(1500);
+    const d = window.__worldDebug();
+    const after = d.dorm ? d.dorm.room : null;
+    const back = (d.exits || [])[0];
+    if (back){ window.__world.teleport(back.x, back.z); await settle(1500); }
+    return { before, after };
+  });
+  check("buying hall upgrades physically grows the dorm (D4)",
+        grew.after && grew.after[0] > grew.before[0] && grew.after[1] > grew.before[1],
+        `${JSON.stringify(grew.before)} -> ${JSON.stringify(grew.after)}`);
 }
 
 check("no uncaught page errors", errs.length === 0, errs.slice(0,3).join(" | "));

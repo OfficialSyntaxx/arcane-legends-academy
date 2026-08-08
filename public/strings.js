@@ -6,7 +6,7 @@ export const STR = {
   play: "Play",
   continue_game: "Continue",
 
-  nav_home: "Hall",
+  nav_home: "Dorm",
   nav_skills: "Skills",
   nav_collection: "Collection",
   nav_loadout: "Loadout",
@@ -19,11 +19,11 @@ export const STR = {
   xp: "XP",
 
   // hall
-  hall_title: "Your Guild Hall",
+  hall_title: "Your Dorm",
   hall_upgrade: "Upgrade",
-  hall_locked: "Buy your guild hall",
-  hall_buy: "Buy Guild Hall (200g)",
-  hall_prompt: "Earn gold from quests to unlock your hall.",
+  hall_locked: "Claim your dorm room",
+  hall_buy: "Claim a Dorm (200g)",
+  hall_prompt: "Earn gold from quests to claim a room of your own.",
 
   // skills
   skills_title: "Skills",

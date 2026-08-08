@@ -334,6 +334,8 @@ import * as ONBOARD from "./onboarding.js";
 import * as ZQ from "./zonequests.js";
 import * as REP from "./reputation.js";
 import * as ACADEMY from "./academy.js";
+import * as DORM from "./dorm.js";
+import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 
 // ================= state =================
 let S = G.load();
@@ -625,6 +627,94 @@ function renderReputationPanel(){
   h += `</div>`;
   return h;
 }
+// The Dorm panel: the tier the room is at, what is in each slot, the furniture shop, and the
+// display cases. Everything shown is DERIVED from the save by dorm.js — this only formats it.
+// `selDormSlot` is transient UI state (which slot the player is filling), deliberately not saved.
+let selDormSlot = null;
+function renderDormPanel(){
+  if (!S.home.owned) return "";
+  const tier = DORM.tierFor(S), prog = DORM.progressToNextTier(S);
+  const slots = DORM.slotsFor(S);
+  const furniture = S.home.furniture || {};
+  const stock = DORM.unplaced(S);
+  let h = `<div class="panel" style="margin-top:12px"><h3>🛏️ Your Dorm — ${tier.name}</h3>
+    <p class="sub">${tier.w}×${tier.d}m · ${tier.slots} furnishing slots. Walk to the Student Dorms on campus to go inside.
+    ${prog.maxed ? "This room is as grand as it gets." : `${prog.have}/${prog.need} upgrade levels toward <b>${prog.next.name}</b>.`}</p>
+    ${prog.maxed ? "" : `<div class="pbar" style="margin-bottom:10px"><div style="width:${prog.pct}%"></div></div>`}`;
+
+  // slots
+  h += `<div class="row" style="flex-wrap:wrap;gap:6px">`;
+  for (const s of slots){
+    const item = DORM.FURNITURE_MAP[furniture[s.id]];
+    const sel = selDormSlot === s.id;
+    h += `<button class="btn sm ${sel?"gold":""}" onclick="window.__ev('dormSlot|${s.id}')"
+      title="${s.kind} slot">${item ? `${item.icon} ${item.name}` : `➕ empty (${s.kind})`}</button>`;
+  }
+  h += `</div>`;
+
+  if (selDormSlot){
+    const slot = DORM.slotById(S, selDormSlot);
+    const held = furniture[selDormSlot];
+    h += `<div class="panel" style="margin-top:10px;background:rgba(0,0,0,.18)">
+      <div style="font-weight:700">Slot “${selDormSlot}” · ${slot ? slot.kind : "?"}</div>`;
+    if (held){
+      h += `<div class="sub" style="margin:6px 0">Holding ${DORM.FURNITURE_MAP[held].icon} ${DORM.FURNITURE_MAP[held].name}.</div>
+        <button class="btn sm" onclick="window.__ev('dormUnplace|${selDormSlot}')">Take it back</button>`;
+      if (held === "case"){
+        const shown = (S.home.cases || {})[selDormSlot];
+        const card = shown && S.cards.find(c => c.uid === shown);
+        h += `<div style="margin-top:10px"><b>Display case</b>
+          <div class="sub">${card ? `Showing ${CARD_MAP[card.id].name} · ${gradeForRoll(card.roll).name} · #${card.serial}` : "Empty."}</div>`;
+        const options = DORM.displayable(S, gradeForRoll);
+        if (!options.length) h += `<div class="sub" style="margin-top:4px">You have no slabbed cards yet — grade a card to a 9 or 10 first.</div>`;
+        else {
+          h += `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">`;
+          for (const o of options.slice(0, 12))
+            h += `<button class="btn sm ${shown===o.uid?"ok":""}" onclick="window.__ev('dormDisplay|${selDormSlot}|${o.uid}')">${CARD_MAP[o.id].name} · ${o.grade.name} #${o.serial}</button>`;
+          h += `</div>`;
+          if (card) h += `<button class="btn sm" style="margin-top:6px" onclick="window.__ev('dormClearCase|${selDormSlot}')">Empty the case</button>`;
+        }
+        h += `</div>`;
+      }
+    } else if (!stock.length){
+      h += `<div class="sub" style="margin:6px 0">Nothing in storage. Buy furniture below, then place it here.</div>`;
+    } else {
+      h += `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">`;
+      for (const u of stock){
+        const f = DORM.FURNITURE_MAP[u.id];
+        const bad = DORM.placementProblem(S, selDormSlot, u.id);
+        h += `<button class="btn sm ${bad?"":"ok"}" ${bad?"disabled":""} title="${bad||""}"
+          onclick="window.__ev('dormPlace|${selDormSlot}|${u.id}')">${f.icon} ${f.name} ×${u.count}</button>`;
+      }
+      h += `</div>`;
+    }
+    h += `</div>`;
+  }
+
+  // shop
+  h += `<div style="margin-top:12px"><b>Furnishings</b> <span class="sub">bought with gold and timber</span></div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">`;
+  for (const f of DORM.FURNITURE){
+    const owned = (S.home.stock || {})[f.id] || 0;
+    const afford = S.gold >= f.gold && (S.inventory.oak_log || 0) >= f.timber;
+    h += `<button class="btn sm ${afford?"gold":""}" ${afford?"":"disabled"} onclick="window.__ev('dormBuy|${f.id}')">
+      ${f.icon} ${f.name} · 🪙${f.gold}${f.timber?` 🪵${f.timber}`:""}${owned?` (own ${owned})`:""}</button>`;
+  }
+  h += `</div>`;
+
+  const trophies = DORM.trophiesFor(S);
+  h += `<div style="margin-top:12px"><b>Trophies</b> <span class="sub">earned by beating bosses — they appear in the room on their own</span></div>
+    <div class="sub">${trophies.length ? trophies.map(t=>`${t.icon} ${t.name}`).join(" · ") : "No boss trophies yet."}</div>`;
+  h += `</div>`;
+  return h;
+}
+window.__EV.dormSlot = (id)=>{ selDormSlot = (selDormSlot === id ? null : id); render(); };
+window.__EV.dormBuy = (id)=>{ const r = DORM.buyFurniture(S, id); r.ok ? toast(`${r.item.icon} ${r.item.name} delivered to your dorm`) : err(r.err==="gold"?"Not enough gold":r.err==="timber"?"Need timber (chop wood)":""); save(); render(); };
+window.__EV.dormPlace = (slot,item)=>{ const r = DORM.place(S, slot, item); r.ok ? toast("Placed.") : err(r.err); save(); render(); };
+window.__EV.dormUnplace = (slot)=>{ DORM.unplace(S, slot); save(); render(); };
+window.__EV.dormDisplay = (slot,uid)=>{ const r = DORM.displayIn(S, slot, uid); r.ok ? toast("🏆 On display.") : err(r.err); save(); render(); };
+window.__EV.dormClearCase = (slot)=>{ DORM.clearCase(S, slot); save(); render(); };
+
 function renderHome(el){
   let h = `<h2>${STR.hall_title}</h2>`;
   if (!S.home.owned){
@@ -633,7 +723,7 @@ function renderHome(el){
       <button class="btn gold" onclick="window.__ev('buyHome')">${STR.hall_buy}</button></div>`;
   } else {
     h += `<div class="panel"><div class="row" style="justify-content:space-between;align-items:center">
-      <div><div style="font-weight:700;font-size:18px">🏰 Your Guild Hall</div>
+      <div><div style="font-weight:700;font-size:18px">🏰 Your Dorm</div>
       <div class="sub">${STR.tagline}</div></div>
       <div><button class="btn ok" onclick="window.__ev('toPvp')">⚔️ ${STR.nav_pvp}</button></div></div></div>`;
     h += `<div class="row">`;
@@ -660,6 +750,7 @@ function renderHome(el){
   h += `</div>`;
   h += renderCurriculum();
   h += renderReputationPanel();
+  h += renderDormPanel();
   // daily quest
   const dl = G.dailyLabel(S);
   h += `<div class="panel" style="margin-top:12px"><h3>📅 Daily Quest</h3><div class="row" style="align-items:center">
@@ -676,7 +767,7 @@ function renderHome(el){
   h += `</div></div>`;
   el.innerHTML = h;
 }
-window.__EV.buyHome = ()=>{ const r=G.buyHome(S); r.ok?toast("🏰 Guild hall acquired!"):err(r.err==="gold"?"Not enough gold (200g)":""); render(); };
+window.__EV.buyHome = ()=>{ const r=G.buyHome(S); r.ok?toast("🏰 Dorm claimed! Walk to the Student Dorms to go inside."):err(r.err==="gold"?"Not enough gold (200g)":""); render(); };
 window.__EV.upgrade = (id)=>{ const r=G.upgradeHome(S,id); r.ok?toast("Upgraded!"):err(r.err==="gold"?"Not enough gold":r.err==="timber"?"Need timber (chop wood)":"Max"); render(); };
 window.__EV.toPvp = ()=>{ screen="pvp"; render(); };
 window.__EV.claimDaily = ()=>{ const r=G.claimDaily(S); if(r.ok){ toast(`📅 Daily complete! +${r.reward}g +${r.drops.length} cards`); winSfx(); } save(); render(); };
@@ -1383,7 +1474,7 @@ const NPC_DIALOGUE = {
   duel: { name:"Referee Kael", role:"Arena Master", lines:["The arena is open. Challenge an AI rival or duel a real player for glory."], buttons:[{label:"⚔️ Enter the Arena", primary:true, action:()=>{screen="pvp";render();}}] },
   scribe: { name:"Scribing Hall", role:"Card Creation", lines:["Refine wood, fish, and ore into canvas, ink, and reagent, then scribe spell cards."], buttons:[{label:"🪶 Scribe & Refine", primary:true, action:()=>{ showOverlay("Scribing Hall", buildScribing()); }}] },
   smith: { name:"Smithy", role:"Forge & Equipment", lines:["Smelt bars and forge equipment to boost your dueling power."], buttons:[{label:"⚒️ Forge & Brew", primary:true, action:()=>{ showOverlay("Smithy & Forge", buildForge()); }}] },
-  home: { name:"Student Dorms", role:"Your Home", lines:["Your own corner of the academy. Upgrade your guild hall."], buttons:[{label:"🏰 Your Hall", primary:true, action:()=>{screen="home";render();}}] },
+  home: { name:"Student Dorms", role:"Your Dorm", lines:["Your own corner of the academy."], buttons:[{label:"🏰 Dorm Management", primary:true, action:()=>{screen="home";render();}}] },
   trainer: { name:"Trainer Lyra", role:"Duel Coach", lines:["Want to warm up? I'll spar with you right here.","Drop your deck and let's see what you've got — a quick practice duel is the best way to test a new build."], buttons:[{label:"⚔️ Practice Duel", primary:true, action:()=>{ startPracticeDuel(); }}] },
   librarian: { name:"Librarian Ossa", role:"Keeper of the Library of Echoes", lines:["The Library of Echoes holds every lesson and challenge record of the Arcanum.","Take on the day's challenge when you're ready, young spellwright."], buttons:[{label:"📜 Daily Challenge", primary:true, action:()=>{screen="quests";render();}}] },
 };
@@ -1435,11 +1526,28 @@ function spawnWorld(canvas, zone, spawnAt){
     onStation(station){
       const quest = questDialogue(station);
       if (quest){ showDialogue(quest.name, quest.role, quest.lines, quest.buttons); return; }
+      // A building that declares an `interior` is a PLACE, not a menu: walking up to it and
+      // pressing the prompt takes you inside. Generic on purpose — the Scribing Hall and Smithy
+      // get interiors the same way, with no new code here (see structures.js).
+      const interior = interiorFor(station);
+      if (interior === "dorm"){ enterDorm(); return; }
       const dlg = NPC_DIALOGUE[station];
       if (dlg){ showDialogue(dlg.name, dlg.role, dlg.lines, dlg.buttons); }
       else { screen = stationTarget(station); render(); }
     },
-    onZoneExit(e){ changeZone(e.toZone, e.fromZone); },
+    onZoneExit(e){
+      // Stepping out of an interior should put you back at the door you came in through, not at
+      // the zone's default spawn on the far side of campus. There is no reciprocal exit to derive
+      // that from (the academy's dorm door is a station, not a gateway), so it is passed
+      // explicitly — and pushed clear of the station's own prompt radius.
+      if (e.fromZone === "dorm"){
+        const b = BUILDINGS.find(x => x.interior === "dorm");
+        const d = b && doorPos(b);
+        changeZone(e.toZone, e.fromZone, d ? { x: d.x, z: d.z - 6 } : null);
+        return;
+      }
+      changeZone(e.toZone, e.fromZone);
+    },
     onDungeon(id){ enterDungeon(id); },
     onEnemy(name){ startDungeonFight(name); },
   }, zone, {
@@ -1492,13 +1600,35 @@ function recordDungeonKill(foe){
     }
   }
 }
-function changeZone(toZoneId, fromZoneId){
+// The Dorm phases, D1. The dorm is COMPILED FRESH on every entry rather than registered once at
+// boot, because its geometry depends on the save: buying a hall upgrade grows the room and adds
+// furniture slots (D4), and furniture placed since the last visit has to be in it. Recompiling is
+// cheap (it is pure maths over one room) and it removes an entire class of staleness bug.
+function enterDorm(){
+  if (!worldCfg) return;
+  if (!S.home.owned){
+    showDialogue("Student Dorms", "Your Home",
+      ["The warden looks you over. \"No room assigned to you yet, student.\"",
+       "A dorm of your own costs 200 gold."],
+      [{ label:"🏰 Open the Hall", primary:true, action:()=>{ screen="home"; render(); } }]);
+    return;
+  }
+  const z = DORM.dormZone(S, {
+    entranceZone: "academy",
+    schoolColor: SCHOOLS[S.school].color,
+    gradeOf: gradeForRoll,
+  });
+  worldCfg.zones[z.id] = z;
+  if (!worldCfg.zoneIds.includes(z.id)) worldCfg.zoneIds.push(z.id);
+  changeZone(z.id, activeZone && activeZone.id);
+}
+function changeZone(toZoneId, fromZoneId, spawnOverride){
   if (zoning || !worldCfg) return;
   const target = worldCfg.get(toZoneId);
   if (!target){ console.warn("exit to unknown zone", toZoneId); return; }
   zoning = true;
   const canvas = $("world");
-  const spawnAt = entryPointFor(worldCfg, toZoneId, fromZoneId);
+  const spawnAt = spawnOverride || entryPointFor(worldCfg, toZoneId, fromZoneId);
   try {
     // Dispose FIRST: two live worlds would each hold a WebGL context on the same canvas and
     // both would keep running their rAF loops.
@@ -1537,6 +1667,15 @@ async function initWorld(){
         if (!worldCfg.zoneIds.includes(z.id)) worldCfg.zoneIds.push(z.id);
       }
     } catch(e){ console.warn("dungeons unavailable:", e && e.message); }
+    // Register the dorm at boot too, so a player who quit inside it is not silently teleported
+    // back to the hub on the next load — `S.worldState.zone` would name a zone nothing knew about.
+    if (S.home && S.home.owned){
+      try {
+        const dz = DORM.dormZone(S, { entranceZone:"academy", schoolColor: SCHOOLS[S.school].color, gradeOf: gradeForRoll });
+        worldCfg.zones[dz.id] = dz;
+        if (!worldCfg.zoneIds.includes(dz.id)) worldCfg.zoneIds.push(dz.id);
+      } catch(e){ console.warn("dorm unavailable:", e && e.message); }
+    }
     // ?zone= wins, then wherever the player last logged out, then the hub.
     const wanted = new URLSearchParams(location.search).get("zone") || (S.worldState && S.worldState.zone);
     activeZone = (wanted && worldCfg.get(wanted)) || worldCfg.get(worldCfg.hub);
@@ -1699,6 +1838,29 @@ window.__testGrant = (questId)=>{
   S.inventory[q.objective.id] = (S.inventory[q.objective.id]||0) + q.objective.n;
   save(); return true;
 };
+// Give the player a furnished dorm without playing an hour of economy first. It uses the real
+// buy/place/display functions, so the test still exercises the code the game runs — only the
+// gold and the boss kill are handed over.
+window.__testDorm = ()=>{
+  S.gold += 5000; S.inventory.oak_log = (S.inventory.oak_log||0) + 60;
+  G.buyHome(S);
+  for (const u of HOME_UPGRADES) for (let i=0;i<3;i++) G.upgradeHome(S, u.id);
+  for (const id of ["bed","bookshelf","case","brazier"]) DORM.buyFurniture(S, id);
+  DORM.place(S, "floor_a", "bed"); DORM.place(S, "wall_a", "bookshelf");
+  DORM.place(S, "case_a", "case"); DORM.place(S, "floor_b", "brazier");
+  // a slabbed card to display, and a dead boss to earn a trophy
+  const slab = { uid:"testslab", id:S.cards[0].id, roll:99, graded:true, serial:9001 };
+  S.cards.push(slab);
+  DORM.displayIn(S, "case_a", slab.uid);
+  S.worldState.dungeons.cinderhollow_caverns = S.worldState.dungeons.cinderhollow_caverns || { cleared:[], defeated:[] };
+  S.worldState.dungeons.cinderhollow_caverns.bossDead = true;
+  save();
+  return { tier: DORM.tierFor(S).id, placed: Object.keys(S.home.furniture).length };
+};
+window.__testEnterDorm = ()=>{ enterDorm(); };
+window.__testDormRoom = ()=>{ const r = DORM.dormRoom(S); return [r.w, r.d]; };
+window.__testDormUpgrade = ()=>{ S.gold += 5000; S.inventory.oak_log = (S.inventory.oak_log||0) + 60;
+  for (const u of HOME_UPGRADES) G.upgradeHome(S, u.id); save(); return DORM.tierFor(S).id; };
 window.__testBoard = ()=>{
   battle.you.pips = 9; battle.enemy.pips = 9;
   battle.you.hand[0] = "fire_dragon"; window.__ev("play|0");

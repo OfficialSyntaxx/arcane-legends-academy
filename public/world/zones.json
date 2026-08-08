@@ -4,7 +4,7 @@
       "id": "academy",
       "name": "The Arcanum Academy",
       "hub": true,
-      "generated": "tools/sync-zones.mjs \u2014 do not hand-edit; edit structures.js/nodes.js and re-run",
+      "generated": "tools/sync-zones.mjs — do not hand-edit; edit structures.js/nodes.js and re-run",
       "spawn": {
         "x": 13,
         "z": 15
@@ -100,7 +100,8 @@
           "roof": 3100554,
           "face": "z-",
           "model": "./assets/models/hex_home_A.glb",
-          "modelRy": 0
+          "modelRy": 0,
+          "interior": "dorm"
         },
         {
           "id": "tavern",
@@ -242,7 +243,7 @@
           "key": "quest",
           "role": "quest",
           "station": "quests",
-          "label": "Professor \u2014 Quests",
+          "label": "Professor — Quests",
           "x": -22,
           "z": 17,
           "main": 10133688,
@@ -266,7 +267,7 @@
           "key": "duel",
           "role": "duel",
           "station": "duel",
-          "label": "Referee \u2014 Duel",
+          "label": "Referee — Duel",
           "x": 9,
           "z": -21,
           "main": 4864634,
@@ -278,7 +279,7 @@
           "key": "trainer",
           "role": "trainer",
           "station": "trainer",
-          "label": "Trainer \u2014 Practice",
+          "label": "Trainer — Practice",
           "x": 17,
           "z": 24,
           "main": 3828696,
@@ -290,7 +291,7 @@
           "key": "librarian",
           "role": "librarian",
           "station": "librarian",
-          "label": "Librarian \u2014 Lore",
+          "label": "Librarian — Lore",
           "x": -31,
           "z": 22,
           "main": 6970270,

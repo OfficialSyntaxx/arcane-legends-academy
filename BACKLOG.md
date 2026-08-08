@@ -36,18 +36,19 @@
 - [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
 - [~] Main story + side quests — five field quests in the Whispering Forest from two NPCs (`zonequests.js`), with gather/slay/clear/boss objectives, prerequisites and a quest log. The main story is still to write.
 - [ ] Visual equipment on 3D character
-- [ ] **Dorm customization — NEXT PHASE (D1–D4).** Today the Student Dorms building is a menu:
-  its station jumps to `screen="home"`, which is a stats page plus four numeric `HOME_UPGRADES`.
-  No interior, no furniture, nothing spatial. Phases: **D1** walk-in interior as a real zone
-  (reuse the `dungeons.js` → zone compile path, new pure `dorm.js`); **D2** furniture catalogue +
-  anchor slots + placement validation, persisted in `S.home.furniture` with a `migrate()` bump,
-  bought with gold/timber; **D3** display cases and trophies; **D4** the existing upgrade levels
-  drive how the room actually looks. See `CLAUDEREADME.md` §9 "Next up — the Dorm phases".
-- [ ] Card/slab display cases — part of **D3**. Graded slabs already carry unique serials, so this
-  makes an existing system visible rather than inventing one. Store only *which* slab the player
-  put in *which* case; derive everything else from the save.
-- [ ] Trophy room — part of **D3**. Boss defeats already persist (`S.worldState.dungeons`), so a
-  Cinder Wyrm trophy is derived state, not new bookkeeping.
+- [x] **Dorm customization — DONE (D1–D4).** The Student Dorms is no longer a menu. Walking up and
+  pressing the prompt builds a real interior *zone* (`dorm.js`, pure; it reuses `dungeons.js` to
+  lay the room out, so a dorm is a one-room dungeon with no enemies and inherits zone transitions,
+  saved position and camera collision for free). Furniture is bought with gold + timber and placed
+  into typed anchor slots authored as fractions of the room; every piece is a procedural
+  primitive, so zero new asset bytes. The interior seam in `structures.js` (`interior:` +
+  `interiorFor`) is generic — the Scribing Hall and Smithy can follow with no new entry-path code.
+- [x] Card/slab display cases — DONE (D3). The save stores only `slot -> card uid`; grade, serial
+  and name are read from the live card, so selling a displayed slab empties its case rather than
+  leaving a ghost (covered by a test).
+- [x] Trophy room — DONE (D3). Trophies are never stored: they are derived from
+  `worldState.dungeons[...].bossDead`, so they cannot disagree with the world. Beat the Cinder
+  Wyrm and one appears in the room's corner.
 - [ ] Achievements and player titles
 
 ## 3. Open World
@@ -115,9 +116,9 @@
 - [ ] Wand cosmetics
 - [ ] Auras
 - [ ] Emotes
-- [ ] Housing furniture — duplicate of §2 "Dorm customization" (D2). §2 is canonical.
-- [ ] Slab display cases — duplicate of §2 (D3). §2 is canonical.
-- [ ] Boss trophies — duplicate of §2 "Trophy room" (D3). §2 is canonical.
+- [x] Housing furniture — shipped as §2 "Dorm customization" (D2). §2 is canonical.
+- [x] Slab display cases — shipped as §2 (D3). §2 is canonical.
+- [x] Boss trophies — shipped as §2 "Trophy room" (D3). §2 is canonical.
 
 ## 8. Multiplayer & Social
 
@@ -140,7 +141,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 252 engine / 34 online / 62 real-browser (8 viewports + gestures + world/dungeon/quest/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 280 engine / 34 online / 75 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -167,7 +168,7 @@ Academy → tutorial → card loop → combat → progression → save system �
 ### Phase 2 — Make the Academy a Game
 Character creation → classes → NPCs → quests → equipment visuals → housing.
 
-### Phase 2b — The Dorm (current)
+### Phase 2b — The Dorm ✅ done
 Interior zone → furniture placement → display cases & trophies → visual upgrade tiers.
 
 ### Phase 3 — Expand the World
@@ -202,7 +203,9 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** the outdoor **Duel Arena landmark** swapped for a
+**Changes made, most recent first:** the **Dorm phases D1–D4** (`dorm.js` — walk-in interior
+zone, furniture placement, display cases, boss trophies, upgrade-driven room tiers) → the outdoor
+**Duel Arena landmark** swapped for a
 user-provided Tripo model (`public/assets/buildings/arena.glb`, rune-floor platform with a pillar
 ring, compressed 1.12MB→0.71MB) — verified via standalone render, post-compression render,
 `model-check.mjs`, in-game debug, and the full `browser-test.mjs` suite (incl. the camera-orbit
@@ -217,10 +220,11 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step: the Dorm phases (D1–D4)** — see §2 above and `CLAUDEREADME.md` §9 "Next up". The
-Student Dorms building currently opens a menu, not a place; D1 makes it a walk-in interior zone,
-D2 adds furniture placement, D3 display cases + trophies, D4 makes the four existing numeric
-upgrade tracks visually readable inside the room.
+**Next step:** the Dorm phases (D1–D4) are **done** — the Student Dorms is a walk-in interior with
+furniture placement, display cases, trophies and upgrade-driven room tiers (§2 above,
+`CLAUDEREADME.md` §6.8). Landed alongside it from the docs review: the home/hall/dorm naming
+collision resolved to "Dorm" everywhere user-facing, `docs/plan.md` marked historical, and §7's
+duplicated housing entries pointed at §2.
 
 **After that:** WORLDSPEC steps 1–5 are all done. Remaining world work is **step 6, the content
 pass** — a second dungeon and a third outdoor zone, mostly authoring against the schemas already

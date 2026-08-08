@@ -220,6 +220,20 @@ Dungeons and boss rooms are **interior instances** — separate scenes, not part
    dungeon and a third outdoor zone — the schemas in §3/§6 need no engine change, so this is
    content-authoring against `zones.json`/`dungeons.json`, not new code.
 
+**Interiors that are not dungeons.** `public/dorm.js` (the Dorm phases, `CLAUDEREADME.md` §6.8)
+compiles the player's dorm into a zone by calling `layoutDungeon` + `dungeonZone` directly: a dorm
+is a one-room dungeon with no enemies. This is the intended way to add any building interior — a
+building declares `interior:"<id>"` in `structures.js` and `interiorFor()` is the seam the entry
+path consults, so the Scribing Hall and Smithy need no new engine code either. Two corrections it
+forced on this spec:
+- **`interior: true` must not imply "cave".** The step-5 light rig assumed every interior ships
+  torches, which is true of a dungeon and false of a home; a zone now declares `lightScale` /
+  `lightTint` instead. See §9b v.
+- **A compiled interior's exit is not always where `dungeonZone` puts it.** That placement is
+  derived from a dungeon's first room and can land behind a wall; a caller that knows its own
+  geometry should overwrite `zone.exits` — and must keep the arrival point clear of the return
+  trigger, or the player bounces straight back out.
+
 ---
 
 ## 9b. Additions from implementing steps 1–2
@@ -349,3 +363,16 @@ the screen did not. Converting sRGB to linear collapses a 10/255 difference betw
 into ~0.05 of linear range, and ACES then compresses the midtones again, so a ±16% variation that
 looked fine as numbers was invisible. Verify ground colour by RENDERING it, and test the spread
 over a screen-sized window rather than the whole zone.
+
+**v. Not every interior is a cave.**
+Steps 5's interior lighting was written for dungeons, which ship a torch in every room, and it was
+applied on the strength of `interior: true` alone. The first dorm inherited it and rendered as a
+black box with a bed somewhere in it — the geometry, the collision and every unit test were
+correct and the room was still unusable. A zone now says how lit it is (`lightScale`, `lightTint`)
+rather than having darkness inferred from being indoors.
+
+The second half of this lesson is about *verification*: this was invisible to every test that
+existed, and a Playwright screenshot of the world canvas comes back blank because the drawing
+buffer is cleared after compositing. `world.renderOnce()` exists so a test can draw one frame and
+read pixels off it; `browser-test.mjs` now asserts mean brightness inside the dorm. Any future
+interior should carry the same check.

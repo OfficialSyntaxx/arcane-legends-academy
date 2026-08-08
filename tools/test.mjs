@@ -14,6 +14,7 @@ import * as VFX from "../public/vfx.js";
 import * as ZQ from "../public/zonequests.js";
 import * as ACADEMY from "../public/academy.js";
 import * as REP from "../public/reputation.js";
+import * as DORM from "../public/dorm.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -1489,6 +1490,200 @@ check("turning in a field quest raises reputation with its giver", (()=>{
   // zonequests.js does not touch reputation itself (kept pure) — this only proves the DATA is
   // there for the UI layer to apply; the UI-layer wiring is covered by the browser test.
   return r.ok && REP.repOf(s, q.giver) === before;
+})());
+
+
+// ---- The Dorm (D1-D4) ----
+// dorm.js is pure, so every layout rule, placement rule and derivation is checkable here rather
+// than only in a browser. The bar is the one the rest of the world modules hold: no spatial maths
+// in world.js, and nothing derived is stored in the save.
+function dormSave(levels = { treasury:2, library:1, armory:0, tavern:1 }){
+  const s = G.newGame();
+  s.home.owned = true; s.home.upgrades = { ...s.home.upgrades, ...levels };
+  return s;
+}
+check("the dorm's own configuration is valid", DORM.validateDorm().length === 0);
+check("a fresh save has the dorm save shape after migrate", (()=>{
+  localStorage_stub(JSON.stringify({ ...G.newGame(), home:{ owned:true, upgrades:{treasury:0,library:0,armory:0,tavern:0} } }));
+  const s = G.load();
+  return s.home.stock && s.home.furniture && s.home.cases;
+})());
+check("an unowned dorm is the bare tier with no levels", DORM.upgradeLevels(G.newGame()) === 0);
+check("buying hall upgrades raises the dorm tier (D4)", (()=>{
+  const bare = DORM.tierFor(dormSave({treasury:0,library:0,armory:0,tavern:0}));
+  const big  = DORM.tierFor(dormSave({treasury:5,library:5,armory:5,tavern:5}));
+  return bare.id === "bare" && big.id === "chambers" && big.w > bare.w && big.slots > bare.slots;
+})());
+check("every tier's slots fit inside its own room", (()=>{
+  for (const lv of [0,4,9,20]){
+    const s = dormSave({treasury:lv>15?5:Math.min(5,lv), library:Math.min(5,Math.max(0,lv-5)), armory:Math.min(5,Math.max(0,lv-10)), tavern:Math.min(5,Math.max(0,lv-15))});
+    const room = DORM.dormRoom(s);
+    for (const slot of DORM.slotsFor(s)){
+      if (Math.abs(slot.x - room.x) > room.w/2 || Math.abs(slot.z - room.z) > room.d/2) return false;
+    }
+  }
+  return true;
+})());
+check("furniture cannot be placed in a slot of the wrong kind", (()=>{
+  const s = dormSave(); s.home.stock = { bookshelf: 1 };
+  return DORM.placementProblem(s, "floor_a", "bookshelf") !== null;
+})());
+check("furniture the player does not own cannot be placed", (()=>{
+  const s = dormSave();
+  return DORM.placementProblem(s, "floor_a", "bed") !== null;
+})());
+check("a slot that this tier has not unlocked is rejected", (()=>{
+  const s = dormSave({treasury:0,library:0,armory:0,tavern:0});   // bare: 4 slots
+  s.home.stock = { case: 1 };
+  return DORM.slotsFor(s).length === 4 && DORM.placementProblem(s, "case_d", "case") !== null;
+})());
+check("buying then placing furniture works, and a slot cannot be double-filled", (()=>{
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  if (!DORM.buyFurniture(s, "bed").ok) return false;
+  if (!DORM.place(s, "floor_a", "bed").ok) return false;
+  DORM.buyFurniture(s, "bed");
+  return DORM.place(s, "floor_a", "bed").ok === false && s.home.furniture.floor_a === "bed";
+})());
+check("buying furniture actually spends gold and timber", (()=>{
+  const s = dormSave(); s.gold = 1000; s.inventory.oak_log = 10;
+  const item = DORM.FURNITURE_MAP.bookshelf;
+  DORM.buyFurniture(s, "bookshelf");
+  return s.gold === 1000 - item.gold && s.inventory.oak_log === 10 - item.timber;
+})());
+check("furniture cannot be bought without the gold or the timber", (()=>{
+  const s = dormSave(); s.gold = 0; s.inventory.oak_log = 0;
+  const a = DORM.buyFurniture(s, "bed");
+  s.gold = 5000;
+  const b = DORM.buyFurniture(s, "bookshelf");   // needs timber
+  return a.ok === false && a.err === "gold" && b.ok === false && b.err === "timber";
+})());
+check("unplacing returns the piece to stock rather than destroying it", (()=>{
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  DORM.buyFurniture(s, "bed"); DORM.place(s, "floor_a", "bed");
+  if (DORM.unplaced(s).length !== 0) return false;
+  DORM.unplace(s, "floor_a");
+  return DORM.unplaced(s).some(u => u.id === "bed" && u.count === 1);
+})());
+// --- display cases (D3): the derived-state rule ---
+function slabbedSave(){
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  DORM.buyFurniture(s, "case"); DORM.place(s, "case_a", "case");
+  s.cards.push({ uid:"slab1", id:s.cards[0].id, roll:99, graded:true, serial:1001 });
+  return s;
+}
+check("only slabbed cards can be displayed", (()=>{
+  const s = slabbedSave();
+  s.cards.push({ uid:"plain", id:s.cards[0].id, roll:40, graded:false });
+  return DORM.displayProblem(s, "case_a", "plain") !== null && DORM.displayIn(s, "case_a", "slab1").ok;
+})());
+check("a slab cannot be shown in two cases at once", (()=>{
+  const s = slabbedSave();
+  DORM.buyFurniture(s, "case"); DORM.place(s, "case_b", "case");
+  DORM.displayIn(s, "case_a", "slab1");
+  return DORM.displayIn(s, "case_b", "slab1").ok === false;
+})());
+check("a case cannot be filled where no case furniture stands", (()=>{
+  const s = slabbedSave();
+  return DORM.displayProblem(s, "floor_a", "slab1") !== null;
+})());
+// THE drift test. The save stores only the card's uid; everything shown is read live. Selling a
+// displayed slab must empty its case, not leave a ghost of a card the player no longer owns.
+check("selling a displayed slab empties its case instead of leaving a ghost", (()=>{
+  const s = slabbedSave();
+  DORM.displayIn(s, "case_a", "slab1");
+  if (!DORM.caseContents(s, gradeForRoll).find(c => c.slot === "case_a").card) return false;
+  s.cards = s.cards.filter(c => c.uid !== "slab1");          // sold
+  const after = DORM.caseContents(s, gradeForRoll).find(c => c.slot === "case_a");
+  return after && after.card === null;
+})());
+check("removing the case furniture removes its display entry too", (()=>{
+  const s = slabbedSave();
+  DORM.displayIn(s, "case_a", "slab1");
+  DORM.unplace(s, "case_a");
+  return DORM.caseContents(s, gradeForRoll).length === 0 && !(s.home.cases||{}).case_a;
+})());
+// --- trophies (D3): derived, never stored ---
+check("a trophy appears only once its boss is actually dead", (()=>{
+  const s = dormSave();
+  if (DORM.trophiesFor(s).length !== 0) return false;
+  s.worldState.dungeons.cinderhollow_caverns = { cleared:[], defeated:[], bossDead:true };
+  return DORM.trophiesFor(s).length === 1 && DORM.trophyPlacements(s)[0].z !== undefined;
+})());
+check("a trophy never lands on a piece of furniture", (()=>{
+  // Every slot filled, every trophy earned, at every tier — the arrangement most likely to
+  // collide. Two earlier trophy layouts failed exactly this, and only a render showed it.
+  for (const t of DORM.TIERS){
+    const s = dormSave({treasury:5,library:5,armory:5,tavern:5});
+    // force this tier by trimming levels to its threshold
+    const lv = t.minLevels;
+    s.home.upgrades = { treasury:Math.min(5,lv), library:Math.min(5,Math.max(0,lv-5)),
+                        armory:Math.min(5,Math.max(0,lv-10)), tavern:Math.min(5,Math.max(0,lv-15)) };
+    if (DORM.tierFor(s).id !== t.id) continue;
+    s.gold = 99999; s.inventory.oak_log = 999;
+    for (const slot of DORM.slotsFor(s)){
+      const item = DORM.FURNITURE.find(f => f.kind === slot.kind);
+      DORM.buyFurniture(s, item.id); DORM.place(s, slot.id, item.id);
+    }
+    s.worldState.dungeons.cinderhollow_caverns = { cleared:[], defeated:[], bossDead:true };
+    const z = DORM.dormZone(s, {});
+    for (const tr of z.dormLayout.trophies){
+      for (const p of z.dormLayout.pieces){
+        if (Math.abs(tr.x - p.x) < (p.w/2 + 1.0) && Math.abs(tr.z - p.z) < (p.d/2 + 1.0)) return false;
+      }
+      const room = DORM.dormRoom(s);
+      if (Math.abs(tr.x) > room.w/2 - 0.5 || Math.abs(tr.z) > room.d/2 - 0.5) return false;
+    }
+  }
+  return true;
+})());
+check("trophies are not written into the save", (()=>{
+  const s = dormSave();
+  s.worldState.dungeons.cinderhollow_caverns = { cleared:[], defeated:[], bossDead:true };
+  DORM.trophyPlacements(s);
+  return JSON.stringify(s).indexOf("Cinder Wyrm Skull") === -1;
+})());
+// --- the zone (D1) ---
+check("the dorm compiles to a zone with a reachable, non-ping-pong exit", (()=>{
+  const z = DORM.dormZone(dormSave(), {});
+  const ex = z.exits[0];
+  const w = WC.buildWorld({ zones:[z] });
+  return z.interior === true && ex.toZone === "academy" &&
+         Math.hypot(z.spawn.x - ex.x, z.spawn.z - ex.z) > WC.EXIT_RADIUS &&
+         !WC.exitNear(w.get("dorm"), z.spawn.x, z.spawn.z);
+})());
+check("the dorm's exit and spawn are both inside its own bounds", (()=>{
+  const z = DORM.dormZone(dormSave(), {});
+  const inb = p => p.x > z.bounds.minX && p.x < z.bounds.maxX && p.z > z.bounds.minZ && p.z < z.bounds.maxZ;
+  return inb(z.spawn) && inb(z.exits[0]);
+})());
+check("the doorway is a real gap — the south wall is not one solid box", (()=>{
+  const z = DORM.dormZone(dormSave(), {});
+  const room = z.rooms.find(r => r.id === "dorm");
+  const south = room.walls.filter(w => w.id.endsWith(":s"));
+  // Two pieces either side of the door, and neither spans the doorway's centre line.
+  return south.length === 2 && south.every(w => Math.abs(w.x) > DORM.DOOR_WIDTH/2 - 0.01);
+})());
+check("the dorm zone carries no enemies (it is a home, not a dungeon)", DORM.dormZone(dormSave(), {}).enemies.length === 0);
+check("placed furniture becomes collision, except flat rugs", (()=>{
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  DORM.buyFurniture(s, "bed"); DORM.place(s, "floor_a", "bed");
+  DORM.buyFurniture(s, "rug"); DORM.place(s, "floor_b", "rug");
+  const obs = DORM.dormZone(s, {}).obstacles.filter(o => String(o.id).startsWith("furn:"));
+  return obs.length === 1 && obs[0].id === "furn:floor_a";
+})());
+check("a banner with no colour of its own takes the player's school colour", (()=>{
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  DORM.buyFurniture(s, "banner"); DORM.place(s, "wall_a", "banner");
+  return DORM.layoutFor(s, { schoolColor: 0x123456 }).pieces[0].color === 0x123456;
+})());
+// The whole point of D1: the dorm reuses the dungeon zone machinery rather than a parallel path.
+check("the dorm's walls and floors were computed by dungeons.js, not hand-placed", (()=>{
+  const z = DORM.dormZone(dormSave(), {});
+  return z.rooms.every(r => Array.isArray(r.walls) && r.walls.length > 0) &&
+         z.obstacles.some(o => String(o.id).startsWith("wall:"));
+})());
+check("structures.js exposes the interior seam generically, not as a dorm special case", (()=>{
+  return ST.interiorFor("home") === "dorm" && ST.interiorFor("market") === null;
 })());
 
 
