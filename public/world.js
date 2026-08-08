@@ -942,7 +942,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
         const vmin = new THREE.Vector3(b.min.x, b.min.y, b.min.z).applyMatrix4(o.matrixWorld);
         const vmax = new THREE.Vector3(b.max.x, b.max.y, b.max.z).applyMatrix4(o.matrixWorld);
         const w = vmax.x - vmin.x, d = vmax.z - vmin.z;
-        if (Math.min(w, d) < 2) return;        // trees/rocks/decor are too small to block
+        if (Math.min(w, d) < 0.8) return;       // block trees/rocks too (not just building-sized shapes)
         mapObstacleBoxes.push([vmin.x, vmax.x, vmin.z, vmax.z]);
       });
       // Sample the map's floor under the spawn so entities/player sit on the surface instead of
@@ -1103,7 +1103,9 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     if (keys.has('r')) mx += 1;
     const gp = (navigator.getGamepads && navigator.getGamepads()[0]);
     if (gp){ const ax=gp.axes[0]||0, ay=gp.axes[1]||0; if(Math.abs(ax)>0.15) mx+=ax; if(Math.abs(ay)>0.15) mz+=ay; }
-    mx += joy.x; mz += joy.y;
+    // touch joystick: screen Y is down-positive, but forward is negative mz — negate so pushing
+    // the stick UP moves the player forward (away from the camera), not backward.
+    mx += joy.x; mz -= joy.y;
     const ml = Math.hypot(mx, mz);
     if (ml>1){ mx/=ml; mz/=ml; }
     if (tapSet && tapTarget){
@@ -1306,7 +1308,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     }
     return false;
   }
-  function updateCamera(){
+  function updateCamera(dt){
     const px = player.position.x, pz = player.position.z, py = player.position.y;
     // CAMERA COLLISION. Without this the camera sits inside whatever is behind the player —
     // the arena canopy's black interior, a hall's backfaces — which is trivial to hit now that
@@ -1329,10 +1331,13 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       mapSurfaceY(cx, cz) + 1.8
     );
     _camTarget.set(cx, y, cz);
-    // Pull IN instantly, ease back OUT. Easing both ways means the camera spends a moment
-    // travelling through whatever it is avoiding, which is exactly the artefact this fixes.
+    // TIME-BASED SMOOTHING. The old fixed factor (0.12/frame) was frame-rate dependent — at low
+    // fps the camera lagged so far it visibly swam, and during fast rotation it wove around the
+    // target. Use an exponential ease so the follow is smooth and frame-rate independent: pull in
+    // quickly when a collision forces it closer, ease back out at a moderate rate.
     const curDist = Math.hypot(camera.position.x - px, camera.position.z - pz);
-    camera.position.lerp(_camTarget, want < curDist - 0.05 ? 1 : 0.12);
+    const k = want < curDist - 0.05 ? (1 - Math.exp(-dt * 22)) : (1 - Math.exp(-dt * 7));
+    camera.position.lerp(_camTarget, k);
     // POST-STEP CORRECTION. The clamp above is computed for the *target* along the new yaw, but
     // easing back out leaves the camera somewhere between its old and new positions — and while
     // orbiting a building, both endpoints can be clear while the arc between them cuts straight
@@ -1369,7 +1374,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     updateChars(dt);
     updateNearby();
     updateExits();
-    updateCamera();
+    updateCamera(dt);
     if (skyGroup) skyGroup.position.copy(camera.position);   // keep the sky centered on the camera
     if (cloudGroup){                                        // drift clouds around the sky
       cloudGroup.rotation.y += dt * 0.012;

@@ -2,6 +2,11 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-07 — Input, camera, and noclip fixes
+- **Input controls no longer inverted**: the touch joystick's Y axis was mapping screen-down (positive) to *forward*, so pushing the stick UP moved the player backward. Negated the touch-joystick Y so pushing up moves forward (away from the camera). Keyboard/gamepad were already correct.
+- **Smoother camera**: the follow used a fixed `0.12`/frame lerp (frame-rate dependent — sluggish at low fps, wavy during fast rotation). Replaced with a time-based exponential ease (`1-exp(-dt*k)`): pulls in quickly on collision, eases out smoothly, frame-rate independent.
+- **No noclip through map trees/rocks**: the map-collision footprints now include sub-building shapes (threshold lowered from 2u to 0.8u), so map trees/rocks/structures and snow hills all block the player (alongside the existing elevated-surface check).
+
 ## 2026-08-07 — Player collision against the GLB map geometry
 Reusing the camera-collision raycasts, the player now collides with the baked maps:
 - **Can't walk through buildings**: `mapBlocks(x,z)` raycasts down onto the map and blocks the player where the surface is elevated (a building wall / steep terrain) OR where (x,z) sits inside a building's 2D footprint (so a hollow structure's interior also blocks). Integrated into movement with slide-along-wall behaviour, NPC wanderers, and teleport (a teleport into a building is rejected).
