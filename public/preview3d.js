@@ -41,7 +41,7 @@ export function createPreview(canvas){
   plinth.position.y = -0.125; scene.add(plinth);
 
   const root = new THREE.Group(); scene.add(root);
-  let model = null, mixer = null, auraGroup = null, appearance = null;
+  let model = null, mixer = null, auraGroup = null, appearance = null, gearList = [], gearGroups = [];
   let spin = true, yaw = 0, raf = 0, last = performance.now();
 
   // Procedural stand-in so the panel is never empty while the GLB downloads. Same reasoning as
@@ -67,6 +67,51 @@ export function createPreview(canvas){
     tintTree(model || stand, appearance);
     buildAura();
   }
+  // Equipped gear, attached to the same bones world.js uses. Sharing the resolved list from
+  // equipment3d.js is what keeps the preview honest — it shows the real attachment, not a mock-up.
+  function applyGear(){
+    for (const g of gearGroups){
+      g.traverse(o => { if (o.isMesh){ o.geometry.dispose(); if (o.material.dispose) o.material.dispose(); } });
+      if (g.parent) g.parent.remove(g);
+    }
+    gearGroups = [];
+    if (!model || !gearList.length) return;
+    for (const a of gearList){
+      const bone = model.getObjectByName(a.bone);
+      if (!bone) continue;
+      const g = new THREE.Group();
+      g.position.fromArray(a.pos); g.rotation.fromArray(a.rot);
+      bone.add(g); gearGroups.push(g);
+      bone.updateWorldMatrix(true, false);
+      const sc = new THREE.Vector3().setFromMatrixScale(bone.matrixWorld);
+      g.scale.setScalar(1 / Math.max(1e-6, (sc.x + sc.y + sc.z) / 3));
+      if (a.model){
+        const loader = new THREE.GLTFLoader();
+        if (THREE.DRACOLoader){ const d = new THREE.DRACOLoader(); d.setDecoderPath("./vendor/draco/"); loader.setDRACOLoader(d); }
+        loader.load("./assets/models/" + a.model, gltf => {
+          const m = gltf.scene;
+          const box = new THREE.Box3().setFromObject(m);
+          const h = Math.max(0.001, box.max.y - box.min.y);
+          m.scale.setScalar(a.height / h);
+          const c = box.getCenter(new THREE.Vector3()).multiplyScalar(a.height / h);
+          m.position.set(-c.x, -c.y, -c.z);
+          if (a.color != null) m.traverse(o => {
+            if (o.isMesh && o.material && o.material.color){
+              o.material = o.material.clone();
+              o.material.color.lerp(new THREE.Color(a.color).convertSRGBToLinear(), 0.55);
+            }
+          });
+          g.add(m);
+        }, undefined, () => {});
+      } else {
+        const bead = new THREE.Mesh(new THREE.SphereGeometry(a.height * 0.5, 10, 8),
+          new THREE.MeshStandardMaterial({ color: a.color || 0xc8c8c8, roughness: 0.4,
+            emissive: new THREE.Color(a.color || 0xc8c8c8), emissiveIntensity: a.glow ? 0.9 : 0 }));
+        g.add(bead);
+      }
+    }
+  }
+
   function buildAura(){
     if (auraGroup){
       auraGroup.traverse(o => { if (o.isMesh){ o.geometry.dispose(); o.material.dispose(); } });
@@ -116,6 +161,7 @@ export function createPreview(canvas){
         mixer.clipAction(idle).play();
       }
       applyAppearance();
+      applyGear();
     }, undefined, onFail);
     tryUrl(modelUrl("player_wizard.glb"), () => tryUrl(local, () => {}));
   }
@@ -147,6 +193,7 @@ export function createPreview(canvas){
 
   return {
     setAppearance(look){ appearance = look; applyAppearance(); },
+    setGear(list){ gearList = list || []; applyGear(); },
     setSpin(on){ spin = on; },
     nudge(dx){ yaw += dx * 0.01; },
     start(){ if (!raf){ last = performance.now(); raf = requestAnimationFrame(frame); } },

@@ -14,7 +14,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
-const PORT = Number(process.env.PORT || 8099);
+// Port 0 asks the OS for a free one. A fixed 8099 meant two runs on the same machine — a stale
+// one, or simply an impatient second invocation — died on EADDRINUSE partway through, which looks
+// exactly like a test failure and wasted real time twice. Set PORT explicitly to pin it.
+const PORT = Number(process.env.PORT || 0);
 const TYPES = { ".html":"text/html", ".js":"text/javascript", ".mjs":"text/javascript", ".json":"application/json",
   ".png":"image/png", ".jpg":"image/jpeg", ".glb":"model/gltf-binary", ".css":"text/css" };
 
@@ -27,8 +30,11 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
   fs.createReadStream(file).pipe(res);
 });
-await new Promise(r => server.listen(PORT, "127.0.0.1", r));
-const BASE = `http://127.0.0.1:${PORT}`;
+await new Promise((resolve, reject) => {
+  server.once("error", reject);
+  server.listen(PORT, "127.0.0.1", resolve);
+});
+const BASE = `http://127.0.0.1:${server.address().port}`;
 const SHOTS = process.env.SHOT_DIR || null;
 
 // Use a preinstalled Chromium when the environment provides one (PLAYWRIGHT_BROWSERS_PATH),
@@ -788,6 +794,61 @@ if (hasWorld){
   check("buying hall upgrades physically grows the dorm (D4)",
         grew.after && grew.after[0] > grew.before[0] && grew.after[1] > grew.before[1],
         `${JSON.stringify(grew.before)} -> ${JSON.stringify(grew.after)}`);
+
+
+  // --- visible equipment on the 3D character (BACKLOG §2) ---
+  // Only a browser can answer the question that matters here: does the weapon actually end up
+  // parented to a bone, at a sane size, moving with the character? Bone axes on a generated rig
+  // are arbitrary, and the first two orientations tried put the staff horizontally across the
+  // body and then upside-down through the floor — both perfectly "valid" data.
+  const gear = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const out = {};
+    out.before = window.__world.gearDebug();
+    out.forged = window.__testGear("rune");
+    // Draco decode of the staff takes a few seconds under swiftshader — this is a real wait, not
+    // a superstitious one. A 2.5s wait showed an empty hand and looked exactly like a bug.
+    for (let i = 0; i < 20; i++){
+      await settle(700);
+      const d = window.__world.gearDebug();
+      // Sample the bone list in the LOOP, not once up front: this block runs just after a zone
+      // rebuild, and reading it immediately returned [] because the player GLB had not finished
+      // loading yet — which looks identical to "the rig has no bones".
+      out.bones = window.__world.playerBones() || out.bones;
+      if (d.wand && d.wand.meshes > 0){ out.after = d; break; }
+      out.after = d;
+    }
+    return out;
+  });
+  check("the player rig exposes the bones the attachment table names",
+        (gear.bones || []).includes("RightHand") && (gear.bones || []).includes("Neck"),
+        JSON.stringify((gear.bones || []).slice(0, 6)));
+  check("nothing hangs off the character before anything is equipped",
+        Object.keys(gear.before || {}).length === 0);
+  check("equipping puts a wand and an amulet on the character",
+        !!gear.after && !!gear.after.wand && !!gear.after.amulet, JSON.stringify(Object.keys(gear.after || {})));
+  check("the weapon model actually loaded onto the bone",
+        gear.after && gear.after.wand && gear.after.wand.meshes > 0,
+        JSON.stringify(gear.after && gear.after.wand));
+  // Size is the check that catches the bone-scale trap: a bone carries the character's own scale,
+  // so anything parented to it inherits that scale too and comes out at the rig's internal units.
+  check("the staff is a sane size in world units, not the rig's internal scale", (()=>{
+    const s = gear.after && gear.after.wand && gear.after.wand.worldSize;
+    if (!s) return false;
+    const longest = Math.max(...s);
+    return longest > 1.0 && longest < 4.0;
+  })(), JSON.stringify(gear.after && gear.after.wand && gear.after.wand.worldSize));
+  check("the staff is held upright, not lying across the body", (()=>{
+    const s = gear.after && gear.after.wand && gear.after.wand.worldSize;
+    // a vertical staff is much taller than it is wide; the horizontal version was the opposite
+    return !!s && s[1] > Math.max(s[0], s[2]) * 1.8;
+  })(), JSON.stringify(gear.after && gear.after.wand && gear.after.wand.worldSize));
+  check("the amulet sits at the neck, not at the feet", (()=>{
+    const a = gear.after && gear.after.amulet;
+    const p = gear.after && gear.after.wand;
+    if (!a || !a.worldCenter) return false;
+    return a.worldCenter[1] > 1.2;                 // the player is 2.6m; a neck is ~1.7m up
+  })(), JSON.stringify(gear.after && gear.after.amulet && gear.after.amulet.worldCenter));
 
   // --- WORLDSPEC step 6 content: the third zone and the second dungeon ---
   // Data-level correctness is covered headlessly; what only a browser can answer is whether the

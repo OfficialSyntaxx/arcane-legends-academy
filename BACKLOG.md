@@ -46,10 +46,13 @@
   Whispering Forest, five at Lake Arcanum gated behind the Cinder Wyrm, with gather/slay/clear/boss
   objectives, prerequisites and a quest log. `validateQuests` proves the whole chain is completable
   and that no prerequisite is missing or cyclic. The main story is still to write.
-- [ ] Visual equipment on 3D character — **unblocked**: the auto-rigged player exposes
-  `RightHand`/`LeftHand` bones and the repo already ships CC0 KayKit weapons
-  (`wpn_sword_A`, `wpn_staff_A`, `wpn_wand_A`, …). What is missing is an attachment helper in
-  `world.js`; `S.loadout` already has the data. See `BLENDERTODO.md` Tier 5.
+- [~] Visual equipment on 3D character — **wand and amulet ship** (`equipment3d.js`): parented to
+  the rig's real `RightHand`/`Neck` bones so they inherit the animation, with the tier picking the
+  silhouette (wand → staff → greater staff) and the metal picking the colour, using CC0 KayKit
+  weapons already in the repo. `hat`, `robe` and `boots` **cannot** be shown — the character is a
+  single mesh, so there is nothing to swap or hide underneath; they are listed in `UNSUPPORTED`
+  with the reason and the Loadout screen labels them "stats only". Making those three visible
+  needs per-part geometry — `BLENDERTODO.md` Tier 5.
 - [x] **Dorm customization — DONE (D1–D4).** The Student Dorms is no longer a menu. Walking up and
   pressing the prompt builds a real interior *zone* (`dorm.js`, pure; it reuses `dungeons.js` to
   lay the room out, so a dorm is a one-room dungeon with no enemies and inherits zone transitions,
@@ -161,7 +164,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 316 engine / 34 online / 95 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 326 engine / 34 online / 102 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -223,7 +226,8 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **character creation + per-school appearance**
+**Changes made, most recent first:** **visible equipment on the 3D character** (`equipment3d.js`)
+→ **character creation + per-school appearance**
 (`charcreate.js` / `tint.js` / `preview3d.js`) and **`BLENDERTODO.md`** → **WORLDSPEC step 6, the content pass** (Lake Arcanum + the
 Drowned Vault, five new quests, per-dungeon palettes, `nearWater` scatter) → the **Dorm phases D1–D4** (`dorm.js` — walk-in interior
 zone, furniture placement, display cases, boss trophies, upgrade-driven room tiers) → the outdoor
@@ -242,7 +246,11 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **character creation + per-school appearance are done** (a three-step screen with a
+**Next step:** **visible equipment is done** — the equipped wand and amulet hang off the rig's real
+bones, tier picks the silhouette and metal picks the colour; the three slots that cannot be shown
+say so instead of silently doing nothing (`CLAUDEREADME.md` §6.10).
+
+Before that, **character creation + per-school appearance were done** (a three-step screen with a
 live 3D preview; the school look is a shader hue-shift plus a coloured aura — see `CLAUDEREADME.md`
 §6.9 for why it could not be a colour assignment). **`BLENDERTODO.md` is new**: a full modelling
 brief for every asset still drawn as a procedural primitive, written for an AI agent driving

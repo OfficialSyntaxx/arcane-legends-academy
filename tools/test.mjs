@@ -1,7 +1,7 @@
 // Engine smoke test — runs the card engine, economy, and economy-balance checks headlessly.
 import * as G from "../public/game.js";
 import { CARDS, CARD_MAP, SCHOOLS, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
-import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS } from "../public/items.js";
+import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS, SLOTS as SLOTS_LIST, METALS as METALS_MAP } from "../public/items.js";
 import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
 import * as ST from "../public/structures.js";
 import { SFX as AUDIO_SFX } from "../public/audio.js";
@@ -16,6 +16,7 @@ import * as ACADEMY from "../public/academy.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
+import * as EQ3 from "../public/equipment3d.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -1913,6 +1914,81 @@ check("migrate defaults the appearance so an old save still renders", (()=>{
   localStorage_stub(JSON.stringify(old));
   const s = G.load();
   return s.appearance.variant === "standard" && CC.appearanceFor(s).aura != null;
+})());
+
+
+// ---- visible equipment on the 3D character (BACKLOG §2) ----
+// The rig's real bone list, captured from player_wizard.glb. Hard-coded on purpose: if the model
+// is ever replaced with one that renames or drops these, the attachment table must fail here
+// rather than silently show no gear in the world.
+const PLAYER_BONES = ["Hips","Spine","Spine1","Neck","Head",
+  "LeftShoulder","LeftArm","LeftForeArm","LeftHand",
+  "RightShoulder","RightArm","RightForeArm","RightHand",
+  "LeftUpLeg","LeftLeg","LeftFoot","RightUpLeg","RightLeg","RightFoot"];
+check("the attachment table validates against the rig, the slots, the metals and the shipped models", (()=>{
+  const problems = EQ3.validateAttachments({
+    bones: PLAYER_BONES,
+    slotIds: SLOTS_LIST.map(s => s.id),
+    metalIds: Object.keys(METALS_MAP),
+    knownModels: [...knownModels],
+  });
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("every equipment slot is either shown on the character or explained", (()=>{
+  return SLOTS_LIST.every(s => EQ3.ATTACHMENTS[s.id] || EQ3.UNSUPPORTED[s.id]);
+})());
+check("a bone the rig does not have is caught", (()=>{
+  return EQ3.validateAttachments({ bones: ["Hips"] }).some(p => /not in the player rig/.test(p));
+})());
+check("nothing hangs off the character until something is equipped", EQ3.attachmentsFor(G.newGame()).length === 0);
+check("equipping a wand puts a model in the right hand", (()=>{
+  const s = G.newGame();
+  const def = equipmentFor("iron", "wand");
+  const item = { uid:"w1", id:def.id, metal:"iron", slot:"wand", tier:def.tier };
+  s.equipment.push(item); G.equip(s, "w1");
+  const a = EQ3.attachmentsFor(s);
+  return a.length === 1 && a[0].bone === "RightHand" && !!a[0].model;
+})());
+check("a better metal changes the silhouette AND the colour", (()=>{
+  const mk = metal => {
+    const s = G.newGame();
+    const def = equipmentFor(metal, "wand");
+    s.equipment.push({ uid:"w", id:def.id, metal, slot:"wand", tier:def.tier }); G.equip(s, "w");
+    return EQ3.attachmentsFor(s)[0];
+  };
+  const bronze = mk("bronze"), rune = mk("rune");
+  return bronze.model !== rune.model && bronze.color !== rune.color && rune.height > bronze.height;
+})());
+check("equipping a hat changes stats but hangs nothing on the character", (()=>{
+  const s = G.newGame();
+  const def = equipmentFor("gold", "hat");
+  s.equipment.push({ uid:"h1", id:def.id, metal:"gold", slot:"hat", tier:def.tier }); G.equip(s, "h1");
+  return EQ3.attachmentsFor(s).length === 0 && EQ3.visibilityNote("hat") !== null;
+})());
+// The derived-state rule again: the visual is never stored, so it cannot outlive the item.
+check("unequipping removes the attachment", (()=>{
+  const s = G.newGame();
+  const def = equipmentFor("iron", "wand");
+  s.equipment.push({ uid:"w1", id:def.id, metal:"iron", slot:"wand", tier:def.tier }); G.equip(s, "w1");
+  G.unequip(s, "wand");
+  return EQ3.attachmentsFor(s).length === 0;
+})());
+check("selling an equipped wand does not leave a ghost staff in the hand", (()=>{
+  const s = G.newGame();
+  const def = equipmentFor("rune", "wand");
+  s.equipment.push({ uid:"w1", id:def.id, metal:"rune", slot:"wand", tier:def.tier }); G.equip(s, "w1");
+  s.equipment = s.equipment.filter(e => e.uid !== "w1");     // sold, loadout still points at it
+  return EQ3.attachmentsFor(s).length === 0;
+})());
+check("every metal tier 1..5 resolves to a wand model", (()=>{
+  return Object.keys(METALS_MAP).every(metal => {
+    const s = G.newGame();
+    const def = equipmentFor(metal, "wand");
+    s.equipment.push({ uid:"w", id:def.id, metal, slot:"wand", tier:def.tier }); G.equip(s, "w");
+    const a = EQ3.attachmentsFor(s)[0];
+    return a && a.model && a.height > 0;
+  });
 })());
 
 

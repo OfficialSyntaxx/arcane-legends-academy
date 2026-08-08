@@ -447,6 +447,59 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     if (pc && pc.model) tintTree(pc.model, appearance);
     buildAura();
   }
+  // ---------- equipped gear on the character (BACKLOG §2, equipment3d.js) ----------
+  // Bone attachment. The auto-rigged player exposes real named bones (RightHand, Neck, ...), so a
+  // weapon can simply be parented to one and inherits the animation for free — no per-frame
+  // matrix copying, no separate update path.
+  //
+  // Rebuilt wholesale on every change rather than diffed: there are at most two attachments, and
+  // a diff would have to reason about tier changes swapping the model underneath a slot.
+  let gearGroups = {};
+  function clearGear(){
+    for (const g of Object.values(gearGroups)){
+      g.traverse(o => { if (o.isMesh){ o.geometry.dispose(); if (o.material.dispose) o.material.dispose(); } });
+      if (g.parent) g.parent.remove(g);
+    }
+    gearGroups = {};
+  }
+  function applyGear(){
+    clearGear();
+    const pc = chars.player;
+    if (!pc || !pc.model || !gearList.length) return;
+    for (const a of gearList){
+      const bone = pc.model.getObjectByName(a.bone);
+      // A missing bone is a real failure (the model was replaced with an unrigged one, or the
+      // rigger renamed things) — say so once rather than silently showing no gear.
+      if (!bone){ console.warn("gear: no bone", a.bone, "for", a.slot); continue; }
+      const g = new THREE.Group();
+      g.position.fromArray(a.pos);
+      g.rotation.fromArray(a.rot);
+      bone.add(g);
+      gearGroups[a.slot] = g;
+      // The bone carries the character's own scale, so anything parented to it inherits that
+      // scale too. Undo it, or a 0.85m wand comes out at whatever the rig's internal units are.
+      bone.updateWorldMatrix(true, false);
+      const s = new THREE.Vector3().setFromMatrixScale(bone.matrixWorld);
+      const inv = 1 / Math.max(1e-6, (s.x + s.y + s.z) / 3);
+      g.scale.setScalar(inv);
+
+      if (a.model){
+        // Gear gets its OWN loader rather than loadLandmarkModel: that one grounds the model to
+        // the terrain height and registers it in `chars`, both of which are wrong for something
+        // parented to a bone. CDN-then-local retry is kept — it is why props stopped vanishing
+        // during a CDN outage.
+        loadGear("./assets/models/" + a.model, g, a);
+      } else {
+        // No model for this slot: a small bead. The amulet has no CC0 mesh in the repo and does
+        // not need one at this size.
+        const bead = new THREE.Mesh(new THREE.SphereGeometry(a.height * 0.5, 10, 8), mat(a.color || 0xc8c8c8));
+        if (a.glow){ bead.material.emissive = srgb(a.color || 0xc8c8c8); bead.material.emissiveIntensity = 0.9; }
+        g.add(bead);
+      }
+    }
+  }
+  let gearList = [];
+
   // A school-coloured glow on the ground under the player. This is the half of the appearance
   // system that is actually unambiguous at a glance — a hue shift on a dark robe is subtle at
   // camera distance, a coloured rune ring is not.
@@ -700,9 +753,41 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     }
   }
   // Generated GLB character models — keys match NPC roles so the update loop uses the GLB mixer.
-  makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>applyPlayerAppearance());
+  makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>{ applyPlayerAppearance(); applyGear(); });
   for (const n of ZONE.npcs) makeCharModel(n.key, './assets/models/' + n.model, npcByKey[n.key]);
   for (let i=0;i<ZWANDER.length;i++) makeCharModel(ZWANDER[i].key, './assets/models/' + ZWANDER[i].model, wanderers[i]);
+
+  // Load one piece of gear into a bone-local group. No terrain grounding, no `chars` entry, no
+  // boot-progress accounting: this is a child of a bone, not a thing in the world.
+  function loadGear(localUrl, group, a){
+    const cdnUrl = CDN[localUrl.split('/').pop()];
+    const go = (url, fallbackUrl) => {
+      const loader = new THREE.GLTFLoader();
+      const d = getDraco();
+      if (d) loader.setDRACOLoader(d);
+      loader.load(url, gltf => {
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const h = Math.max(0.001, box.max.y - box.min.y);
+        model.scale.setScalar(a.height / h);
+        // Centre the model on its own bounding box so the grip sits at the bone, not the model's
+        // base — otherwise a 2m staff is held by its foot and stabs through the floor.
+        const c = box.getCenter(new THREE.Vector3()).multiplyScalar(a.height / h);
+        model.position.set(-c.x, -c.y, -c.z);
+        if (a.color != null) model.traverse(o => {
+          if (o.isMesh && o.material && o.material.color){
+            o.material = o.material.clone();
+            o.material.color.lerp(srgb(a.color), 0.55);
+          }
+        });
+        group.add(model);
+      }, undefined, err => {
+        if (fallbackUrl){ go(fallbackUrl, null); return; }
+        console.warn("gear model failed to load:", url, err && err.message);
+      });
+    };
+    go(cdnUrl || localUrl, cdnUrl ? localUrl : null);
+  }
 
   // ---------- static landmark/building models (unlike characters, no fixed 1.8 target height —
   // each is scaled to its own footprint, and stays centered on X/Z with its base at y=0) ----------
@@ -1234,6 +1319,35 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     setPlayerAppearance(look){
       appearance = look;
       applyPlayerAppearance();
+    },
+    // Equipped gear, resolved by equipment3d.js. Remembered like the appearance, because this is
+    // usually called before the player GLB (and therefore its skeleton) has loaded.
+    // Test hook: which bones the loaded player rig actually exposes. equipment3d.js validates its
+    // table against this list, so a model swap that renames bones fails loudly instead of
+    // silently showing no gear.
+    gearDebug(){
+      const out = {};
+      for (const [slot, g] of Object.entries(gearGroups)){
+        g.updateWorldMatrix(true, true);
+        const b = new THREE.Box3().setFromObject(g);
+        const size = b.isEmpty() ? null : b.getSize(new THREE.Vector3()).toArray().map(v=>+v.toFixed(3));
+        const ctr = b.isEmpty() ? null : b.getCenter(new THREE.Vector3()).toArray().map(v=>+v.toFixed(2));
+        let meshes = 0; g.traverse(o=>{ if(o.isMesh) meshes++; });
+        out[slot] = { children: g.children.length, meshes, worldSize: size, worldCenter: ctr,
+                      groupScale: +g.scale.x.toFixed(4) };
+      }
+      return out;
+    },
+    playerBones(){
+      const pc = chars.player;
+      if (!pc || !pc.model) return null;
+      const out = [];
+      pc.model.traverse(o => { if (o.isBone) out.push(o.name); });
+      return out;
+    },
+    setPlayerGear(list){
+      gearList = list || [];
+      applyGear();
     },
     rotateCam(dx){ camYaw += dx * 0.006; },
     zoomCam(dy){ camDist = Math.max(6, Math.min(40, camDist + dy * 0.05)); },

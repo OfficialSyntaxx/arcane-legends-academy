@@ -66,6 +66,7 @@ wizard-tcg/                 (the repo root)
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
 │   ├── charcreate.js       character creation + per-school appearance numbers — PURE
+│   ├── equipment3d.js      which equipped item hangs off which bone — PURE
 │   ├── tint.js             the per-school hue shift, as a fragment-shader patch (shared by
 │   │                       world.js and preview3d.js so the preview cannot drift from the world)
 │   ├── preview3d.js        the rotating 3D character preview on the creation screen
@@ -85,10 +86,10 @@ wizard-tcg/                 (the repo root)
 ├── tools/                  headless test suites + asset pipeline
 │   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
 │   ├── sync-zones.mjs      regenerates the academy zone in zones.json (--check in CI)
-│   ├── test.mjs            engine tests (297 checks)
+│   ├── test.mjs            engine tests (326 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
 │   ├── ui-smoke.mjs        UI boot smoke + engine/string/id binding checks
-│   ├── browser-test.mjs    real-Chromium responsive + input-gesture + world/quest/dorm/lake/VFX suite (86 checks)
+│   ├── browser-test.mjs    real-Chromium responsive + input-gesture + world/quest/dorm/lake/creation/gear/VFX suite (102 checks)
 │   ├── model-check.mjs     loads AND renders every shipped GLB in a real browser (npm run check:models)
 │   ├── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
 │   └── rig-character.py    Blender-as-a-module auto-rigger for unrigged generated characters
@@ -221,6 +222,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 
 ### 6.5 Quests & PvP
 - **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
+- **Visible equipment** (`equipment3d.js`) — the equipped wand and amulet hang off real skeleton bones; the other three slots are stats-only and say so. See §6.10.
 - **Character creation** (`charcreate.js`) — name, school and look with a live 3D preview; the per-school appearance is a shader hue-shift plus a coloured aura, not a per-part outfit. See §6.9 for why.
 - **Field quests** (`zonequests.js`) — separate from the duel ladder: things to do in a *place*, given by NPCs out in the world (gather/slay/clear/boss objectives, prerequisites, a quest log). Ten ship: five in the Whispering Forest leading into Cinderhollow Caverns, and five at Lake Arcanum leading into the Drowned Vault, gated behind killing the Cinder Wyrm so the zones are met in order. `validateQuests` proves the chain is completable and that no prerequisite is missing or cyclic.
 - **Local PvP:** dueling AI wizards (and a practice duel with the Trainer).
@@ -297,7 +299,31 @@ So:
 before the world exists and can be reopened from the Dorm while a world is already running. It
 imports the **same `tint.js`**; two copies of that maths would drift and make the preview a lie.
 
-### 6.10 Retention
+### 6.10 Visible equipment (`equipment3d.js`)
+Equipped gear shows on the 3D character, in the world and in the creation preview.
+
+- **Bone attachment.** The auto-rigged player exposes real named bones (`RightHand`, `Neck`,
+  `Head`, `Spine`, the limbs), so a weapon is simply parented to one and inherits the animation
+  for free — no per-frame matrix copying, no separate update path.
+- **Two of five slots, and the other three say why.** `wand` (right hand) and `amulet` (neck) are
+  showable. `hat`, `robe` and `boots` are not: the character is a single mesh, so there is nothing
+  to swap and nothing to hide underneath. They are listed in `UNSUPPORTED` **with the reason**,
+  the Loadout screen labels them "stats only", and `validateAttachments` fails if a slot is ever
+  neither shown nor explained.
+- **Tier picks the silhouette.** Bronze/iron get a stubby wand, gold/mithril a staff, rune a
+  greater staff — tinted by metal colour. The cheapest possible "my gear is visibly better"
+  signal, using CC0 KayKit weapons already in the repo. No new asset bytes.
+- **`pos`/`rot` are MEASURED, not derived.** Bone axes on a generated rig are arbitrary. The hand
+  bone's local +Y points *down*, so an unrotated staff hangs through the floor and a Z-rotation
+  lays it horizontally across the body — both were on screen before the right answer (a half-turn
+  about X). If the player model is ever replaced, re-measure.
+- **Undo the bone's scale.** A bone carries the character's own scale, so anything parented to it
+  inherits it and a 2.1 m staff comes out at the rig's internal units. `applyGear` divides it back
+  out; the browser suite asserts the staff's world size stays between 1 and 4 metres.
+- Fully derived: sell an equipped wand and it vanishes from the hand, because nothing about the
+  visual is stored.
+
+### 6.11 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -331,10 +357,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 297 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 326 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 34 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (86 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (102 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -369,7 +395,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 297 engine / 34 online-rules / 86 real-browser (layout + gestures + world +
+**All tests green:** 326 engine / 34 online-rules / 102 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -416,7 +442,41 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: character creation + per-school appearance, and `BLENDERTODO.md`.**
+**Last landed: visible equipment on the 3D character** (§6.10). The equipped wand and amulet are
+parented to the rig's real `RightHand` and `Neck` bones, so they inherit the character's animation
+with no extra update path. Tier picks the silhouette (wand → staff → greater staff), metal picks
+the colour, and all of it uses CC0 KayKit weapons already in the repo — no new asset bytes.
+
+The three slots that *cannot* be shown say so rather than silently doing nothing: the character is
+one mesh, so `hat`/`robe`/`boots` have nothing to swap or hide under. They sit in `UNSUPPORTED`
+**with a reason**, the Loadout screen labels them "stats only", and `validateAttachments` fails if
+a future slot ends up neither shown nor explained.
+
+Two things this cost, both found by rendering:
+- **The staff's orientation had to be measured, not derived.** The hand bone's local +Y points
+  *down*, so the first attempt laid the staff horizontally across the body and the second hung it
+  upside-down through the floor. A half-turn about X is the answer, and the browser suite now
+  asserts the staff is taller than it is wide so a future regression is caught.
+- **A bone carries the character's own scale**, so anything parented to it inherits it. Without
+  dividing that back out a 2.1 m staff comes out at the rig's internal units.
+
+Also: an empty hand that looked exactly like a bug turned out to be **a 2.5 s wait that was too
+short** — Draco decoding the staff takes several seconds under swiftshader. Measured before
+"fixing" anything. And `browser-test.mjs` now binds to **port 0** instead of a fixed 8099; two runs
+overlapping produced an `EADDRINUSE` crash that reads exactly like a test failure, twice.
+
+**Known intermittent, not fixed here:** `the camera never ends up inside geometry while orbiting`
+failed once (1/16 positions) during this work. It could not be reproduced afterwards — **0 bad
+samples out of 208** across three different settle timings in a focused harness — and nothing in
+this change touches the camera or the collision resolver. Worth remembering that the check is
+**2D**: it tests `isClear(x, z, CAMERA_RADIUS)` and knows nothing about camera height, so a camera
+that has been forced in *and raised to look down over* an obstruction reads as "inside" even when
+it visibly is not. If this recurs, that is the first thing to rule out before chasing the
+collision code.
+
+Tests: **326 engine / 34 online-rules / 102 browser / 8 viewports / model-check clean.**
+
+**Before that: character creation + per-school appearance, and `BLENDERTODO.md`.**
 
 `BLENDERTODO.md` is new and is the file to hand a Blender agent: a complete modelling brief for
 **every asset in the game that is still a procedural primitive** — all eight pieces of dorm
@@ -607,10 +667,9 @@ as part of the dorm work rather than left as notes:
 
 1. ~~**Dorm phases D1–D4**~~ — ✅ done; architecture in §6.8.
 2. ~~**WORLDSPEC step 6 — content pass**~~ — ✅ done; all six steps complete.
-3. ~~**Character creation & 3D preview**~~ — ✅ done (§6.9). Still open from this line: **visible
-   equipment on the 3D model** (unblocked — the rig exposes `RightHand`/`LeftHand`, and the repo
-   already ships CC0 KayKit weapons) and genuinely different **per-school garments**, which needs
-   new geometry rather than tinting — `BLENDERTODO.md` Tier 5.
+3. ~~**Character creation, 3D preview, visible equipment**~~ — ✅ done (§6.9, §6.10). Still open
+   from this line: **per-school garments** and visible **hat/robe/boots**, both of which need
+   per-part geometry rather than tinting or bone attachment — `BLENDERTODO.md` Tier 5.
 4. **Deepen the Academy curriculum** — actual class/lesson content, not just the numeric perks
    `academy.js` already grants.
 5. **Collection depth** — card evolution, foil/holo variants, an encyclopedia (`BACKLOG.md` §5).

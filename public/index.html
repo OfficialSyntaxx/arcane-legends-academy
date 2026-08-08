@@ -354,6 +354,7 @@ import * as ACADEMY from "./academy.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
+import * as EQ3 from "./equipment3d.js";
 import { createPreview } from "./preview3d.js";
 
 // ================= state =================
@@ -534,7 +535,7 @@ window.__EV.chooseSchool = (s)=>{
   G.issueSchoolStarter(S, s);
   save();
   $("schoolPicker").style.display = "none";
-  if (world) world.setPlayerAppearance(CC.appearanceFor(S));
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
   toast(`Welcome to the ${SCHOOLS[s].name} School! Your school's cards were added to your collection.`); render();
   // The school picker is now step 2 of character creation. If creation is still unfinished
   // (no name yet, or no look chosen), fall back into it rather than dumping the player into the
@@ -554,14 +555,14 @@ function showCharCreate(){
   if (!preview){
     try { preview = createPreview($("ccPreview")); } catch(e){ console.warn("preview unavailable:", e && e.message); }
   }
-  if (preview){ preview.resize(); preview.setAppearance(CC.appearanceFor(S)); preview.start(); }
+  if (preview){ preview.resize(); preview.setAppearance(CC.appearanceFor(S)); preview.setGear(EQ3.attachmentsFor(S)); preview.start(); }
   renderCharCreate();
 }
 function closeCharCreate(){
   ccOpen = false;
   $("charCreate").style.display = "none";
   if (preview) preview.stop();          // stop the loop; keep the context so reopening is instant
-  if (world) world.setPlayerAppearance(CC.appearanceFor(S));
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
   render();
 }
 function renderCharCreate(){
@@ -569,7 +570,7 @@ function renderCharCreate(){
   const step = CC.currentStep(S) || CC.STEPS[CC.STEPS.length - 1];
   const prog = CC.progress(S);
   const look = CC.appearanceFor(S);
-  if (preview) preview.setAppearance(look);
+  if (preview){ preview.setAppearance(look); preview.setGear(EQ3.attachmentsFor(S)); }
   $("ccSub").textContent = `${step.sub}  ·  step ${prog.index + 1} of ${prog.total}`;
   $("ccLook").textContent = look.label;
 
@@ -1040,6 +1041,13 @@ window.__EV.sell = (uid)=>{ const r=G.sellCard(S,uid); r.ok?toast(`Sold for ${r.
 window.__EV.toLoadout = ()=>{ screen="loadout"; render(); };
 
 // ================= LOADOUT =================
+// Equipping, unequipping or selling gear must re-derive what hangs off the 3D character. One
+// function so a future gear action cannot forget half of it.
+function refreshGear(){
+  const list = EQ3.attachmentsFor(S);
+  if (world) world.setPlayerGear(list);
+  if (preview) preview.setGear(list);
+}
 function renderLoadout(el){
   const gear = G.equipStats(S);
   let h = `<h2>${STR.loadout_title}</h2>`;
@@ -1051,6 +1059,8 @@ function renderLoadout(el){
     h += `<div class="panel" style="flex:1;min-width:150px;text-align:center">
       <div style="font-size:26px">${slot.icon}</div>
       <div class="nm" style="font-weight:700;font-size:13px">${slot.name}</div>
+      ${EQ3.UNSUPPORTED[slot.id] ? `<div class="sub" style="font-size:10px" title="${EQ3.UNSUPPORTED[slot.id]}">stats only</div>`
+        : `<div class="sub" style="font-size:10px;color:var(--ok)">shown on you</div>`}
       ${def ? `<div style="color:var(--gold);font-size:13px;font-weight:700">${def.name}</div>
         <div class="sub">${equipStatsLabel(def)}</div>
         <button class="btn sm danger" onclick="window.__ev('unequip|${slot.id}')">Unequip</button>`
@@ -1097,9 +1107,9 @@ function renderLoadout(el){
   h += `</div></div>`;
   el.innerHTML = h;
 }
-window.__EV.equip = (uid)=>{ G.equip(S,uid); render(); };
-window.__EV.unequip = (slot)=>{ G.unequip(S,slot); render(); };
-window.__EV.sellEq = (uid)=>{ const r=G.sellEquipment(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
+window.__EV.equip = (uid)=>{ G.equip(S,uid); refreshGear(); render(); };
+window.__EV.unequip = (slot)=>{ G.unequip(S,slot); refreshGear(); render(); };
+window.__EV.sellEq = (uid)=>{ const r=G.sellEquipment(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; refreshGear(); render(); };
 window.__EV.deckAdd = (id)=>{ const r=G.addToDeck(S,id); if(!r.ok) err(r.err==="full"?"Deck full (20)":r.err==="max"?"Max 3 copies":r.err==="copies"?"You don't own that many":"Error"); render(); };
 window.__EV.deckRm = (id)=>{ G.removeFromDeck(S,id); render(); };
 
@@ -1773,6 +1783,7 @@ function changeZone(toZoneId, fromZoneId, spawnOverride){
     world = spawnWorld(canvas, target, spawnAt);
     window.__world = world;
     world.setPlayerAppearance(CC.appearanceFor(S));
+    world.setPlayerGear(EQ3.attachmentsFor(S));
     world.resize();
     S.worldState.zone = toZoneId;
     if (!S.worldState.visited.includes(toZoneId)) S.worldState.visited.push(toZoneId);
@@ -1990,6 +2001,23 @@ window.__testDorm = ()=>{
 };
 window.__testEnterDorm = ()=>{ enterDorm(); };
 window.__testPreview = ()=> preview;
+// Forge and equip a full set at one metal tier, then re-derive the attachments. Uses the real
+// engine functions so the test cannot pass against a path the game does not take.
+window.__testGear = (metal)=>{
+  for (const slot of SLOTS){
+    const def = equipmentFor(metal, slot.id);
+    const item = { uid: G.uid(), id: def.id, metal, slot: slot.id, tier: def.tier };
+    S.equipment.push(item);
+    G.equip(S, item.uid);
+  }
+  refreshGear(); save();
+  return { attachments: EQ3.attachmentsFor(S).map(a=>({slot:a.slot,bone:a.bone,model:a.model,h:a.height})),
+           bones: window.__testBones(), gear: window.__world && window.__world.gearDebug ? window.__world.gearDebug() : null };
+};
+window.__testBones = ()=>{
+  const w = window.__world && window.__world.playerBones && window.__world.playerBones();
+  return w || null;
+};
 window.__testAppearance = ()=> CC.appearanceFor(S);
 window.__testDormRoom = ()=>{ const r = DORM.dormRoom(S); return [r.w, r.d]; };
 window.__testDormUpgrade = ()=>{ S.gold += 5000; S.inventory.oak_log = (S.inventory.oak_log||0) + 60;
@@ -2024,7 +2052,7 @@ window.__EV.toggleMute = ()=>{
 async function boot(){
   $("muteBtn").textContent = AUDIO.isMuted() ? "🔇" : "🔊";
   await initWorld();
-  if (world) world.setPlayerAppearance(CC.appearanceFor(S));
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
   // Character creation replaces the bare school picker on a fresh save. It is skipped for any
   // save that already finished it, and `CC.isComplete` is DERIVED, so an older save that has a
   // school but no name is walked through the remaining steps rather than either re-doing the
