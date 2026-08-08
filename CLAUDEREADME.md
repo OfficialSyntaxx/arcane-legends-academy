@@ -298,34 +298,34 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 252 engine / 34 online-rules / 62 real-browser (layout + gestures + world +
-dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
-gates every push.
+**All tests green:** 262 engine / 34 online-rules / 36 creature-rule / real-browser (layout +
+gestures + world + dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and
+renders). `npm test` gates every push.
 
 **What's working, end to end:**
 - Full card/duel/economy loop: schools, elemental matrix, all 4 card types, grading/slabs,
   scribing, skills, equipment, home/guild, market/auctions, daily quests, local + online PvP.
-- **A multi-zone 3D world**, not just a single campus: the `academy` hub, a streaming outdoor
-  zone (`whispering_forest`, reached through a walkable gateway) with its own NPCs and field
-  quests, and an instanced dungeon (`cinderhollow_caverns`, reached through a doorway in the
-  forest) with persistent kill/room/boss progress. All of **WORLDSPEC §9's five implementation
-  steps are done** — config/data model, terrain, chunk streaming, zone transitions, dungeon
-  instancing.
-- **Painted terrain** (vertex-colour height bands, rock on slopes, shorelines, mottling) — no
-  textures, so no assets to author or compress for the ground.
-- **A rigged, animated player character** with a proper standing pose (not a bind-pose T-pose),
-  scaled correctly (`CHARACTER_HEIGHT = 2.6`), via `tools/rig-character.py` for any future
-  unrigged generated character.
-- **A guided first session** (`onboarding.js`) that actually walks a new player through the whole
-  loop, and **field quests** (`zonequests.js`) that give the forest a reason to exist.
-- **Spell VFX** (six procedural archetypes) and a **duel arena that reads as a place** (colonnade,
-  rune circle, raised pads) rather than a flat coloured disc.
-- **Academy curriculum + NPC reputation** (`academy.js` / `reputation.js`) — the academy rank that
-  used to be a cosmetic label now unlocks real perks (quest gold bonus, market discount, XP
-  bonus), and standing with quest-givers stacks its own bonus on top.
-- **Model integrity is actively checked** (`tools/model-check.mjs`) after finding four silently
-  broken GLBs in the repo that no existing test caught (`world.js` degrades a load/render failure
-  to the procedural stand-in with only a console warning — invisible in play).
+- **Four baked GLB map zones** wired in as the world (`ZONE_MAPS` in `worldconfig.js`): the
+  **Plains/Academy hub, Whispering Forest, Ashen Mountains, and a Snow zone (Frostborne Peaks)** —
+  each a full ~56-unit baked map (right-sized, recentered, saturated, no black bakes), loaded as
+  the zone's terrain+structures base layer. Plus the procedural zones, dungeons, chunk streaming
+  and WORLDSPEC §9 steps 1–5.
+- **Full collision** against the map geometry for BOTH the player and the camera: `mapBlocks`
+  blocks buildings, trees/rocks and steep terrain (2D footprint + elevated-surface raycast),
+  the player walks on the map surface (raycast `mapSurfaceY`), and the camera never sinks into
+  hills or clips through structures.
+- **A guided, connected loop**: `onboarding.js` walks a new player through the first session, and
+  `advice.js` ("Adventurer's Path") keeps guiding the SAME loop forever after — the objective bar
+  always suggests the next action (scribe→housing→grade→duel→refine→pack→gather→explore)
+  derived from the save.
+- **Client analytics** behind `/api/analytics` (JSON) + `/api/dashboard` (HTML): sessions,
+  zones, tab clicks, uncaught errors, movement-stuck, world/map load, low-FPS, and advice
+  shown→clicked — all D1-backed, with a readable dashboard.
+- **A redesigned mobile UI**: bottom nav bar (8 tabs fit on mobile) with a muted charcoal +
+  champagne-gold palette instead of the cartoonish purple.
+- **Input & camera feel**: touch-joystick inversion fixed, time-based smooth camera follow.
+- Plus everything earlier: painted terrain, rigged player, spell VFX, field quests, curriculum +
+  reputation, the 39-creature combat pass, model-integrity checks.
 
 **SCALE: 1 world unit = 1 metre.** Characters are `CHARACTER_HEIGHT = 2.6` (not 1.8 — that read as
 anatomically correct but *looked* tiny, because the normalisation measures the full bounding box
@@ -345,57 +345,63 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed:** the full **creature combat pass** — all 39 creature models now have unique battle
-identities (`creatures.js`: stats, ability, passive, category, school) shown in the **Creature
-Codex** (Collection → 🐾) and as in-battle floating labels, and their passives are **wired into
-the duel engine** (`game.js`): Taunt, Haste, Drain, Regen, Poison, Thorns, Evade, Shield, Survive,
-Spell-immune, Freeze-immune, plus on-play (AoE/heal-all/buff-all/freeze/draw/wizard-snipe) and
-on-attack (AoE stomp, wizard nick, debuff, heal-on-hit, freeze-on-hit, warband) effects. Verified
-in real duels (dragon on-play AoE + regen both fire). Pushed as `555119e`.
+**Last landed — Phase A (connect the loop):** the `advice.js` "Adventurer's Path" — after the
+onboarding chain, the objective bar becomes a persistent advisor that always suggests the next
+meaningful action in the loop (scribe→housing→grade→duel→refine→pack→gather→explore), derived
+from the save, with a Go button and a `flags.adviceHidden` toggle. It also **tracks
+`advice_shown`/`advice_click`** so the analytics dashboard shows which loop steps players actually
+follow. 6 regression tests added (262 engine total). Pushed as `96f311d`.
 
-**Before that, in order:** the full 39-model creature roster (Ultimate Monsters + Textured Cute
-Monsters, imported via the Google Drive connector and OpenGameArt), the **Ashen Mountains** mining
-zone + **Ashen Caverns** dungeon (WORLDSPEC step 6 content), the **character-creation screen** with
-a live rotating 3D wizard preview, the atmospheric **skybox + drifting clouds + cloud-shadow pass**,
-and (from the merged Claude collaboration) WORLDSPEC steps 1–5 (zone config, procedural terrain,
-chunk streaming, zone transitions, dungeon instancing), spell VFX, field quests, onboarding,
-curriculum + reputation, the rigged player, painted terrain, and the Phases A–D core-system fixes.
+**Before that, in order:** client analytics + dashboard (`/api/analytics` + `/api/dashboard`,
+D1-backed, 2026-08-08) → the UI redesign (bottom nav bar + muted charcoal/gold palette) → input
+inversion fix + smooth camera + noclip/collision fixes → player + camera collision against the
+GLB map geometry → the 4 re-exported baked maps wired in as zone visuals → the earlier creature
+combat pass, character creation, Ashen/forest content, and WORLDSPEC steps 1–5.
 
-**Immediate next candidates** (none started yet):
-1. **Wire the creature abilities as usable in-battle** — the passives now affect combat; the
-   *active abilities* (e.g. Wizard firespell targeting, Frog tongue steal, Orc rage threshold) are
-   still codex-flavoured and could be made interactive. Also consider **creature-specific cards**
-   (summon a specific creature by name) and a **familiar/pet system** that follows the player.
-2. **Academy §2 items** (`BACKLOG.md` §2) still open: **visual equipment on the 3D character**
-   (weapons/staffs already imported), **dorm customization**, **card/slab display cases**,
-   **achievements/titles**, and real **class/lesson content** for the curriculum (years currently
-   grant numeric perks only).
-3. **WORLDSPEC step 6 continues** — **Lake Arcanum** (fourth outdoor zone) and a third dungeon;
-   plus fast travel, day/night, weather, and hidden areas (`BACKLOG.md` §3).
-4. Everything else unstarted is in `BACKLOG.md` — PvP ranking/leaderboards, guilds, pets, card
-   evolution/variants, and the endgame section.
+**Operational notes for the next session:**
+- **Deploy:** the game deploys via the **website-builder** (`deploy_website`, website id
+  `c739c4e5-9f2e-4aab-8ed5-9127cd802ec4`), NOT `deploy_game`. The deployable repo is cloned from
+  `website_repo_access`; the client lives in `app/public/` and the server rules in
+  `app/src/logic.js`. **After editing `wizard-tcg/public/`, rsync those files into the app's
+  `app/public/` and commit+push the app repo, then `deploy_website`.**
+- **Analytics:** `GET /api/analytics` (JSON) and `GET /api/dashboard` (HTML) on the live URL; D1
+  table `analytics`; query via `website_db`. Full details in `memory.md`.
+- **Durable memory:** `memory.md` at the repo root is the version-controlled project memory; new
+  learnings are appended there (see the `append-project-memory` skill), not the agent memory store.
+
+**Immediate next candidates (BACKLOG §2–§3, in the recommended order):**
+1. **Phase B — Dorm customization + physical showcases.** Make the dorm a real 3D space you
+   furnish: place KayKit furniture on a grid, turn the **Display Case** into a physical shelf that
+   shows your slabs in 3D, plus a **trophy wall** for boss kills. Smallest version: a furniture
+   grid + one physical slab shelf.
+2. **Phase C — Pets / familiars.** Leverages the 39 creatures: a familiar follows you in the 3D
+   world, levels, and gives small bonuses (card pull, gather bonus, a duel trait).
+3. **Phase D — Lake Arcanum (4th zone) + world feel.** Author a new zone against the existing
+   schemas (WORLDSPEC step 6), plus fast travel, day/night, weather.
+4. **Phase E — PvP ranking + leaderboards.**
+5. **Phase F — Deepen collection & combat** (card evolution/variants, multi-phase bosses, enemy
+   archetypes, school-specific mechanics + ultimates).
+6. **Phase G — Achievements, titles, social** (guilds, marketplace).
 
 **Suggestions flagged while working nearby:**
-- **Balance the creature passives.** The engine now applies them, but they were tuned by design
-  intent, not playtest — some (e.g. Dragon on-play AoE 2, Yeti taunt+freeze) may be strong. A
-  balance pass + regression tests for each mechanic is worth doing before leaning on them.
+- **Balance the creature passives** — tuned by design intent, not playtest; some may be strong.
 - **The outdoor Duel Arena landmark** is still decorative-only (duels render in the separate
-  `battle3d.js` pit); making the landmark be the duel space is a polish pass (see BACKLOG §combat).
-- **A "verify before trusting" pattern for asset swaps** (render standalone → post-compression →
-  model-check → in-game debug → targeted test) is the default checklist for any generated-model
-  integration.
+  `battle3d.js` pit); making the landmark the actual duel space is a polish pass.
+- **Use the advice analytics** (shown→click) to find where the player loop actually stalls before
+  deepening any single system.
 
 ## 10. Roadmap (in priority order)
 
-1. **WORLDSPEC step 6 — content pass.** Second dungeon, third outdoor zone. The engine is ready;
-   this is authoring work against the schemas in `WORLDSPEC.md` §3/§6.
-2. **Character creation & visuals.** 3D preview at character creation, per-school outfit
-   visuals, visible equipment on the 3D model — `BACKLOG.md` §2, `docs/DESIGN-DECISIONS.md` §4.
-3. **Deepen the Academy curriculum** — actual class/lesson content, not just the numeric perks
-   `academy.js` already grants.
-4. **Collection depth** — card evolution, foil/holo variants, an encyclopedia (`BACKLOG.md` §5).
-5. **Social layer** — PvP ranking, guilds, leaderboards (`BACKLOG.md` §8).
-6. **Endgame** — pets/mounts, prestige, seasonal content (`BACKLOG.md` §10).
+1. **Phase B — Dorm customization + physical display cases** (BACKLOG §2): real 3D dorm space,
+   furniture grid, physical slab shelf, trophy wall.
+2. **Phase C — Pets / familiars** (BACKLOG §7): a familiar that follows in the world and levels.
+3. **Phase D — Lake Arcanum + world feel** (BACKLOG §3): 4th outdoor zone, fast travel,
+   day/night, weather.
+4. **Phase E — PvP ranking & leaderboards** (BACKLOG §8).
+5. **Phase F — Collection & combat depth** (BACKLOG §4–5): card evolution/variants,
+   multi-phase bosses, enemy archetypes, school mechanics + ultimates.
+6. **Phase G — Achievements, titles, social** (BACKLOG §2, §8): achievements, player titles,
+   guilds, marketplace.
 
 ---
 

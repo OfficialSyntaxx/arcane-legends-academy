@@ -20,8 +20,8 @@
 - [~] **First 10 minutes / onboarding**
   - A 7-step guided chain (`onboarding.js`) with a persistent objective bar: school → gather → refine → scribe → grade → deck → first duel. Every step is DERIVED from the save, so playing out of order cannot desync it. A full character-creation screen is still pending.
 
-- [ ] **Connect existing systems**
-  - Make exploration, gathering, crafting, cards, grading, quests, equipment, combat, and housing feel like one game loop.
+- [~] **Connect existing systems**
+  - Make exploration, gathering, crafting, cards, grading, quests, equipment, combat, and housing feel like one game loop. **Phase A landed**: the `advice.js` "Adventurer's Path" keeps the objective bar guiding the loop forever (scribe→housing→grade→duel→refine→pack→gather→explore), with advice-shown/click analytics. Still to deepen: make the world itself show the loop (not just the bar).
 
 - [~] **Combat rules cleanup**
   - Create one source of truth for card/combat rules.
@@ -36,7 +36,7 @@
 - [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
 - [~] Main story + side quests — five field quests in the Whispering Forest from two NPCs (`zonequests.js`), with gather/slay/clear/boss objectives, prerequisites and a quest log. The main story is still to write.
 - [~] Visual equipment on 3D character — the equipped wand-slot weapon is shown on the player's hand (by metal tier); hats/robes/boots visuals still pending
-- [ ] Dorm customization — design proposed (see below)
+- [ ] Dorm customization — **Phase B (next)**: real 3D dorm space, furniture grid, physical slab display shelf, trophy wall
 - [x] Card/slab display cases — the Display Case showcases slabbed Mint/Gem Mint cards with serials (Collection → 🖼️)
 - [ ] Trophy room
 - [ ] Achievements and player titles
@@ -136,6 +136,10 @@
 - [x] Expanded automated tests — 252 engine / 34 online / 62 real-browser (8 viewports + gestures + world/dungeon/quest/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
+- [x] UI redesign — bottom nav bar (8 tabs fit on mobile) + muted charcoal/champagne palette (was cartoonish purple)
+- [x] Client analytics + dashboard — `advice.js`/`analytics.js` feed D1; `/api/analytics` (JSON) + `/api/dashboard` (HTML) track sessions, zones, tab clicks, errors, movement-stuck, world/map load, low-FPS, advice shown→click
+- [x] World collision — player + camera collide with the GLB map geometry (buildings, trees/rocks, steep terrain); no noclip, no camera clipping
+- [x] Input + camera feel — touch-joystick inversion fixed; time-based smooth camera follow
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
 - [x] Ambient world audio — procedural pad in the 3D world
 - [~] Music per zone / activity — mode changes per screen (campus/duel/menu); per-*zone* pending step 4
@@ -207,16 +211,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** WORLDSPEC steps 1–5 are all done. Remaining world work is **step 6, the content
-pass** — a second dungeon and a third outdoor zone, mostly authoring against the schemas already
-built (§3/§6 in WORLDSPEC.md). In parallel, the §2 Academy items that still need real work:
-a character-creation screen with a 3D preview + per-school outfit visuals
-(`docs/DESIGN-DECISIONS.md` §4), visual equipment on the 3D character, and actual
-class/lesson *content* for the curriculum (right now a year only grants numeric bonuses).
-See `CLAUDEREADME.md` §9 "Where we left off" for the fuller narrative version of this note,
-including suggestions flagged during the arena swap (re-measuring its collision circle against
-the new mesh, and a longer-term idea to make the outdoor landmark the actual duel space instead
-of two disconnected scenes).
+**Next step:** **Phase B — Dorm customization + physical display cases**: turn the dorm into a
+real 3D space you furnish (KayKit furniture grid), make the Display Case a physical shelf that
+shows slabs in 3D, and add a trophy wall for boss kills. Then Phase C (pets/familiars leveraging
+the 39 creatures), Phase D (Lake Arcanum + fast travel/day-night/weather), Phase E (PvP ranking),
+Phase F (collection/combat depth), Phase G (achievements/titles/social). See `CLAUDEREADME.md` §9
+"Where we left off" for the fuller narrative and operational/deploy notes.
 
 ---
 
