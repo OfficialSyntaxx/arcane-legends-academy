@@ -324,6 +324,7 @@ body.has-touch .worldbtn{display:flex;}
 <script src="./vendor/three.min.js"></script>
 <script src="./vendor/GLTFLoader.js"></script>
 <script src="./vendor/DRACOLoader.js"></script>
+<script src="./analytics.js"></script>
 <script type="module">
 import { STR } from "./strings.js";
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
@@ -670,7 +671,7 @@ window.__EV.objHide = ()=>{ S.flags.onboardingHidden = true; save(); render(); }
 
 function buildNav(){
   $("nav").innerHTML = NAV.map(([id,ic,label])=>`<button class="navbtn ${id===screen?"on":""}" data-screen="${id}"><span class="ic">${ic}</span>${label}</button>`).join("");
-  document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>{ screen=b.dataset.screen; render(); });
+  document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>{ screen=b.dataset.screen; if (window.__analytics) window.__analytics.track("tab_click", { tab: screen }); render(); });
 }
 // Show the equipped wand-slot weapon on the 3D player (visual equipment).
 function syncPlayerWeapon(){
@@ -1659,6 +1660,7 @@ function changeZone(toZoneId, fromZoneId){
   if (zoning || !worldCfg) return;
   const target = worldCfg.get(toZoneId);
   if (!target){ console.warn("exit to unknown zone", toZoneId); return; }
+  if (window.__analytics) window.__analytics.track("zone_visit", { zone: toZoneId, from: fromZoneId || null });
   zoning = true;
   const canvas = $("world");
   const spawnAt = entryPointFor(worldCfg, toZoneId, fromZoneId);
@@ -1704,6 +1706,7 @@ async function initWorld(){
     const wanted = new URLSearchParams(location.search).get("zone") || (S.worldState && S.worldState.zone);
     activeZone = (wanted && worldCfg.get(wanted)) || worldCfg.get(worldCfg.hub);
     if (wanted && !worldCfg.get(wanted)) console.warn("unknown zone \"" + wanted + "\", using the hub");
+    if (window.__analytics && activeZone) window.__analytics.track("zone_visit", { zone: activeZone.id });
   } catch(e){
     console.warn("world config unavailable, using built-in academy:", e && e.message);
   }

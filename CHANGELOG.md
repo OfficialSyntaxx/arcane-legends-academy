@@ -2,6 +2,13 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-08 — Client analytics (session, zones, tabs, errors)
+Added lightweight client-side analytics to the live build so play-testers' behaviour is visible:
+- **`analytics.js`** — tracks session start/end (with duration seconds), UI tab clicks, zone visits, uncaught JS errors, and movement "stuck" events. Events are batched and POSTed to the worker's `/api/analytics` (sendBeacon, flushed on a timer and on page-hide).
+- **Worker `/api/analytics`** (D1-backed) — `POST` records events; `GET` returns a summary (total, counts per event type, top zones, recent errors, last 50 events). D1 enabled via `app.manifest.json` (`db: true`).
+- Wired into the game: nav-tab clicks, `changeZone` + initial zone load, and a "stuck" signal when tap-to-move hits a wall.
+- Verify live: `GET https://magic-woodland-396.higgsfield.app/api/analytics`. Deployed + pushed.
+
 ## 2026-08-08 — UI redesign: bottom nav + muted palette
 - **Bottom navigation bar** (mobile-RPG convention) replacing the top nav — the tabs (World, Hall, Skills, Collection, Loadout, Market, Quests, Duel) now sit at the bottom of the screen, above the safe area, evenly spaced and fully visible on mobile (verified at 412px).
 - **Softer, more elegant palette** replacing the cartoonish bright purple + saturated gold: deep charcoal/slate backgrounds with a muted champagne-gold accent, softer borders and buttons, and a gold-tinted quest bar (no more purple banners or pillars).

@@ -1149,7 +1149,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       // a tap-to-move target inside a building is unreachable — drop it instead of grinding
       if (tapSet && Math.hypot(hit.x-nx, hit.z-nz) > 0.001){
         stuckT += dt;
-        if (stuckT > 0.5){ tapTarget = null; tapSet = false; stuckT = 0; }
+        if (stuckT > 0.5){ tapTarget = null; tapSet = false; stuckT = 0; if (window.__analytics) window.__analytics.track("movement", { event: "stuck", at: [Math.round(player.position.x), Math.round(player.position.z)] }); }
       } else stuckT = 0;
       const t = Math.atan2(wx, wz);
       let diff = t - player.rotation.y;
