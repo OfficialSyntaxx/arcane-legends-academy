@@ -36,9 +36,18 @@
 - [x] NPC reputation — `reputation.js`: per-NPC standing (Stranger→Honored) from turning in that NPC's field quests, stacking a reward bonus on top of the academy curriculum bonus
 - [~] Main story + side quests — five field quests in the Whispering Forest from two NPCs (`zonequests.js`), with gather/slay/clear/boss objectives, prerequisites and a quest log. The main story is still to write.
 - [ ] Visual equipment on 3D character
-- [ ] Dorm customization
-- [ ] Card/slab display cases
-- [ ] Trophy room
+- [ ] **Dorm customization — NEXT PHASE (D1–D4).** Today the Student Dorms building is a menu:
+  its station jumps to `screen="home"`, which is a stats page plus four numeric `HOME_UPGRADES`.
+  No interior, no furniture, nothing spatial. Phases: **D1** walk-in interior as a real zone
+  (reuse the `dungeons.js` → zone compile path, new pure `dorm.js`); **D2** furniture catalogue +
+  anchor slots + placement validation, persisted in `S.home.furniture` with a `migrate()` bump,
+  bought with gold/timber; **D3** display cases and trophies; **D4** the existing upgrade levels
+  drive how the room actually looks. See `CLAUDEREADME.md` §9 "Next up — the Dorm phases".
+- [ ] Card/slab display cases — part of **D3**. Graded slabs already carry unique serials, so this
+  makes an existing system visible rather than inventing one. Store only *which* slab the player
+  put in *which* case; derive everything else from the save.
+- [ ] Trophy room — part of **D3**. Boss defeats already persist (`S.worldState.dungeons`), so a
+  Cinder Wyrm trophy is derived state, not new bookkeeping.
 - [ ] Achievements and player titles
 
 ## 3. Open World
@@ -106,9 +115,9 @@
 - [ ] Wand cosmetics
 - [ ] Auras
 - [ ] Emotes
-- [ ] Housing furniture
-- [ ] Slab display cases
-- [ ] Boss trophies
+- [ ] Housing furniture — duplicate of §2 "Dorm customization" (D2). §2 is canonical.
+- [ ] Slab display cases — duplicate of §2 (D3). §2 is canonical.
+- [ ] Boss trophies — duplicate of §2 "Trophy room" (D3). §2 is canonical.
 
 ## 8. Multiplayer & Social
 
@@ -158,6 +167,9 @@ Academy → tutorial → card loop → combat → progression → save system �
 ### Phase 2 — Make the Academy a Game
 Character creation → classes → NPCs → quests → equipment visuals → housing.
 
+### Phase 2b — The Dorm (current)
+Interior zone → furniture placement → display cases & trophies → visual upgrade tiers.
+
 ### Phase 3 — Expand the World
 Forest → Lake → Mountains → Dungeons → bosses → world events.
 
@@ -205,7 +217,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** WORLDSPEC steps 1–5 are all done. Remaining world work is **step 6, the content
+**Next step: the Dorm phases (D1–D4)** — see §2 above and `CLAUDEREADME.md` §9 "Next up". The
+Student Dorms building currently opens a menu, not a place; D1 makes it a walk-in interior zone,
+D2 adds furniture placement, D3 display cases + trophies, D4 makes the four existing numeric
+upgrade tracks visually readable inside the room.
+
+**After that:** WORLDSPEC steps 1–5 are all done. Remaining world work is **step 6, the content
 pass** — a second dungeon and a third outdoor zone, mostly authoring against the schemas already
 built (§3/§6 in WORLDSPEC.md). In parallel, the §2 Academy items that still need real work:
 a character-creation screen with a 3D preview + per-school outfit visuals

@@ -364,13 +364,45 @@ above), field quests for the Whispering Forest, the onboarding chain, dungeon-en
 rigged player character with a standing pose, painted terrain, and WORLDSPEC steps 3–5 (chunk
 streaming, zone transitions, dungeon instancing).
 
-**Immediate next candidates** (none started yet):
+### Next up — the Dorm phases (D1–D4)
+
+**Decided next**, ahead of the other candidates below. What exists today is *not* a dorm: it's an
+abstract menu. `Student Dorms` is a building in `structures.js` (id `home`, at 0,32) whose station
+prompt jumps straight to `screen = "home"`, and `renderHome()` is a stats-and-upgrades page — buy
+the hall for 200g (`buyHome`), then level four **numeric** upgrades (treasury / library / armory /
+tavern, `HOME_UPGRADES` in `game.js`), which feed bonuses elsewhere. There is **no interior, no
+furniture, no placement, no display, nothing spatial**. The building's door is a menu button.
+
+The phases below are ordered smallest-playable-first, each independently shippable and testable:
+
+- **D1 — Dorm interior as a real space.** Walk through the door into an actual interior *zone*
+  rather than a menu. This is not new engine work: a dungeon already compiles to a zone
+  (`dungeons.js` → `dungeonZone`), so an interior is the same trick with a room, walls, a door
+  exit and no enemies. Deliverable: a pure `dorm.js` producing the room layout + furniture anchor
+  slots, wired through the existing `changeZone` path. The `screen="home"` page stays reachable as
+  the *management* UI (upgrades, stats) — D1 adds the place, it doesn't delete the panel.
+- **D2 — Furniture placement.** A pure placement model in `dorm.js`: a catalogue of furniture
+  items, a set of anchor slots per room, validation (slot type, no overlap, ownership), and
+  `S.home.furniture` persisted in the save + a `migrate()` bump. Bought from the Merchant with
+  gold and crafted timber, so it plugs into the economy sinks that already exist. Keep the maths
+  pure — `world.js` only reads the resolved layout.
+- **D3 — Display cases & trophy room** (`BACKLOG.md` §2, §7). This is the one with real pull: the
+  game already mints graded slabs with unique serials and already tracks boss defeats. A case that
+  physically shows *your* highest-graded slab, and a trophy that appears once the Cinder Wyrm is
+  down, turns two existing systems into something visible. **Derive what's displayable from the
+  save** (the pattern used by `onboarding.js` / `academy.js` / `zonequests.js`) — store only the
+  player's *choice* of which slab sits in which case, never a copy of the card.
+- **D4 — Dorm upgrades become visual.** Tie the four existing `HOME_UPGRADES` levels to what the
+  room actually looks like (bigger room, more slots, better fittings per tier) so the numeric
+  progression that already ships gains a physical readout instead of a progress bar.
+
+**Then, in order** (unchanged, just deprioritised behind the dorm work):
 1. **WORLDSPEC step 6, the content pass** — a second dungeon and a third outdoor zone. This is
    mostly authoring `zones.json`/`dungeons.json` entries now that the engine work (terrain,
    streaming, transitions, instancing) is done; see WORLDSPEC §3/§6 schemas.
 2. **Academy §2 remaining items** (`BACKLOG.md` §2) — a real character-creation screen with a 3D
-   preview and per-school outfit visuals (`docs/DESIGN-DECISIONS.md` §4 has the design), visual
-   equipment on the 3D character, dorm customization.
+   preview and per-school outfit visuals (`docs/DESIGN-DECISIONS.md` §4 has the design), and
+   visual equipment on the 3D character.
 3. **Academy classes/curriculum content** beyond the perk unlocks that just landed — the
    curriculum currently only grants numeric bonuses; there's no lesson/class *content* yet.
 4. Everything else unstarted is tracked in `BACKLOG.md` — PvP ranking/leaderboards, guilds, pets,
@@ -395,17 +427,39 @@ streaming, zone transitions, dungeon instancing).
   a fresh screenshot proves anything on its own. Worth keeping as the default checklist for any
   future generated-model integration, character or landmark alike.
 
+**Refinements flagged during the docs review (2026-08-08):**
+- **Naming collision: "home" means two things.** `S.home` / `buyHome` / `HOME_UPGRADES` /
+  `screen="home"` are the *guild hall* meta-progression, while the building labelled "Student
+  Dorms" is the physical place. The nav tab reads "Hall", the NPC dialogue says "Your Home", and
+  the building says "Dorms" — three names for overlapping ideas. Before D1 adds a fourth,
+  decide whether the dorm and the guild hall are the same thing (rename to one term) or
+  deliberately different (a personal room vs. a guild-wide hall). Cheapest moment to fix is now,
+  while nothing spatial depends on it.
+- **The `home` station skips a step every other building takes.** `library` and `tavern` are
+  `noStation:true` (decorative); `scribe`/`smith`/`market` open a working screen. `home` opens a
+  screen too, so D1's interior transition is the *first* time a campus building becomes a place
+  you enter. Worth making that transition generic in `structures.js` (an `interior:` field) rather
+  than special-casing the dorm, since `docs/DESIGN-DECISIONS.md` §1 already wants interiors for
+  the Scribing Hall and Smithy — the two buildings players actually spend time in.
+- **Housing is listed twice in the backlog**, as §2 "Dorm customization / display cases / trophy
+  room" and again as §7 "Housing furniture / slab display cases / boss trophies". Same feature,
+  two sections. §2 is now the canonical entry; §7's duplicates point at it.
+- **`docs/plan.md` and `design/plan.md` are near-identical copies** of the same original design
+  doc. One should be deleted or marked historical, or a future session will update the wrong one.
+
 ## 10. Roadmap (in priority order)
 
-1. **WORLDSPEC step 6 — content pass.** Second dungeon, third outdoor zone. The engine is ready;
+1. **Dorm phases D1–D4** — interior as a real space, furniture placement, display cases + trophy
+   room, then visual upgrade tiers. See "Next up" in §9 for the phase breakdown.
+2. **WORLDSPEC step 6 — content pass.** Second dungeon, third outdoor zone. The engine is ready;
    this is authoring work against the schemas in `WORLDSPEC.md` §3/§6.
-2. **Character creation & visuals.** 3D preview at character creation, per-school outfit
+3. **Character creation & visuals.** 3D preview at character creation, per-school outfit
    visuals, visible equipment on the 3D model — `BACKLOG.md` §2, `docs/DESIGN-DECISIONS.md` §4.
-3. **Deepen the Academy curriculum** — actual class/lesson content, not just the numeric perks
+4. **Deepen the Academy curriculum** — actual class/lesson content, not just the numeric perks
    `academy.js` already grants.
-4. **Collection depth** — card evolution, foil/holo variants, an encyclopedia (`BACKLOG.md` §5).
-5. **Social layer** — PvP ranking, guilds, leaderboards (`BACKLOG.md` §8).
-6. **Endgame** — pets/mounts, prestige, seasonal content (`BACKLOG.md` §10).
+5. **Collection depth** — card evolution, foil/holo variants, an encyclopedia (`BACKLOG.md` §5).
+6. **Social layer** — PvP ranking, guilds, leaderboards (`BACKLOG.md` §8).
+7. **Endgame** — pets/mounts, prestige, seasonal content (`BACKLOG.md` §10).
 
 ---
 
