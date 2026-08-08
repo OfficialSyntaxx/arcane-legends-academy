@@ -4,6 +4,19 @@
 > project. It holds the operational details (deploy, analytics, asset pipeline, conventions)
 > that the agent needs across sessions. Keep it current — edit + commit with every change.
 
+## How to update this file (convention)
+- **New durable learnings go HERE, appended, not into the agent memory store.** The agent memory
+  tool only holds a short pointer to this file.
+- When a new fact / preference / operational detail comes up, edit the relevant section or add a
+  dated entry under **Learnings log** below, then commit + push.
+- See the `append-project-memory` skill for the full rule.
+
+## Learnings log
+- 2026-08-08 — Analytics dashboard is at `/api/dashboard` (bare `/dashboard` is intercepted by the
+  platform SPA fallback). Worker routes: `/api/analytics` (POST/GET), `/api/dashboard` (HTML).
+- 2026-08-08 — `memory.md` established as the durable project memory; agent memory store holds only
+  a pointer. Convention: append learnings here, not to the memory tool.
+
 ## Live deployment
 - Play URL: **https://magic-woodland-396.higgsfield.app** (website id `c739c4e5-9f2e-4aab-8ed5-9127cd802ec4`)
 - Source repo: **https://github.com/OfficialSyntaxx/arcane-legends-academy** (user `OfficialSyntaxx`)
