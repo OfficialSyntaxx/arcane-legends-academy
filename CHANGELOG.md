@@ -2,6 +2,12 @@
 
 > Reverse-chronological. Companion docs: `CLAUDEREADME.md` (state + "Where we left off"), `BACKLOG.md` (feature backlog), `WORLDSPEC.md` (world architecture), `ASSETS.md` (asset library).
 
+## 2026-08-08 — Phase A: Adventurer's Path (connect the loop)
+- **`advice.js`** — ongoing "next step" guidance that keeps the core loop connected after onboarding. The objective bar becomes a persistent advisor suggesting the next meaningful action, derived from the save (no tracked step): **scribe → housing (buy/upgrade) → grade → duel → refine → pack → gather → explore**. Every action has a Go button that jumps you to the right screen.
+- The bar shows the guided onboarding chain first, then hands off to the advisor once onboarding completes; a `flags.adviceHidden` toggle (with migration) hides it.
+- 6 new regression tests (one per advice branch). 262 engine tests pass.
+- Deployed + pushed.
+
 ## 2026-08-08 — Analytics dashboard + richer debug tracking
 - **Dashboard UI** at **`GET /api/dashboard`** (HTML): KPI cards (events, sessions, unique players, avg session, active days), a 14-day sessions bar chart, zone-visit / tab-click / event-type bars, recent errors, and a recent-events table. (Note: `/dashboard` is intercepted by the platform's SPA fallback — it must live under `/api/`.)
 - **Richer client tracking** (`analytics.js`): `session_meta` (device type, screen, DPR, locale, WebGL renderer), `world` events (`map_loaded`/`map_failed` with zone+model), low-FPS sampling (`fps` < 30), and opportunistic `debug` breadcrumbs via `window.__analytics.debug(k, v)`.

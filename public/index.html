@@ -338,6 +338,7 @@ import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
 import { modelUrl } from "./cdn.js";
 import { loadDungeons, dungeonZone } from "./dungeons.js";
 import * as ONBOARD from "./onboarding.js";
+import * as ADVICE from "./advice.js";
 import * as ZQ from "./zonequests.js";
 import * as REP from "./reputation.js";
 import * as ACADEMY from "./academy.js";
@@ -644,21 +645,35 @@ const NAV = [
   ["world","🌍","World"],["home","🏰",STR.nav_home],["skills","⛏️",STR.nav_skills],["collection","🃏",STR.nav_collection],
   ["loadout","🗡️",STR.nav_loadout],["market","🛒",STR.nav_market],["quests","📜",STR.nav_quests],["pvp","⚔️",STR.nav_pvp],
 ];
-// Onboarding objective bar. Rebuilt on every render because every step is DERIVED from the save
-// (see onboarding.js) — there is no state here to keep in sync, it just re-asks the questions.
+// Objective bar. During onboarding it shows the guided chain; once that's complete it becomes
+// the ongoing "Adventurer's Path" (advice.js) — always suggesting the next meaningful action in
+// the gather→refine→scribe→grade→duel→housing loop. Both are DERIVED from the save, so there is
+// no here state to keep in sync — it just re-asks the questions on every render.
 function buildObjective(){
   const bar = $("objective");
   const step = ONBOARD.currentStep(S);
-  if (!step || S.flags.onboardingHidden){ bar.style.display = "none"; return; }
-  const p = ONBOARD.progress(S);
-  const where = step.where ? ` — ${step.where}` : "";
-  const canGo = step.goto && step.goto !== screen && step.goto !== "duel";
+  if (step && !S.flags.onboardingHidden){
+    const p = ONBOARD.progress(S);
+    const where = step.where ? ` — ${step.where}` : "";
+    const canGo = step.goto && step.goto !== screen && step.goto !== "duel";
+    bar.innerHTML =
+      `<span class="obj-tick">🎓</span>` +
+      `<span class="obj-main"><div class="obj-title">${p.index}/${p.total} · ${step.title}</div>` +
+      `<div class="obj-why">${step.why}${where}</div></span>` +
+      (canGo ? `<button class="btn gold" onclick="window.__ev('objGo')">Go</button>` : ``) +
+      `<button class="btn" onclick="window.__ev('objHide')" aria-label="Hide guide">✕</button>`;
+    bar.style.display = "flex"; return;
+  }
+  // Onboarding done (or hidden) → ongoing loop guidance.
+  if (S.flags.adviceHidden){ bar.style.display = "none"; return; }
+  const a = ADVICE.nextAdvice(S);
+  if (!a){ bar.style.display = "none"; return; }
+  const canGo = a.goto && a.goto !== screen && a.goto !== "duel";
   bar.innerHTML =
-    `<span class="obj-tick">🎓</span>` +
-    `<span class="obj-main"><div class="obj-title">${p.index}/${p.total} · ${step.title}</div>` +
-    `<div class="obj-why">${step.why}${where}</div></span>` +
-    (canGo ? `<button class="btn gold" onclick="window.__ev('objGo')">Go</button>` : ``) +
-    `<button class="btn" onclick="window.__ev('objHide')" aria-label="Hide guide">✕</button>`;
+    `<span class="obj-tick">${a.icon}</span>` +
+    `<span class="obj-main"><div class="obj-title">${a.title}</div><div class="obj-why">${a.why}</div></span>` +
+    (canGo ? `<button class="btn gold" onclick="window.__ev('adviceGo')">Go</button>` : ``) +
+    `<button class="btn" onclick="window.__ev('adviceHide')" aria-label="Hide guide">✕</button>`;
   bar.style.display = "flex";
 }
 window.__EV.objGo = ()=>{
@@ -668,6 +683,13 @@ window.__EV.objGo = ()=>{
   render();
 };
 window.__EV.objHide = ()=>{ S.flags.onboardingHidden = true; save(); render(); };
+window.__EV.adviceGo = ()=>{
+  const a = ADVICE.nextAdvice(S);
+  if (!a) return;
+  screen = a.goto === "world" ? "world" : a.goto;
+  render();
+};
+window.__EV.adviceHide = ()=>{ S.flags.adviceHidden = true; save(); render(); };
 
 function buildNav(){
   $("nav").innerHTML = NAV.map(([id,ic,label])=>`<button class="navbtn ${id===screen?"on":""}" data-screen="${id}"><span class="ic">${ic}</span>${label}</button>`).join("");

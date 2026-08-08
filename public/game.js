@@ -38,7 +38,7 @@ export function newGame(){
     // NPC reputation (reputation.js). Only quest givers earn any right now — see that module
     // for why this is a flat {npcKey: number} map rather than a richer per-NPC shape.
     reputation:{},
-    auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false, lastClassDay:null },
+    auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false, lastClassDay:null, adviceHidden:false },
   };
 }
 export function load(){
@@ -66,6 +66,7 @@ function migrate(s){
   // was `if (!s.flags.schoolPicked)`, which also fired on an explicit false — so a player who
   // quit during character creation never saw the picker again and was silently stuck on Balance.
   if (s.flags.schoolPicked === undefined) s.flags.schoolPicked = true;
+  if (s.flags.adviceHidden === undefined) s.flags.adviceHidden = false;
   if (!s.auctions) s.auctions = [];
   if (!s.worldState) s.worldState = { zone:"academy", visited:["academy"], dungeons:{} };
   if (!Array.isArray(s.worldState.visited)) s.worldState.visited = ["academy"];

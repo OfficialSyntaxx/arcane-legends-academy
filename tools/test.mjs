@@ -10,6 +10,7 @@ import * as TER from "../public/terrain.js";
 import * as WC from "../public/worldconfig.js";
 import * as DG from "../public/dungeons.js";
 import * as OB from "../public/onboarding.js";
+import * as ADVICE from "../public/advice.js";
 import * as VFX from "../public/vfx.js";
 import * as ZQ from "../public/zonequests.js";
 import * as ACADEMY from "../public/academy.js";
@@ -1477,6 +1478,40 @@ check("every ZONE_MAPS entry points at a real zone and an existing map file", ((
     if (!fs.existsSync(p)) return false;                     // map file must be deployed
   }
   return true;
+})());
+
+// ---- Adventurer's Path / loop guidance (BACKLOG §1 "Connect existing systems") ----
+check("holding a scribing supply advises scribing a card", (()=>{
+  const s = G.newGame(); s.inventory.canvas = 1;
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "skills" && /scribe/i.test(a.title);
+})());
+check("gold without a home advises buying the guild hall", (()=>{
+  const s = G.newGame(); s.gold = 500; s.inventory.canvas = 0;
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "home" && /guild hall/i.test(a.title);
+})());
+check("an ungraded card advises grading", (()=>{
+  const s = G.newGame(); s.gold = 0; s.inventory = {}; s.deck = [];
+  s.cards = [{ uid:"x", id:"fire_cat", roll:50, graded:false }];
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "collection" && /grade/i.test(a.title);
+})());
+check("a legal deck with nothing else pending advises dueling", (()=>{
+  const s = G.newGame(); s.gold = 0; s.inventory = {};
+  s.cards = s.deck.map((id, i) => ({ uid:"c"+i, id, roll:60, graded:true }));
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "duel" && /duel/i.test(a.title);
+})());
+check("holding raw material with no legal deck advises refining", (()=>{
+  const s = G.newGame(); s.deck = []; s.cards = []; s.gold = 0; s.inventory = { iron: 1 };
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "skills" && /refine/i.test(a.title);
+})());
+check("an empty save (no cards/deck/materials) advises gathering", (()=>{
+  const s = G.newGame(); s.deck = []; s.cards = []; s.gold = 0; s.inventory = {};
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "world" && /gather/i.test(a.title);
 })());
 
 // ---- NPC reputation (BACKLOG "NPC reputation") ----
