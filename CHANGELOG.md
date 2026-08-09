@@ -16,6 +16,20 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### Deck Testing Laboratory; §8 audited and documented as server-blocked — `82faa22`
+- **Deck Testing Laboratory** (§5): a PvP-screen panel to play your current deck against any of
+  the five AI personalities, fighting a real thematic 20-card deck (the same builder dungeon
+  monsters use) from a school that isn't your own. Pays out **nothing** — no gold, no cards, no
+  PvP win/loss, no rank change — a lab that pays out is a farm wearing a lab coat, and would have
+  quietly poisoned PvP ranking's streak/season-floor maths besides. No new pure module needed.
+- **§8 Multiplayer & Social audited before building more of it**: Multiplayer Academy, player
+  presence, and every guild feature need a persistent, always-on server tracking state for every
+  connected player. This project's only server-side code, `logic.js`, is a *stateless per-room
+  referee* per online duel — it holds nothing once a match ends. `BACKLOG.md` now says so directly
+  against each blocked §8 item, the same honesty the PvP-ranking work already applied to a
+  cross-player leaderboard, one level up — rather than leaving them looking merely unstarted.
+- *443 engine / 34 online / 131 browser.*
+
 ### School mechanics, ultimates, and a reusable combat effect system — `e352681`
 - **The last three open items in §4 PvE & Combat, closed together**: a reusable effect pipeline
   is what made the other two cheap. `game.js`'s `applyFx` if/else chain became `FX_HANDLERS`, a
