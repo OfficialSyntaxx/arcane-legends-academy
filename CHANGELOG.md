@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### School mechanics, ultimates, and a reusable combat effect system — *pending*
+### School mechanics, ultimates, and a reusable combat effect system — `e352681`
 - **The last three open items in §4 PvE & Combat, closed together**: a reusable effect pipeline
   is what made the other two cheap. `game.js`'s `applyFx` if/else chain became `FX_HANDLERS`, a
   `{kind: fn}` dispatch table — every card fx, the new affinity bonus and the new ultimates all
