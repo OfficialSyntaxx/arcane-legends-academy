@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### Auction history / price history, and a real countdown bug fixed — *pending*
+### Auction history / price history, and a real countdown bug fixed — `6f7f11b`
 - **Audit first**: checking §6's remaining unstarted items found "Player marketplace" already
   fully built (`listAuction`/`auctionTick`/`settleAuctions` — a simulated NPC-bidding auction
   house, honestly labelled, no cross-player market) — just never checked off.
