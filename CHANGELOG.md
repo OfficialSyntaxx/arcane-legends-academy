@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### Enchanting — *pending*
+### Enchanting — `507e196`
 - §6 Crafting & Economy was entirely unstarted; equipment (§2/§6.10) had metal×slot stats and
   nothing else to spend a skill level or materials on beyond the one-time forge.
 - A new `enchanting` skill gates 3 stats (atk/def/hp) × 3 tiers, each a flat bonus applied to ONE
