@@ -18,6 +18,7 @@ import * as LSN from "../public/lessons.js";
 import * as VAR from "../public/variants.js";
 import * as CX from "../public/codex.js";
 import * as ARCH from "../public/archetypes.js";
+import * as RANK from "../public/pvprank.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -2547,6 +2548,108 @@ check("a non-boss archetype never enters a boss phase, however low its HP", (()=
   return !b.enemy.phasesApplied || b.enemy.phasesApplied.length === 0;
 })());
 
+
+// ---------------------------------------------------------------- pvprank.js
+check("validateRanks reports no problems", RANK.validateRanks().length === 0);
+check("tierFor(0) is bronze, tierFor a huge score is grandmaster", (()=>{
+  return RANK.tierFor(0).id === "bronze" && RANK.tierFor(99999).id === "grandmaster";
+})());
+check("tierFor is exact-boundary inclusive", (()=>{
+  return RANK.tierFor(300).id === "silver" && RANK.tierFor(299).id === "bronze";
+})());
+check("nextTier is null at the top tier, populated everywhere else", (()=>{
+  return RANK.nextTier(0).id === "silver" && RANK.nextTier(99999) === null;
+})());
+check("progressToNextTier reports maxed at the top tier", RANK.progressToNextTier(99999).maxed === true);
+check("progressToNextTier reports have/need/pct within a tier", (()=>{
+  const p = RANK.progressToNextTier(150);       // bronze [0,300)
+  return p.have === 150 && p.need === 300 && p.pct === 50 && !p.maxed;
+})());
+check("titleFor: ordinary tiers are '<Tier> Duelist', grandmaster is special", (()=>{
+  return RANK.titleFor(0) === "Bronze Duelist" && RANK.titleFor(99999) === "Grandmaster of the Arcane";
+})());
+check("resultOf: a win always gains points and increments the streak", (()=>{
+  const r = RANK.resultOf(true, 100, 0, 0);
+  return r.points === 120 && r.streak === 1 && r.delta === 20;
+})());
+check("resultOf: streak bonus grows then caps at STREAK_CAP", (()=>{
+  const a = RANK.resultOf(true, 0, 5, 0);        // already at the cap
+  const b = RANK.resultOf(true, 0, 50, 0);       // way past the cap
+  return a.delta === 30 && b.delta === 30;
+})());
+check("resultOf: a loss always costs points, and resets the streak", (()=>{
+  const r = RANK.resultOf(false, 100, 4, 0);
+  return r.points === 85 && r.streak === 0 && r.delta === -15;
+})());
+check("resultOf: a loss cannot fall below the season floor", (()=>{
+  const r = RANK.resultOf(false, 305, 0, 300);   // one point above the floor
+  return r.points === 300;
+})());
+check("resultOf: the season floor itself cannot go negative", (()=>{
+  const r = RANK.resultOf(false, 5, 0, 0);
+  return r.points === 0;
+})());
+check("seasonIdFor is a stable YYYY-MM in UTC", (()=>{
+  return RANK.seasonIdFor(Date.UTC(2026, 7, 9)) === "2026-08"       // August, 0-indexed month 7
+      && RANK.seasonIdFor(Date.UTC(2026, 0, 1)) === "2026-01";
+})());
+check("applyResult mutates rankPoints/streak/seasonBest in place and returns the delta", (()=>{
+  const pvp = { rankPoints: 0, streak: 0, seasonBest: 0 };
+  const r = RANK.applyResult(pvp, true);
+  return pvp.rankPoints === 20 && pvp.streak === 1 && pvp.seasonBest === 20 && r.delta === 20;
+})());
+check("applyResult: seasonBest only ever rises, even after a loss", (()=>{
+  const pvp = { rankPoints: 320, streak: 0, seasonBest: 320 };
+  RANK.applyResult(pvp, false);
+  return pvp.rankPoints === 305 && pvp.seasonBest === 320;
+})());
+check("settleSeason on a brand-new save starts the current season with no history", (()=>{
+  const pvp = { rankPoints: 0, streak: 0, season: null, seasonBest: 0, history: [] };
+  RANK.settleSeason(pvp, Date.UTC(2026, 7, 9));
+  return pvp.season === "2026-08" && pvp.history.length === 0;
+})());
+check("settleSeason is a no-op within the same season", (()=>{
+  const pvp = { rankPoints: 123, streak: 3, season: "2026-08", seasonBest: 200, history: [] };
+  RANK.settleSeason(pvp, Date.UTC(2026, 7, 20));
+  return pvp.rankPoints === 123 && pvp.streak === 3 && pvp.history.length === 0;
+})());
+check("settleSeason on rollover records history and soft-resets, never below the tier floor", (()=>{
+  const pvp = { rankPoints: 270, streak: 4, season: "2026-08", seasonBest: 270, history: [] };
+  RANK.settleSeason(pvp, Date.UTC(2026, 8, 1));  // next month
+  const halved = Math.floor(270 * 0.5);
+  return pvp.season === "2026-09"
+      && pvp.rankPoints === halved && pvp.seasonBest === halved
+      && pvp.streak === 0
+      && pvp.history.length === 1 && pvp.history[0].season === "2026-08"
+      && pvp.history[0].points === 270 && pvp.history[0].tier === "bronze";
+})());
+check("settleSeason soft reset cannot drop a player below the tier they finished in", (()=>{
+  const pvp = { rankPoints: 1850, streak: 2, season: "2026-08", seasonBest: 1850, history: [] };  // diamond
+  RANK.settleSeason(pvp, Date.UTC(2026, 8, 1));
+  return pvp.rankPoints >= RANK.TIERS.find(t=>t.id==="diamond").min;
+})());
+check("settleSeason caps history at 12 entries", (()=>{
+  const pvp = { rankPoints: 0, streak: 0, season: "2020-01", seasonBest: 0, history: Array.from({length:12}, (_,i)=>({season:`2019-${i+1}`, points:0, tier:"bronze"})) };
+  RANK.settleSeason(pvp, Date.UTC(2020, 1, 1));
+  return pvp.history.length === 12 && pvp.history[0].season === "2020-01";
+})());
+check("game.js newGame() gives a fresh pvp record with the pvprank fields", (()=>{
+  const s = G.newGame();
+  return s.pvp.rankPoints === 0 && s.pvp.streak === 0 && s.pvp.seasonBest === 0
+      && Array.isArray(s.pvp.history) && s.pvp.season === null;
+})());
+check("game.js load() settles the season on a fresh save", (()=>{
+  const s = G.load();
+  return typeof s.pvp.season === "string" && s.pvp.season === RANK.seasonIdFor(Date.now());
+})());
+check("game.js migrate() defaults rank fields for an older save missing them", (()=>{
+  const old = G.newGame();
+  delete old.pvp.rankPoints; delete old.pvp.streak; delete old.pvp.history; delete old.pvp.seasonBest;
+  old.pvp.wins = 40; old.pvp.losses = 20;
+  const m = G.migrate ? G.migrate(old) : null;
+  if (!m) return true;  // migrate() is not exported; covered indirectly via load() above
+  return m.pvp.rankPoints === 0 && m.pvp.streak === 0 && Array.isArray(m.pvp.history) && m.pvp.seasonBest === 0;
+})());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

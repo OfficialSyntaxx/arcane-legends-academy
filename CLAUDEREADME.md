@@ -66,6 +66,7 @@ wizard-tcg/                 (the repo root)
 │   ├── variants.js         card printings (foil/holo/prismatic) + first editions — PURE
 │   ├── codex.js            collection index: filters, completion, achievements — PURE
 │   ├── archetypes.js       AI battle personalities, thematic enemy decks, boss phases — PURE
+│   ├── pvprank.js          PvP tiers, seasons, streak-bonus match results — PURE
 │   ├── reputation.js       per-NPC standing + reward bonuses — PURE
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
@@ -228,6 +229,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 ### 6.5 Quests & PvP
 - **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
 - **AI archetypes & multi-phase bosses** (`archetypes.js`) — five battle personalities, thematic per-monster decks, and boss HP escalations. See §6.14.
+- **PvP ranking & seasons** (`pvprank.js`) — seven tiers, streak-bonus match results, monthly UTC seasons with a soft reset and a personal history. See §6.16.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -448,7 +450,38 @@ was one strategy wearing different decks.
   `startLocalDuel` now takes an `opts.hp` override; a browser test asserts the real Cinderhollow
   fight starts at 200, not 100.
 
-### 6.15 Retention
+### 6.16 PvP ranking & seasons (`pvprank.js`)
+The PvP screen tracked only lifetime wins/losses — a counter with no shape, no sense of "am I
+getting better," and nothing to chase once you'd farmed enough gold.
+
+- **Seven tiers**, Bronze → Silver → Gold → Platinum → Diamond → Master → Grandmaster, driven by a
+  single stored `rankPoints` number. `tierFor`/`nextTier`/`progressToNextTier` are pure reads of
+  that number — the tier itself is derived, never stored.
+- **Match results** (`resultOf`): a win is always `+20` plus a capped streak bonus (`+2` per streak
+  win, capped at 5 for `+30` max); a loss is always `-15`, floored at the **season floor** — the
+  standard ranked-game promise that a tier reached this season cannot be lost to a losing streak,
+  only fallen *within*.
+- **Seasons** (`seasonIdFor`/`settleSeason`): one per UTC calendar month. Crossing into a new one
+  soft-resets `rankPoints` to half the previous season's peak (`seasonBest`), never below the tier
+  that peak reached, and records the finished season into a capped 12-entry `history` array.
+  `settleSeason` is called from exactly one place, `game.js` `load()` — the same pattern as
+  `settleAuctions` — since the PvP screen is the only place a season boundary is user-visible, and
+  a save is always reloaded before that screen can be reached.
+- **`rankPoints`/`streak`/`seasonBest` are STORED** — the second deliberate exception to "derive,
+  don't store" (the first is a card's `roll`/`variant` in `variants.js`). They are the outcome of a
+  *sequence* of match results, each shaped by the state the previous one left behind (the streak
+  bonus, the season floor); there is no way to recompute "how many points" from `pvp.wins`/`losses`
+  alone — two 40-20 records can sit at very different points depending on the order the results
+  came in.
+- **Deliberately no cross-player leaderboard**: this project has no persistent server —
+  `logic.js` is a stateless per-room referee (§3), not a database. A "leaderboard" that can only
+  ever show one row is not a leaderboard. What the PvP screen shows instead is the player's own
+  **season history**, honestly labelled as theirs.
+- Wired into every win/loss path: `index.html`'s local-AI-duel outcome and online-duel outcome both
+  call `RANK.applyResult(S.pvp, won)` alongside the existing `wins++`/`losses++` counters (which
+  stay, as the lifetime record the rank system doesn't replace).
+
+### 6.17 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -567,7 +600,26 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: AI archetypes and multi-phase bosses** (§6.14). Every AI opponent in the game had
+**Last landed: PvP ranking and seasons** (§6.16). The PvP screen showed only lifetime wins/losses —
+no sense of getting better, nothing to chase once gold stopped mattering. `pvprank.js` gives it
+seven tiers (Bronze → Grandmaster) driven by a stored `rankPoints`, win/loss deltas with a capped
+streak bonus, and monthly UTC seasons that soft-reset on rollover (never below the tier reached)
+into a capped personal history. Wired into every win/loss path — local AI duels and online duels
+both call `RANK.applyResult`.
+
+Deliberately **not** a leaderboard: this project has no persistent server (`logic.js` is a
+stateless per-room referee, §3), so there is no data source for one — a leaderboard that can only
+ever show one row is a lie with a scoreboard's furniture. The PvP screen shows a season history
+instead, honestly labelled as the player's own.
+
+`rankPoints`/`streak`/`seasonBest` are the **second** deliberate exception to "derive, don't store"
+(the first is a card's `roll`/`variant` in `variants.js`) — they're the outcome of a *sequence* of
+match results, each shaped by the state the previous one left behind, and cannot be recomputed from
+`pvp.wins`/`pvp.losses` alone.
+
+Tests: **427 engine / 34 online-rules / 123 browser / 8 viewports / model-check clean.**
+
+**Before that: AI archetypes and multi-phase bosses** (§6.14). Every AI opponent in the game had
 been running one strategy — highest-cost affordable card, damage spells finish the weakest enemy
 creature, always race face unless a taunt forces it — with only the deck and the HP total varying.
 `archetypes.js` gives it five real personalities (Aggro/Control/Tempo/Boss, plus `midrange` which

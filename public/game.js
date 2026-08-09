@@ -5,6 +5,7 @@ import * as ACADEMY from "./academy.js";
 import * as LESSONS from "./lessons.js";
 import * as VAR from "./variants.js";
 import * as ARCH from "./archetypes.js";
+import * as RANK from "./pvprank.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
 export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
@@ -39,7 +40,12 @@ export function newGame(){
     name:"", appearance:{ variant:"standard", aura:"ring" },
     home:{ owned:false, upgrades:{ treasury:0, library:0, armory:0, tavern:0 }, stock:{}, furniture:{}, cases:{} },
     quests:{ current:0, done:[] },
-    pvp:{ wins:0, losses:0 },
+    // PvP rank (pvprank.js). `rankPoints`/`streak`/`seasonBest` are STORED — the outcome of a
+    // sequence of match results that cannot be recomputed from win/loss totals alone (two 40-20
+    // records can sit at very different points depending on the order the results came in),
+    // exactly like a card's `roll` in variants.js. `season` is set on first load, not here — a
+    // fresh save has never "started" a season until load() calls settleSeason.
+    pvp:{ wins:0, losses:0, rankPoints:0, streak:0, season:null, seasonBest:0, history:[] },
     stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 },
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
@@ -62,9 +68,11 @@ export function newGame(){
 export function load(){
   try{
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && s.version){ const m = migrate(s); settleAuctions(m); return m; }
+    if (s && s.version){ const m = migrate(s); settleAuctions(m); RANK.settleSeason(m.pvp, Date.now()); return m; }
   }catch(e){}
-  return newGame();
+  const s = newGame();
+  RANK.settleSeason(s.pvp, Date.now());
+  return s;
 }
 export function save(s){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(s)); }catch(e){} }
 function migrate(s){
@@ -94,6 +102,13 @@ function migrate(s){
   if (!Array.isArray(s.zoneQuests.done)) s.zoneQuests.done = [];
   if (!s.reputation || typeof s.reputation !== "object") s.reputation = {};
   if (!Array.isArray(s.favorites)) s.favorites = [];
+  // PvP rank. An older save has real wins/losses but never had a rank — it starts at Bronze
+  // rather than being credited retroactively, because there is no recorded ORDER for those old
+  // results to replay through the streak/season maths.
+  if (s.pvp.rankPoints == null) s.pvp.rankPoints = 0;
+  if (s.pvp.streak == null) s.pvp.streak = 0;
+  if (!Array.isArray(s.pvp.history)) s.pvp.history = [];
+  if (s.pvp.seasonBest == null) s.pvp.seasonBest = s.pvp.rankPoints;
   if (!s.lessons) s.lessons = { enrolled: [], done: [] };
   if (!Array.isArray(s.lessons.enrolled)) s.lessons.enrolled = [];
   if (!Array.isArray(s.lessons.done)) s.lessons.done = [];

@@ -360,6 +360,7 @@ import * as LSN from "./lessons.js";
 import * as VAR from "./variants.js";
 import * as CX from "./codex.js";
 import * as ARCH from "./archetypes.js";
+import * as RANK from "./pvprank.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -1421,6 +1422,26 @@ function renderPvp(el){
   h += `</div>`;
   h += `<div class="row"><div class="kpi"><div class="lv">${S.pvp.wins}</div><div class="nm">PvP Wins</div></div>
   <div class="kpi"><div class="lv">${S.pvp.losses}</div><div class="nm">PvP Losses</div></div></div>`;
+  const tier = RANK.tierFor(S.pvp.rankPoints);
+  const prog = RANK.progressToNextTier(S.pvp.rankPoints);
+  const title = RANK.titleFor(S.pvp.rankPoints);
+  h += `<div class="panel"><h3>${tier.icon} Rank</h3>`;
+  h += `<div class="sub">${title} · ${S.pvp.rankPoints} pts${S.pvp.streak>1?` · 🔥 ${S.pvp.streak}-win streak`:""}</div>`;
+  if (prog.maxed){
+    h += `<div class="sub" style="margin-top:6px">Maximum rank reached.</div>`;
+  } else {
+    h += `<div class="sub" style="margin-top:6px">${prog.have}/${prog.need} to ${prog.next.icon} ${prog.next.name}</div>
+    <div class="pbar"><div style="width:${prog.pct}%"></div></div>`;
+  }
+  h += `</div>`;
+  if (S.pvp.history && S.pvp.history.length){
+    h += `<div class="panel"><h3>📜 Your Season History</h3><p class="sub">Your own past seasons — there is no cross-player leaderboard.</p><div class="list">`;
+    for (const s of S.pvp.history){
+      const t = RANK.TIERS.find(t=>t.id===s.tier) || RANK.TIERS[0];
+      h += `<div class="row" style="justify-content:space-between"><span>${s.season}</span><span>${t.icon} ${t.name} · ${s.points} pts</span></div>`;
+    }
+    h += `</div></div>`;
+  }
   el.innerHTML = h;
 }
 function randomAiDeck(){
@@ -1660,14 +1681,14 @@ window.__EV.duelAgain = ()=>{
     } else {
       const base = isQuest ? 30 : 40 + Math.floor(Math.random()*40);
       G.gainGold(S, base + bonus(base));
-      if (!isQuest){ S.pvp.wins++; S.stats.won++; G.dropCards(S,1); toast(`Victory! +${base+bonus(base)}g +1 card`); }
+      if (!isQuest){ S.pvp.wins++; S.stats.won++; G.dropCards(S,1); RANK.applyResult(S.pvp, true); toast(`Victory! +${base+bonus(base)}g +1 card`); }
       else toast(`+${base+bonus(base)}g`);
       winSfx();
     }
   } else {
     loseSfx();
     if (isQuest) toast("Defeated — try again!");
-    else { S.pvp.losses++; toast("Defeated"); }
+    else { S.pvp.losses++; RANK.applyResult(S.pvp, false); toast("Defeated"); }
   }
   save();
   clearInterval(duelTimerInt);
@@ -1743,8 +1764,8 @@ function connectOnline(){
     online.state = msg;
     if (msg.status==="over" && !online.rewarded){
       online.rewarded = true;
-      if (msg.result.winner===msg.you){ S.pvp.wins++; G.gainGold(S, 60); toast("+60g online win!"); }
-      else S.pvp.losses++;
+      if (msg.result.winner===msg.you){ S.pvp.wins++; RANK.applyResult(S.pvp, true); G.gainGold(S, 60); toast("+60g online win!"); }
+      else { S.pvp.losses++; RANK.applyResult(S.pvp, false); }
       save();
     }
     renderOnline();

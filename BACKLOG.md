@@ -174,9 +174,14 @@
 
 ## 8. Multiplayer & Social
 
-- [ ] PvP ranking
-- [ ] PvP seasons
-- [ ] Leaderboards
+- [x] PvP ranking — `pvprank.js`: seven tiers Bronze→Grandmaster, win/loss point deltas with a
+      capped streak bonus, wired into every win/loss path (local + online duels)
+- [x] PvP seasons — one per UTC calendar month, soft-reset on rollover (never below the tier
+      reached), a capped 12-season personal history shown on the PvP screen
+- [ ] Leaderboards — deliberately not built: `logic.js` is a stateless per-room referee with no
+      persistent server (see CLAUDEREADME §3), so there is no data source for a cross-player
+      leaderboard. §8's "PvP ranking" ships a *season history* instead — honestly labelled as the
+      player's own past seasons, not a leaderboard with only one row.
 - [ ] Multiplayer Academy
 - [ ] Player presence
 - [ ] Guild creation
@@ -193,7 +198,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 404 engine / 34 online / 123 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 427 engine / 34 online / 123 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -255,7 +260,9 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **AI archetypes + multi-phase bosses** (`archetypes.js`, and
+**Changes made, most recent first:** **PvP ranking + seasons** (`pvprank.js` — seven tiers, streak
+bonus, monthly UTC seasons with a soft reset, a personal season history, no fake leaderboard) →
+**AI archetypes + multi-phase bosses** (`archetypes.js`, and
 a real HP bug fixed on the two dungeon bosses along the way) → **the Codex** (`codex.js` — catalog browser, filters,
 completion, achievements) and **`CHANGELOG.md`** → **card printings + first editions** (`variants.js`, and
 `mintCard()` consolidating five copies of the card-instance literal) → **Academy class content** (`lessons.js` — 21 classes, four
@@ -279,15 +286,29 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **AI archetypes and multi-phase bosses are done** — five real personalities
+**Next step:** **PvP ranking and seasons are done** (`pvprank.js`) — seven tiers Bronze→Grandmaster
+driven by stored rank points, a capped win-streak bonus, and a season soft-floor so a tier once
+reached in a season cannot be lost to a losing streak, only fallen-within. Wired into every win/loss
+path: local AI duels and online duels both call `RANK.applyResult`. Seasons are one UTC calendar
+month; crossing into a new one soft-resets to half the previous peak (never below the tier reached)
+and records the finished season in a capped 12-entry personal history, shown on the PvP screen. This
+is deliberately **not** a leaderboard — the project has no persistent server (`logic.js` is a
+stateless per-room referee, CLAUDEREADME §3), so there is no data source for one; §8's "Leaderboards"
+stays unchecked and says why. `rankPoints`/`streak`/`seasonBest` are the second deliberate exception
+to "derive, don't store" (the first is a card's printing in `variants.js`) — they are the outcome of
+a *sequence* of results, not recomputable from win/loss totals alone.
+
+§8, the social layer, now has PvP ranking and seasons done; leaderboards, multiplayer Academy,
+presence and guilds remain unstarted and are the largest untouched area in this file.
+
+Before that, **AI archetypes and multi-phase bosses were done** — five real personalities
 replace the one strategy every AI opponent used to run, dungeon monsters play a deck built from
 what they visibly are, and both dungeon bosses escalate at 50%/20% HP (`CLAUDEREADME.md` §6.14).
 Fixed a real, previously-unnoticed bug along the way: dungeon bosses had been fighting at 100 HP
 regardless of the 200/280 `dungeons.json` actually declares for them.
 
 §4 PvE & Combat now has only a reusable combat effect system and school-specific mechanics /
-ultimates left unstarted. The largest untouched area in this file remains **§8, the social layer**
-(PvP ranking, seasons, leaderboards, guilds).
+ultimates left unstarted.
 
 Before that, **the Codex was done** — the catalog is browsable with filters, search, per-school
 completion, favourites and nine derived achievements (`CLAUDEREADME.md` §6.13). **`CHANGELOG.md`**

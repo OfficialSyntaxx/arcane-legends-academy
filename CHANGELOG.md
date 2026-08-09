@@ -16,6 +16,23 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### PvP ranking and seasons — *pending*
+- **`pvprank.js`**: seven tiers Bronze → Grandmaster, driven by a stored `rankPoints`. A win is
+  always `+20` plus a capped streak bonus (`+2`/streak win, capped at 5); a loss is always `-15`,
+  floored at a **season floor** — a tier reached this season cannot be lost to a losing streak,
+  only fallen *within*.
+- **Seasons**: one per UTC calendar month. Crossing a boundary soft-resets to half the previous
+  peak, never below the tier that peak reached, and records the finished season into a capped
+  12-entry personal history — shown on the PvP screen.
+- **Deliberately no leaderboard**: the project has no persistent server (`logic.js` is a stateless
+  per-room referee), so there is no data source for a cross-player one. A season history — honestly
+  the player's own — replaces it.
+- `rankPoints`/`streak`/`seasonBest` are the **second** deliberate exception to "derive, don't
+  store" (the first is a card's printing in `variants.js`): the outcome of a *sequence* of match
+  results, not recomputable from `pvp.wins`/`pvp.losses` alone.
+- Wired into every win/loss path — local AI duels and online duels both call `RANK.applyResult`.
+- *427 engine / 34 online / 123 browser.*
+
 ### AI archetypes, thematic enemy decks, multi-phase bosses — `1051742`
 - **`archetypes.js`**: every AI opponent — the seven QUESTS rivals, every dungeon monster, every
   open-world skeleton — ran the identical strategy (highest-cost affordable card, damage spells
