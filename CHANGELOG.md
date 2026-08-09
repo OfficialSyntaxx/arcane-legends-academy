@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### An end-to-end audit, then Deck Archetypes — *pending*
+### An end-to-end audit, then Deck Archetypes — `e03e8dd`
 - **Audit**: asked to check the previous stretch of work for anything left unfinished. Working
   tree was clean and every commit pushed, but `CLAUDEREADME.md` had drifted — a "how to run tests"
   section and an "All tests green" line both still quoting 343/34/109, long overtaken by real
