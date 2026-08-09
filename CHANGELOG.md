@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### AI archetypes, thematic enemy decks, multi-phase bosses — *pending*
+### AI archetypes, thematic enemy decks, multi-phase bosses — `1051742`
 - **`archetypes.js`**: every AI opponent — the seven QUESTS rivals, every dungeon monster, every
   open-world skeleton — ran the identical strategy (highest-cost affordable card, damage spells
   finish the weakest enemy creature, always race face unless a taunt forced a trade). Five real
