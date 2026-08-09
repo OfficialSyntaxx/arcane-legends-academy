@@ -64,6 +64,7 @@ wizard-tcg/                 (the repo root)
 │   ├── academy.js          curriculum years + perks (quest gold / market discount / XP) — PURE
 │   ├── lessons.js          the class syllabus: assignments + techniques taught — PURE
 │   ├── variants.js         card printings (foil/holo/prismatic) + first editions — PURE
+│   ├── codex.js            collection index: filters, completion, achievements — PURE
 │   ├── reputation.js       per-NPC standing + reward bonuses — PURE
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
@@ -95,6 +96,7 @@ wizard-tcg/                 (the repo root)
 │   ├── model-check.mjs     loads AND renders every shipped GLB in a real browser (npm run check:models)
 │   ├── compress-models.mjs Draco + WebP compression for the GLBs (npm run compress)
 │   └── rig-character.py    Blender-as-a-module auto-rigger for unrigged generated characters
+├── CHANGELOG.md            what shipped when, newest first, with test counts per entry
 ├── BACKLOG.md              whole-game feature backlog + recommended phase order
 ├── WORLDSPEC.md            world architecture blueprint (zones, terrain, chunks, dungeons)
 ├── design/                 design docs (plan, thresholds, asset manifest)
@@ -224,6 +226,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 
 ### 6.5 Quests & PvP
 - **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
+- **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
 - **Visible equipment** (`equipment3d.js`) — the equipped wand and amulet hang off real skeleton bones; the other three slots are stats-only and say so. See §6.10.
@@ -392,7 +395,30 @@ Without it a long-standing player could never earn a first edition for anything 
 collection and the feature would be dead for them; without the flag, selling and re-buying would
 mint a second "first" edition.
 
-### 6.13 Retention
+### 6.13 The Codex (`codex.js`)
+The collection screen answers *"what do I own"*. Only the Codex can answer *"what am I missing"* —
+and it can only do that by filtering the **catalog**, not the collection. That distinction is why
+this is a separate module and a separate screen rather than more controls on the grid.
+
+- **Filters**: All / Owned / Missing / Favourites / Special (a printing or first edition) / Graded,
+  plus a school filter and a text search over names and card text.
+- **Sorts**: school, rarity, cost, best copy, name — every one falling back to name as a tie-break
+  so the grid does not re-order itself between renders on equal keys.
+- **Completion**: overall and per school. `completionBy` takes a `groupBy` function, so the same
+  code answers "per school" and "per rarity" without a second implementation.
+- **Nine collection achievements**, all **derived**: sell the cards and the achievement un-earns
+  itself. A stored achievement list drifts the first time a player sells something, and the drift
+  is invisible until someone notices a badge for a card they no longer own.
+- **Favourites are the one stored bit** — a choice, so it is saved.
+- Unowned cards render as greyed silhouettes rather than being hidden: a codex that hides what you
+  are missing cannot tell you what to chase.
+
+`validateCodex` proves every achievement is reachable by scoring it against a synthetic
+best-possible collection. That check found a bug in **itself** first: the probe made every card
+prismatic, so a tally of prismatics contained no foils and the foil/holo achievements reported as
+unreachable. The validator was right; the sample was wrong.
+
+### 6.14 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -511,7 +537,27 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: card printings** (§6.12) — foil, holographic and prismatic cards, plus first
+**Last landed: the Codex** (§6.13) and **`CHANGELOG.md`**.
+
+The collection was a single flat grid — survivable at 30 starter cards, and not once printings
+landed: a prismatic first edition somewhere in ninety cards is unfindable, and the grid could never
+answer the question a collection game exists to keep asking, *what am I missing?* It cannot: you
+cannot filter a list of owned cards for the ones you do not own. `codex.js` browses the **catalog**
+instead — six filters, five sorts, per-school completion, a search over names and card text, and
+nine **derived** collection achievements that un-earn themselves if you sell the cards.
+
+`validateCodex` proves every achievement is reachable against a synthetic best-possible collection,
+and that check caught a bug **in its own probe** first: it made every card prismatic, so a tally of
+prismatics contained no foils and the foil/holo achievements read as unreachable. The validator was
+right and the sample was wrong.
+
+**`CHANGELOG.md` is new**, backfilled from the full git history rather than started blank. Entries
+carry their test counts so a regression in coverage is as visible as one in behaviour, and the
+flakes that could not be reproduced say so rather than claiming a verified fix.
+
+Tests: **377 engine / 34 online-rules / 120 browser / 8 viewports / model-check clean.**
+
+**Before that: card printings** (§6.12) — foil, holographic and prismatic cards, plus first
 editions. Design pillar 3 has always read *"grade, foil, and slab serials make each card feel
 tangible"*; grade and slabs shipped long ago and **foil simply did not exist**, so grade was the
 only axis of collection value and two identical cards were identical.
@@ -797,8 +843,9 @@ as part of the dorm work rather than left as notes:
    per-part geometry rather than tinting or bone attachment — `BLENDERTODO.md` Tier 5.
 4. ~~**Deepen the Academy curriculum**~~ — ✅ done (§6.11): 21 classes with assignments and taught
    techniques.
-5. **Collection depth** — ~~foil/holo variants~~ ✅ (§6.12). Still open: card evolution, a card
-   encyclopedia, collection achievements and filters (`BACKLOG.md` §5).
+5. **Collection depth** — ~~foil/holo variants~~ ✅ (§6.12), ~~encyclopedia, achievements,
+   filters, favourites~~ ✅ (§6.13). Still open: card evolution, deck archetypes, a deck testing
+   lab (`BACKLOG.md` §5).
 6. **Social layer** — PvP ranking, guilds, leaderboards (`BACKLOG.md` §8).
 7. **Endgame** — pets/mounts, prestige, seasonal content (`BACKLOG.md` §10).
 

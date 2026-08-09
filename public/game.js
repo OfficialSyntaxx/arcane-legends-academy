@@ -49,6 +49,9 @@ export function newGame(){
     // Academy classes (lessons.js). Only the CHOICES: enrolled and passed. What each class taught
     // is recomputed from `done` on every read.
     lessons:{ enrolled:[], done:[] },
+    // Favourited card TYPES (codex.js). The one stored bit of the codex — everything else about a
+    // collection (completion, achievements, filters) is derived from `cards` on every read.
+    favorites:[],
     // NPC reputation (reputation.js). Only quest givers earn any right now — see that module
     // for why this is a flat {npcKey: number} map rather than a richer per-NPC shape.
     reputation:{},
@@ -89,6 +92,7 @@ function migrate(s){
   if (!Array.isArray(s.zoneQuests.accepted)) s.zoneQuests.accepted = [];
   if (!Array.isArray(s.zoneQuests.done)) s.zoneQuests.done = [];
   if (!s.reputation || typeof s.reputation !== "object") s.reputation = {};
+  if (!Array.isArray(s.favorites)) s.favorites = [];
   if (!s.lessons) s.lessons = { enrolled: [], done: [] };
   if (!Array.isArray(s.lessons.enrolled)) s.lessons.enrolled = [];
   if (!Array.isArray(s.lessons.done)) s.lessons.done = [];

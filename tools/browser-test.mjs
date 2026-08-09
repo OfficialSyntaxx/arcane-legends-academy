@@ -809,6 +809,71 @@ if (hasWorld){
 
 
 
+
+  // --- the Codex (codex.js) ---
+  // Filtering and completion are covered headlessly. What only a browser proves: the controls are
+  // wired, the grid actually changes, and the search box does not lose focus on every keystroke —
+  // which it would if the whole panel simply re-rendered.
+  const cx = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const out = {};
+    window.__ev("openCodex");
+    await settle(350);
+    const body = () => document.getElementById("ovBody");
+    const count = () => body().querySelectorAll(".card").length;
+    out.opens = /discovered/.test(body().innerText);
+    out.all = count();
+    body().querySelector('button[onclick*="cxFilter|missing"]').click();
+    await settle(250);
+    out.missing = count();
+    body().querySelector('button[onclick*="cxFilter|owned"]').click();
+    await settle(250);
+    out.owned = count();
+    // school filter narrows further
+    body().querySelector('button[onclick*="cxFilter|all"]').click();
+    await settle(200);
+    body().querySelector('button[onclick*="cxSchool|fire"]').click();
+    await settle(250);
+    out.fire = count();
+    body().querySelector('button[onclick*="cxSchool|"]').click();     // back to all schools
+    await settle(200);
+    // search keeps focus and the caret
+    const box = document.getElementById("cxQ");
+    box.focus(); box.value = "dragon"; box.setSelectionRange(6, 6);
+    window.__ev("cxQuery");
+    await settle(250);
+    const after = document.getElementById("cxQ");
+    out.searchCount = count();
+    out.keptFocus = document.activeElement === after;
+    out.caret = after ? after.selectionStart : null;
+    after.value = ""; window.__ev("cxQuery");
+    await settle(200);
+    // favourite round-trip
+    const favBtn = body().querySelector('button[onclick*="cxFav|"]');
+    out.favId = favBtn.getAttribute("onclick").match(/cxFav\|([a-z_]+)/)[1];
+    favBtn.click();
+    await settle(300);
+    out.saved = JSON.parse(localStorage.getItem("arcane_legends_save_v1")).favorites.slice();
+    body().querySelector('button[onclick*="cxFilter|favorite"]').click();
+    await settle(250);
+    out.favCount = count();
+    out.achievements = /Collection Achievements/.test(body().innerText);
+    document.getElementById("overlay").style.display = "none";
+    return out;
+  });
+  check("the codex opens and shows the whole catalog", cx.opens === true && cx.all > 40, `${cx.all} cards`);
+  check("owned and missing partition the catalog in the UI too",
+        cx.owned + cx.missing === cx.all && cx.owned > 0 && cx.missing > 0,
+        `${cx.owned} owned + ${cx.missing} missing = ${cx.all}`);
+  check("a school filter narrows the grid", cx.fire > 0 && cx.fire < cx.all, `${cx.fire} fire cards`);
+  check("search narrows the grid", cx.searchCount > 0 && cx.searchCount < cx.all, `${cx.searchCount} matches`);
+  check("the search box keeps focus and caret while typing", cx.keptFocus === true && cx.caret === 6,
+        `focus=${cx.keptFocus} caret=${cx.caret}`);
+  check("favouriting persists and the favourites filter finds it",
+        (cx.saved || []).length === 1 && cx.saved[0] === cx.favId && cx.favCount === 1,
+        `${JSON.stringify(cx.saved)} -> ${cx.favCount} shown`);
+  check("the codex lists collection achievements", cx.achievements === true);
+
   // --- card printings (variants.js) ---
   // The odds and the value maths are covered headlessly. What only a browser answers: does a rare
   // printing actually LOOK different in the collection grid, and does the sort put it on top.

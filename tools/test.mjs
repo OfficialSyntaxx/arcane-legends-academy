@@ -16,6 +16,7 @@ import * as ZQ from "../public/zonequests.js";
 import * as ACADEMY from "../public/academy.js";
 import * as LSN from "../public/lessons.js";
 import * as VAR from "../public/variants.js";
+import * as CX from "../public/codex.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -2272,6 +2273,129 @@ check("the collection sort floats the best printing to the top", (()=>{
 })());
 check("a printing has a badge so it is visible without reading a tooltip", (()=>{
   return VAR.VARIANTS.filter(v => v.id !== "normal").every(v => VAR.badgesFor({ variant:v.id }).length === 1);
+})());
+
+
+// ---- the codex: filters, completion, favourites, achievements (BACKLOG §5) ----
+// The collection screen answers "what do I own". Only the codex can answer "what am I missing",
+// which is the question a collection game exists to keep asking — and it can only do that by
+// filtering the CATALOG rather than the collection.
+check("the codex tables validate against the real catalog", (()=>{
+  const problems = CX.validateCodex(CARDS);
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("every achievement is reachable with the best possible collection", (()=>{
+  // The probe must contain one of EVERY printing. An earlier version made every card prismatic,
+  // and the foil and holo achievements reported as unreachable — the validator was right and the
+  // sample was wrong.
+  const printings = VAR.VARIANTS.map(v => v.id);
+  const everything = CARDS.map((d, i) => ({ id:d.id, roll:100, graded:true, serial:1,
+                                            variant:printings[i % printings.length], fe:true }));
+  return CX.achievementsFor(CARDS, everything).every(a => a.done);
+})());
+check("a fresh save has earned nothing yet", (()=>{
+  const s = G.newGame();
+  return CX.achievementCount(CARDS, s.cards).done === 0;
+})());
+check("completion counts card TYPES, not copies", (()=>{
+  const s = G.newGame();
+  const before = CX.overallCompletion(CARDS, s.cards).owned;
+  G.mintCard(s, s.cards[0].id, 50);          // a duplicate of something already owned
+  return CX.overallCompletion(CARDS, s.cards).owned === before;
+})());
+check("per-school completion adds up to the whole catalog", (()=>{
+  const s = G.newGame();
+  const by = CX.completionBy(CARDS, s.cards, d => d.school);
+  const total = Object.values(by).reduce((a, g) => a + g.total, 0);
+  const owned = Object.values(by).reduce((a, g) => a + g.owned, 0);
+  const all = CX.overallCompletion(CARDS, s.cards);
+  return total === CARDS.length && owned === all.owned;
+})());
+// --- browse ---
+check("owned and missing partition the catalog", (()=>{
+  const s = G.newGame();
+  const owned = CX.browse(CARDS, s, { filter:"owned" }).length;
+  const missing = CX.browse(CARDS, s, { filter:"missing" }).length;
+  return owned + missing === CARDS.length && owned > 0 && missing > 0;
+})());
+check("the missing filter really lists cards the player does not have", (()=>{
+  const s = G.newGame();
+  const have = new Set(s.cards.map(c => c.id));
+  return CX.browse(CARDS, s, { filter:"missing" }).every(r => !have.has(r.def.id));
+})());
+check("a school filter only returns that school", (()=>{
+  const s = G.newGame();
+  return CX.browse(CARDS, s, { school:"fire" }).every(r => r.def.school === "fire");
+})());
+check("search matches names and card text", (()=>{
+  const s = G.newGame();
+  const byName = CX.browse(CARDS, s, { query:"dragon" });
+  return byName.length > 0 && byName.every(r => /dragon/i.test(r.def.name + " " + (r.def.text||"")));
+})());
+check("every sort returns the whole set in a stable order", (()=>{
+  const s = G.newGame();
+  for (const o of CX.SORTS){
+    const a = CX.browse(CARDS, s, { sort:o.id }).map(r => r.def.id);
+    const b = CX.browse(CARDS, s, { sort:o.id }).map(r => r.def.id);
+    if (a.length !== CARDS.length) { console.log(`   ${o.id} returned ${a.length}`); return false; }
+    if (a.join() !== b.join()){ console.log(`   ${o.id} is not stable`); return false; }
+  }
+  return true;
+})());
+check("sorting by best copy puts a prismatic ahead of a plain card", (()=>{
+  const s = G.newGame();
+  const target = s.cards[0].id;
+  G.mintCard(s, target, 50, { variant:"prism" });
+  const rows = CX.browse(CARDS, s, { sort:"value", desc:true });
+  return rows[0].def.id === target;
+})());
+check("the special filter finds a printing or a first edition and nothing else", (()=>{
+  const s = G.newGame();
+  for (const c of s.cards){ c.variant = "normal"; delete c.fe; }
+  if (CX.browse(CARDS, s, { filter:"printed" }).length !== 0) return false;
+  s.cards[0].variant = "holo";
+  const rows = CX.browse(CARDS, s, { filter:"printed" });
+  return rows.length === 1 && rows[0].def.id === s.cards[0].id;
+})());
+// --- favourites: the one stored bit ---
+check("favouriting a card stores it and toggles back off", (()=>{
+  const s = G.newGame();
+  const id = CARDS[0].id;
+  CX.toggleFavorite(s, id);
+  const on = CX.isFavorite(s, id);
+  CX.toggleFavorite(s, id);
+  return on && !CX.isFavorite(s, id) && s.favorites.length === 0;
+})());
+check("the favourites filter returns exactly what was favourited", (()=>{
+  const s = G.newGame();
+  CX.toggleFavorite(s, CARDS[3].id);
+  const rows = CX.browse(CARDS, s, { filter:"favorite" });
+  return rows.length === 1 && rows[0].def.id === CARDS[3].id;
+})());
+check("a save that predates favourites migrates cleanly", (()=>{
+  const old = G.newGame(); delete old.favorites;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  return Array.isArray(s.favorites) && CX.browse(CARDS, s, { filter:"favorite" }).length === 0;
+})());
+// --- the derived rule, which is the whole reason achievements are not stored ---
+check("selling the cards un-earns the achievement they propped up", (()=>{
+  const s = G.newGame();
+  for (const d of CARDS) if (!s.cards.some(c => c.id === d.id)) G.mintCard(s, d.id, 50);
+  const full = CX.achievementsFor(CARDS, s.cards).find(a => a.id === "archivist");
+  if (!full.done) return false;
+  s.cards = s.cards.slice(0, 3);                       // sold almost everything
+  return CX.achievementsFor(CARDS, s.cards).find(a => a.id === "archivist").done === false;
+})());
+check("nothing about completion or achievements is written to the save", (()=>{
+  const s = G.newGame();
+  const before = JSON.stringify(s);
+  CX.overallCompletion(CARDS, s.cards);
+  CX.completionBy(CARDS, s.cards, d => d.school);
+  CX.achievementsFor(CARDS, s.cards);
+  CX.browse(CARDS, s, { filter:"missing", sort:"rarity" });
+  return JSON.stringify(s) === before;
 })());
 
 

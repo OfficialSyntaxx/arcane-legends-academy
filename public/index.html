@@ -358,6 +358,7 @@ import * as REP from "./reputation.js";
 import * as ACADEMY from "./academy.js";
 import * as LSN from "./lessons.js";
 import * as VAR from "./variants.js";
+import * as CX from "./codex.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -1126,7 +1127,8 @@ function renderCollection(el){
   let h = `<h2>${STR.collection_title}</h2><p class="sub">${S.cards.length} cards · value ${G.totalCollectionValue(S)}g · pack ${G.PACK_COST}g</p>`;
   h += `<div class="row" style="margin-bottom:10px">
     <button class="btn gold" onclick="window.__ev('pack')">🃏 Open Pack (${G.PACK_COST}g)</button>
-    <button class="btn" onclick="window.__ev('toLoadout')">🗡️ ${STR.nav_loadout}</button></div>`;
+    <button class="btn" onclick="window.__ev('toLoadout')">🗡️ ${STR.nav_loadout}</button>
+    <button class="btn" onclick="window.__ev('openCodex')">📖 Codex</button></div>`;
   // Printings tally, so a collection is something to look at and not just a pile. Derived from
   // the cards every render — nothing about it is stored.
   const tally = VAR.tallyFor(S.cards);
@@ -1157,6 +1159,90 @@ function renderCollection(el){
   h += `</div></div>`;
   el.innerHTML = h;
 }
+
+// ================= CODEX (codex.js) =================
+// The collection screen shows what you OWN. The Codex shows the whole catalog, so the question a
+// collection game exists to keep asking — *what am I missing?* — is answerable at all. Filters
+// live here rather than on the collection grid for the same reason: you cannot filter a list of
+// owned cards for the ones you do not own.
+let codexView = { filter:"all", sort:"school", school:"", query:"" };
+function buildCodex(){
+  const comp = CX.overallCompletion(CARDS, S.cards);
+  const bySchool = CX.completionBy(CARDS, S.cards, d => d.school);
+  const ach = CX.achievementsFor(CARDS, S.cards);
+  const achDone = ach.filter(a => a.done).length;
+
+  let h = `<p class="sub">${comp.owned}/${comp.total} cards discovered · ${achDone}/${ach.length} achievements</p>
+    <div class="pbar" style="margin-bottom:10px"><div style="width:${comp.pct}%"></div></div>`;
+
+  // per-school completion
+  h += `<div class="row" style="flex-wrap:wrap;margin-bottom:10px">`;
+  for (const [id, g] of Object.entries(bySchool)){
+    const sc = SCHOOLS[id];
+    h += `<div class="kpi" style="min-width:96px"><div class="lv" style="font-size:15px;color:${sc.color}">${SCHOOL_ICON[id]} ${g.owned}/${g.total}</div>
+      <div class="nm">${sc.name}</div><div class="pbar" style="margin-top:4px"><div style="width:${g.pct}%"></div></div></div>`;
+  }
+  h += `</div>`;
+
+  // controls
+  h += `<div class="row" style="flex-wrap:wrap;gap:5px;margin-bottom:6px">` +
+    CX.FILTERS.map(f => `<button class="btn sm ${codexView.filter===f.id?"gold":""}" onclick="window.__ev('cxFilter|${f.id}')">${f.label}</button>`).join("") +
+    `</div>`;
+  h += `<div class="row" style="flex-wrap:wrap;gap:5px;margin-bottom:6px"><span class="sub" style="align-self:center">Sort</span>` +
+    CX.SORTS.map(o => `<button class="btn sm ${codexView.sort===o.id?"gold":""}" onclick="window.__ev('cxSort|${o.id}')">${o.label}</button>`).join("") +
+    `</div>`;
+  h += `<div class="row" style="flex-wrap:wrap;gap:5px;margin-bottom:6px">
+    <button class="btn sm ${codexView.school===""?"gold":""}" onclick="window.__ev('cxSchool|')">All schools</button>` +
+    Object.keys(SCHOOLS).map(id => `<button class="btn sm ${codexView.school===id?"gold":""}" onclick="window.__ev('cxSchool|${id}')">${SCHOOL_ICON[id]}</button>`).join("") +
+    `<input id="cxQ" type="text" placeholder="Search…" value="${escapeAttr(codexView.query)}" oninput="window.__ev('cxQuery')"
+      style="flex:1;min-width:120px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:#12101c;color:var(--ink)"></div>`;
+
+  const rows = CX.browse(CARDS, S, codexView);
+  h += `<p class="sub">${rows.length} card${rows.length===1?"":"s"}</p><div class="row">`;
+  for (const r of rows){
+    // An unowned card is shown as a silhouette rather than hidden: a codex that hides what you
+    // are missing cannot tell you what to chase.
+    const face = cardFace(r.def, { inst: r.owned ? { variant:r.owned.bestVariant, fe:r.owned.fe } : null,
+                                   grade: r.owned && r.owned.graded ? r.owned.bestRoll : null });
+    h += `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;${r.owned?"":"opacity:.34;filter:grayscale(1)"}">
+      ${face}
+      <div class="row" style="gap:4px;align-items:center">
+        <button class="btn sm ${r.favorite?"gold":""}" title="Favourite" onclick="window.__ev('cxFav|${r.def.id}')">${r.favorite?"★":"☆"}</button>
+        <span class="sub" style="font-size:11px">${r.owned ? `×${r.owned.count}` : "not owned"}</span>
+      </div></div>`;
+  }
+  h += `</div>`;
+
+  // achievements
+  h += `<div class="panel" style="margin-top:14px"><h3>🏅 Collection Achievements</h3><div class="row" style="flex-wrap:wrap">`;
+  for (const a of ach){
+    h += `<div class="kpi" style="min-width:150px;${a.done?"":"opacity:.6"}">
+      <div class="lv" style="font-size:18px">${a.icon} ${a.done?"✔":""}</div>
+      <div class="nm">${a.name}</div>
+      <div style="font-size:10px;color:var(--muted)">${a.desc}</div>
+      ${a.done?"":`<div class="pbar" style="margin-top:4px"><div style="width:${a.pct}%"></div></div>
+      <div style="font-size:10px;color:var(--muted)">${a.have}/${a.need}</div>`}</div>`;
+  }
+  h += `</div></div>`;
+  return h;
+}
+function refreshCodex(){
+  if ($("overlay").style.display === "block") showOverlay("📖 Card Codex", buildCodex());
+}
+window.__EV.openCodex = ()=>{ showOverlay("📖 Card Codex", buildCodex()); };
+window.__EV.cxFilter = (id)=>{ codexView.filter = id; refreshCodex(); };
+window.__EV.cxSort   = (id)=>{ codexView.sort = id; refreshCodex(); };
+window.__EV.cxSchool = (id)=>{ codexView.school = id || ""; refreshCodex(); };
+window.__EV.cxQuery  = ()=>{
+  // Re-render on every keystroke would blow away focus in the search box, so the query is read
+  // and the grid rebuilt with the caret restored — the same problem the name field on the
+  // creation screen has, solved the other way because here the whole list must change.
+  const el = $("cxQ"); const pos = el.selectionStart;
+  codexView.query = el.value;
+  refreshCodex();
+  const again = $("cxQ"); if (again){ again.focus(); again.setSelectionRange(pos, pos); }
+};
+window.__EV.cxFav = (id)=>{ CX.toggleFavorite(S, id); save(); refreshCodex(); render(); };
 window.__EV.pack = ()=>{ const r=G.openPack(S); if(!r.ok){ err("Not enough gold"); return; } sfx(600,.2); toast("✨ Pack opened!"); render(); };
 window.__EV.grade = (uid)=>{ const c=G.cardInstance(S,uid); if(!c||c.graded) return; const fee=gradeFee(c.id); const r=G.gradeCard(S,uid); r.ok?toast(`${r.grade.icon} ${r.grade.name}!`):err(`Need ${fee}g to grade`); render(); };
 window.__EV.regrade = (uid)=>{ const r=G.regradeCard(S,uid); if(!r.ok){ err("Not enough gold"); return; } toast(`Regraded: ${r.old.icon} ${r.old.name} → ${r.grade.icon} ${r.grade.name}!`); sfx(500,.1); render(); };

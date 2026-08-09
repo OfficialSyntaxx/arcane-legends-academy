@@ -6,6 +6,7 @@
 > - **`docs/ASSET-BUDGET.md`** — asset platform costs, CC0 sources, licensing.
 > - **`docs/NEXT-PHASE-PLAN.md`** — the systems audit and phase tracker (Phases A–D).
 > - **`BLENDERTODO.md`** — modelling briefs for every asset still drawn as a procedural primitive.
+> - **`CHANGELOG.md`** — what shipped when, newest first, with per-entry test counts.
 >
 > **Status markers below:** `[x]` done, `[~]` partly done. Items were re-checked against the
 > codebase on merge, since several were already complete.
@@ -119,10 +120,16 @@
 - [x] First editions — ① ×1.6 on the first copy of each type the player obtains, multiplying with
   the printing. Existing saves are grandfathered one per type owned, once.
 - [x] Serialized cards — grades 9–10 mint slabs with unique serials
-- [ ] Card lore / encyclopedia
-- [ ] Collection achievements
-- [ ] Better collection filters
-- [ ] Favorite cards
+- [x] Card lore / encyclopedia — `codex.js`: the whole catalog browsable, with unowned cards shown
+  as greyed silhouettes so it can answer "what am I missing" (the collection grid never could —
+  you cannot filter owned cards for the ones you do not own)
+- [x] Collection achievements — nine, all **derived** from the collection: sell the cards and the
+  achievement un-earns itself. `validateCodex` proves each one is reachable against a synthetic
+  best-possible collection.
+- [x] Better collection filters — All / Owned / Missing / Favourites / Special / Graded, plus a
+  school filter, a text search over names and card text, and five sorts (school, rarity, cost,
+  best copy, name) each tie-breaking on name so the grid is stable between renders
+- [x] Favorite cards — the one stored bit of the codex; everything else about a collection is derived
 - [ ] Card backs
 - [ ] Booster opening animations
 - [ ] Deck archetypes
@@ -175,7 +182,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 360 engine / 34 online / 113 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 377 engine / 34 online / 120 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -237,7 +244,8 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **card printings + first editions** (`variants.js`, and
+**Changes made, most recent first:** **the Codex** (`codex.js` — catalog browser, filters,
+completion, achievements) and **`CHANGELOG.md`** → **card printings + first editions** (`variants.js`, and
 `mintCard()` consolidating five copies of the card-instance literal) → **Academy class content** (`lessons.js` — 21 classes, four
 techniques hooked into real systems) → **visible equipment on the 3D character** (`equipment3d.js`)
 → **character creation + per-school appearance**
@@ -259,7 +267,14 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **card printings are done** — foil/holo/prismatic and first editions
+**Next step:** **the Codex is done** — the catalog is browsable with filters, search, per-school
+completion, favourites and nine derived achievements (`CLAUDEREADME.md` §6.13). **`CHANGELOG.md`**
+is new, backfilled from the full git history. §5 collection depth now has only card evolution,
+deck archetypes and a deck-testing lab left; the largest untouched area in this file is **§8, the
+social layer** (PvP ranking, seasons, leaderboards, guilds), followed by §4 combat depth (enemy
+archetypes, multi-phase bosses, school mechanics) and §6 crafting/economy.
+
+Before that, **card printings were done** — foil/holo/prismatic and first editions
 (`CLAUDEREADME.md` §6.12), which closes the "foil" third of design pillar 3 that had never been
 built. Collection depth continues with card evolution, an encyclopedia, achievements and filters
 (§5 below); the other large untouched area is the social layer (§8).
