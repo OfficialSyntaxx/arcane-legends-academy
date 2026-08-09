@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### Booster pack opening animations — *pending*
+### Booster pack opening animations — `43dcd7b`
 - Opening a pack was a gold cost and a toast — the five cards it minted appeared in the collection
   with no moment to see what landed. Now a CSS 3D flip-card reveal, reused into the app's existing
   generic `#overlay`/`showOverlay()` modal (the same one the Codex opens into) rather than a
