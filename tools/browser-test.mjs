@@ -661,6 +661,39 @@ if (hasWorld){
         `${vfx.slowExpiry} survived a low frame rate`);
 }
 
+// ---------------- deck testing laboratory (BACKLOG §5) ----------------
+// Drives the PvP screen's Lab panel for real: press an archetype button, confirm the resulting
+// duel is tagged isLab and fights a thematic 20-card deck, then force a win and confirm NOTHING
+// about the save moved — no gold, no card drop, no PvP win counted, no rank change. A lab that
+// pays out is a farm, not a lab.
+{
+  const lab = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    window.__ev("toPvp");
+    await settle(300);
+    const before = { gold: window.__testSave().gold, wins: window.__testSave().pvp.wins, rank: window.__testSave().pvp.rankPoints, cards: window.__testSave().cards.length };
+    window.__ev("labDuel|aggro");
+    await settle(400);
+    const b = window.__testBattle();
+    const out = { started: !!b, isLab: b && b.isLab, deckLen: b && (b.enemy.deck.length + b.enemy.hand.length) };
+    if (b) b.enemy.hp = 0;                       // declare victory without playing it out
+    window.__ev("duelAgain");
+    await settle(300);
+    const s = window.__testSave();
+    out.after = { gold: s.gold, wins: s.pvp.wins, rank: s.pvp.rankPoints, cards: s.cards.length };
+    out.before = before;
+    out.screen = document.getElementById("screen").innerText;
+    return out;
+  });
+  check("pressing a Lab archetype starts a duel tagged isLab", lab.started && lab.isLab === true);
+  check("the Lab opponent plays a full 20-card thematic deck", lab.deckLen === 20, String(lab.deckLen));
+  check("a Lab win pays out no gold, no cards, no PvP record, no rank change", (()=>{
+    const b = lab.before, a = lab.after;
+    return a.gold === b.gold && a.cards === b.cards && a.wins === b.wins && a.rank === b.rank;
+  })(), `${JSON.stringify(lab.before)} -> ${JSON.stringify(lab.after)}`);
+  check("a Lab duel returns to the PvP screen afterward", lab.screen.includes("Deck Testing Laboratory"));
+}
+
 // ---------------- school ultimates (BACKLOG §4, schoolmagic.js) ----------------
 // Drives the real duel UI, not just the pure module: charge the meter, confirm the button turns
 // on, click it through the real event handler, and confirm the effect and the "(used)" state both

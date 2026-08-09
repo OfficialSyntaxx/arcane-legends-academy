@@ -232,6 +232,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **AI archetypes & multi-phase bosses** (`archetypes.js`) — five battle personalities, thematic per-monster decks, and boss HP escalations. See §6.14.
 - **PvP ranking & seasons** (`pvprank.js`) — seven tiers, streak-bonus match results, monthly UTC seasons with a soft reset and a personal history. See §6.16.
 - **School mechanics & ultimates** (`schoolmagic.js`) — a same-school spell bonus and a once-per-duel ultimate per school, both flowing through a new reusable `FX_HANDLERS` effect dispatch table. See §6.18.
+- **Deck Testing Laboratory** (`index.html`) — play your current deck against any AI personality with zero rewards and zero record kept. See §6.20.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -511,7 +512,23 @@ mechanic, an ultimate — would just be one more branch bolted onto.
   already fully recomputed from `startDuel` every time, the same reason nothing else about a duel
   in progress is persisted.
 
-### 6.19 Retention
+### 6.20 Deck Testing Laboratory (`index.html`, no new module)
+A deck's shape is a real question a player should be able to answer — does it fold to Aggro's
+early curve, does it out-grind Control — and the only honest way to answer it is to actually play
+it against one. The PvP screen's Lab panel does exactly that: pick one of the five AI personalities
+(`archetypes.js`), and `window.__EV.labDuel` builds a real 20-card thematic deck for it
+(`ARCH.archetypeDeckFor`, the same builder dungeon monsters use) from a school that is not the
+player's own — the interesting matchup is against someone else's magic, not a mirror of your own
+affinity bonus — and starts a duel via the existing `startLocalDuel(..., { archetype, school, hp })`
+path dungeons already use.
+
+**Pays out nothing.** `battle.isLab` is checked first thing in `duelAgain`: no gold, no card drop,
+no PvP win/loss counted, no rank change — a lab that pays out is a farm wearing a lab coat, and it
+would also quietly poison PvP ranking's win-streak/season-floor maths with matches that were never
+really contested. No new pure module was needed — everything the Lab needs (thematic decks, the
+duel engine, the archetype table) already existed; this is pure wiring in `index.html`.
+
+### 6.21 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -630,7 +647,27 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: school mechanics and ultimates** (§6.18) — the last three unstarted items in §4 PvE
+**Last landed: the Deck Testing Laboratory** (§6.20) and a look at what §8 actually needs before
+touching it further. The Lab is a PvP-screen panel: play your current deck against any of the five
+AI personalities, fighting a real thematic 20-card deck built the same way a dungeon monster's is —
+and it pays out **nothing**, no gold, no cards, no PvP record, no rank change, because a lab that
+pays out is a farm wearing a lab coat (and would quietly poison PvP ranking's streak/season-floor
+maths with matches that were never really contested). No new pure module — everything the Lab
+needs already existed; this is wiring in `index.html` plus one `duelAgain` early-out.
+
+**Checked §8 before building more of it, and stopped**: Multiplayer Academy, player presence, and
+guilds all need a persistent, always-on server tracking state for every connected player — this
+project's only server-side code, `logic.js`, is explicitly a *stateless per-room referee* per
+online duel (§3), holding nothing once a match ends and knowing nothing about anyone not in that
+match. That's not a gap a client-side module can close honestly; it's the same category of problem
+the PvP-ranking work already refused to fake for a leaderboard, one level up. `BACKLOG.md` now says
+so directly against each blocked item rather than leaving them looking merely unstarted. Steered
+instead to **§5 Cards & Collection**, which had a real, fully client-side gap: **Deck Testing
+Laboratory**.
+
+Tests: **443 engine / 34 online-rules / 131 browser / 8 viewports / model-check clean.**
+
+**Before that: school mechanics and ultimates** (§6.18) — the last three unstarted items in §4 PvE
 & Combat, closed together because they depend on each other. The combat effect pipeline
 (`applyFx`) was a hand-grown if/else chain; it became `FX_HANDLERS`, a dispatch table, **first** —
 that is what made the other two cheap to add rather than two more special cases. `schoolmagic.js`
@@ -644,8 +681,6 @@ since a free finisher isn't a targeting choice.
 
 §4 PvE & Combat is now fully checked off except the two `[~]` partial items (boss abilities beyond
 HP-phase escalation, and locked-door dungeon gating) — everything else in that section shipped.
-The largest untouched area in the backlog moves to **§8, the social layer** beyond PvP
-ranking/seasons (leaderboards deliberately excluded, multiplayer Academy, presence, guilds).
 
 Tests: **443 engine / 34 online-rules / 127 browser / 8 viewports / model-check clean.**
 

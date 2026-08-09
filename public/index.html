@@ -1443,8 +1443,20 @@ function renderPvp(el){
     }
     h += `</div></div>`;
   }
+  // Deck Testing Laboratory (BACKLOG §5): a deck's shape is a real question — does it fold to
+  // Aggro's early curve, does it out-grind Control — and the only honest way to answer it is to
+  // actually play it against one. No rewards and no record kept; see window.__EV.duelAgain's
+  // `isLab` branch for why.
+  h += `<div class="panel"><h3>🧪 Deck Testing Laboratory</h3>
+    <p class="sub">Play your current deck against a chosen AI personality. No gold, no cards, no PvP record — just reps.</p>
+    <div class="row" style="flex-wrap:wrap;gap:6px">`;
+  for (const id of ARCH.ARCHETYPE_IDS){
+    h += `<button class="btn" onclick="window.__ev('labDuel|${id}')">${LAB_ICON[id]||"⚔️"} ${ARCH.ARCHETYPES[id].name}</button>`;
+  }
+  h += `</div></div>`;
   el.innerHTML = h;
 }
+const LAB_ICON = { midrange:"⚔️", aggro:"🔥", control:"🛡️", tempo:"⚡", boss:"👑" };
 function randomAiDeck(){
   // build a 30-card deck from random cards
   const pool = [];
@@ -1463,6 +1475,21 @@ window.__EV.localPvp = ()=>{
   startLocalDuel(randomAiDeck(), gear, "AI Wizard", -1, false, { archetype });
 };
 window.__EV.online = ()=>{ setupOnline(); };
+window.__EV.labDuel = (archetype)=>{
+  // A representative opponent for the chosen personality: a thematic deck (archetypeDeckFor
+  // already builds one from a school's card pool for dungeon monsters), a fixed mid-tier HP/gear
+  // so the result reflects the DECK, not a random gear roll, and a school picked round-robin from
+  // the schools that AREN'T the player's own — the interesting matchup is against someone else's
+  // magic, not a mirror of your own affinity bonus.
+  const schools = Object.keys(SCHOOLS).filter(s => s !== S.school);
+  const school = schools[Math.floor(Math.random()*schools.length)] || "balance";
+  const pool = CARDS.filter(c => c.school === school);
+  const deck = ARCH.archetypeDeckFor(archetype, pool.length ? pool : CARDS);
+  const gearTier = 2;
+  const gear = { hp: gearTier*5, atk: gearTier, def: Math.floor(gearTier/2), pip: 0 };
+  startLocalDuel(deck, gear, `Lab: ${ARCH.ARCHETYPES[archetype].name}`, -1, false, { archetype, school, hp: 100 });
+  battle.isLab = true;
+};
 
 // ================= LOCAL DUEL =================
 // Sync the 3D duel arena to the battle board (summon/remove creatures as played).
@@ -1668,6 +1695,18 @@ window.__EV.useUltimate = ()=>{
 window.__EV.endTurn = ()=>{ const r=G.endTurn(battle); render(); };
 window.__EV.duelAgain = ()=>{
   const over = G.isOver(battle);
+  // Deck Testing Laboratory (BACKLOG §5): a lab duel exists to answer "does this deck work against
+  // an Aggro/Control/Tempo/Boss opponent", not to be farmed — no gold, no cards, no PvP record, no
+  // rank change. It is the one duel outcome that changes nothing about the save except the log.
+  if (battle && battle.isLab){
+    over.winner==="you" ? winSfx() : loseSfx();
+    toast(over.draw ? "Draw." : over.winner==="you" ? "Lab win — no rewards, just reps." : "Lab loss — no penalty, try another build.");
+    clearInterval(duelTimerInt);
+    battle=null; pendingTarget=null;
+    screen = "pvp";
+    render();
+    return;
+  }
   const isQuest = battle && battle.isQuest;
   const qIdx = battle && battle.questIdx;
   const gear = G.equipStats(S);
@@ -2239,6 +2278,7 @@ window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
 // Test hooks for tools/browser-test.mjs. They drive the REAL functions rather than reimplementing
 // them, so the test cannot pass against a path the game does not actually use.
 window.__testBattle = ()=> battle;
+window.__testSave = ()=> S;
 window.__testAiTurn = ()=>{ if (battle) G.aiTurn(battle); };
 // Leave the duel screen cleanly without going through a real win/loss, for tests that only need
 // to inspect the battle object mid-fight rather than play it out.

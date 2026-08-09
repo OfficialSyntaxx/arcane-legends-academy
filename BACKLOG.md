@@ -152,7 +152,9 @@
 - [ ] Card backs
 - [ ] Booster opening animations
 - [ ] Deck archetypes
-- [ ] Deck testing laboratory
+- [x] Deck testing laboratory — a PvP-screen panel: play your current deck against any of the five
+  AI personalities (`archetypes.js`), fighting a real thematic 20-card deck. Pays out nothing — no
+  gold, no cards, no PvP win/loss, no rank change — a lab that pays out is a farm, not a lab
 
 ## 6. Crafting & Economy
 
@@ -190,9 +192,19 @@
       persistent server (see CLAUDEREADME §3), so there is no data source for a cross-player
       leaderboard. §8's "PvP ranking" ships a *season history* instead — honestly labelled as the
       player's own past seasons, not a leaderboard with only one row.
-- [ ] Multiplayer Academy
-- [ ] Player presence
-- [ ] Guild creation
+- [ ] Multiplayer Academy — **blocked on infrastructure this repo does not have**, not on design.
+      "Other players walking around the same campus" needs a persistent, always-on server tracking
+      live position for every connected player; this project's only server-side code is
+      `logic.js`, which is explicitly a *stateless per-room referee* instantiated per online duel
+      (§3) — it holds no state once a match ends and knows nothing about anyone not in that match.
+      Building this honestly, rather than faking it the way a single-player "leaderboard" would
+      have been faked, means standing up real always-on server infrastructure first — out of scope
+      for a client-only web build. Left unchecked rather than half-built.
+- [ ] Player presence — same blocker as Multiplayer Academy; presence IS the always-on server.
+- [ ] Guild creation — same blocker: a guild is shared, persistent, multi-player state (roster,
+      storage, standing) with no single owning client, which is exactly what this project has no
+      server for. Guild halls/quests/storage/wars below inherit the same blocker and are not
+      listed as separate problems.
 - [ ] Guild halls
 - [ ] Guild quests
 - [ ] Guild storage
@@ -206,7 +218,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 443 engine / 34 online / 127 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 443 engine / 34 online / 131 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -268,7 +280,12 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **school mechanics + ultimates** (`schoolmagic.js`, plus a
+**Changes made, most recent first:** **the Deck Testing Laboratory** (a PvP-screen panel to play
+your current deck against any AI personality for zero reward and zero record — see §5) → **§8
+audited before building more of it**: Multiplayer Academy/presence/guilds all need an always-on
+server this project's client-only architecture does not have (`logic.js` is a stateless per-room
+referee, not a database), so they are now marked blocked-on-infrastructure in `BACKLOG.md` rather
+than merely unstarted, and effort moved to the fully client-side gap in §5 instead → **school mechanics + ultimates** (`schoolmagic.js`, plus a
 `game.js` refactor of the combat effect pipeline into a reusable `FX_HANDLERS` dispatch table that
 the new same-school spell bonus and once-per-duel school ultimates both flow through) →
 **PvP ranking + seasons** (`pvprank.js` — seven tiers, streak
@@ -297,7 +314,22 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **School mechanics and ultimates are done** (`schoolmagic.js`) — the last three
+**Next step:** **The Deck Testing Laboratory is done** — a PvP-screen panel to play your current
+deck against any of the five AI personalities, fighting a real thematic 20-card deck, for zero
+reward and zero record (no gold, no cards, no PvP win/loss, no rank change — a lab that pays out is
+a farm wearing a lab coat, and would have quietly poisoned PvP ranking's streak/season-floor maths
+besides). No new pure module needed; everything it uses already existed.
+
+Before building it, **§8 Multiplayer & Social was audited rather than pushed on**: Multiplayer
+Academy, player presence, and every guild feature all need a persistent, always-on server tracking
+state for every connected player. This project's only server-side code, `logic.js`, is explicitly
+a *stateless per-room referee* per online duel (CLAUDEREADME §3) — it holds nothing once a match
+ends and knows nothing about anyone outside that match. That is not a design gap a client-side
+module can close honestly, the same category of problem the PvP-ranking work already refused to
+fake for a cross-player leaderboard, one level up. `BACKLOG.md`'s §8 now says so directly against
+each blocked item. Effort moved instead to §5's fully client-side gap, the Lab, above.
+
+Before that: **School mechanics and ultimates** (`schoolmagic.js`) — the last three
 open items in §4 PvE & Combat, closed together since a reusable effect pipeline is what made the
 other two cheap. `game.js`'s `applyFx` if/else chain became `FX_HANDLERS`, a `{kind: fn}` dispatch
 table every card fx, the new affinity bonus, and the new ultimates all flow through — adding an
