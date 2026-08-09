@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### Debug dashboard — *pending*
+### Debug dashboard — `ce39fae`
 - **`public/debug.html`**: a separate page — never in-game UI, never on the gameplay hot path —
   that reads this browser's own save (via `G.load()`, the same migration/settlement path the game
   itself takes) and runs **every `validateX()` in the codebase live**, plus save/collection/PvP/
