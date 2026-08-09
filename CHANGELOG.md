@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### Card backs — *pending*
+### Card backs — `918c9f0`
 - **`cardbacks.js`**: 9 procedural CSS-gradient backs, unlocked by the matching `codex.js`
   achievement — no new grind, the same collection effort now buys two rewards. `save.cardBack` is
   the one stored bit; which backs are UNLOCKED stays derived from achievements every time, the
