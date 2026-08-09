@@ -1379,6 +1379,54 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   await bctx.close();
 }
 
+// ---------------- enchanting (BACKLOG §6) ----------------
+// Drives the real Loadout picker: apply a rune through the real event handler, confirm the item's
+// stats actually change through equipStats (not just a label), confirm a second rune REPLACES
+// rather than stacks, and confirm a rune you can't afford is disabled in the real DOM, not just
+// silently rejected server-side.
+{
+  const ectx = await browser.newContext({ viewport:{width:420,height:900} });
+  const eerrs = [];
+  const epage = await ectx.newPage();
+  epage.on("pageerror", e => eerrs.push(String(e)));
+  await epage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await epage.waitForTimeout(900);
+  const ench = await epage.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const s = window.__testSave();
+    s.gold = 2000; s.inventory.bar_bronze = 3; s.inventory.bar_silver = 3;
+    s.equipment.push({ uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 });
+    // High enough to try whet_2 (needs Lv20) below, but NOT whet_3 (needs Lv45) — that gap is
+    // what "a rune above the current level shows disabled" actually tests.
+    s.skills.enchanting = 25;
+    window.__ev("toLoadout");
+    await settle(300);
+    const atkBefore = window.__testEquipStats().atk;   // 0: nothing equipped yet
+    window.__ev("equip|eq1");
+    const atkEquipped = window.__testEquipStats().atk;
+    window.__ev("openEnchant|eq1");
+    await settle(200);
+    // the level-45 runes must show disabled — this save starts at Enchanting level 1
+    const lockedDisabled = [...document.querySelectorAll(".panel button")]
+      .some(b => b.closest(".panel").textContent.includes("Lv45") && b.disabled);
+    window.__ev("doEnchant|eq1|whet_1");
+    await settle(200);
+    const atkAfterFirst = window.__testEquipStats().atk;
+    const barAfterFirst = s.inventory.bar_bronze;
+    window.__ev("doEnchant|eq1|whet_2");
+    await settle(200);
+    const atkAfterSecond = window.__testEquipStats().atk;
+    const enchantOnItem = s.equipment.find(e => e.uid === "eq1").enchant;
+    return { atkBefore, atkEquipped, lockedDisabled, atkAfterFirst, barAfterFirst, atkAfterSecond, enchantOnItem };
+  });
+  check("no uncaught page errors while enchanting", eerrs.length === 0, eerrs.slice(0,3).join(" | "));
+  check("equipping a wand raises attack before any enchant", ench.atkEquipped > ench.atkBefore);
+  check("a rune above the current Enchanting level shows disabled in the real picker", ench.lockedDisabled === true);
+  check("applying an enchant raises attack further and consumes the bar", ench.atkAfterFirst === ench.atkEquipped + 1 && ench.barAfterFirst === 2);
+  check("re-enchanting REPLACES the bonus rather than stacking it", ench.atkAfterSecond === ench.atkEquipped + 2 && ench.enchantOnItem === "whet_2");
+  await ectx.close();
+}
+
 // ---------------- debug dashboard (public/debug.html) ----------------
 // A separate page from the game itself — plays a bit of the real game first (via the game's own
 // #app in dctx above would pollute state, so a fresh context) to give the dashboard a real save

@@ -362,7 +362,7 @@ body.has-touch .worldbtn{display:flex;}
 <script type="module">
 import { STR } from "./strings.js";
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
-import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS } from "./items.js";
+import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats } from "./items.js";
 import * as G from "./game.js";
 import { createWorld } from "./world.js";
 import { createAudio, SFX } from "./audio.js";
@@ -1380,11 +1380,17 @@ function renderLoadout(el){
   for (const e of S.equipment){
     const def = equipmentFor(e.metal, e.slot);
     const equipped = Object.values(S.loadout).includes(e.uid);
+    // Enchanting (BACKLOG §6): a per-item bonus layered on top of the metal×slot base stats,
+    // shown as its own line so it never reads as part of the item's own printed value.
+    const enchLine = e.enchant && ENCHANT_MAP[e.enchant]
+      ? `<div class="sub" style="color:var(--gold)">🔮 ${ENCHANT_MAP[e.enchant].name} (+${ENCHANT_MAP[e.enchant].n} ${ENCHANT_MAP[e.enchant].stat.toUpperCase()})</div>` : "";
     h += `<div class="panel" style="flex:1;min-width:150px">
       <div style="font-weight:700">${def.icon} ${def.name} ${equipped?"<span style='color:var(--ok)'>✓</span>":""}</div>
       <div class="sub">${equipStatsLabel(def)}</div>
+      ${enchLine}
       <div class="row">
         <button class="btn sm ok" ${equipped?"disabled":""} onclick="window.__ev('equip|${e.uid}')">Equip</button>
+        <button class="btn sm" onclick="window.__ev('openEnchant|${e.uid}')">🔮 Enchant</button>
         <button class="btn sm danger" onclick="window.__ev('sellEq|${e.uid}')">Sell ${def.value}g</button>
       </div></div>`;
   }
@@ -1425,6 +1431,33 @@ function renderLoadout(el){
 window.__EV.equip = (uid)=>{ G.equip(S,uid); refreshGear(); render(); };
 window.__EV.unequip = (slot)=>{ G.unequip(S,slot); refreshGear(); render(); };
 window.__EV.sellEq = (uid)=>{ const r=G.sellEquipment(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; refreshGear(); render(); };
+// Enchanting (BACKLOG §6): a picker in the generic overlay, one row per rune. Reuses the same
+// "row shows what it costs, disables what you can't afford yet" shape the Skills tab's own
+// crafting rows already use, rather than inventing a second UI language for it.
+function buildEnchantPicker(uid){
+  const eq = S.equipment.find(x=>x.uid===uid); if (!eq) return `<p class="sub">Item not found.</p>`;
+  let h = `<p class="sub">One rune per item — applying a new one replaces the old, at full cost again.</p><div class="row" style="flex-wrap:wrap">`;
+  for (const en of ENCHANTS){
+    const can = G.canEnchant(S, en.id);
+    const active = eq.enchant === en.id;
+    const barId = Object.keys(en.req)[0];
+    const bar = BARS.find(b => b.id === barId);
+    h += `<div class="panel" style="flex:1;min-width:160px;${can||active?"":"opacity:.55"}">
+      <div style="font-weight:700">${en.name} ${active?`<span style="color:var(--ok)">✓</span>`:""}</div>
+      <div class="sub">+${en.n} ${en.stat.toUpperCase()} · Enchanting Lv${en.lvl}</div>
+      <div class="sub">${en.cost}g + 1 ${bar.icon} ${bar.name}</div>
+      <button class="btn sm ${active?"":"gold"}" ${(can && !active) ? "" : "disabled"} onclick="window.__ev('doEnchant|${uid}|${en.id}')">${active?"Equipped":"Apply"}</button>
+    </div>`;
+  }
+  h += `</div>`;
+  return h;
+}
+window.__EV.openEnchant = (uid)=>{ showOverlay("🔮 Enchant Item", buildEnchantPicker(uid)); };
+window.__EV.doEnchant = (uid, enchantId)=>{
+  const r = G.enchantItem(S, uid, enchantId);
+  if (r.ok){ save(); AUDIO.play("levelUp"); toast(`${r.enchant.name} applied!`); showOverlay("🔮 Enchant Item", buildEnchantPicker(uid)); render(); }
+  else err(r.err==="gold"?"Not enough gold":r.err==="level"?"Enchanting level too low":r.err==="resources"?"Missing materials":"Error");
+};
 window.__EV.deckAdd = (id)=>{ const r=G.addToDeck(S,id); if(!r.ok) err(r.err==="full"?"Deck full (20)":r.err==="max"?"Max 3 copies":r.err==="copies"?"You don't own that many":"Error"); render(); };
 window.__EV.deckRm = (id)=>{ G.removeFromDeck(S,id); render(); };
 window.__EV.autoBuild = (archetype)=>{
@@ -2457,6 +2490,7 @@ window.__testPrintings = ()=>{
 };
 // Forge and equip a full set at one metal tier, then re-derive the attachments. Uses the real
 // engine functions so the test cannot pass against a path the game does not take.
+window.__testEquipStats = ()=> G.equipStats(S);
 window.__testGear = (metal)=>{
   for (const slot of SLOTS){
     const def = equipmentFor(metal, slot.id);

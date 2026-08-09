@@ -1,6 +1,6 @@
 // Wizard TCG — engine (saved state, skills, economy, market, auctions, housing, duels, AI)
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, SCHOOL_BONUS, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
-import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS } from "./items.js";
+import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats } from "./items.js";
 import * as ACADEMY from "./academy.js";
 import * as LESSONS from "./lessons.js";
 import * as VAR from "./variants.js";
@@ -32,8 +32,8 @@ export function newGame(){
   }
   return {
     version:1, school:"balance", gold:START_GOLD, xp:0, level:1,
-    skills:{ mining:1, fishing:1, woodcutting:1, smithing:1, alchemy:1, scribing:1 },
-    skillXp:{ mining:0, fishing:0, woodcutting:0, smithing:0, alchemy:0, scribing:0 },
+    skills:{ mining:1, fishing:1, woodcutting:1, smithing:1, alchemy:1, scribing:1, enchanting:1 },
+    skillXp:{ mining:0, fishing:0, woodcutting:0, smithing:0, alchemy:0, scribing:0, enchanting:0 },
     inventory:{}, cards, equipment:[],
     loadout:{ wand:null, hat:null, robe:null, boots:null, amulet:null },
     deck,
@@ -84,6 +84,8 @@ function migrate(s){
   // v1 -> aligned: add scribing skill, slab fields, trim deck to 20-card format
   if (!s.skills.scribing) s.skills.scribing = 1;
   if (!s.skillXp.scribing) s.skillXp.scribing = 0;
+  if (!s.skills.enchanting) s.skills.enchanting = 1;
+  if (!s.skillXp.enchanting) s.skillXp.enchanting = 0;
   if (!s.stats.slabs) s.stats.slabs = 0;
   // Counters the onboarding chain asks about. They record an ACTION the save had no other record
   // of — a scribed card is indistinguishable from a starter one once it is in `cards`.
@@ -323,6 +325,13 @@ export function equipStats(s){
     const eq = s.equipment.find(e=>e.uid===uid); if (!eq) continue;
     const def = equipmentFor(eq.metal, eq.slot).stats;
     for (const k of Object.keys(def)) stats[k] += def[k];
+    // Enchanting (items.js ENCHANTS): a per-item bonus layered BEFORE the Armory multiplier below,
+    // so a home upgrade that boosts "gear stats" honestly boosts everything gear contributes,
+    // enchant included, rather than treating an enchant as something else.
+    if (eq.enchant){
+      const bonus = enchantStats(eq.enchant);
+      for (const k of Object.keys(bonus)) stats[k] += bonus[k];
+    }
   }
   const armory = s.home.owned ? s.home.upgrades.armory : 0;
   if (armory) for (const k of ["atk","def","hp"]) stats[k] = Math.round(stats[k] * (1 + armory*0.05));
@@ -333,6 +342,25 @@ export function equip(s, uidE){
   s.loadout[eq.slot] = uidE; return {ok:true};
 }
 export function unequip(s, slot){ s.loadout[slot] = null; return {ok:true}; }
+// Enchanting: apply one of items.js's ENCHANTS to a specific owned equipment instance. One
+// enchant per item — re-enchanting overwrites and pays again, so a player who outgrows an early
+// Whetting Rune I can commit to Whetting Rune III without needing to sell the item and re-forge.
+export function canEnchant(s, enchantId){
+  const e = ENCHANT_MAP[enchantId];
+  if (!e) return false;
+  return skillLevel(s, "enchanting") >= e.lvl && s.gold >= e.cost && hasItems(s, e.req);
+}
+export function enchantItem(s, uidE, enchantId){
+  const eq = s.equipment.find(e=>e.uid===uidE); if (!eq) return { ok:false, err:"item" };
+  const e = ENCHANT_MAP[enchantId]; if (!e) return { ok:false, err:"enchant" };
+  if (skillLevel(s, "enchanting") < e.lvl) return { ok:false, err:"level" };
+  if (s.gold < e.cost) return { ok:false, err:"gold" };
+  if (!hasItems(s, e.req)) return { ok:false, err:"resources" };
+  s.gold -= e.cost; removeItems(s, e.req);
+  eq.enchant = enchantId;
+  addSkillXp(s, "enchanting", e.xp);
+  return { ok:true, enchant:e };
+}
 
 // ---------- Cards: packs, drops, grade, sell ----------
 const RARITY_POOL = [ ["common",60],["uncommon",25],["rare",11],["epic",3],["legendary",1] ];

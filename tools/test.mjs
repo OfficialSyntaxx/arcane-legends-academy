@@ -1,7 +1,7 @@
 // Engine smoke test — runs the card engine, economy, and economy-balance checks headlessly.
 import * as G from "../public/game.js";
 import { CARDS, CARD_MAP, SCHOOLS, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
-import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS, SLOTS as SLOTS_LIST, METALS as METALS_MAP } from "../public/items.js";
+import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS, SLOTS as SLOTS_LIST, METALS as METALS_MAP, ENCHANTS, ENCHANT_MAP, enchantStats } from "../public/items.js";
 import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
 import { SKILLS as SKILLS_MAP } from "../public/items.js";
 import * as ST from "../public/structures.js";
@@ -2792,6 +2792,73 @@ check("game.js load() never leaves cardBack unset or pointing at a fake back", (
   const s = G.load();
   return !!s.cardBack && !!CB.BACK_MAP[s.cardBack];
 })());
+
+// ---------------------------------------------------------------- enchanting (BACKLOG §6)
+check("every enchant costs a real bar the smithing chain actually produces", (()=>{
+  const barIds = new Set(BARS.map(b => b.id));
+  return ENCHANTS.every(e => Object.keys(e.req).every(id => barIds.has(id)));
+})());
+check("enchantStats returns a zeroed stat block for an unknown enchant id", (()=>{
+  const s = enchantStats("not-a-real-id");
+  return s.atk === 0 && s.def === 0 && s.hp === 0 && s.pip === 0 && s.gold === 0;
+})());
+check("enchantStats returns exactly the printed stat/n for a real enchant", (()=>{
+  const s = enchantStats("ward_2");
+  return s.def === 2 && s.atk === 0 && s.hp === 0;
+})());
+check("canEnchant is false below the required level, gold or resources", (()=>{
+  const s = G.newGame();
+  return G.canEnchant(s, "whet_1") === false;   // no bar_bronze, no matter the gold
+})());
+check("enchantItem applies to the named item, charges gold, consumes the bar, and grants XP", (()=>{
+  const s = G.newGame();
+  s.gold = 500; s.inventory.bar_bronze = 2;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  const goldBefore = s.gold, xpBefore = s.skillXp.enchanting;
+  const r = G.enchantItem(s, "eq1", "whet_1");
+  return r.ok && eq.enchant === "whet_1"
+      && s.gold === goldBefore - ENCHANT_MAP.whet_1.cost
+      && s.inventory.bar_bronze === 1
+      && s.skillXp.enchanting > xpBefore;
+})());
+check("enchantItem refuses without enough gold, even with the resource and level in hand", (()=>{
+  const s = G.newGame();
+  s.gold = 0; s.inventory.bar_bronze = 2;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  const r = G.enchantItem(s, "eq1", "whet_1");
+  return r.ok === false && r.err === "gold" && eq.enchant === undefined;
+})());
+check("enchantItem refuses below the required enchanting level", (()=>{
+  const s = G.newGame();
+  s.gold = 500; s.inventory.bar_mithril = 2;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  const r = G.enchantItem(s, "eq1", "whet_3");   // needs level 45, save starts at 1
+  return r.ok === false && r.err === "level";
+})());
+check("re-enchanting an item overwrites the previous enchant rather than stacking", (()=>{
+  const s = G.newGame();
+  s.gold = 1000; s.inventory.bar_bronze = 2; s.inventory.bar_silver = 2; s.skills.enchanting = 25;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  G.enchantItem(s, "eq1", "whet_1");
+  G.enchantItem(s, "eq1", "whet_2");
+  return eq.enchant === "whet_2";
+})());
+check("equipStats includes an equipped item's enchant bonus on top of its base stats", (()=>{
+  const s = G.newGame();
+  s.gold = 500; s.inventory.bar_bronze = 2;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  G.equip(s, "eq1");
+  const afterUnenchanted = G.equipStats(s).atk;   // bronze wand's own +2 atk
+  G.enchantItem(s, "eq1", "whet_1");
+  const afterEnchanted = G.equipStats(s).atk;
+  return afterEnchanted === afterUnenchanted + 1;   // whet_1 is +1 atk
+})());
+check("game.js newGame() starts the enchanting skill at level 1 like every other skill", G.newGame().skills.enchanting === 1);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

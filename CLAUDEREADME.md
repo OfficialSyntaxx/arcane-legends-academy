@@ -239,6 +239,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Debug Dashboard** (`public/debug.html`) — a separate page reading this browser's save + running every validator live, no server telemetry. See §6.23.
 - **Booster Pack Opening** (`index.html`) — a CSS flip-card reveal for the 5 cards a pack mints, reusing the app's existing generic overlay. See §6.24.
 - **Card Backs** (`cardbacks.js`) — 9 procedural CSS backs unlocked by codex achievements, no new grind. See §6.25.
+- **Enchanting** (`items.js` `ENCHANTS`) — a new skill + per-item stat runes, reusing bars already smelted via Smithing. See §6.26.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -668,7 +669,29 @@ a finished, derived ladder with nothing at the top of it besides a checkmark.
   `codex.js`'s own achievement reads) both unlocks and equips, and the equipped back's colour
   shows up on both the pack reveal and the Codex gallery's highlight.
 
-### 6.26 Retention
+### 6.26 Enchanting (`items.js` `ENCHANTS`, BACKLOG §6)
+§6 Crafting & Economy's items were all unstarted; the equipment system (§6.10) had metal×slot
+stats and nothing else to spend materials or a skill level on beyond forging the base item once.
+
+- **A new skill, `enchanting`**, alongside mining/fishing/woodcutting/smithing/alchemy/scribing —
+  same shape, `s.skills.enchanting` gated recipes, `addSkillXp` on success.
+- **Deliberately reuses `BARS`** (already smelted via Smithing) as the enchant's material cost,
+  rather than inventing a new resource chain — an enchant is a metal thing done to a metal item,
+  and the game already has metal.
+- **3 stats (atk/def/hp) × 3 tiers** — a flat bonus, escalating level/cost/bar-tier requirement per
+  tier, applied to **one specific owned equipment instance** (`eq.enchant`, a stored id) rather
+  than the item TYPE — two Bronze Wands can carry different enchants.
+- **One enchant per item.** Re-enchanting overwrites the old one and pays again — the same
+  "spend to change your mind" shape `regradeCard` already established, not a slot system that
+  would need its own UI and its own balance pass.
+- **`equipStats` folds the enchant bonus in per-item, before the Armory home-upgrade's
+  percentage multiplier** — a home upgrade that promises "+5% gear stats" has to mean gear stats
+  *including* what you enchanted onto it, or the promise is only half true.
+- Covered by `tools/browser-test.mjs`: applies a rune through the real Loadout picker, confirms
+  `equipStats` actually moves (not just a UI label), confirms a level-gated rune shows disabled in
+  the real DOM, and confirms re-enchanting replaces rather than stacks.
+
+### 6.27 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -710,7 +733,7 @@ Individually:
 node tools/test.mjs          # 443 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (151 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (156 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -817,7 +840,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **460 engine / 42 online-rules / 151 browser / 8 viewports / model-check clean.**
+Tests: **470 engine / 42 online-rules / 156 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —

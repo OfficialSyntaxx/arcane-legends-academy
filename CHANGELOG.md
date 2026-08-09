@@ -16,6 +16,24 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### Enchanting — *pending*
+- §6 Crafting & Economy was entirely unstarted; equipment (§2/§6.10) had metal×slot stats and
+  nothing else to spend a skill level or materials on beyond the one-time forge.
+- A new `enchanting` skill gates 3 stats (atk/def/hp) × 3 tiers, each a flat bonus applied to ONE
+  specific owned equipment instance (`eq.enchant`) via a Loadout-screen picker — two Bronze Wands
+  can carry different runes.
+- Deliberately reuses `BARS` already smelted through Smithing rather than inventing a new resource
+  chain: an enchant is a metal thing done to a metal item.
+- One enchant per item; re-enchanting overwrites at full cost rather than stacking, the same
+  "spend to change your mind" shape `regradeCard` already established.
+- `equipStats` folds the enchant bonus in per-item, BEFORE the Armory home upgrade's percentage
+  multiplier — "+5% gear stats" has to mean gear stats including what got enchanted onto it.
+- A test-authoring bug caught along the way: the browser-test's re-enchant check silently failed
+  because the test save's Enchanting skill was never raised to the required level, so the second
+  rune application was being rejected server-side rather than stacking — fixed by raising the test
+  save's own skill level to match the level-gated recipe it was exercising.
+- *470 engine / 42 online / 156 browser.*
+
 ### Card backs — `918c9f0`
 - **`cardbacks.js`**: 9 procedural CSS-gradient backs, unlocked by the matching `codex.js`
   achievement — no new grind, the same collection effort now buys two rewards. `save.cardBack` is

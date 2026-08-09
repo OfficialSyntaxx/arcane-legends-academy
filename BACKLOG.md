@@ -199,7 +199,12 @@
 ## 6. Crafting & Economy
 
 - [ ] Expand Alchemy
-- [ ] Enchanting
+- [x] Enchanting — a new Enchanting skill + `items.js` `ENCHANTS` (3 stats × 3 tiers), applied to
+  ONE specific owned equipment instance (`eq.enchant`) via the Loadout screen's picker. Deliberately
+  reuses bars already smelted via Smithing rather than inventing a new resource chain — an enchant
+  is a metal thing done to a metal item. One enchant per item; re-enchanting overwrites at full
+  cost, never stacks. `equipStats` folds the bonus in before the Armory home-upgrade multiplier,
+  so a %-gear-stats bonus honestly covers enchants too
 - [ ] Rune crafting
 - [ ] Cooking
 - [ ] Advanced Scribing
@@ -265,7 +270,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 460 engine / 42 online / 151 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 470 engine / 42 online / 156 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback/enchant flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -327,7 +332,10 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **card backs** (`cardbacks.js` — 9 procedural CSS backs
+**Changes made, most recent first:** **Enchanting** (§6 — a new skill + `items.js` `ENCHANTS`, 3
+stats × 3 tiers applied to one specific owned equipment instance, reusing bars already smelted via
+Smithing rather than a new resource chain; one enchant per item, `equipStats` folds it in before
+the Armory percentage multiplier) → **card backs** (`cardbacks.js` — 9 procedural CSS backs
 unlocked by the matching codex achievement, no new grind; shown on the pack reveal and a new Codex
 gallery) → **booster pack opening animations** (§5 — a CSS flip-card
 reveal for the 5 cards a pack mints, reusing the app's existing generic overlay; a rare PRINTING
@@ -376,7 +384,22 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Card backs are done** (§5, `cardbacks.js`) — 9 procedural CSS-gradient backs
+**Next step:** **Enchanting is done** (§6, `items.js` `ENCHANTS`). §6 Crafting & Economy was
+entirely unstarted; equipment (§2/§6.10) had metal×slot stats and nothing else to spend a skill
+level or materials on beyond the one-time forge. A new `enchanting` skill gates 3 stats (atk/def/
+hp) × 3 tiers, each a flat bonus applied to ONE specific owned equipment instance — two Bronze
+Wands can carry different runes — via a Loadout-screen picker. Deliberately reuses `BARS` already
+smelted through Smithing rather than inventing a new resource chain: an enchant is a metal thing
+done to a metal item. One enchant per item; re-enchanting overwrites at full cost rather than
+stacking, the same "spend to change your mind" shape `regradeCard` already established.
+`equipStats` folds the bonus in per-item, BEFORE the Armory home upgrade's percentage multiplier —
+"+5% gear stats" has to mean gear stats including what got enchanted onto it. A real test-authoring
+bug caught along the way: the browser-test's re-enchant check silently failed because the test
+save's Enchanting skill was never raised to the required level, so the SECOND rune application was
+being rejected server-side, not stacking — the assertion was measuring the wrong failure until the
+setup itself was fixed to match the level-gated recipe it was exercising.
+
+Before that: **Card backs** (§5, `cardbacks.js`) — 9 procedural CSS-gradient backs
 (zero new asset bytes), each unlocked by finishing the matching codex achievement rather than a
 second grind alongside it. `save.cardBack` is the one stored bit; which backs are unlocked stays
 derived from achievements, the exact shape codex favourites already use. Shown on the
