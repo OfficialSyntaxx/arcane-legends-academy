@@ -67,6 +67,7 @@ wizard-tcg/                 (the repo root)
 │   ├── codex.js            collection index: filters, completion, achievements — PURE
 │   ├── archetypes.js       AI battle personalities, thematic enemy decks, boss phases — PURE
 │   ├── pvprank.js          PvP tiers, seasons, streak-bonus match results — PURE
+│   ├── schoolmagic.js      school affinity bonus + ultimate abilities — PURE
 │   ├── reputation.js       per-NPC standing + reward bonuses — PURE
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
@@ -230,6 +231,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
 - **AI archetypes & multi-phase bosses** (`archetypes.js`) — five battle personalities, thematic per-monster decks, and boss HP escalations. See §6.14.
 - **PvP ranking & seasons** (`pvprank.js`) — seven tiers, streak-bonus match results, monthly UTC seasons with a soft reset and a personal history. See §6.16.
+- **School mechanics & ultimates** (`schoolmagic.js`) — a same-school spell bonus and a once-per-duel ultimate per school, both flowing through a new reusable `FX_HANDLERS` effect dispatch table. See §6.18.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -481,7 +483,35 @@ getting better," and nothing to chase once you'd farmed enough gold.
   call `RANK.applyResult(S.pvp, won)` alongside the existing `wins++`/`losses++` counters (which
   stay, as the lifetime record the rank system doesn't replace).
 
-### 6.17 Retention
+### 6.18 School mechanics & ultimates (`schoolmagic.js`)
+The seven schools differed only in flavour and which two schools their attacks did +1 damage
+against (`SCHOOL_BONUS`, an already-existing elemental ring) — a Fire wizard and a Balance wizard
+playing the identical spell got the identical result. And the combat effect pipeline (`applyFx` in
+`game.js`) was a hand-grown if/else chain, one branch per fx kind, that anything new — a school
+mechanic, an ultimate — would just be one more branch bolted onto.
+
+- **Reusable combat effect system first**: `applyFx`'s if/else chain became `FX_HANDLERS`, a
+  `{kind: (ctx, f) => …}` dispatch table. Every card's fx, the affinity bonus below, and every
+  school's ultimate all resolve through that one table now — a new effect kind is one new entry,
+  not a new branch threaded through every place an effect can originate.
+- **Affinity bonus, the spell-side echo of the creature one**: a creature already hits harder when
+  `p.school === c.school` (`makeCreature`, pre-existing). `schoolmagic.js` `AFFINITY_FX` gives
+  spells the matching bonus — Fire +1 dmg, Ice +1 shield, Storm +1 card drawn, Myth board-wide +1
+  ATK, Life +2 heal, Death +1 straight to the enemy wizard, Balance +1 heal — applied through
+  `FX_HANDLERS` exactly like the spell's own printed fx.
+- **One ultimate per school** (`ULTIMATES`): a finisher — Fire's Inferno, Ice's Deep Freeze,
+  Storm's Maelstrom, Myth's Titan's Call, Life's Rebirth, Death's Soul Harvest, Balance's Judgement
+  — spent **once per duel**, gated behind a charge meter that fills by playing your own school's
+  cards (`p.ultCharge`, capped at `ULT_CHARGE_MAX = 5`) and costs neither pips nor a card when
+  cast. A meter that only fills from on-theme play rewards the same thing the affinity bonus
+  already rewards, rather than being a free extra spell on a timer.
+- **Every AI archetype spends a charged ultimate immediately** (`aiTurn`) — a finisher that costs
+  nothing isn't a personality choice the targeting logic in `archetypes.js` needs to weigh in on.
+- `ultCharge`/`ultUsed` live only on the in-battle `you`/`enemy` objects, never the save — a duel is
+  already fully recomputed from `startDuel` every time, the same reason nothing else about a duel
+  in progress is persisted.
+
+### 6.19 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -600,7 +630,26 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: PvP ranking and seasons** (§6.16). The PvP screen showed only lifetime wins/losses —
+**Last landed: school mechanics and ultimates** (§6.18) — the last three unstarted items in §4 PvE
+& Combat, closed together because they depend on each other. The combat effect pipeline
+(`applyFx`) was a hand-grown if/else chain; it became `FX_HANDLERS`, a dispatch table, **first** —
+that is what made the other two cheap to add rather than two more special cases. `schoolmagic.js`
+then gives spells the same same-school bonus creatures already had (Fire +1 dmg, Ice +1 shield,
+Storm +1 card, Myth board-wide +1 ATK, Life +2 heal, Death +1 to the enemy wizard, Balance +1
+heal), and gives every school a once-per-duel ultimate spent from a charge meter that fills by
+playing your own school's cards — Fire's Inferno, Ice's Deep Freeze, Storm's Maelstrom, Myth's
+Titan's Call, Life's Rebirth, Death's Soul Harvest, Balance's Judgement. Wired into the duel UI (a
+button showing charge %) and into every AI archetype, which spends a charged ultimate immediately
+since a free finisher isn't a targeting choice.
+
+§4 PvE & Combat is now fully checked off except the two `[~]` partial items (boss abilities beyond
+HP-phase escalation, and locked-door dungeon gating) — everything else in that section shipped.
+The largest untouched area in the backlog moves to **§8, the social layer** beyond PvP
+ranking/seasons (leaderboards deliberately excluded, multiplayer Academy, presence, guilds).
+
+Tests: **443 engine / 34 online-rules / 127 browser / 8 viewports / model-check clean.**
+
+**Before that: PvP ranking and seasons** (§6.16). The PvP screen showed only lifetime wins/losses —
 no sense of getting better, nothing to chase once gold stopped mattering. `pvprank.js` gives it
 seven tiers (Bronze → Grandmaster) driven by a stored `rankPoints`, win/loss deltas with a capped
 streak bonus, and monthly UTC seasons that soft-reset on rollover (never below the tier reached)

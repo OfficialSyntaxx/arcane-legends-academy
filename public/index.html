@@ -361,6 +361,7 @@ import * as VAR from "./variants.js";
 import * as CX from "./codex.js";
 import * as ARCH from "./archetypes.js";
 import * as RANK from "./pvprank.js";
+import * as MAGIC from "./schoolmagic.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -1542,6 +1543,15 @@ function renderDuel(el){
       disabled: !playable, onclick: playable ? (isTargeted?`cast|${i}`:`play|${i}`) : "" });
   }
   h += `</div></div>`;
+  // school ultimate (schoolmagic.js) — a once-per-duel finisher banked by playing your own school's cards
+  const ult = MAGIC.ultimateFor(you.school);
+  if (ult){
+    const charged = MAGIC.canUseUltimate(you.ultCharge, you.school, you.ultUsed);
+    const pct = Math.min(100, Math.round((you.ultCharge||0) / MAGIC.ULT_CHARGE_MAX * 100));
+    h += `<div class="row" style="justify-content:center;margin-top:4px">
+      <button class="btn ${charged&&myTurn&&!over.over?"gold":""}" ${charged&&myTurn&&!over.over?"":"disabled"} onclick="window.__ev('useUltimate')" title="${ult.text}">
+        ${ult.icon} ${ult.name}${you.ultUsed?" (used)":charged?"":` ${pct}%`}</button></div>`;
+  }
   // potions (brewed via Alchemy — 1 pip, one per turn)
   const potions = G.heldPotions(S);
   if (potions.length){
@@ -1648,6 +1658,11 @@ window.__EV.atkWiz = ()=>{
 window.__EV.drink = (potionId)=>{
   const r = G.usePotion(S, battle, battle.you, potionId);
   if (r.ok){ AUDIO.play("heal"); toast(STR.potion_drunk.replace("{n}", r.healed)); G.save(S); }
+  render();
+};
+window.__EV.useUltimate = ()=>{
+  const r = G.useUltimate(battle, battle.you);
+  if (r.ok){ AUDIO.play("levelUp"); toast(`${r.ultimate.icon} ${r.ultimate.name}!`); }
   render();
 };
 window.__EV.endTurn = ()=>{ const r=G.endTurn(battle); render(); };
@@ -2230,6 +2245,7 @@ window.__testAiTurn = ()=>{ if (battle) G.aiTurn(battle); };
 window.__testEndBattle = ()=>{ battle = null; screen = "world"; render(); };
 window.__testGather = ()=>{ const m = MATERIALS.find(x=>x.id==="oak_log"); G.gather(S, m); save(); };
 window.__testDuel = ()=>{ startPracticeDuel(); };
+window.__testRender = ()=>{ render(); };
 window.__testGold = ()=> S.gold;
 // Grant exactly the materials a gather quest asks for — the alternative is mining eight logs in
 // a browser test, which tests the gather loop rather than the quest turn-in.

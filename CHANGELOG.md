@@ -16,6 +16,25 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### School mechanics, ultimates, and a reusable combat effect system — *pending*
+- **The last three open items in §4 PvE & Combat, closed together**: a reusable effect pipeline
+  is what made the other two cheap. `game.js`'s `applyFx` if/else chain became `FX_HANDLERS`, a
+  `{kind: fn}` dispatch table — every card fx, the new affinity bonus and the new ultimates all
+  flow through the same one table now.
+- **`schoolmagic.js`**: a same-school spell now does a little more (Fire +1 dmg, Ice +1 shield,
+  Storm +1 card, Myth board-wide +1 ATK, Life +2 heal, Death +1 to the enemy wizard, Balance +1
+  heal) — the spell-side echo of the creature affinity bonus that already existed.
+- **One ultimate per school**, spent once per duel from a charge meter filled by playing your own
+  school's cards (`ULT_CHARGE_MAX = 5`), costing neither pips nor a card: Fire's Inferno, Ice's
+  Deep Freeze, Storm's Maelstrom, Myth's Titan's Call, Life's Rebirth, Death's Soul Harvest,
+  Balance's Judgement. Wired into the duel UI (a button showing charge %) and into every AI
+  archetype, which spends a charged ultimate the instant it's available.
+- A test bug caught along the way: the first pass of the ultimate browser test read "Judgement"
+  off a fixed default school, but an earlier test in the same page session can leave the save on a
+  different school — fixed by forcing the school on the *battle* object under test, not assuming
+  the save's.
+- *443 engine / 34 online / 127 browser.*
+
 ### PvP ranking and seasons — `5eead83`
 - **`pvprank.js`**: seven tiers Bronze → Grandmaster, driven by a stored `rankPoints`. A win is
   always `+20` plus a capped streak bonus (`+2`/streak win, capped at 5); a loss is always `-15`,

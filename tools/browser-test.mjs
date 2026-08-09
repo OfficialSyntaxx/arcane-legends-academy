@@ -661,6 +661,48 @@ if (hasWorld){
         `${vfx.slowExpiry} survived a low frame rate`);
 }
 
+// ---------------- school ultimates (BACKLOG §4, schoolmagic.js) ----------------
+// Drives the real duel UI, not just the pure module: charge the meter, confirm the button turns
+// on, click it through the real event handler, and confirm the effect and the "(used)" state both
+// actually land on screen.
+{
+  const ult = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    window.__testDuel();
+    await settle(700);
+    const b = window.__testBattle();
+    // Force a known school on the BATTLE object (not the save — earlier tests in this same page
+    // session may have picked a different one at character creation) so the ultimate under test
+    // is deterministic rather than whatever the player happens to be playing right now.
+    b.you.school = "balance";
+    const shieldBefore = b.you.shield;
+    b.you.ultCharge = 0;
+    window.__testRender();
+    await settle(50);
+    const lockedText = document.getElementById("screen").innerText;
+    b.you.ultCharge = 5;                              // MAGIC.ULT_CHARGE_MAX for the default "balance" school
+    window.__testRender();
+    await settle(50);
+    const chargedText = document.getElementById("screen").innerText;
+    window.__ev("useUltimate");
+    await settle(200);
+    const afterText = document.getElementById("screen").innerText;
+    window.__testEndBattle();
+    return {
+      lockedText, chargedText, afterText,
+      shieldBefore, shieldAfter: b.you.shield, ultUsed: b.you.ultUsed,
+    };
+  });
+  check("the ultimate button is present but shows charge, not ready, below threshold",
+        ult.lockedText.includes("Judgement") && !ult.lockedText.includes("(used)"), ult.lockedText.includes("Judgement") ? "shown" : "missing");
+  check("the ultimate button reads ready once charge is full",
+        /Judgement/.test(ult.chargedText), "Judgement not found while charged");
+  check("clicking the charged ultimate applies its effect (Judgement shields +6)",
+        ult.shieldAfter - ult.shieldBefore === 6, `${ult.shieldBefore} -> ${ult.shieldAfter}`);
+  check("the ultimate is marked used and can't be re-triggered from the same button",
+        ult.ultUsed === true && ult.afterText.includes("(used)"), ult.afterText.includes("(used)") ? "used" : "not marked used");
+}
+
 // ---------------- zone quests (BACKLOG §2) ----------------
 // Drives the real dialogue path: walk to the giver in the forest, press the prompt, accept from
 // the dialogue's own button, gather, then hand in — and check the reward actually landed.

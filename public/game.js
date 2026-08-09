@@ -6,6 +6,7 @@ import * as LESSONS from "./lessons.js";
 import * as VAR from "./variants.js";
 import * as ARCH from "./archetypes.js";
 import * as RANK from "./pvprank.js";
+import * as MAGIC from "./schoolmagic.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
 export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
@@ -554,8 +555,8 @@ export const MAX_TURNS = 100;
 export function startDuel(playerCardIds, playerGear, enemyDefs, enemyGear, enemyHp=100, playerSchool="balance", enemySchool="balance", seed=null){
   const s = seed == null ? (rng()*4294967296)>>>0 : seed>>>0;
   const rand = mulberry32(s);
-  const you = { id:"you", school:playerSchool, hp:100+playerGear.hp, maxHp:100+playerGear.hp, shield:0, maxPips:1+playerGear.pip, pips:1+playerGear.pip, hand:[], deck:buildDeck(playerCardIds, rand), board:[], field:[], traps:[], atkBonus:playerGear.atk, defBonus:playerGear.def, fatigue:0 };
-  const enemy = { id:"enemy", school:enemySchool, hp:enemyHp, maxHp:enemyHp, shield:0, maxPips:1+enemyGear.pip, pips:1+enemyGear.pip, hand:[], deck:buildDeck(enemyDefs, rand), board:[], field:[], traps:[], atkBonus:enemyGear.atk, defBonus:enemyGear.def, fatigue:0 };
+  const you = { id:"you", school:playerSchool, hp:100+playerGear.hp, maxHp:100+playerGear.hp, shield:0, maxPips:1+playerGear.pip, pips:1+playerGear.pip, hand:[], deck:buildDeck(playerCardIds, rand), board:[], field:[], traps:[], atkBonus:playerGear.atk, defBonus:playerGear.def, fatigue:0, ultCharge:0, ultUsed:false };
+  const enemy = { id:"enemy", school:enemySchool, hp:enemyHp, maxHp:enemyHp, shield:0, maxPips:1+enemyGear.pip, pips:1+enemyGear.pip, hand:[], deck:buildDeck(enemyDefs, rand), board:[], field:[], traps:[], atkBonus:enemyGear.atk, defBonus:enemyGear.def, fatigue:0, ultCharge:0, ultUsed:false };
   const b = { you, enemy, turn:"you", phase:"play", winner:null, log:[], seed:s, rand, turns:0 };
   for (let i=0;i<5;i++){ draw(you); draw(enemy); }  // 5-card opening hand
   return b;
@@ -599,23 +600,33 @@ function resolveTarget(b, foe, target){
   if (target.kind === "creature") return foe.board[target.idx] || null;
   return foe;  // "wiz" (or an unrecognised descriptor) hits the opposing wizard
 }
+// The reusable combat effect system (BACKLOG §4): every card fx, school affinity bonus
+// (schoolmagic.js AFFINITY_FX) and school ultimate (schoolmagic.js ULTIMATES) all resolve through
+// this ONE dispatch table instead of each being its own bolted-on special case. Adding a new kind
+// of effect anywhere in the game — a new card, a new school mechanic — means adding one entry here,
+// not threading a new `if` through every place effects can originate.
+const FX_HANDLERS = {
+  dmg: (ctx, f) => {
+    const t = resolveTarget(ctx.b, ctx.foe, ctx.zone && ctx.zone.target);
+    if (!t) return;
+    if (t === ctx.foe) damageWizard(ctx.foe, f.n, ctx.foe.defBonus);
+    else t.hp -= f.n;                         // creatures have no shield/defBonus
+  },
+  dmgAll: (ctx, f) => { for (const c of [...ctx.foe.board]) c.hp -= f.n; },
+  dmgWiz: (ctx, f) => damageWizard(ctx.foe, f.n, ctx.foe.defBonus),
+  heal:   (ctx, f) => { ctx.owner.hp = Math.min(ctx.owner.maxHp, ctx.owner.hp + f.n); },
+  shield: (ctx, f) => { ctx.owner.shield += f.n; },
+  buffAll:(ctx, f) => { for (const c of ctx.owner.board) c.atk += f.n; },
+  draw:   (ctx, f) => { for (let i=0;i<f.n;i++) draw(ctx.owner); },
+  freezeAll: (ctx) => { for (const c of ctx.foe.board) c.freeze = 1; },
+};
 const applyFx = (b, owner, fx, zone) => {
   const foe = foeOf(b, owner);
+  const ctx = { b, owner, foe, zone };
   for (const f of fx){
     if (typeof f === "string") continue;
-    if (f.k === "dmg"){
-      const t = resolveTarget(b, foe, zone && zone.target);
-      if (!t) continue;
-      if (t === foe) damageWizard(foe, f.n, foe.defBonus);
-      else t.hp -= f.n;                       // creatures have no shield/defBonus
-    }
-    else if (f.k === "dmgAll"){ for (const c of [...foe.board]) c.hp -= f.n; }
-    else if (f.k === "dmgWiz"){ damageWizard(foe, f.n, foe.defBonus); }
-    else if (f.k === "heal"){ owner.hp = Math.min(owner.maxHp, owner.hp + f.n); }
-    else if (f.k === "shield"){ owner.shield += f.n; }
-    else if (f.k === "buffAll"){ for (const c of owner.board) c.atk += f.n; }
-    else if (f.k === "draw"){ for (let i=0;i<f.n;i++) draw(owner); }
-    else if (f.k === "freezeAll"){ for (const c of foe.board) c.freeze = 1; }
+    const handler = FX_HANDLERS[f.k];
+    if (handler) handler(ctx, f);
   }
   // cleanup deaths
   for (const side of [b.you, b.enemy]) side.board = side.board.filter(c => c.hp > 0);
@@ -625,6 +636,11 @@ export function playCard(b, p, handIndex, target){
   p.pips -= c.cost; p.hand.splice(handIndex,1);
   b.log.push(p.id+" plays "+c.name);
   const enemy = p.id==="you" ? b.enemy : b.you;
+  // Ultimate charge (schoolmagic.js): playing a card of your OWN school banks charge toward your
+  // school's ultimate, capped so it can't be hoarded past the threshold it unlocks.
+  if (p.school && c.school === p.school){
+    p.ultCharge = Math.min(MAGIC.ULT_CHARGE_MAX, (p.ultCharge||0) + 1);
+  }
   if (c.type === "creature"){
     const cr = makeCreature(id, p);
     for (const f of c.fx){
@@ -649,8 +665,27 @@ export function playCard(b, p, handIndex, target){
     p.traps.push({ fx: c.fx });
   } else {
     applyFx(b, p, c.fx, { target });
+    // School affinity bonus (schoolmagic.js): a spell cast by a wizard of its own school does a
+    // little more, the spell-side echo of the creature affinity bonus makeCreature already grants.
+    const bonus = MAGIC.affinityFx(p.school, c.school);
+    if (bonus) applyFx(b, p, bonus, { target });
   }
   return {ok:true};
+}
+// The school ultimate (schoolmagic.js): a once-per-duel finisher, spent when its charge meter
+// (filled by playing your own school's cards, see playCard) reaches ULT_CHARGE_MAX. Does not cost
+// pips or a card — it is banked from play, not bought with it.
+export function useUltimate(b, p){
+  if (isOver(b).over) return { ok:false, err:"over" };
+  if (b.turn !== p.id) return { ok:false, err:"turn" };
+  const ult = MAGIC.ultimateFor(p.school);
+  if (!ult) return { ok:false, err:"school" };
+  if (!MAGIC.canUseUltimate(p.ultCharge, p.school, p.ultUsed)) return { ok:false, err:"charge" };
+  p.ultCharge = 0;
+  p.ultUsed = true;
+  b.log.push(p.id + " unleashes " + ult.name);
+  applyFx(b, p, ult.fx, {});
+  return { ok:true, ultimate: ult };
 }
 export function attack(b, attackerIdx, targetKind, targetIdx){
   const p = b[b.turn];
@@ -742,6 +777,10 @@ export function aiTurn(b){
   const ai = b.enemy;
   const policy = ARCH.policyFor(ai.archetype);
   applyBossPhase(b, ai);
+
+  // Spend a charged ultimate the moment it's available — every archetype wants a free finisher
+  // that cost neither pips nor a card, so this isn't a personality choice the way targeting is.
+  if (MAGIC.canUseUltimate(ai.ultCharge, ai.school, ai.ultUsed)) useUltimate(b, ai);
 
   // play ONE affordable card, ordered by the archetype's preference (cheap-first for Aggro,
   // priciest-first for everyone else — see archetypes.js `orderCards`)

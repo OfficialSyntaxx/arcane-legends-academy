@@ -19,6 +19,7 @@ import * as VAR from "../public/variants.js";
 import * as CX from "../public/codex.js";
 import * as ARCH from "../public/archetypes.js";
 import * as RANK from "../public/pvprank.js";
+import * as MAGIC from "../public/schoolmagic.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -2649,6 +2650,74 @@ check("game.js migrate() defaults rank fields for an older save missing them", (
   const m = G.migrate ? G.migrate(old) : null;
   if (!m) return true;  // migrate() is not exported; covered indirectly via load() above
   return m.pvp.rankPoints === 0 && m.pvp.streak === 0 && Array.isArray(m.pvp.history) && m.pvp.seasonBest === 0;
+})());
+
+// ---------------------------------------------------------------- schoolmagic.js
+check("validateSchoolMagic reports no problems", MAGIC.validateSchoolMagic().length === 0);
+check("affinityFx: same-school caster and spell earns a bonus", (()=>{
+  const fx = MAGIC.affinityFx("fire", "fire");
+  return Array.isArray(fx) && fx.length === 1;
+})());
+check("affinityFx: off-school spell earns nothing", MAGIC.affinityFx("fire", "ice") === null);
+check("affinityFx: no caster school earns nothing", MAGIC.affinityFx(null, "fire") === null);
+check("every school has both an affinity bonus and an ultimate", (()=>{
+  const ids = ["fire","ice","storm","myth","life","death","balance"];
+  return ids.every(id => MAGIC.AFFINITY_FX[id] && MAGIC.ultimateFor(id));
+})());
+check("canUseUltimate: false below the charge threshold", MAGIC.canUseUltimate(MAGIC.ULT_CHARGE_MAX-1, "fire", false) === false);
+check("canUseUltimate: true once charged, for a real school", MAGIC.canUseUltimate(MAGIC.ULT_CHARGE_MAX, "fire", false) === true);
+check("canUseUltimate: false once already used this duel", MAGIC.canUseUltimate(MAGIC.ULT_CHARGE_MAX, "fire", true) === false);
+check("canUseUltimate: false for an unknown school", MAGIC.canUseUltimate(MAGIC.ULT_CHARGE_MAX, "nope", false) === false);
+
+// ---- game.js integration: affinity bonus, ultimate charge/cast, AI auto-cast ----
+check("startDuel gives both sides a fresh, unused ultimate charge", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("firebolt"), flat, 100, "fire", "fire");
+  return b.you.ultCharge === 0 && !b.you.ultUsed && b.enemy.ultCharge === 0 && !b.enemy.ultUsed;
+})());
+check("playing a card of your OWN school banks ultimate charge; an off-school card does not", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b.you.hand = ["firebolt"]; b.you.pips = 10;
+  G.playCard(b, b.you, 0, { kind: "wiz" });
+  const withOwnSchool = b.you.ultCharge;
+  const b2 = G.startDuel(deck20("ice_golem"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b2.you.hand = ["ice_golem"]; b2.you.pips = 10;
+  G.playCard(b2, b2.you, 0, null);
+  return withOwnSchool === 1 && b2.you.ultCharge === 0;
+})());
+check("a fire wizard's own-school spell deals the affinity bonus dmg on top of the printed value", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b.you.hand = ["firebolt"]; b.you.pips = 10;
+  const before = b.enemy.hp;
+  G.playCard(b, b.you, 0, { kind: "wiz" });
+  return before - b.enemy.hp === 5;    // 4 printed + 1 fire affinity
+})());
+check("useUltimate fails below the charge threshold", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  return G.useUltimate(b, b.you).ok === false;
+})());
+check("useUltimate applies the school's fx, drains the charge, and can't be reused this duel", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b.you.ultCharge = MAGIC.ULT_CHARGE_MAX;
+  const enemyHpBefore = b.enemy.hp;
+  const r = G.useUltimate(b, b.you);
+  const spentAndUsed = r.ok && b.you.ultCharge === 0 && b.you.ultUsed;
+  const dealtDamage = enemyHpBefore - b.enemy.hp === 3;   // Inferno's dmgWiz
+  const second = G.useUltimate(b, b.you);
+  return spentAndUsed && dealtDamage && second.ok === false;
+})());
+check("useUltimate refuses on the opponent's turn", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b.you.ultCharge = MAGIC.ULT_CHARGE_MAX;
+  b.turn = "enemy";
+  return G.useUltimate(b, b.you).ok === false;
+})());
+check("aiTurn spends a charged ultimate automatically", (()=>{
+  const b = G.startDuel(deck20("elixir"), flat, deck20("frost_giant"), flat, 100, "balance", "ice");
+  b.turn = "enemy";
+  b.enemy.ultCharge = MAGIC.ULT_CHARGE_MAX;
+  const shieldBefore = b.enemy.shield;
+  G.aiTurn(b);
+  return b.enemy.ultUsed && b.enemy.shield > shieldBefore;   // Deep Freeze shields for 8
 })());
 
 console.log(`\n${pass} passed, ${fail} failed`);

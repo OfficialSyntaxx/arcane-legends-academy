@@ -117,9 +117,17 @@
   gating still pending
 - [x] Spell VFX — six procedural archetypes (bolt/burst/rain/aura/beam/glyph) driven from each card's own effects and school; zero assets
 - [~] Attack / summon / death animations — `battle3d.js` exists; procedural walk cycle already added for NPCs
-- [ ] Reusable combat effect system
-- [ ] School-specific mechanics
-- [ ] School ultimate abilities
+- [x] Reusable combat effect system — `game.js`'s `applyFx` if/else chain replaced with an
+  `FX_HANDLERS` dispatch table; every card fx, school affinity bonus and school ultimate below all
+  resolve through the same one pipeline instead of each being its own special case
+- [x] School-specific mechanics — `schoolmagic.js`: a same-school spell now does a little more
+  (Fire +1 dmg, Ice +1 shield, Storm +1 card, Myth board-wide +1 ATK, Life +2 heal, Death +1 to the
+  enemy wizard, Balance +1 heal), the spell-side echo of the creature affinity bonus that already
+  existed
+- [x] School ultimate abilities — `schoolmagic.js` `ULTIMATES`: one finisher per school, spent once
+  per duel when a charge meter (filled by playing your own school's cards) reaches 5. Wired into
+  the duel UI (a button that shows charge %) and into every AI archetype (spent the instant it's
+  available — a free finisher isn't a personality choice)
 
 ## 5. Cards & Collection
 
@@ -198,7 +206,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 427 engine / 34 online / 123 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 443 engine / 34 online / 127 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -260,7 +268,10 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **PvP ranking + seasons** (`pvprank.js` — seven tiers, streak
+**Changes made, most recent first:** **school mechanics + ultimates** (`schoolmagic.js`, plus a
+`game.js` refactor of the combat effect pipeline into a reusable `FX_HANDLERS` dispatch table that
+the new same-school spell bonus and once-per-duel school ultimates both flow through) →
+**PvP ranking + seasons** (`pvprank.js` — seven tiers, streak
 bonus, monthly UTC seasons with a soft reset, a personal season history, no fake leaderboard) →
 **AI archetypes + multi-phase bosses** (`archetypes.js`, and
 a real HP bug fixed on the two dungeon bosses along the way) → **the Codex** (`codex.js` — catalog browser, filters,
@@ -286,7 +297,19 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **PvP ranking and seasons are done** (`pvprank.js`) — seven tiers Bronze→Grandmaster
+**Next step:** **School mechanics and ultimates are done** (`schoolmagic.js`) — the last three
+open items in §4 PvE & Combat, closed together since a reusable effect pipeline is what made the
+other two cheap. `game.js`'s `applyFx` if/else chain became `FX_HANDLERS`, a `{kind: fn}` dispatch
+table every card fx, the new affinity bonus, and the new ultimates all flow through — adding an
+effect kind anywhere is one table entry now, not a new branch threaded through the engine. Spells
+of your own school do a little more (the spell-side echo of the creature affinity bonus that
+already existed), and every school gets a once-per-duel ultimate spent from a charge meter filled
+by playing your own school's cards — wired into the duel UI and into every AI archetype, which
+spends a charged ultimate the instant it's available. §4 PvE & Combat is now fully checked off
+except its two `[~]` partial items (boss abilities beyond HP-phase escalation; locked-door dungeon
+gating).
+
+Before that: **PvP ranking and seasons** (`pvprank.js`) — seven tiers Bronze→Grandmaster
 driven by stored rank points, a capped win-streak bonus, and a season soft-floor so a tier once
 reached in a season cannot be lost to a losing streak, only fallen-within. Wired into every win/loss
 path: local AI duels and online duels both call `RANK.applyResult`. Seasons are one UTC calendar
