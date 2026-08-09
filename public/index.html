@@ -359,6 +359,7 @@ import * as ACADEMY from "./academy.js";
 import * as LSN from "./lessons.js";
 import * as VAR from "./variants.js";
 import * as CX from "./codex.js";
+import * as ARCH from "./archetypes.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -1433,7 +1434,11 @@ function randomAiDeck(){
 window.__EV.localPvp = ()=>{
   const gearTier = 1 + Math.floor(S.level/3);
   const gear = { hp: gearTier*5, atk: gearTier, def: Math.floor(gearTier/2), pip: gearTier>=4?1:0 };
-  startLocalDuel(randomAiDeck(), gear, "AI Wizard", -1, false);
+  // A random personality (never "boss" — that escalation is reserved for real bosses) so the
+  // quick-match AI is not the same opponent in a different deck every time.
+  const casual = ARCH.ARCHETYPE_IDS.filter(id => id !== "boss");
+  const archetype = casual[Math.floor(Math.random()*casual.length)];
+  startLocalDuel(randomAiDeck(), gear, "AI Wizard", -1, false, { archetype });
 };
 window.__EV.online = ()=>{ setupOnline(); };
 
@@ -1455,12 +1460,16 @@ function startPracticeDuel(){
   const practiceDeck = ["fire_cat","fire_cat","fire_elf","fire_elf","firebolt","ice_golem","pixie","novice","elixir","fire_elf"];
   startLocalDuel(practiceDeck, {hp:0,atk:0,def:0,pip:0}, "Trainer Lyra", -1, false);
 }
-function startLocalDuel(enemyDeck, enemyGear, enemyName, questIdx, isQuest){
+function startLocalDuel(enemyDeck, enemyGear, enemyName, questIdx, isQuest, opts = {}){
   // ensure deck valid
   if (S.deck.length !== G.MAX_DECK){ err(STR.deck_need); return; }
-  const enemyHp = isQuest ? G.QUESTS[questIdx].hp : 100;
-  const enemySchool = isQuest ? G.QUESTS[questIdx].school : "balance";
+  // `opts.hp`/`opts.school`/`opts.archetype` let a caller override the quest-ladder defaults —
+  // dungeon and open-world enemies are not quests, but they still have their own declared HP
+  // (dungeons.json `boss.hp`) and their own battle personality (archetypes.js).
+  const enemyHp = opts.hp != null ? opts.hp : (isQuest ? G.QUESTS[questIdx].hp : 100);
+  const enemySchool = opts.school || (isQuest ? G.QUESTS[questIdx].school : "balance");
   battle = G.startDuel(S.deck, G.equipStats(S), enemyDeck, enemyGear, enemyHp, S.school, enemySchool);
+  battle.enemy.archetype = opts.archetype || (isQuest ? G.QUESTS[questIdx].archetype : "midrange");
   battle.enemyName = enemyName; battle.questIdx = questIdx; battle.isQuest = isQuest;
   pendingTarget = null;
   screen = "duel";
@@ -1926,15 +1935,26 @@ function enterDungeon(id){
   S.worldState.dungeons[id] = S.worldState.dungeons[id] || { cleared: [], defeated: [], bossDead: false };
   changeZone(id, activeZone && activeZone.id);
 }
-// Bumping into a dungeon enemy starts a duel. The enemy's level picks the quest deck it fights
-// with, so a Lv3 slime is not shuffling the Archon's endgame list.
+// Bumping into a dungeon enemy starts a duel. Level picks the GEAR tier off the quest ladder
+// (so a Lv3 slime is not geared like the Archon's endgame) — but the DECK and the battle
+// personality are the monster's own, built from archetypes.js rather than borrowed from a human
+// rival's authored list. A Cinder Slime playing "The Academy Rookie"'s exact fire deck was the
+// "one strategy, different decks" problem this system exists to fix.
 function startDungeonFight(id){
   const zone = activeZone;
   const foe = (zone && zone.enemies || []).find(e => e.id === id);
   if (!foe) return;
   const tier = Math.max(0, Math.min(G.QUESTS.length - 1, Math.floor((foe.level || 1) / 2)));
   const q = G.QUESTS[tier];
-  startLocalDuel(q.deck, q.gear, foe.name, tier, false);
+  const archetype = ARCH.archetypeFor(foe);
+  const school = ARCH.flavorSchoolFor(foe);
+  const pool = CARDS.filter(c => c.school === school);
+  const deck = ARCH.archetypeDeckFor(archetype, pool);
+  // The boss's own declared HP (dungeons.json `boss.hp`) — previously ignored entirely, so the
+  // Cinder Wyrm and the Drowned Archon were fighting at the open-world default of 100, not the
+  // 200/280 their own data declares. That undersells a boss fight and, now that boss phases exist,
+  // also mistimes them (the phase thresholds are HP FRACTIONS of the intended total).
+  startLocalDuel(deck, q.gear, foe.name, tier, false, { archetype, school, hp: foe.hp });
   // Remembered on the battle so the reward/persistence step knows what was actually beaten.
   battle.dungeonFoe = { zone: zone.id, id: foe.id, room: foe.room, boss: !!foe.boss };
 }
@@ -2183,6 +2203,10 @@ window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
 // Test hooks for tools/browser-test.mjs. They drive the REAL functions rather than reimplementing
 // them, so the test cannot pass against a path the game does not actually use.
 window.__testBattle = ()=> battle;
+window.__testAiTurn = ()=>{ if (battle) G.aiTurn(battle); };
+// Leave the duel screen cleanly without going through a real win/loss, for tests that only need
+// to inspect the battle object mid-fight rather than play it out.
+window.__testEndBattle = ()=>{ battle = null; screen = "world"; render(); };
 window.__testGather = ()=>{ const m = MATERIALS.find(x=>x.id==="oak_log"); G.gather(S, m); save(); };
 window.__testDuel = ()=>{ startPracticeDuel(); };
 window.__testGold = ()=> S.gold;

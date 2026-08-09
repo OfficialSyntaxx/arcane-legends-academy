@@ -417,6 +417,23 @@ if (hasWorld){
     await settle(500);
     log.bossPrompt = dbg().nearbyKind;
     log.bossLabel = dbg().nearbyLabel;
+    // --- press the boss and check the ARCHETYPE system through the real trigger path ---
+    // (archetypes.js — enemy personalities, thematic decks, multi-phase bosses)
+    window.__world.trigger();
+    await settle(500);
+    const battle = window.__testBattle();
+    log.enemyArchetype = battle && battle.enemy.archetype;
+    log.enemyMaxHp = battle && battle.enemy.maxHp;
+    log.enemyDeckLen = battle && [...battle.you.deck, ...battle.you.hand].length; // sanity: not asserted
+    if (battle){
+      // Force the boss low without needing to actually win the fight, and take one AI turn — the
+      // headless engine tests already prove the phase MATHS; this proves the WIRING: a real
+      // dungeon-triggered duel actually carries the "boss" archetype and its maxHp through.
+      battle.enemy.hp = Math.max(1, Math.round(battle.enemy.maxHp * 0.1));
+      window.__testAiTurn();
+      log.phasesApplied = (window.__testBattle().enemy.phasesApplied || []).slice();
+    }
+    window.__testEndBattle();
     // and back out
     const back = (dbg().exits || [])[0];
     if (back){ window.__world.teleport(back.x, back.z); await settle(1400); }
@@ -431,6 +448,9 @@ if (hasWorld){
   check("the dungeon is lit as an interior", dung.interior === true);
   check("the player does not spawn inside a dungeon wall", dung.spawnClear === true);
   check("the boss can be approached and engaged", dung.bossPrompt === "enemy", `${dung.bossPrompt} / ${dung.bossLabel}`);
+  check("engaging the dungeon boss starts a duel with the boss archetype", dung.enemyArchetype === "boss", String(dung.enemyArchetype));
+  check("the boss fights at its OWN declared HP, not the open-world default", dung.enemyMaxHp === 200, String(dung.enemyMaxHp));
+  check("a boss fight triggered through the real world actually escalates", (dung.phasesApplied||[]).includes("bloodied"), JSON.stringify(dung.phasesApplied));
   check("leaving the dungeon returns outdoors", dung.zoneAfter === "whispering_forest", String(dung.zoneAfter));
 
   // --- dungeon progression: a killed enemy must stay killed ---

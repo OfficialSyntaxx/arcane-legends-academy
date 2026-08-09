@@ -65,6 +65,7 @@ wizard-tcg/                 (the repo root)
 │   ├── lessons.js          the class syllabus: assignments + techniques taught — PURE
 │   ├── variants.js         card printings (foil/holo/prismatic) + first editions — PURE
 │   ├── codex.js            collection index: filters, completion, achievements — PURE
+│   ├── archetypes.js       AI battle personalities, thematic enemy decks, boss phases — PURE
 │   ├── reputation.js       per-NPC standing + reward bonuses — PURE
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
@@ -226,6 +227,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 
 ### 6.5 Quests & PvP
 - **8 quest bosses** (Rookie Battle Mage → The Archon) with a tuned difficulty curve — the *duel ladder*, `QUESTS` in `game.js`.
+- **AI archetypes & multi-phase bosses** (`archetypes.js`) — five battle personalities, thematic per-monster decks, and boss HP escalations. See §6.14.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -418,7 +420,35 @@ best-possible collection. That check found a bug in **itself** first: the probe 
 prismatic, so a tally of prismatics contained no foils and the foil/holo achievements reported as
 unreachable. The validator was right; the sample was wrong.
 
-### 6.14 Retention
+### 6.14 AI archetypes & multi-phase bosses (`archetypes.js`)
+Every AI opponent — the seven QUESTS rivals, every dungeon monster, every open-world skeleton —
+ran the identical strategy: play the highest-cost affordable card, cast a damage spell at whichever
+enemy creature had the least HP, always attack face unless a taunt forced a trade. A level-3
+Cinder Slime and the level-10 Cinder Wyrm boss differed only in deck and HP total; the *behaviour*
+was one strategy wearing different decks.
+
+- **Five personalities** (`ARCHETYPES`), each a handful of preferences over plain numbers —
+  which end of the cost curve to play from, whether a damage spell burns face or removes a
+  creature, which creature it removes, whether an attack takes a favourable trade or always races
+  face. `midrange` reproduces the **old, only** behaviour exactly, so `aiTurn(b)` with no
+  archetype set — every existing call site, every existing test — is unchanged.
+- **Aggro** always burns face and deploys cheap. **Control** removes the biggest threat and takes
+  trades it can win instead of always racing face. **Tempo** faces when ahead on board, clears
+  when behind. **Boss** removes threats, trades favourably, and escalates.
+- **Thematic decks**: a dungeon monster's deck is now built from the card catalog to match *what
+  it visibly is* (`archetypeFor`/`flavorSchoolFor`, read off its model/name — Slime → Aggro/Fire,
+  Skeleton → Control/Death, Bat/Wraith → Tempo/Storm, Dragon → Boss/Fire), not borrowed verbatim
+  from a human rival's authored ladder deck.
+- **Multi-phase bosses**: two HP-fraction thresholds (50%, 20%), each a permanent ATK/shield
+  escalation, applied in a **loop** — a hit that crosses both between the boss's own turns fires
+  both at once rather than making the boss wait an extra turn to "catch up."
+- **A real bug found and fixed while wiring this up**: dungeon boss fights had been running at the
+  open-world default of 100 HP the whole time — `dungeons.json`'s `boss.hp` (200 for the Cinder
+  Wyrm, 280 for the Drowned Archon) was carried on the enemy object but never read.
+  `startLocalDuel` now takes an `opts.hp` override; a browser test asserts the real Cinderhollow
+  fight starts at 200, not 100.
+
+### 6.15 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -537,7 +567,33 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: the Codex** (§6.13) and **`CHANGELOG.md`**.
+**Last landed: AI archetypes and multi-phase bosses** (§6.14). Every AI opponent in the game had
+been running one strategy — highest-cost affordable card, damage spells finish the weakest enemy
+creature, always race face unless a taunt forces it — with only the deck and the HP total varying.
+`archetypes.js` gives it five real personalities (Aggro/Control/Tempo/Boss, plus `midrange` which
+reproduces the old behaviour **exactly**, so every existing call site and test is unchanged), and
+dungeon monsters now play a deck built from *what they visibly are* rather than borrowing a human
+rival's authored ladder list verbatim.
+
+**A real bug turned up while wiring it in, not invented to justify the change:** dungeon boss
+fights had been running at the open-world default of 100 HP the whole time. `dungeons.json`
+declares `boss.hp` — 200 for the Cinder Wyrm, 280 for the Drowned Archon — and it was carried on
+the enemy object but never actually read by the code that starts the duel. Fixed alongside this
+work because the boss-phase thresholds are HP *fractions*, and a phase system built on the wrong
+maxHp would have quietly mistimed itself from day one. A browser test now asserts the real
+Cinderhollow fight starts at 200, confirmed by driving the actual world → walk to boss → press
+prompt → duel path rather than only the pure module.
+
+Two test bugs of my own caught along the way, both in the tests, not the code: a duel meant to
+"let the boss's own attacks bring its HP down" used a deck that never damaged anything, so the
+boss's HP never moved and the phase never fired — fixed by setting HP directly instead of hoping a
+simulation would get there. And an assertion that dropping to 15% HP should trigger *both* phase
+thresholds in one call was checking a threshold (37.5%) that only clears the first one — arithmetic
+error in the test, not the phase logic.
+
+Tests: **404 engine / 34 online-rules / 123 browser / 8 viewports / model-check clean.**
+
+**Before that: the Codex** (§6.13) and **`CHANGELOG.md`**.
 
 The collection was a single flat grid — survivable at 30 starter cards, and not once printings
 landed: a prismatic first edition somewhere in ninety cards is unfindable, and the grid could never

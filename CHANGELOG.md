@@ -14,7 +14,29 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
-## Collection & Academy depth — 2026-08-08 → 09
+## Combat depth & collection — 2026-08-08 → 09
+
+### AI archetypes, thematic enemy decks, multi-phase bosses — *pending*
+- **`archetypes.js`**: every AI opponent — the seven QUESTS rivals, every dungeon monster, every
+  open-world skeleton — ran the identical strategy (highest-cost affordable card, damage spells
+  finish the weakest enemy creature, always race face unless a taunt forced a trade). Five real
+  personalities now exist: **Aggro** (cheap-first, always burns face), **Control** (removes the
+  biggest threat, takes favourable trades instead of always racing), **Tempo** (faces when ahead
+  on board), **Boss** (removes + trades + escalates), and **Midrange**, which reproduces the
+  **old, only** behaviour exactly — `aiTurn(b)` with no archetype set is unchanged.
+- Dungeon monsters now play a deck built from **what they visibly are** (Slime → Aggro/Fire,
+  Skeleton → Control/Death, Bat/Wraith → Tempo/Storm, Dragon → Boss/Fire), not borrowed verbatim
+  from a human rival's authored ladder deck.
+- **Multi-phase bosses**: two HP-fraction thresholds (50%/20%), each a permanent ATK/shield
+  escalation, applied in a loop so a hit crossing both between the boss's own turns fires both at
+  once.
+- **A real, previously-unnoticed bug found while wiring this up**: dungeon boss fights had been
+  running at the open-world default of 100 HP — `dungeons.json`'s own `boss.hp` (200 for the
+  Cinder Wyrm, 280 for the Drowned Archon) was carried on the enemy object but never read.
+- Two bugs in the *tests*, not the code: a duel meant to let the boss's own attacks lower its HP
+  used a deck that dealt no damage, so the boss's HP never moved; and an assertion expecting both
+  phase thresholds at 15% HP was actually checking 37.5%, which only clears the first.
+- *404 engine / 34 online / 123 browser.*
 
 ### The Codex, and this changelog — `e0bf4a9`
 - **`codex.js`**: the whole catalog browsable — six filters (All / Owned / **Missing** / Favourites

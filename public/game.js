@@ -4,6 +4,7 @@ import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, C
 import * as ACADEMY from "./academy.js";
 import * as LESSONS from "./lessons.js";
 import * as VAR from "./variants.js";
+import * as ARCH from "./archetypes.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
 export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
@@ -475,16 +476,19 @@ export function upgradeHome(s, id){
 }
 
 // ---------- Quests (bosses) ----------
-const q = (id,name,title,school,deck,hp,reward,dropN,gear)=>({id,name,title,school,deck,hp,reward,dropN,gear});
+// `archetype` (archetypes.js) gives each rival its own BATTLE PERSONALITY on top of its
+// hand-authored deck — the deck stays exactly as designed, only how it is PLAYED changes.
+// Defaults to "midrange" (the old, only, unconditional behaviour) when not given.
+const q = (id,name,title,school,deck,hp,reward,dropN,gear,archetype)=>({id,name,title,school,deck,hp,reward,dropN,gear,archetype:archetype||"midrange"});
 export const QUESTS = [
-  q(0,"Battle Mage","The Academy Rookie","fire",["fire_cat","fire_cat","fire_elf","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf"], 40, 120, 2, {hp:0,atk:0,def:0,pip:0}),
-  q(1,"The Sprite","A Garden Guardian","life",["pixie","pixie","healing_wave","unicorn","healing_wave","pixie","unicorn","pixie","healing_wave","satyr","pixie","unicorn","healing_wave","pixie","unicorn","elixir","pixie","healing_wave","pixie","unicorn"], 60, 180, 3, {hp:5,atk:0,def:1,pip:0}),
-  q(2,"Stone Golem","The Balance of Power","balance",["novice","balance_blade","sunbird","golden_golem","balance_blade","novice","sunbird","golden_golem","balance_blade","novice","balance_blade","sunbird","golden_golem","master_wand","novice","sunbird","balance_blade","golden_golem","balance_dragon","master_wand"], 75, 260, 3, {hp:8,atk:1,def:1,pip:0}),
-  q(3,"Death Knight","Champion of the Underworld","death",["skeleton","dark_pact","ghoul","vampire","dark_pact","skeleton","ghoul","vampire","dark_pact","skeleton","ghoul","dark_pact","vampire","skeleton","ghoul","dark_pact","vampire","skeleton","ghoul","reaper"], 90, 360, 4, {hp:10,atk:1,def:2,pip:0}),
-  q(4,"Storm Caller","Lord of the Tempest","storm",["storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift"], 60, 500, 4, {hp:6,atk:2,def:1,pip:0}),
-  q(5,"Ice Queen","Guardian of the Frost","ice",["ice_golem","ice_armor","frost_shield","frost_giant","ice_armor","ice_golem","frost_shield","frost_giant","ice_armor","ice_golem","frost_giant","ice_armor","frost_shield","frost_giant","ice_golem","frost_giant","ice_armor","blizzard","ice_wyrm","frost_shield"], 110, 700, 5, {hp:15,atk:2,def:2,pip:0}),
-  q(6,"Myth Master","Keeper of the Beasts","myth",["myth_walker","myth_blast","minotaur","basilisk","myth_blast","myth_walker","minotaur","basilisk","myth_blast","myth_walker","minotaur","basilisk","myth_blast","hydra","myth_walker","minotaur","basilisk","hydra","myth_blast","minotaur"], 120, 900, 5, {hp:15,atk:3,def:2,pip:1}),
-  q(7,"The Archon","Final Trial of the Arcane","balance",["balance_streak","sunbird","master_wand","golden_golem","arcane_guardian","balance_dragon","hydra","reaper","ice_wyrm","basilisk","balance_streak","sunbird","arcane_guardian","balance_dragon","hydra","reaper","ice_wyrm","blizzard","master_wand","golden_golem"], 95, 1500, 6, {hp:15,atk:3,def:2,pip:1}),
+  q(0,"Battle Mage","The Academy Rookie","fire",["fire_cat","fire_cat","fire_elf","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf"], 40, 120, 2, {hp:0,atk:0,def:0,pip:0}, "aggro"),
+  q(1,"The Sprite","A Garden Guardian","life",["pixie","pixie","healing_wave","unicorn","healing_wave","pixie","unicorn","pixie","healing_wave","satyr","pixie","unicorn","healing_wave","pixie","unicorn","elixir","pixie","healing_wave","pixie","unicorn"], 60, 180, 3, {hp:5,atk:0,def:1,pip:0}, "control"),
+  q(2,"Stone Golem","The Balance of Power","balance",["novice","balance_blade","sunbird","golden_golem","balance_blade","novice","sunbird","golden_golem","balance_blade","novice","balance_blade","sunbird","golden_golem","master_wand","novice","sunbird","balance_blade","golden_golem","balance_dragon","master_wand"], 75, 260, 3, {hp:8,atk:1,def:1,pip:0}, "control"),
+  q(3,"Death Knight","Champion of the Underworld","death",["skeleton","dark_pact","ghoul","vampire","dark_pact","skeleton","ghoul","vampire","dark_pact","skeleton","ghoul","dark_pact","vampire","skeleton","ghoul","dark_pact","vampire","skeleton","ghoul","reaper"], 90, 360, 4, {hp:10,atk:1,def:2,pip:0}, "control"),
+  q(4,"Storm Caller","Lord of the Tempest","storm",["storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift"], 60, 500, 4, {hp:6,atk:2,def:1,pip:0}, "tempo"),
+  q(5,"Ice Queen","Guardian of the Frost","ice",["ice_golem","ice_armor","frost_shield","frost_giant","ice_armor","ice_golem","frost_shield","frost_giant","ice_armor","ice_golem","frost_giant","ice_armor","frost_shield","frost_giant","ice_golem","frost_giant","ice_armor","blizzard","ice_wyrm","frost_shield"], 110, 700, 5, {hp:15,atk:2,def:2,pip:0}, "control"),
+  q(6,"Myth Master","Keeper of the Beasts","myth",["myth_walker","myth_blast","minotaur","basilisk","myth_blast","myth_walker","minotaur","basilisk","myth_blast","myth_walker","minotaur","basilisk","myth_blast","hydra","myth_walker","minotaur","basilisk","hydra","myth_blast","minotaur"], 120, 900, 5, {hp:15,atk:3,def:2,pip:1}, "tempo"),
+  q(7,"The Archon","Final Trial of the Arcane","balance",["balance_streak","sunbird","master_wand","golden_golem","arcane_guardian","balance_dragon","hydra","reaper","ice_wyrm","basilisk","balance_streak","sunbird","arcane_guardian","balance_dragon","hydra","reaper","ice_wyrm","blizzard","master_wand","golden_golem"], 95, 1500, 6, {hp:15,atk:3,def:2,pip:1}, "boss"),
 ];
 export function currentQuest(s){ return QUESTS[s.quests.current]; }
 export function questDone(s, id){ return s.quests.done.includes(id); }
@@ -713,32 +717,64 @@ export function isOver(b){
 }
 export function cleanDeaths(b){ b.you.board = b.you.board.filter(c=>c.hp>0); b.enemy.board = b.enemy.board.filter(c=>c.hp>0); }
 
-// ---------- AI ----------
+// ---------- AI (archetypes.js decides WHAT the personality prefers; this carries it out) ----------
+//
+// `b.enemy.archetype` picks the personality. Absent, it resolves to "midrange" — which is defined
+// in archetypes.js to reproduce the OLD unconditional behaviour exactly (descending cost, damage
+// spells finish the weakest enemy creature, always race face unless a taunt forces a trade), so
+// every existing call site and every existing test keeps its old behaviour with zero changes here.
 export function aiTurn(b){
   const ai = b.enemy;
-  // play ONE highest-cost affordable creature (or a removal spell), then pass
-  const sorted = ai.hand.map((id,i)=>({id,i})).filter(x=>CARD_MAP[x.id].cost<=ai.pips).sort((a,b)=>CARD_MAP[b.id].cost-CARD_MAP[a.id].cost);
-  for (const pick of sorted){
+  const policy = ARCH.policyFor(ai.archetype);
+  applyBossPhase(b, ai);
+
+  // play ONE affordable card, ordered by the archetype's preference (cheap-first for Aggro,
+  // priciest-first for everyone else — see archetypes.js `orderCards`)
+  const playable = ai.hand.map((id,i)=>({id,i,cost:CARD_MAP[id].cost})).filter(x=>x.cost<=ai.pips);
+  const ordered = ARCH.orderCards(policy, playable);
+  for (const pick of ordered){
     const c = CARD_MAP[pick.id];
-    if (c.type === "creature"){ playCard(b, ai, pick.i, null); break; }
-    if (c.type === "field"){ playCard(b, ai, pick.i, null); break; }
-    if (c.type === "trap"){ playCard(b, ai, pick.i, null); break; }
-    if (c.type === "spell" && c.fx.some(f=>f.k==="dmg") && b.you.board.length){
-      const t = b.you.board.reduce((m,x)=>x.hp<m.hp?x:m, b.you.board[0]);
-      playCard(b, ai, pick.i, {kind:"creature", idx:b.you.board.indexOf(t)});
+    if (c.type === "creature" || c.type === "field" || c.type === "trap"){ playCard(b, ai, pick.i, null); break; }
+    if (c.type === "spell" && c.fx.some(f=>f.k==="dmg")){
+      const enemyBoard = b.you.board.map(x=>({atk:x.atk, hp:x.hp}));
+      const ownPower = ai.board.reduce((a,x)=>a+x.atk,0), enemyPower = b.you.board.reduce((a,x)=>a+x.atk,0);
+      const t = ARCH.pickSpellTarget(policy, enemyBoard, ownPower, enemyPower);
+      playCard(b, ai, pick.i, t === "face" ? {kind:"wiz"} : {kind:"creature", idx:t});
       b.you.board = b.you.board.filter(x=>x.hp>0);
       break;
     }
   }
-  // attack: clear taunts, else race face
+  // attack: taunt is a RULE (every archetype obeys it); beyond that, the archetype decides
+  // between a favourable trade and racing face — see archetypes.js `pickAttackTarget`.
   const you = b.you;
-  const taunts = you.board.filter(c=>c.taunt && c.hp>0);
   for (const atk of ai.board){
     if (atk.exhausted || atk.summoning || isOver(b).over) continue;
-    if (taunts.length) attack(b, ai.board.indexOf(atk), "creature", you.board.indexOf(taunts[0]));
-    else attack(b, ai.board.indexOf(atk), "wiz", -1);
+    const tauntIdx = you.board.findIndex(c=>c.taunt && c.hp>0);
+    const enemyBoard = you.board.map(x=>({atk:x.atk, hp:x.hp}));
+    const target = ARCH.pickAttackTarget(policy, {atk:atk.atk, hp:atk.hp}, enemyBoard, tauntIdx>=0?tauntIdx:null);
+    if (target === "face") attack(b, ai.board.indexOf(atk), "wiz", -1);
+    else attack(b, ai.board.indexOf(atk), "creature", target);
   }
   endTurn(b);
+}
+
+// A boss's escalations (BACKLOG "multi-phase bosses"). Checked once per AI turn; a phase, once
+// triggered, is permanent for the rest of the duel — `b.enemy.phasesApplied` is the record of
+// which ones already fired, so healing back above a threshold cannot un-trigger it.
+function applyBossPhase(b, ai){
+  if (ai.archetype !== "boss" || ai.maxHp <= 0) return;
+  ai.phasesApplied = ai.phasesApplied || [];
+  // A LOOP, not a single check: a big player hit between the boss's turns can cross both
+  // thresholds at once, and archetypes.js promises both fire "in order" when that happens rather
+  // than making the boss wait a whole extra turn to catch up on the one it skipped.
+  let phase;
+  while ((phase = ARCH.nextBossPhase(ai.hp / ai.maxHp, ai.phasesApplied))){
+    ai.phasesApplied.push(phase.id);
+    for (const c of ai.board) c.atk += phase.buffAtk;
+    ai.atkBonus = (ai.atkBonus || 0) + phase.buffAtk;   // creatures played AFTER the phase too
+    ai.shield = (ai.shield || 0) + phase.shield;
+    b.log.push(ai.id + " " + phase.log);
+  }
 }
 
 // ---------- Self-test (smoke reference route) ----------

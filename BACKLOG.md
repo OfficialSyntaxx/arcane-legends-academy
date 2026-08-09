@@ -96,10 +96,21 @@
 
 ## 4. PvE & Combat
 
-- [ ] Enemy levels and archetypes
-- [ ] Better AI deck archetypes
+- [x] Enemy levels and archetypes — `archetypes.js`: every dungeon/open-world monster's battle
+  PERSONALITY (not just its deck) is derived from what it visibly is (Slime→Aggro, Skeleton→
+  Control, Bat/Wraith→Tempo, Dragon→Boss), and its deck is built thematically from the card
+  catalog instead of borrowed verbatim from a human rival's ladder deck. Found and fixed a real
+  bug while wiring it in: dungeon bosses had been fighting at the open-world default of 100 HP —
+  `dungeons.json`'s own declared `boss.hp` (200/280) was never read.
+- [x] Better AI deck archetypes — five personalities (Aggro/Control/Tempo/Boss + Midrange, which
+  reproduces the exact old unconditional behaviour so nothing existing changed): which end of the
+  cost curve to play from, whether removal burns face or clears a creature, and whether an attack
+  takes a favourable trade or always races face. The seven QUESTS rivals are tagged too, and a
+  quick local match now rolls a random personality instead of the same AI every time.
 - [~] Boss battles — the Cinder Wyrm fights via the duel engine; multi-phase/abilities pending
-- [ ] Multi-phase bosses
+- [x] Multi-phase bosses — two HP-fraction thresholds (50%/20%), each a permanent ATK/shield
+  escalation, applied in a loop so a hit crossing both between the boss's own turns fires both at
+  once rather than making it wait an extra turn to catch up.
 - [~] Dungeon progression — two dungeons playable end to end (Cinderhollow Caverns, the Drowned
   Vault); kills, cleared rooms and boss defeat all persist and enemies stay dead, and each dungeon
   carries its own palette/lighting so the second is not the first reskinned. Locked doors / key
@@ -182,7 +193,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 377 engine / 34 online / 120 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/VFX flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 404 engine / 34 online / 123 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -244,7 +255,8 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **the Codex** (`codex.js` — catalog browser, filters,
+**Changes made, most recent first:** **AI archetypes + multi-phase bosses** (`archetypes.js`, and
+a real HP bug fixed on the two dungeon bosses along the way) → **the Codex** (`codex.js` — catalog browser, filters,
 completion, achievements) and **`CHANGELOG.md`** → **card printings + first editions** (`variants.js`, and
 `mintCard()` consolidating five copies of the card-instance literal) → **Academy class content** (`lessons.js` — 21 classes, four
 techniques hooked into real systems) → **visible equipment on the 3D character** (`equipment3d.js`)
@@ -267,7 +279,17 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **the Codex is done** — the catalog is browsable with filters, search, per-school
+**Next step:** **AI archetypes and multi-phase bosses are done** — five real personalities
+replace the one strategy every AI opponent used to run, dungeon monsters play a deck built from
+what they visibly are, and both dungeon bosses escalate at 50%/20% HP (`CLAUDEREADME.md` §6.14).
+Fixed a real, previously-unnoticed bug along the way: dungeon bosses had been fighting at 100 HP
+regardless of the 200/280 `dungeons.json` actually declares for them.
+
+§4 PvE & Combat now has only a reusable combat effect system and school-specific mechanics /
+ultimates left unstarted. The largest untouched area in this file remains **§8, the social layer**
+(PvP ranking, seasons, leaderboards, guilds).
+
+Before that, **the Codex was done** — the catalog is browsable with filters, search, per-school
 completion, favourites and nine derived achievements (`CLAUDEREADME.md` §6.13). **`CHANGELOG.md`**
 is new, backfilled from the full git history. §5 collection depth now has only card evolution,
 deck archetypes and a deck-testing lab left; the largest untouched area in this file is **§8, the

@@ -17,6 +17,7 @@ import * as ACADEMY from "../public/academy.js";
 import * as LSN from "../public/lessons.js";
 import * as VAR from "../public/variants.js";
 import * as CX from "../public/codex.js";
+import * as ARCH from "../public/archetypes.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -2396,6 +2397,154 @@ check("nothing about completion or achievements is written to the save", (()=>{
   CX.achievementsFor(CARDS, s.cards);
   CX.browse(CARDS, s, { filter:"missing", sort:"rarity" });
   return JSON.stringify(s) === before;
+})());
+
+
+// ---- AI battle personalities, thematic enemy decks, multi-phase bosses (BACKLOG §4) ----
+// Every AI opponent used to run the identical strategy — highest-cost affordable card, damage
+// spells finish the weakest enemy creature, always race face unless a taunt forces a trade. These
+// checks are about the two things that have to be true for "archetype" to mean anything: the
+// personalities must actually choose DIFFERENTLY given the same board, and the compatibility
+// default must reproduce the OLD behaviour exactly so nothing that already worked breaks.
+check("the archetype table validates", (()=>{
+  const problems = ARCH.validateArchetypes();
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("midrange reproduces the old unconditional behaviour: face unless taunt", (()=>{
+  const p = ARCH.policyFor("midrange");
+  const enemyBoard = [{atk:9,hp:1},{atk:1,hp:9}];   // a very tempting trade either way
+  return ARCH.pickAttackTarget(p, {atk:5,hp:5}, enemyBoard, null) === "face";
+})());
+check("midrange's damage spell finishes the weakest enemy creature", (()=>{
+  const p = ARCH.policyFor("midrange");
+  const enemyBoard = [{atk:9,hp:8},{atk:1,hp:2}];
+  return ARCH.pickSpellTarget(p, enemyBoard, 5, 5) === 1;
+})());
+check("every archetype obeys taunt, no exceptions", (()=>{
+  return ARCH.ARCHETYPE_IDS.every(id => ARCH.pickAttackTarget(ARCH.policyFor(id), {atk:9,hp:9}, [{atk:1,hp:1}], 0) === 0);
+})());
+check("aggro always burns face with removal, even into a killable creature", (()=>{
+  const p = ARCH.policyFor("aggro");
+  return ARCH.pickSpellTarget(p, [{atk:1,hp:1}], 5, 5) === "face";
+})());
+check("aggro plays its cheapest card first; midrange plays its priciest", (()=>{
+  const playable = [{i:0,cost:1},{i:1,cost:5},{i:2,cost:3}];
+  const aggroFirst = ARCH.orderCards(ARCH.policyFor("aggro"), playable)[0];
+  const midFirst = ARCH.orderCards(ARCH.policyFor("midrange"), playable)[0];
+  return aggroFirst.cost === 1 && midFirst.cost === 5;
+})());
+check("control removes the biggest threat, not the weakest creature", (()=>{
+  const p = ARCH.policyFor("control");
+  const enemyBoard = [{atk:9,hp:8},{atk:1,hp:2}];
+  return ARCH.pickSpellTarget(p, enemyBoard, 5, 5) === 0;
+})());
+check("control takes a trade it can win instead of always racing face", (()=>{
+  const p = ARCH.policyFor("control");
+  const enemyBoard = [{atk:2,hp:3}];                // attacker kills it and survives
+  return ARCH.pickAttackTarget(p, {atk:5,hp:5}, enemyBoard, null) === 0;
+})());
+check("control will not take a trade that kills its own creature", (()=>{
+  const p = ARCH.policyFor("control");
+  const enemyBoard = [{atk:9,hp:1}];                // attacker kills it but dies too — not favourable
+  return ARCH.pickAttackTarget(p, {atk:5,hp:5}, enemyBoard, null) === "face";
+})());
+check("tempo faces when ahead on board and clears when behind", (()=>{
+  const p = ARCH.policyFor("tempo");
+  const enemyBoard = [{atk:1,hp:1}];
+  return ARCH.pickSpellTarget(p, enemyBoard, 10, 2) === "face" &&
+         ARCH.pickSpellTarget(p, enemyBoard, 2, 10) === 0;
+})());
+// --- boss phases ---
+check("a boss enters its first phase at half health, not before", (()=>{
+  return ARCH.nextBossPhase(0.51, []) === null && ARCH.nextBossPhase(0.50, []).id === "bloodied";
+})());
+check("a phase never fires twice", (()=>{
+  return ARCH.nextBossPhase(0.10, ["bloodied","desperate"]) === null;
+})());
+check("dropping straight through both thresholds still gets both, in order", (()=>{
+  const applied = [];
+  let p = ARCH.nextBossPhase(0.05, applied); applied.push(p.id);
+  const p2 = ARCH.nextBossPhase(0.05, applied);
+  return p.id === "bloodied" && p2.id === "desperate";
+})());
+// --- thematic decks ---
+check("every archetype builds a full, non-empty deck from a real school pool", (()=>{
+  const pool = CARDS.filter(d => d.school === "fire");
+  return ["aggro","control","tempo","boss","midrange"].every(a => ARCH.archetypeDeckFor(a, pool).length === 20);
+})());
+check("a school with no damage spell still gets a full deck (falls back to creatures)", (()=>{
+  const pool = CARDS.filter(d => d.school === "ice");   // ice has zero fx:dmg spells
+  return ARCH.archetypeDeckFor("control", pool).length === 20;
+})());
+check("an empty pool never crashes — it returns an empty deck, not a broken one", ARCH.archetypeDeckFor("aggro", []).length === 0);
+check("aggro's deck skews cheaper than the boss deck from the same pool", (()=>{
+  const pool = CARDS.filter(d => d.school === "fire");
+  const avgCost = ids => ids.reduce((a,id) => a + CARD_MAP[id].cost, 0) / ids.length;
+  return avgCost(ARCH.archetypeDeckFor("aggro", pool)) < avgCost(ARCH.archetypeDeckFor("boss", pool));
+})());
+check("every card in a generated deck actually comes from the pool given", (()=>{
+  const pool = CARDS.filter(d => d.school === "death");
+  const ids = new Set(pool.map(d => d.id));
+  return ARCH.archetypeDeckFor("control", pool).every(id => ids.has(id));
+})());
+// --- assigning an archetype from what the enemy visibly is ---
+check("a boss is always the boss archetype regardless of its model name", ARCH.archetypeFor({model:"whatever.glb", boss:true}) === "boss");
+check("dragons, slimes, skeletons and bats/wraiths get their own personality", (()=>{
+  return ARCH.archetypeFor({model:"creature_Dragon.glb"}) === "boss" &&
+         ARCH.archetypeFor({model:"creature_Slime.glb"}) === "aggro" &&
+         ARCH.archetypeFor({model:"creature_Skeleton.glb"}) === "control" &&
+         ARCH.archetypeFor({model:"creature_Bat.glb"}) === "tempo" &&
+         ARCH.archetypeFor({model:"enemy_skeleton.glb"}) === "control";
+})());
+check("an unrecognised enemy still gets a usable, safe default", ARCH.archetypeFor({model:"mystery.glb"}) === "midrange");
+check("every flavour school actually has a positive population to draw from", (()=>{
+  const schools = new Set(["fire","ice","storm","myth","life","death","balance"]);
+  const usedSchools = new Set([ARCH.flavorSchoolFor({model:"creature_Dragon.glb"}),
+    ARCH.flavorSchoolFor({model:"creature_Slime.glb"}), ARCH.flavorSchoolFor({model:"creature_Skeleton.glb"}),
+    ARCH.flavorSchoolFor({model:"creature_Bat.glb"}), ARCH.flavorSchoolFor({model:"???"})]);
+  return [...usedSchools].every(s => schools.has(s) && CARDS.some(d => d.school === s));
+})());
+
+// ---- game.js integration: the archetype actually changes how a real duel plays out ----
+check("QUESTS carry an archetype, defaulting to midrange when not given", (()=>{
+  return G.QUESTS.every(q => !!q.archetype) && G.QUESTS[0].archetype === "aggro" && G.QUESTS[7].archetype === "boss";
+})());
+check("aiTurn with no archetype set behaves exactly as the old unconditional AI did", (()=>{
+  // Reproduce runSelfTest's "contrast" case (player never acts) with an explicit archetype-free
+  // battle and confirm it still resolves the same way: the AI alone is enough to win.
+  const s = G.newGame();
+  const b = G.startDuel(s.deck, G.equipStats(s), G.QUESTS[0].deck, G.QUESTS[0].gear, G.QUESTS[0].hp);
+  delete b.enemy.archetype;
+  let guard = 0; while (!G.isOver(b).over && guard++ < 200) G.aiTurn(b);
+  return G.isOver(b).over && G.isOver(b).winner === "enemy";
+})());
+check("a boss duel actually enters a phase once its HP crosses the threshold", (()=>{
+  const s = G.newGame();
+  const b = G.startDuel(deck20("elixir"), {hp:0,atk:0,def:0,pip:0}, deck20("fire_dragon"), {hp:0,atk:0,def:0,pip:0}, 40);
+  b.enemy.archetype = "boss";
+  b.enemy.hp = 18;                              // 45% — past "bloodied" (50%), not yet "desperate" (20%)
+  G.aiTurn(b);
+  return JSON.stringify(b.enemy.phasesApplied) === JSON.stringify(["bloodied"]);
+})());
+check("dropping through BOTH thresholds between the boss's own turns fires both at once", (()=>{
+  // The guarantee archetypes.js documents: a big hit landing between the boss's turns must not
+  // make it wait an extra turn to "catch up" on a phase it skipped past.
+  const s = G.newGame();
+  const b = G.startDuel(deck20("elixir"), {hp:0,atk:0,def:0,pip:0}, deck20("fire_dragon"), {hp:0,atk:0,def:0,pip:0}, 40);
+  b.enemy.archetype = "boss";
+  b.enemy.hp = 5;                               // 12.5% — already past BOTH thresholds
+  const before = b.enemy.atkBonus || 0;
+  G.aiTurn(b);
+  return (b.enemy.atkBonus || 0) > before && JSON.stringify(b.enemy.phasesApplied) === JSON.stringify(["bloodied","desperate"]);
+})());
+check("a non-boss archetype never enters a boss phase, however low its HP", (()=>{
+  const s = G.newGame();
+  const b = G.startDuel(deck20("elixir"), {hp:0,atk:0,def:0,pip:0}, deck20("skeleton"), {hp:0,atk:0,def:0,pip:0}, 40);
+  b.enemy.archetype = "control";
+  b.enemy.hp = 2;
+  G.aiTurn(b);
+  return !b.enemy.phasesApplied || b.enemy.phasesApplied.length === 0;
 })());
 
 
