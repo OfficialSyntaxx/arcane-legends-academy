@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### PvP ranking and seasons — *pending*
+### PvP ranking and seasons — `5eead83`
 - **`pvprank.js`**: seven tiers Bronze → Grandmaster, driven by a stored `rankPoints`. A win is
   always `+20` plus a capped streak bonus (`+2`/streak win, capped at 5); a loss is always `-15`,
   floored at a **season floor** — a tier reached this season cannot be lost to a losing streak,
