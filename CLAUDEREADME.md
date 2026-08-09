@@ -235,7 +235,8 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **School mechanics & ultimates** (`schoolmagic.js`) — a same-school spell bonus and a once-per-duel ultimate per school, both flowing through a new reusable `FX_HANDLERS` effect dispatch table. See §6.18.
 - **Deck Testing Laboratory** (`index.html`) — play your current deck against any AI personality with zero rewards and zero record kept. See §6.20.
 - **Deck Archetypes** (`archetypes.js` `autoBuildDeck`) — one-click builds a deck from your own collection, weighted like an AI opponent's, capped by what you own. See §6.22.
-- **Debug Dashboard** (`public/debug.html`) — a separate page reading this browser's save + running every validator live, no server telemetry. See §6.24.
+- **Debug Dashboard** (`public/debug.html`) — a separate page reading this browser's save + running every validator live, no server telemetry. See §6.23.
+- **Booster Pack Opening** (`index.html`) — a CSS flip-card reveal for the 5 cards a pack mints, reusing the app's existing generic overlay. See §6.24.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -583,7 +584,7 @@ turns that same table around for the player.
   a clean starting point to hand-tune from, the same "auto-build then adjust" pattern most deck
   builders in this genre use, not a merge that could silently exceed the 3-copy cap.
 
-### 6.24 Debug Dashboard (`public/debug.html`, no game-code changes)
+### 6.23 Debug Dashboard (`public/debug.html`, no game-code changes)
 Asked for "a debug page ... so we can test everything better and get way more info produced," and
 specifically as a **dashboard**, not an in-game menu, "so it doesn't interfere with gameplay." The
 game has no server (§3), so the honest scope for a "dashboard" here is: read whatever this browser's
@@ -617,6 +618,31 @@ own save currently holds, and run every self-checking function the codebase alre
   dashboard a non-default save to read), opens `/debug.html` in a second, and asserts zero page
   errors, a real (non-empty-save) save section, every validator badge reading clean, and the raw
   save JSON present and inspectable.
+
+### 6.24 Booster Pack Opening (`index.html`, reuses the existing generic `#overlay`)
+Opening a pack was a gold cost and a toast — the five cards it minted appeared in the collection
+with no moment to actually see what landed. A pack's whole appeal is the reveal; the game had built
+everything a reveal needs (printings, rarity, `cardFace()`) and never staged one.
+
+- **Reused the app's existing generic overlay** (`showOverlay()`/`#overlay`/`#ovBody`, the same
+  modal the Codex already opens into) rather than inventing a second modal system.
+- **A CSS 3D flip**, not a new asset: each pulled card is a `.packcard` with a `.back` (face-down)
+  and a `.front` (the real `cardFace(c, {inst})` — the exact same printing badges, sheen and
+  rarity border the collection grid already renders) on either side of a `rotateY` flip.
+- **Sequential auto-reveal**, one card every 450ms, so five identical instant pop-ins don't blur
+  together — but every step goes through `packFlip(i)`, the same function a tap calls, and it is
+  idempotent (guarded on `.flipped`), so a player tapping ahead of the timer just gets there early
+  rather than double-firing an animation or a sound.
+- **A rare PRINTING outranks base rarity for the fanfare**, deliberately: a common card that rolls
+  Prismatic is the bigger deal than a plain-normal legendary, and the SFX/glow tier
+  (`sfxForDrop`) checks the printing first. The glow colour is the printing's own colour
+  (`variants.js`) when there is one, falling back to the card's rarity colour otherwise — so a
+  pull that's exciting for either reason reads as exciting.
+- **"Reveal All"** for a player who has opened enough packs to not want to wait — flips everything
+  immediately by calling the same idempotent `packFlip` in a loop, not a separate code path.
+- Covered by `tools/browser-test.mjs`: opens a real pack through the real event handler, waits out
+  the full auto-reveal, and asserts all 5 cards minted match what's shown, all 5 actually flipped,
+  the pack cost was actually charged, and Continue closes the shared overlay cleanly.
 
 ### 6.25 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
@@ -660,7 +686,7 @@ Individually:
 node tools/test.mjs          # 443 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (140 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (146 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -681,7 +707,7 @@ from `world/*.json`. It auto-refreshes every 5s, so leaving it open in a second 
 of a play session in the first. There is deliberately no cross-session or cross-player telemetry —
 this project has no persistent server (§3), so a "dashboard" that tried to aggregate more than the
 one browser it's opened in would be exactly the kind of fake the PvP-ranking work already refused
-to build for a leaderboard. See §6.24 for the full rationale.
+to build for a leaderboard. See §6.23 for the full rationale.
 
 ### Deploy (the game platform)
 Use the `deploy_game` tool:
@@ -767,7 +793,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **449 engine / 42 online-rules / 140 browser / 8 viewports / model-check clean.**
+Tests: **449 engine / 42 online-rules / 146 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —

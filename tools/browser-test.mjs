@@ -1295,6 +1295,45 @@ const dVis = await dpage.evaluate(() => ({
 check("joystick is hidden on a non-touch desktop", dVis.joy === "none");
 check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
 
+// ---------------- booster pack opening (BACKLOG §5) ----------------
+// Drives the real event handler, not a mock: buy a pack, let the sequential auto-flip run, and
+// confirm every card actually flipped, the reveal matches what was minted into the save, and
+// Continue (the shared #overlay's own close button) actually closes it.
+{
+  const pctx = await browser.newContext({ viewport:{width:420,height:820} });
+  const perrs = [];
+  const ppage = await pctx.newPage();
+  ppage.on("pageerror", e => perrs.push(String(e)));
+  await ppage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await ppage.waitForTimeout(900);
+  const pack = await ppage.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const s = window.__testSave();
+    s.gold = 1000;
+    const before = s.cards.length;
+    window.__ev("pack");
+    const drops = window.__testSave().cards.slice(before);   // the 5 cards this pack minted
+    await settle(3200);                                       // let the sequential flip finish
+    const flippedCount = document.querySelectorAll(".packcard.flipped").length;
+    const overlayShown = document.getElementById("overlay").style.display === "block";
+    const cardsInOverlay = document.querySelectorAll("#ovBody .packcard").length;
+    window.__ev("ovClose");
+    await settle(100);
+    return {
+      dropCount: drops.length, flippedCount, overlayShown, cardsInOverlay,
+      closedAfter: document.getElementById("overlay").style.display,
+      goldAfter: window.__testSave().gold,
+    };
+  });
+  check("no uncaught page errors while opening a pack", perrs.length === 0, perrs.slice(0,3).join(" | "));
+  check("opening a pack mints exactly 5 cards into the save", pack.dropCount === 5, String(pack.dropCount));
+  check("the reveal overlay shows all 5 pulled cards", pack.cardsInOverlay === 5, String(pack.cardsInOverlay));
+  check("every pulled card auto-flips within the reveal sequence", pack.flippedCount === 5, String(pack.flippedCount));
+  check("the pack cost was actually charged", pack.goldAfter === 900, String(pack.goldAfter));
+  check("Continue closes the reveal overlay", pack.closedAfter === "none", pack.closedAfter);
+  await pctx.close();
+}
+
 // ---------------- debug dashboard (public/debug.html) ----------------
 // A separate page from the game itself — plays a bit of the real game first (via the game's own
 // #app in dctx above would pollute state, so a fresh context) to give the dashboard a real save

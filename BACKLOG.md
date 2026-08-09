@@ -156,7 +156,12 @@
   best copy, name) each tie-breaking on name so the grid is stable between renders
 - [x] Favorite cards — the one stored bit of the codex; everything else about a collection is derived
 - [ ] Card backs
-- [ ] Booster opening animations
+- [x] Booster opening animations — a pack used to be a toast and nothing else, the five cards it
+  minted appearing in the collection with no moment to look at what you got. Now a flip-card
+  reveal (reused the app's existing generic `#overlay`/`showOverlay()` modal, no bespoke one):
+  cards auto-flip in sequence, a rare PRINTING (not just base rarity — a common card rolling
+  Prismatic is the bigger deal) gets the loudest fanfare and a pulsing glow in its own colour,
+  tap any card to flip it early, "Reveal All" for the impatient
 - [x] Deck archetypes — `archetypes.js` `autoBuildDeck`: one-click builds a 20-card deck from your
   OWN collection, weighted the same way an AI opponent of that personality would be (Aggro/Control/
   Tempo/Midrange — Boss excluded, that escalation is a monster mechanic, not a player build). Caps
@@ -236,7 +241,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 449 engine / 42 online / 140 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 449 engine / 42 online / 146 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -298,7 +303,11 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **an end-to-end audit** (nothing left uncommitted, full suite
+**Changes made, most recent first:** **booster pack opening animations** (§5 — a CSS flip-card
+reveal for the 5 cards a pack mints, reusing the app's existing generic overlay; a rare PRINTING
+outranks base rarity for the fanfare, since a common card rolling Prismatic is the bigger deal) →
+**the debug dashboard** (`public/debug.html` — a separate page, live save + every validator, no
+in-game UI, no server telemetry) → **an end-to-end audit** (nothing left uncommitted, full suite
 re-run green, stale test-count claims in `CLAUDEREADME.md` corrected) followed by **Deck
 Archetypes** (`archetypes.js` `autoBuildDeck` — one-click builds a deck from your own collection,
 weighted like an AI opponent's, sharing its weighting table with `archetypeDeckFor` via a new
@@ -341,7 +350,27 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **An end-to-end audit, then Deck Archetypes.** Asked to check the last stretch of
+**Next step:** **Booster pack opening animations are done** (§5). Opening a pack was a gold cost and
+a toast — the five cards it minted appeared in the collection with no moment to see what landed.
+Now a CSS 3D flip-card reveal, reusing the app's existing generic `#overlay`/`showOverlay()` modal
+rather than a bespoke one: `cardFace()` on the front face is the exact same printing/rarity render
+the collection grid already uses, cards auto-flip in sequence (450ms apart, idempotent so a tap
+ahead of the timer never double-fires), and a rare **printing** — not just base rarity — gets the
+loudest fanfare, since a common card rolling Prismatic is the bigger pull than a plain legendary.
+"Reveal All" for players who don't want to wait.
+
+Before that: **the debug dashboard** (`public/debug.html`, BACKLOG §9) — asked for "a debug page
+... so we can test everything better," specifically as a dashboard rather than in-game UI. A
+separate page that reads this browser's own save and runs every `validateX()` in the codebase
+live, plus save/collection/PvP/dorm stats and world/dungeon/quest structural checks fetched fresh.
+No cross-session telemetry — the project has no persistent server, so a dashboard aggregating more
+than the one browser it's open in would be the exact fake already refused for PvP leaderboards.
+Caught a real false positive while building it: merging dungeon zones into the outdoor world for
+`validateExits` flagged every dungeon as "one-way" (the return trip is computed dynamically at
+runtime, never a static graph edge) — fixed by validating each dungeon zone solo, the way
+`tools/test.mjs` already does.
+
+Before that: **an end-to-end audit, then Deck Archetypes.** Asked to check the last stretch of
 work for anything left unfinished before continuing: working tree was already clean and every
 commit pushed, but `CLAUDEREADME.md` had several **stale current-state test counts** (a "how to
 run tests" section still quoting 343/34/109 and an "All tests green" line quoting the same, both

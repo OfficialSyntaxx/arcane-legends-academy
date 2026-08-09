@@ -16,6 +16,23 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### Booster pack opening animations — *pending*
+- Opening a pack was a gold cost and a toast — the five cards it minted appeared in the collection
+  with no moment to see what landed. Now a CSS 3D flip-card reveal, reused into the app's existing
+  generic `#overlay`/`showOverlay()` modal (the same one the Codex opens into) rather than a
+  bespoke one.
+- Each pulled card's front face is the exact same `cardFace(c, {inst})` the collection grid
+  already renders — same printing badges, sheen, rarity border — so the reveal is not a second,
+  drifting copy of what a card looks like.
+- Cards auto-flip in sequence (450ms apart) through `packFlip(i)`, the same function a tap calls —
+  it is idempotent (guarded on `.flipped`), so tapping ahead of the timer just gets there early
+  rather than double-firing. "Reveal All" flips everything at once via the same function.
+- A rare **printing** outranks base rarity for the fanfare, deliberately: a common card rolling
+  Prismatic is the bigger pull than a plain-normal legendary, and `sfxForDrop` checks the printing
+  first. The glow colour is the printing's own colour when there is one, the card's rarity colour
+  otherwise.
+- *449 engine / 42 online / 146 browser.*
+
 ### Debug dashboard — `ce39fae`
 - **`public/debug.html`**: a separate page — never in-game UI, never on the gameplay hot path —
   that reads this browser's own save (via `G.load()`, the same migration/settlement path the game

@@ -114,6 +114,24 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .card.tired{opacity:.6;}
 .card .tired-ic{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:20px;opacity:.9;text-shadow:0 0 6px #000;}
 
+/* booster pack opening (BACKLOG §5 "Booster opening animations") — rendered into the app's
+   existing generic #overlay/showOverlay() modal rather than a bespoke one. */
+.packgrid{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:6px 0 16px;}
+/* Sized to match .card's own clamp so the face-down back and the revealed .card front line up. */
+.packcard{width:clamp(84px,23vw,108px);perspective:900px;cursor:pointer;}
+.packcard .flip{position:relative;width:100%;aspect-ratio:0.68;transform-style:preserve-3d;
+  transition:transform .6s cubic-bezier(.2,.8,.2,1);}
+.packcard.flipped .flip{transform:rotateY(180deg);}
+.packcard .face{position:absolute;inset:0;backface-visibility:hidden;border-radius:10px;overflow:hidden;}
+.packcard .back{background:linear-gradient(160deg,#3a2d6e,#1a1440);border:2px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:34px;}
+.packcard .front{transform:rotateY(180deg);}
+.packcard .front .card{width:100%;cursor:inherit;}
+/* A rare printing or a high base rarity pulses its own border colour once revealed — the flip
+   itself already sells "something happened"; the glow is what says "something GOOD happened". */
+.packcard.rare-glow.flipped .flip{animation:packglow 1.3s ease-in-out infinite alternate;}
+@keyframes packglow{from{filter:drop-shadow(0 0 3px var(--glowcolor));}to{filter:drop-shadow(0 0 16px var(--glowcolor));}}
+
 /* list rows */
 .lrow{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--panel2);flex-wrap:wrap;}
 .lrow .grow{flex:1;min-width:120px;}
@@ -1246,7 +1264,56 @@ window.__EV.cxQuery  = ()=>{
   const again = $("cxQ"); if (again){ again.focus(); again.setSelectionRange(pos, pos); }
 };
 window.__EV.cxFav = (id)=>{ CX.toggleFavorite(S, id); save(); refreshCodex(); render(); };
-window.__EV.pack = ()=>{ const r=G.openPack(S); if(!r.ok){ err("Not enough gold"); return; } sfx(600,.2); toast("✨ Pack opened!"); render(); };
+// Booster opening (BACKLOG §5): opening a pack used to be a toast and nothing else — the five
+// cards it minted appeared in the collection with no moment to look at what you got. Reused the
+// app's existing generic #overlay/showOverlay() rather than a bespoke modal.
+let packReveal = null;
+function sfxForDrop(d){
+  const c = CARD_MAP[d.id];
+  // A rare PRINTING is the bigger deal than base rarity — a common card can roll Prismatic and
+  // out-shine a plain legendary — so it gets the top fanfare regardless of the card underneath.
+  if (d.variant && d.variant !== "normal") return "slab";
+  if (c.rarity === "legendary" || c.rarity === "epic") return "levelUp";
+  return "card";
+}
+function packRevealHtml(drops){
+  let h = `<p class="sub">Tap a card to flip it, or reveal them all at once.</p><div class="packgrid">`;
+  drops.forEach((d,i)=>{
+    const c = CARD_MAP[d.id];
+    const printing = VAR.variantOf(d);
+    const glow = printing && printing.color != null ? "#"+printing.color.toString(16).padStart(6,"0") : RARITY[c.rarity].color;
+    const rare = (d.variant && d.variant !== "normal") || c.rarity === "epic" || c.rarity === "legendary";
+    h += `<div class="packcard${rare?" rare-glow":""}" id="packcard-${i}" style="--glowcolor:${glow}" onclick="window.__ev('packFlip|${i}')">
+      <div class="flip">
+        <div class="face back">🎴</div>
+        <div class="face front">${cardFace(c, { inst:d })}</div>
+      </div>
+    </div>`;
+  });
+  h += `</div><div class="row" style="justify-content:center;gap:10px">
+    <button class="btn" onclick="window.__ev('packSkip')">Reveal All ▶</button>
+    <button class="btn gold" onclick="window.__ev('ovClose')">Continue</button>
+  </div>`;
+  return h;
+}
+window.__EV.pack = ()=>{
+  const r = G.openPack(S);
+  if (!r.ok){ err("Not enough gold"); return; }
+  save();
+  packReveal = r.drops;
+  render();   // the Collection screen underneath updates (gold, card count) while the overlay is on top
+  showOverlay("🎁 Booster Pack", packRevealHtml(r.drops));
+  // Sequential auto-flip, one card at a time — packFlip is idempotent (guarded on .flipped), so a
+  // player who taps ahead of the timer just gets there early, nothing double-fires.
+  r.drops.forEach((d,i)=>{ setTimeout(()=>window.__EV.packFlip(i), 450 + i*450); });
+};
+window.__EV.packFlip = (i)=>{
+  const card = $("packcard-"+i);
+  if (!card || card.classList.contains("flipped") || !packReveal || !packReveal[i]) return;
+  card.classList.add("flipped");
+  AUDIO.play(sfxForDrop(packReveal[i]));
+};
+window.__EV.packSkip = ()=>{ (packReveal||[]).forEach((d,i)=>window.__EV.packFlip(i)); };
 window.__EV.grade = (uid)=>{ const c=G.cardInstance(S,uid); if(!c||c.graded) return; const fee=gradeFee(c.id); const r=G.gradeCard(S,uid); r.ok?toast(`${r.grade.icon} ${r.grade.name}!`):err(`Need ${fee}g to grade`); render(); };
 window.__EV.regrade = (uid)=>{ const r=G.regradeCard(S,uid); if(!r.ok){ err("Not enough gold"); return; } toast(`Regraded: ${r.old.icon} ${r.old.name} → ${r.grade.icon} ${r.grade.name}!`); sfx(500,.1); render(); };
 window.__EV.sell = (uid)=>{ const r=G.sellCard(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
