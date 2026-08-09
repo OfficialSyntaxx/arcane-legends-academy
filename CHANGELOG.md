@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### Online/local combat parity — *pending*
+### Online/local combat parity — `4ae15ef`
 - **`logic.js` (the online duel referee) had NO player-school concept at all.** It runs sandboxed
   with no imports, so it never automatically inherited anything landed in `game.js`: online duels
   were already missing the pre-existing creature school-affinity bonus, and had no way to ever
