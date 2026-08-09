@@ -1334,6 +1334,51 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   await pctx.close();
 }
 
+// ---------------- card backs (BACKLOG §5) ----------------
+// Drives the real Codex gallery and the real event handler: a locked back can't be equipped, an
+// achievement actually earned unlocks its matching back, equipping it updates both the gallery's
+// own highlight AND the pack-reveal's face-down side (the two real places a card back shows).
+{
+  const bctx = await browser.newContext({ viewport:{width:420,height:900} });
+  const berrs = [];
+  const bpage = await bctx.newPage();
+  bpage.on("pageerror", e => berrs.push(String(e)));
+  await bpage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await bpage.waitForTimeout(900);
+  const backs = await bpage.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const s = window.__testSave();
+    s.gold = 1000;
+    // locked: try to equip a back with zero achievements done
+    const beforeBack = s.cardBack;
+    window.__EV.backEquip("legends");
+    const stillDefault = window.__testSave().cardBack === beforeBack;
+    // earn "shiny" (own a foil) for real, the same way a player would — mint one via a pack loop
+    // would be slow and flaky, so seed it directly the way the engine tests already do.
+    s.cards.push({ uid:"t1", id:"firebolt", roll:80, graded:false, variant:"foil" });
+    window.__EV.backEquip("shiny");
+    const equippedAfterUnlock = window.__testSave().cardBack === "shiny";
+    // the pack reveal's face-down side now wears it
+    window.__ev("pack");
+    await settle(150);
+    const packBackHtml = document.querySelector(".packcard .back") ? document.querySelector(".packcard .back").outerHTML : "";
+    window.__ev("ovClose");
+    await settle(100);
+    // the Codex gallery reflects the same equipped state
+    window.__ev("openCodex");
+    await settle(200);
+    document.getElementById("overlay").scrollTop = document.getElementById("overlay").scrollHeight;
+    const galleryHtml = document.querySelector("#ovBody .panel:last-child").innerHTML;
+    return { stillDefault, equippedAfterUnlock, packBackHtml, galleryHtml };
+  });
+  check("no uncaught page errors while equipping card backs", berrs.length === 0, berrs.slice(0,3).join(" | "));
+  check("a locked card back cannot be equipped", backs.stillDefault === true);
+  check("earning the matching achievement unlocks and allows equipping its back", backs.equippedAfterUnlock === true);
+  check("the equipped back's colour shows on the pack reveal's face-down side", /linear-gradient\(135deg,#16213e/.test(backs.packBackHtml), backs.packBackHtml.slice(0,120));
+  check("the Codex gallery shows the Card Backs section with the equip highlighted", /Card Backs/.test(backs.galleryHtml) && /var\(--gold\)/.test(backs.galleryHtml));
+  await bctx.close();
+}
+
 // ---------------- debug dashboard (public/debug.html) ----------------
 // A separate page from the game itself — plays a bit of the real game first (via the game's own
 // #app in dctx above would pollute state, so a fresh context) to give the dashboard a real save

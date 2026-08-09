@@ -20,6 +20,7 @@ import * as CX from "../public/codex.js";
 import * as ARCH from "../public/archetypes.js";
 import * as RANK from "../public/pvprank.js";
 import * as MAGIC from "../public/schoolmagic.js";
+import * as CB from "../public/cardbacks.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -2749,6 +2750,47 @@ check("aiTurn spends a charged ultimate automatically", (()=>{
   const shieldBefore = b.enemy.shield;
   G.aiTurn(b);
   return b.enemy.ultUsed && b.enemy.shield > shieldBefore;   // Deep Freeze shields for 8
+})());
+
+// ---------------------------------------------------------------- cardbacks.js
+check("validateCardBacks reports no problems", CB.validateCardBacks().length === 0);
+check("the default back is always unlocked, with no achievement gate", (()=>{
+  return CB.isUnlocked(CB.DEFAULT_BACK, []) === true;
+})());
+check("every non-default back is locked with no achievements done", (()=>{
+  return CB.CARD_BACKS.filter(b => b.id !== CB.DEFAULT_BACK).every(b => CB.isUnlocked(b.id, []) === false);
+})());
+check("a back unlocks once its matching achievement is done", (()=>{
+  return CB.isUnlocked("archivist", ["archivist"]) === true
+      && CB.isUnlocked("archivist", ["curator"]) === false;
+})());
+check("unlockedBacks always includes the default plus whatever achievements are done", (()=>{
+  const ids = CB.unlockedBacks(["shiny", "founder"]).map(b => b.id);
+  return ids.includes(CB.DEFAULT_BACK) && ids.includes("shiny") && ids.includes("founder") && !ids.includes("curator");
+})());
+check("equippedBack falls back to the default for a fresh or bad save", (()=>{
+  return CB.equippedBack({}).id === CB.DEFAULT_BACK
+      && CB.equippedBack({ cardBack: "not-a-real-id" }).id === CB.DEFAULT_BACK
+      && CB.equippedBack(null).id === CB.DEFAULT_BACK;
+})());
+check("setBack refuses a locked back and leaves the save unchanged", (()=>{
+  const save = { cardBack: CB.DEFAULT_BACK };
+  const r = CB.setBack(save, "legends", []);
+  return r.ok === false && save.cardBack === CB.DEFAULT_BACK;
+})());
+check("setBack accepts an unlocked back", (()=>{
+  const save = { cardBack: CB.DEFAULT_BACK };
+  const r = CB.setBack(save, "scholar", ["scholar"]);
+  return r.ok === true && save.cardBack === "scholar";
+})());
+check("every card back's achievement id (if any) is a real codex achievement", (()=>{
+  const ids = CX.ACHIEVEMENTS.map(a => a.id);
+  return CB.CARD_BACKS.every(b => b.achievement == null || ids.includes(b.achievement));
+})());
+check("game.js newGame() equips the default card back", G.newGame().cardBack === CB.DEFAULT_BACK);
+check("game.js load() never leaves cardBack unset or pointing at a fake back", (()=>{
+  const s = G.load();
+  return !!s.cardBack && !!CB.BACK_MAP[s.cardBack];
 })());
 
 console.log(`\n${pass} passed, ${fail} failed`);

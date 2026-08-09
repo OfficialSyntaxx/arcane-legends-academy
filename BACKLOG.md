@@ -155,7 +155,11 @@
   school filter, a text search over names and card text, and five sorts (school, rarity, cost,
   best copy, name) each tie-breaking on name so the grid is stable between renders
 - [x] Favorite cards — the one stored bit of the codex; everything else about a collection is derived
-- [ ] Card backs
+- [x] Card backs — `cardbacks.js`: 9 procedural CSS-gradient backs (zero new asset bytes) unlocked
+  by the matching codex achievement — no second grind, the same collection effort now buys two
+  rewards. `save.cardBack` is the one stored bit; which backs are UNLOCKED stays derived from
+  achievements every time. Shown on the pack-opening reveal's face-down side and in a new "Card
+  Backs" gallery in the Codex, right under the achievements that unlock them
 - [x] Booster opening animations — a pack used to be a toast and nothing else, the five cards it
   minted appearing in the collection with no moment to look at what you got. Now a flip-card
   reveal (reused the app's existing generic `#overlay`/`showOverlay()` modal, no bespoke one):
@@ -241,7 +245,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 449 engine / 42 online / 146 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 460 engine / 42 online / 151 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -303,7 +307,9 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **booster pack opening animations** (§5 — a CSS flip-card
+**Changes made, most recent first:** **card backs** (`cardbacks.js` — 9 procedural CSS backs
+unlocked by the matching codex achievement, no new grind; shown on the pack reveal and a new Codex
+gallery) → **booster pack opening animations** (§5 — a CSS flip-card
 reveal for the 5 cards a pack mints, reusing the app's existing generic overlay; a rare PRINTING
 outranks base rarity for the fanfare, since a common card rolling Prismatic is the bigger deal) →
 **the debug dashboard** (`public/debug.html` — a separate page, live save + every validator, no
@@ -350,7 +356,15 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Booster pack opening animations are done** (§5). Opening a pack was a gold cost and
+**Next step:** **Card backs are done** (§5, `cardbacks.js`) — 9 procedural CSS-gradient backs
+(zero new asset bytes), each unlocked by finishing the matching codex achievement rather than a
+second grind alongside it. `save.cardBack` is the one stored bit; which backs are unlocked stays
+derived from achievements, the exact shape codex favourites already use. Shown on the
+pack-opening reveal's face-down side and a new "Card Backs" gallery in the Codex, right under the
+achievements that unlock each one. §5 Cards & Collection now has only card evolution left
+unstarted.
+
+Before that: **Booster pack opening animations** (§5). Opening a pack was a gold cost and
 a toast — the five cards it minted appeared in the collection with no moment to see what landed.
 Now a CSS 3D flip-card reveal, reusing the app's existing generic `#overlay`/`showOverlay()` modal
 rather than a bespoke one: `cardFace()` on the front face is the exact same printing/rarity render

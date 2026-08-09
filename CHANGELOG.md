@@ -16,6 +16,15 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### Card backs — *pending*
+- **`cardbacks.js`**: 9 procedural CSS-gradient backs, unlocked by the matching `codex.js`
+  achievement — no new grind, the same collection effort now buys two rewards. `save.cardBack` is
+  the one stored bit; which backs are UNLOCKED stays derived from achievements every time, the
+  same shape codex favourites already use.
+- Shown on the pack-opening reveal's face-down side and a new "Card Backs" gallery in the Codex,
+  directly under the achievements that unlock each one.
+- *460 engine / 42 online / 151 browser.*
+
 ### Booster pack opening animations — `43dcd7b`
 - Opening a pack was a gold cost and a toast — the five cards it minted appeared in the collection
   with no moment to see what landed. Now a CSS 3D flip-card reveal, reused into the app's existing

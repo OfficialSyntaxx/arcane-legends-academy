@@ -7,6 +7,7 @@ import * as VAR from "./variants.js";
 import * as ARCH from "./archetypes.js";
 import * as RANK from "./pvprank.js";
 import * as MAGIC from "./schoolmagic.js";
+import * as CB from "./cardbacks.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
 export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
@@ -60,6 +61,9 @@ export function newGame(){
     // Favourited card TYPES (codex.js). The one stored bit of the codex — everything else about a
     // collection (completion, achievements, filters) is derived from `cards` on every read.
     favorites:[],
+    // Equipped card back (cardbacks.js). The one stored bit there too — WHICH backs are unlocked
+    // is derived from achievements every time; this is only the choice among the unlocked ones.
+    cardBack: CB.DEFAULT_BACK,
     // NPC reputation (reputation.js). Only quest givers earn any right now — see that module
     // for why this is a flat {npcKey: number} map rather than a richer per-NPC shape.
     reputation:{},
@@ -103,6 +107,7 @@ function migrate(s){
   if (!Array.isArray(s.zoneQuests.done)) s.zoneQuests.done = [];
   if (!s.reputation || typeof s.reputation !== "object") s.reputation = {};
   if (!Array.isArray(s.favorites)) s.favorites = [];
+  if (!s.cardBack || !CB.BACK_MAP[s.cardBack]) s.cardBack = CB.DEFAULT_BACK;
   // PvP rank. An older save has real wins/losses but never had a rank — it starts at Bronze
   // rather than being credited retroactively, because there is no recorded ORDER for those old
   // results to replay through the streak/season maths.

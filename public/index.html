@@ -380,6 +380,7 @@ import * as CX from "./codex.js";
 import * as ARCH from "./archetypes.js";
 import * as RANK from "./pvprank.js";
 import * as MAGIC from "./schoolmagic.js";
+import * as CB from "./cardbacks.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -1245,6 +1246,23 @@ function buildCodex(){
       <div style="font-size:10px;color:var(--muted)">${a.have}/${a.need}</div>`}</div>`;
   }
   h += `</div></div>`;
+
+  // card backs (cardbacks.js) — unlocked by the achievements just above, not a second grind
+  const doneIds = ach.filter(a => a.done).map(a => a.id);
+  const equipped = CB.equippedBack(S).id;
+  h += `<div class="panel" style="margin-top:14px"><h3>🎴 Card Backs</h3><p class="sub">Unlocked by the achievements above. Pick one to show on face-down cards.</p><div class="row" style="flex-wrap:wrap">`;
+  for (const b of CB.CARD_BACKS){
+    const unlocked = CB.isUnlocked(b.id, doneIds);
+    h += `<div class="packcard" style="${unlocked?"cursor:pointer":"cursor:not-allowed;opacity:.35"}" ${unlocked?`onclick="window.__ev('backEquip|${b.id}')"`:""} title="${unlocked?b.name:b.name+" (locked)"}">
+      <div class="flip" style="transform:none">
+        <div class="face front" style="position:static;transform:none;background:${b.css};display:flex;align-items:center;justify-content:center;height:100%;border-radius:10px;
+          ${b.id===equipped?"outline:3px solid var(--gold)":"border:2px solid var(--line)"}">
+          <span style="color:${b.emblemColor};font-size:26px">${unlocked?b.emblem:"🔒"}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+  h += `</div></div>`;
   return h;
 }
 function refreshCodex(){
@@ -1264,9 +1282,18 @@ window.__EV.cxQuery  = ()=>{
   const again = $("cxQ"); if (again){ again.focus(); again.setSelectionRange(pos, pos); }
 };
 window.__EV.cxFav = (id)=>{ CX.toggleFavorite(S, id); save(); refreshCodex(); render(); };
+window.__EV.backEquip = (id)=>{
+  const doneIds = CX.achievementsFor(CARDS, S.cards).filter(a=>a.done).map(a=>a.id);
+  const r = CB.setBack(S, id, doneIds);
+  if (r.ok){ save(); toast(`${CB.BACK_MAP[id].emblem} ${CB.BACK_MAP[id].name} equipped`); refreshCodex(); }
+};
 // Booster opening (BACKLOG §5): opening a pack used to be a toast and nothing else — the five
 // cards it minted appeared in the collection with no moment to look at what you got. Reused the
 // app's existing generic #overlay/showOverlay() rather than a bespoke modal.
+// The face-down side of a pack card wears the player's equipped card back (cardbacks.js) — the
+// same look also used in the Codex's "Card Backs" gallery (buildCodex).
+function equippedCardBackCss(){ return CB.equippedBack(S).css; }
+function equippedCardBackEmblem(){ const b = CB.equippedBack(S); return `<span style="color:${b.emblemColor};font-size:28px">${b.emblem}</span>`; }
 let packReveal = null;
 function sfxForDrop(d){
   const c = CARD_MAP[d.id];
@@ -1285,7 +1312,7 @@ function packRevealHtml(drops){
     const rare = (d.variant && d.variant !== "normal") || c.rarity === "epic" || c.rarity === "legendary";
     h += `<div class="packcard${rare?" rare-glow":""}" id="packcard-${i}" style="--glowcolor:${glow}" onclick="window.__ev('packFlip|${i}')">
       <div class="flip">
-        <div class="face back">🎴</div>
+        <div class="face back" style="background:${equippedCardBackCss()}">${equippedCardBackEmblem()}</div>
         <div class="face front">${cardFace(c, { inst:d })}</div>
       </div>
     </div>`;

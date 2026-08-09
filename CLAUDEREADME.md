@@ -69,6 +69,7 @@ wizard-tcg/                 (the repo root)
 │   ├── archetypes.js       AI battle personalities, thematic enemy decks, boss phases — PURE
 │   ├── pvprank.js          PvP tiers, seasons, streak-bonus match results — PURE
 │   ├── schoolmagic.js      school affinity bonus + ultimate abilities — PURE
+│   ├── cardbacks.js        collectible card backs, unlocked by codex achievements — PURE
 │   ├── reputation.js       per-NPC standing + reward bonuses — PURE
 │   ├── dorm.js             the player's dorm: tiers, furniture slots/placement, display cases,
 │   │                       trophies — PURE; compiles to a zone by reusing dungeons.js
@@ -237,6 +238,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Deck Archetypes** (`archetypes.js` `autoBuildDeck`) — one-click builds a deck from your own collection, weighted like an AI opponent's, capped by what you own. See §6.22.
 - **Debug Dashboard** (`public/debug.html`) — a separate page reading this browser's save + running every validator live, no server telemetry. See §6.23.
 - **Booster Pack Opening** (`index.html`) — a CSS flip-card reveal for the 5 cards a pack mints, reusing the app's existing generic overlay. See §6.24.
+- **Card Backs** (`cardbacks.js`) — 9 procedural CSS backs unlocked by codex achievements, no new grind. See §6.25.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -644,7 +646,29 @@ everything a reveal needs (printings, rarity, `cardFace()`) and never staged one
   the full auto-reveal, and asserts all 5 cards minted match what's shown, all 5 actually flipped,
   the pack cost was actually charged, and Continue closes the shared overlay cleanly.
 
-### 6.25 Retention
+### 6.25 Card Backs (`cardbacks.js`)
+A booster reveal now has a face-down side worth looking at, and the Codex's nine achievements were
+a finished, derived ladder with nothing at the top of it besides a checkmark.
+
+- **Tied to the existing achievement ladder, not a new grind**: `codex.js`'s nine achievements
+  (`ACHIEVEMENTS`) are already a complete "what has this collection accomplished" progression.
+  Every card back but the default unlocks by finishing the matching achievement — the same
+  collection effort buys two rewards, rather than inventing a second currency alongside it.
+- **CSS gradients, not images** — zero new asset bytes, consistent with `tint.js`'s hue shift and
+  `vfx.js`'s procedural spells, and a back reads clearly at card-grid size where an illustration
+  would not.
+- **`save.cardBack` is the one stored bit**, the exact shape `codex.js` favourites already
+  established: which backs are UNLOCKED is derived from achievements every time; which one is
+  EQUIPPED is a choice, so it is the thing that gets saved.
+- **Two real places a back shows**: the pack-opening reveal's face-down `.back` side (§6.24), and
+  a new "Card Backs" gallery in the Codex overlay, placed directly under the achievements that
+  unlock each one — a locked back shows 🔒 in place of its emblem and cannot be clicked.
+- Covered by `tools/browser-test.mjs`: a locked back refuses to equip through the real handler, a
+  back earned by seeding the matching achievement (owning a foil, the same signal
+  `codex.js`'s own achievement reads) both unlocks and equips, and the equipped back's colour
+  shows up on both the pack reveal and the Codex gallery's highlight.
+
+### 6.26 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -686,7 +710,7 @@ Individually:
 node tools/test.mjs          # 443 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (146 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (151 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -793,7 +817,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **449 engine / 42 online-rules / 146 browser / 8 viewports / model-check clean.**
+Tests: **460 engine / 42 online-rules / 151 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —
