@@ -1295,6 +1295,39 @@ const dVis = await dpage.evaluate(() => ({
 check("joystick is hidden on a non-touch desktop", dVis.joy === "none");
 check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
 
+// ---------------- debug dashboard (public/debug.html) ----------------
+// A separate page from the game itself — plays a bit of the real game first (via the game's own
+// #app in dctx above would pollute state, so a fresh context) to give the dashboard a real save
+// to read, then opens debug.html and checks it actually surfaces that save plus every validator,
+// live, with zero errors — not a static mock of what it MIGHT show.
+{
+  const dbgCtx = await browser.newContext({ viewport:{width:1280,height:900} });
+  const dbgErrs = [];
+  const gamePage = await dbgCtx.newPage();
+  gamePage.on("pageerror", e => dbgErrs.push(String(e)));
+  await gamePage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await gamePage.waitForTimeout(900);
+  // touch the save so it is not a bare fresh-game default — level up and drop a card via the same
+  // real functions the rest of this suite already trusts.
+  await gamePage.evaluate(() => { window.__testGather && window.__testGather(); });
+  await gamePage.waitForTimeout(200);
+
+  const dashPage = await dbgCtx.newPage();
+  dashPage.on("pageerror", e => dbgErrs.push(String(e)));
+  await dashPage.goto(BASE + "/debug.html", { waitUntil:"load" });
+  await dashPage.waitForTimeout(1500);   // world/dungeon config fetch + validators
+  const dash = await dashPage.evaluate(() => ({
+    text: document.getElementById("root").innerText,
+    badges: [...document.querySelectorAll(".vbadge")].map(b => b.textContent),
+    hasRawSave: document.querySelector("pre") && document.querySelector("pre").textContent.length > 20,
+  }));
+  check("the debug dashboard loads with no page errors", dbgErrs.length === 0, dbgErrs.slice(0,3).join(" | "));
+  check("the dashboard renders a real save section, not an empty-save placeholder", /Level \/ XP/.test(dash.text) && !/No save found/.test(dash.text));
+  check("the dashboard runs every module's validateX() and reports clean", dash.badges.length > 0 && dash.badges.every(b => b.includes("✓")), dash.badges.filter(b=>!b.includes("✓")).join(" | "));
+  check("the dashboard's world/dungeon/quest validators ran (fetched live, not hardcoded)", dash.badges.length >= 10, String(dash.badges.length));
+  check("the dashboard exposes the raw save as inspectable JSON", dash.hasRawSave === true);
+  await dbgCtx.close();
+}
 
 await browser.close();
 server.close();

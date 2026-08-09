@@ -16,6 +16,27 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### Debug dashboard — *pending*
+- **`public/debug.html`**: a separate page — never in-game UI, never on the gameplay hot path —
+  that reads this browser's own save (via `G.load()`, the same migration/settlement path the game
+  itself takes) and runs **every `validateX()` in the codebase live**, plus save/collection/PvP/
+  dorm/reputation stats and world/dungeon/quest structural checks fetched fresh from
+  `world/*.json`. Auto-refreshes every 5s so a second tab stays live while playing in the first.
+- **No cross-session or cross-player telemetry, deliberately** — this project has no persistent
+  server, so a dashboard aggregating more than the one browser it's open in would be exactly the
+  fake the PvP-ranking work already refused to build for a leaderboard.
+- **A real false positive caught and fixed while building it**: merging dungeon zones into the
+  outdoor world and running `validateExits` over the result flagged every dungeon as "one-way" —
+  a dungeon's own `exits` entry points back to its entrance zone, but the *return* trip is computed
+  dynamically by `world.js` at runtime, never a second static entry on the outdoor zone. Fixed by
+  validating each dungeon zone SOLO, exactly the way `tools/test.mjs`'s own "each dungeon compiles
+  to a valid zone" check already does — the dashboard was testing an invariant the game was never
+  designed to satisfy statically, not reporting a real bug.
+- Covered by `tools/browser-test.mjs`: plays a bit of the real game, opens `/debug.html` in a
+  second tab, and asserts zero page errors, a real save section, every validator reading clean, and
+  the raw save JSON inspectable.
+- *449 engine / 42 online / 140 browser.*
+
 ### An end-to-end audit, then Deck Archetypes — `e03e8dd`
 - **Audit**: asked to check the previous stretch of work for anything left unfinished. Working
   tree was clean and every commit pushed, but `CLAUDEREADME.md` had drifted — a "how to run tests"
@@ -28,7 +49,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
   copies, never invents a card the player doesn't have, and returns an honest partial deck (not a
   hang) when the collection can't fill the archetype yet. Wired into the Loadout screen as
   one-click buttons that **replace** the current deck.
-- *449 engine / 42 online / 135 browser.*
+- *449 engine / 42 online / 140 browser.*
 
 ### Online/local combat parity — `4ae15ef`
 - **`logic.js` (the online duel referee) had NO player-school concept at all.** It runs sandboxed

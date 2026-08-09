@@ -224,12 +224,19 @@
 ## 9. Technical / Quality
 
 - [~] Centralize game rules/data — cards/items/nodes/structures/zones are all data; `logic.js` catalog is generated and drift-checked by `npm test`
+- [x] Debug dashboard — `public/debug.html`: a separate page (never in-game UI, never touches
+      gameplay) that reads this browser's own save and runs every `validateX()` in the codebase
+      live, plus save/collection/PvP/dorm/reputation stats and world/dungeon/quest structural
+      checks fetched fresh from `world/*.json`. No server, no cross-player telemetry — it can only
+      ever show the save on the machine it's opened on, the same honesty already applied to PvP's
+      season history instead of a fake leaderboard. Auto-refreshes every 5s so a second tab stays
+      live while playing in the first.
 - [x] Save versioning + migration — `migrate()` in `game.js`, covered by tests
 - [ ] Save backup/import/export
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 449 engine / 42 online / 135 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 449 engine / 42 online / 140 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes

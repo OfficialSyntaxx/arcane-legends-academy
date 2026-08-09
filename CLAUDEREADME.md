@@ -51,6 +51,7 @@ wizard-tcg/                 (the repo root)
 ├── package.json            (type: module, for the node test runner)
 ├── public/                 the game client (deployed as-is)
 │   ├── index.html          the game page (all UI + boot)
+│   ├── debug.html          debug dashboard: this browser's save + every validateX(), live — separate page, never in-game UI
 │   ├── cards.js            card catalog + grading + elemental matrix
 │   ├── items.js            skills, materials, equipment, recipes, home upgrades
 │   ├── nodes.js            gathering-node table (data; world.js builds the meshes from it)
@@ -234,6 +235,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **School mechanics & ultimates** (`schoolmagic.js`) — a same-school spell bonus and a once-per-duel ultimate per school, both flowing through a new reusable `FX_HANDLERS` effect dispatch table. See §6.18.
 - **Deck Testing Laboratory** (`index.html`) — play your current deck against any AI personality with zero rewards and zero record kept. See §6.20.
 - **Deck Archetypes** (`archetypes.js` `autoBuildDeck`) — one-click builds a deck from your own collection, weighted like an AI opponent's, capped by what you own. See §6.22.
+- **Debug Dashboard** (`public/debug.html`) — a separate page reading this browser's save + running every validator live, no server telemetry. See §6.24.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -581,7 +583,42 @@ turns that same table around for the player.
   a clean starting point to hand-tune from, the same "auto-build then adjust" pattern most deck
   builders in this genre use, not a merge that could silently exceed the 3-copy cap.
 
-### 6.23 Retention
+### 6.24 Debug Dashboard (`public/debug.html`, no game-code changes)
+Asked for "a debug page ... so we can test everything better and get way more info produced," and
+specifically as a **dashboard**, not an in-game menu, "so it doesn't interfere with gameplay." The
+game has no server (§3), so the honest scope for a "dashboard" here is: read whatever this browser's
+own save currently holds, and run every self-checking function the codebase already has, live.
+
+- **Reads the real save via `G.load()`** — the same migration/settlement path the game itself
+  takes, not a raw `localStorage` dump — so the numbers shown are exactly what the game would
+  compute, never a second, drifting copy of that logic.
+- **Runs every `validateX()` in the codebase** (`archetypes.js`, `codex.js`, `dorm.js`,
+  `pvprank.js`, `schoolmagic.js`, `variants.js`, `lessons.js`) plus `worldconfig.js`/`dungeons.js`/
+  `zonequests.js`'s structural validators against `world/*.json` **fetched fresh** — the exact
+  same functions `tools/test.mjs` asserts in CI, so a regression that would fail `npm test` shows
+  up here too, in the browser, against the code as actually served. Model-existence checks are the
+  one thing skipped (a browser page has no filesystem access to list what `.glb` files exist) —
+  that stays `npm run check:models`'s job.
+- **Save/collection/PvP/dorm/reputation stats**, all read through the same exported functions the
+  game's own screens use (`G.equipStats`, `G.totalCollectionValue`, `G.academyScore`,
+  `CX.overallCompletion`/`completionBy`/`achievementsFor`, `RANK.tierFor`/`progressToNextTier`,
+  `DORM.tierFor`/`progressToNextTier`, `REP.levelFor`) — never a parallel computation that could
+  disagree with what the player actually sees.
+- **Deliberately no cross-session or cross-player telemetry.** This project has no persistent
+  server; a dashboard that claimed to aggregate more than the one browser it is open in would be
+  the exact shape of fake the PvP-ranking work (§6.16) already refused to build for a leaderboard.
+  What it CAN honestly show — one browser's full save, plus live self-checks — it shows in full.
+- **A separate page, not a screen in `screen`/`render()`.** No shared state with the game's own
+  render loop, no risk of ever showing up mid-duel; opened at `/debug.html`, entirely independent.
+  Auto-refreshes every 5s (togglable) so a second tab can watch a play session live in the first —
+  world/dungeon config is fetched once per page load, not on every refresh, since it cannot change
+  while the tab is open and refetching it every 5s would be pure waste.
+- Covered by `tools/browser-test.mjs`: plays a little of the real game in one tab (to give the
+  dashboard a non-default save to read), opens `/debug.html` in a second, and asserts zero page
+  errors, a real (non-empty-save) save section, every validator badge reading clean, and the raw
+  save JSON present and inspectable.
+
+### 6.25 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -623,7 +660,7 @@ Individually:
 node tools/test.mjs          # 443 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (131 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (140 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -633,6 +670,18 @@ CI runs `npm test` on every push (`.github/workflows/test.yml`). All three suite
 paths relative to the repo — never hardcode an absolute sandbox path into a tool again; the
 old `ui-smoke.mjs` did, threw ENOENT before its `process.exit`, and reported a false pass for
 several commits.
+
+### Debug dashboard
+Open `/debug.html` (a separate page from the game itself — never an in-game menu, never on the
+gameplay hot path) to see, live, in any browser that has played the game: the save's full state
+(player, deck, PvP rank, dorm, reputation, collection/codex completion, printings, achievements),
+**every `validateX()` in the codebase run right there** against the code as actually shipped (the
+same functions `npm test` asserts in CI), and world/dungeon/quest structural checks fetched fresh
+from `world/*.json`. It auto-refreshes every 5s, so leaving it open in a second tab is a live view
+of a play session in the first. There is deliberately no cross-session or cross-player telemetry —
+this project has no persistent server (§3), so a "dashboard" that tried to aggregate more than the
+one browser it's opened in would be exactly the kind of fake the PvP-ranking work already refused
+to build for a leaderboard. See §6.24 for the full rationale.
 
 ### Deploy (the game platform)
 Use the `deploy_game` tool:
@@ -718,7 +767,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **449 engine / 42 online-rules / 135 browser / 8 viewports / model-check clean.**
+Tests: **449 engine / 42 online-rules / 140 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —
