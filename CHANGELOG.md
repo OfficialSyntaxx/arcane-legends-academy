@@ -16,6 +16,25 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### Online/local combat parity — *pending*
+- **`logic.js` (the online duel referee) had NO player-school concept at all.** It runs sandboxed
+  with no imports, so it never automatically inherited anything landed in `game.js`: online duels
+  were already missing the pre-existing creature school-affinity bonus, and had no way to ever
+  gain the spell affinity bonus or school ultimates added earlier this session.
+- **`setDeck` now carries a `school`** (falling back to `balance`, matching `game.js`'s own
+  fallback); `makeCreature` and the spell-cast branch gained the same affinity bonuses `game.js`
+  has, ported by hand since `logic.js` cannot `import` `schoolmagic.js`.
+- **`logic.js` carries its own generated copy** of the affinity/ultimate fx, emitted into the same
+  `tools/sync-cards.mjs` generated block the card catalog already uses (drift-checked by
+  `npm test`) — only the `{k,n}` an effect needs to resolve travels here; flavour strings stay
+  client-only.
+- **A new `"ultimate"` action** mirrors `game.js`'s `useUltimate`; the online duel UI gained the
+  same charge-percentage ultimate button the local one has.
+- Found by deliberately auditing local/online parity after two sessions of only ever extending the
+  local engine — `npm test`'s catalog check already guards data drift, but nothing was watching
+  rules drift.
+- Online-rules tests: 34 → 42. *443 engine / 42 online / 131 browser.*
+
 ### Deck Testing Laboratory; §8 audited and documented as server-blocked — `82faa22`
 - **Deck Testing Laboratory** (§5): a PvP-screen panel to play your current deck against any of
   the five AI personalities, fighting a real thematic 20-card deck (the same builder dungeon

@@ -1790,6 +1790,14 @@ function renderOnline(el){
       h += `<div class="panel"><div class="zonecap" style="position:static">${STR.hand} (${v.you.hand.length})</div><div class="hand">`;
       for (let i=0;i<v.you.hand.length;i++){ const id=v.you.hand[i]; const c=CARD_MAP[id]; const playable=myTurn&&v.you.pips>=c.cost; const targeted=c.type==="spell"&&c.fx.some(f=>f.k==="dmg"); h += cardFace(c,{disabled:!playable, onclick: playable?(targeted?`oCast|${i}`:`oPlay|${i}`):""}); }
       h += `</div></div>`;
+      const ult = MAGIC.ultimateFor(v.you.school);
+      if (ult){
+        const charged = MAGIC.canUseUltimate(v.you.ultCharge, v.you.school, v.you.ultUsed);
+        const pct = Math.min(100, Math.round((v.you.ultCharge||0) / MAGIC.ULT_CHARGE_MAX * 100));
+        h += `<div class="row" style="justify-content:center;margin-bottom:4px">
+          <button class="btn ${charged&&myTurn?"gold":""}" ${charged&&myTurn?"":"disabled"} onclick="window.__ev('oUltimate')" title="${ult.text}">
+            ${ult.icon} ${ult.name}${v.you.ultUsed?" (used)":charged?"":` ${pct}%`}</button></div>`;
+      }
       h += `<div class="row" style="justify-content:center"><button class="btn gold" ${myTurn?"":"disabled"} onclick="window.__ev('oEnd')">${STR.end_turn}</button></div>`;
       h += `<div id="duelLog">${(v.log||[]).slice(-4).join(" · ")}</div>`;
     }
@@ -1809,7 +1817,7 @@ function connectOnline(){
   const base = location.pathname.replace(/\/+$/,"");
   const wsUrl = (location.protocol==="https:"?"wss://":"ws://") + location.host + base + "/ws/" + online.room;
   online.ws = new WebSocket(wsUrl);
-  online.ws.onopen = ()=>{ sendOnline({type:"join", playerId: online.playerId}); sendOnline({type:"action", action:{type:"setDeck", deck: online.deck}}); };
+  online.ws.onopen = ()=>{ sendOnline({type:"join", playerId: online.playerId}); sendOnline({type:"action", action:{type:"setDeck", deck: online.deck, school: S.school}}); };
   online.ws.onclose = ()=>{ setTimeout(connectOnline, 1500); };
   online.ws.onmessage = (e)=>{
     const msg = JSON.parse(e.data);
@@ -1830,6 +1838,7 @@ window.__EV.oCast = (i)=>{ const c=CARD_MAP[online.state.view.you.hand[i]]; if(c
 window.__EV.oDmg = (ti)=>{ if(pendingTarget&&pendingTarget.kind==="oSpell"){ sendOnline({type:"action",action:{type:"play",handIndex:pendingTarget.idx,target:{kind:"creature",idx:ti}}}); pendingTarget=null; } else if(pendingTarget&&pendingTarget.kind==="oAtk"){ sendOnline({type:"action",action:{type:"attack",attacker:pendingTarget.idx,targetKind:"creature",targetIdx:ti}}); pendingTarget=null; } };
 window.__EV.oAtk = (i)=>{ const v=online.state.view; const hasTaunt=v.opp.board.some(c=>c.taunt&&c.hp>0); if(hasTaunt){ pendingTarget={kind:"oAtk",idx:i}; } else sendOnline({type:"action",action:{type:"attack",attacker:i,targetKind:"wiz"}}); };
 window.__EV.oEnd = ()=>{ sendOnline({type:"action",action:{type:"endTurn"}}); };
+window.__EV.oUltimate = ()=>{ sendOnline({type:"action",action:{type:"ultimate"}}); };
 window.__EV.oReset = ()=>{ sendOnline({type:"reset"}); online.rewarded=false; };
 
 // ================= WORLD (3D hub) =================

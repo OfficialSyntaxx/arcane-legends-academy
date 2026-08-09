@@ -90,7 +90,7 @@ wizard-tcg/                 (the repo root)
 │   └── assets/             generated art: character GLBs (models/), landmarks (buildings/)
 ├── models_cdn/              git-tracked source copies of large GLBs (not deployed — see cdn.js)
 ├── tools/                  headless test suites + asset pipeline
-│   ├── sync-cards.mjs      regenerates the logic.js catalog from cards.js (--check in CI)
+│   ├── sync-cards.mjs      regenerates logic.js's catalog + school affinity/ultimate fx from cards.js/schoolmagic.js (--check in CI)
 │   ├── sync-zones.mjs      regenerates the academy zone in zones.json (--check in CI)
 │   ├── test.mjs            engine tests (343 checks)
 │   ├── logic-test.mjs      online-rules tests (34 checks)
@@ -511,6 +511,10 @@ mechanic, an ultimate — would just be one more branch bolted onto.
 - `ultCharge`/`ultUsed` live only on the in-battle `you`/`enemy` objects, never the save — a duel is
   already fully recomputed from `startDuel` every time, the same reason nothing else about a duel
   in progress is persisted.
+- **Online parity (`logic.js`) came later, as a separate fix** — see §6.21 below. `logic.js` runs
+  sandboxed with no imports, so it never automatically inherits anything landed in
+  `game.js`/`schoolmagic.js`; the online engine had NO player-school concept at all until that fix,
+  a wider gap than just missing ultimates.
 
 ### 6.20 Deck Testing Laboratory (`index.html`, no new module)
 A deck's shape is a real question a player should be able to answer — does it fold to Aggro's
@@ -528,7 +532,33 @@ would also quietly poison PvP ranking's win-streak/season-floor maths with match
 really contested. No new pure module was needed — everything the Lab needs (thematic decks, the
 duel engine, the archetype table) already existed; this is pure wiring in `index.html`.
 
-### 6.21 Retention
+### 6.21 Online/local combat parity (`logic.js`, BACKLOG §1 "Combat rules cleanup")
+`logic.js` is the online duel referee, and it runs sandboxed — no imports, no timers — so it never
+automatically picks up anything landed in `game.js` or a module `game.js` imports. Every time this
+session added a new stat-affecting system to the local engine (school affinity, then school
+ultimates in §6.18), the online engine silently fell further behind: it had **no player-school
+concept at all**, so online duels were already missing the pre-existing creature affinity bonus,
+and had no way to ever gain the newer spell affinity bonus or ultimates.
+
+- **`setDeck` now carries a `school`** (falling back to `balance` for a missing or unrecognised
+  one, matching `game.js`'s own fallback), stored on `state.schools` and read into `you.school`/
+  `enemy.school` when the battle starts.
+- **`makeCreature` and the spell-cast branch gained the same affinity bonuses `game.js` has** —
+  ported by hand since `logic.js` cannot `import` `schoolmagic.js`.
+- **`logic.js` carries its own generated copy** of `SCHOOL_AFFINITY_FX`/`SCHOOL_ULT_FX`/
+  `ULT_CHARGE_MAX`, emitted into the *same* generated block the card catalog already uses
+  (`tools/sync-cards.mjs`, drift-checked by `npm test`) — only the `{k,n}` an effect needs to
+  resolve travels here; name/icon/text stay client-only, since `index.html` already has
+  `schoolmagic.js` to import them from directly.
+- **A new `"ultimate"` action** mirrors `game.js`'s `useUltimate`: validated against charge/used
+  state, applies the school's fx, and is exposed through `viewFor` (`you.school`/`ultCharge`/
+  `ultUsed` — the player's own, never the opponent's, the same hidden-info discipline every other
+  `viewFor` field already follows). The online duel UI (`renderOnline`) gained the same
+  charge-percentage ultimate button the local duel screen has.
+- Online-rules tests: **34 → 42**, covering the affinity bonus on both creatures and spells, charge
+  accrual, the ultimate action's validation and effect, and `viewFor`'s exposure of the new fields.
+
+### 6.22 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -541,7 +571,12 @@ duel engine, the archetype table) already existed; this is pure wiring in `index
 3. **All asset/module references are RELATIVE paths** (the game is served under a subpath). Never root-absolute.
 4. **The STYLE_FORMULA** (approved storybook fantasy) is embedded in every generated asset prompt. Keep the look consistent.
 5. **Third-party libs are vendored** into `public/vendor/` (pinned). No CDN hotlinks.
-6. **`logic.js` must stay pure** — no imports, no timers. Its card catalog is **generated**: edit `public/cards.js`, then run `npm run sync`. The block between the `<<< GENERATED CARD CATALOG` markers is machine-written and `npm test` fails if it is stale — never hand-edit it. (It also exports `MAX_TURNS` alongside the six rules functions.)
+6. **`logic.js` must stay pure** — no imports, no timers. Its card catalog **and** its school
+   affinity/ultimate fx are **generated**: edit `public/cards.js` or `public/schoolmagic.js`, then
+   run `npm run sync`. The block between the `<<< GENERATED CARD CATALOG` markers is
+   machine-written and `npm test` fails if it is stale — never hand-edit it. (It also exports
+   `MAX_TURNS` alongside the seven rules functions.) A school module's flavour strings
+   (name/icon/text) stay client-only — `logic.js` only carries the `{k,n}` fx it needs to resolve.
 7. **Hidden info is masked server-side** in `viewFor` (opponent hand, deck, traps) — never in the client.
 8. **Mobile-first** — touch controls, 44px minimum tap targets, responsive layout, safe-area insets. Everything must work touch-only, in portrait *and* landscape. World input goes through **Pointer Events with per-pointer tracking** (never touch/mouse events separately) — that is what keeps drag-to-rotate, tap-to-move and pinch-to-zoom from interfering. Verify changes with `npm run test:browser`.
 9. **Deterministic duel logic** — pass a seed to `startDuel(...)` (or set `state.seed` online) and a duel replays exactly. Do not reintroduce module-level shared RNG in `logic.js`: it is one sandbox across every room.
@@ -647,7 +682,22 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: the Deck Testing Laboratory** (§6.20) and a look at what §8 actually needs before
+**Last landed: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
+runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —
+and it turned out to have **no player-school concept at all**: online duels were already missing
+the pre-existing creature affinity bonus, and had no way to ever gain the newer spell affinity
+bonus or school ultimates from earlier this session. `setDeck` now carries a school; `logic.js`
+carries its own generated copy of the affinity/ultimate fx (`tools/sync-cards.mjs`, the same
+drift-checked pattern the card catalog already uses, since flavour strings stay client-only and
+only the raw `{k,n}` needs to cross into the sandbox); a new `"ultimate"` action mirrors
+`game.js`'s `useUltimate`; the online duel UI gained the same ultimate button the local one has.
+Online-rules tests: 34 → 42. Found by deliberately auditing local/online parity after two sessions
+of only ever extending the local engine — the kind of drift `npm test`'s catalog check already
+guards one layer of, but nothing was watching the *rules*, only the *data*.
+
+Tests: **443 engine / 42 online-rules / 131 browser / 8 viewports / model-check clean.**
+
+**Before that: the Deck Testing Laboratory** (§6.20) and a look at what §8 actually needs before
 touching it further. The Lab is a PvP-screen panel: play your current deck against any of the five
 AI personalities, fighting a real thematic 20-card deck built the same way a dungeon monster's is —
 and it pays out **nothing**, no gold, no cards, no PvP record, no rank change, because a lab that
