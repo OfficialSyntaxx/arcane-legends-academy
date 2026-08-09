@@ -142,7 +142,8 @@ const isTanky = def => def.type === "creature" && ((def.fx || []).includes("taun
  * with no damage spell (Ice, Life) does not get one invented for it; Control there leans on tanky
  * creatures instead, which the weight table already prefers when spells are scarce.
  */
-export function archetypeDeckFor(archetypeId, pool, count = 20){
+/** The shared preference weighting both deck builders below draw from — see archetypeDeckFor. */
+function weightedPicksFor(archetypeId, pool){
   const creatures = pool.filter(d => d.type === "creature");
   const spells = pool.filter(d => d.type === "spell");
   if (!creatures.length) return [];   // nothing to build a deck from at all
@@ -170,9 +171,46 @@ export function archetypeDeckFor(archetypeId, pool, count = 20){
     for (const s of spells.filter(isDamageSpell)) add(s, 1);
   }
   if (!weighted.length) for (const c of creatures) add(c, 1);   // never return an empty deck
+  return weighted;
+}
 
+export function archetypeDeckFor(archetypeId, pool, count = 20){
+  const weighted = weightedPicksFor(archetypeId, pool);
+  if (!weighted.length) return [];
   const deck = [];
   for (let i = 0; deck.length < count; i++) deck.push(weighted[i % weighted.length].id);
+  return deck;
+}
+
+/**
+ * The player-facing sibling of archetypeDeckFor (BACKLOG §5 "Deck archetypes"): same preference
+ * weighting, but capped by what the player actually OWNS — `archetypeDeckFor` assumes infinite
+ * supply, which is right for an AI opponent's deck and wrong for a real collection (never suggest
+ * a card the player doesn't have three of).
+ *
+ * `ownedCounts` is `{cardId: copiesOwned}`. Stops the moment a full cycle over the weighted list
+ * adds nothing — every card that fits the archetype is either at its 3-copy cap or exhausted —
+ * rather than looping forever chasing a 20th card that does not exist in the collection. A
+ * partial deck (fewer than `count`) is a legitimate result, not a bug: it means the collection
+ * cannot fill this archetype yet.
+ */
+export function autoBuildDeck(archetypeId, ownedCounts, pool, count = 20){
+  const weighted = weightedPicksFor(archetypeId, pool);
+  if (!weighted.length) return [];
+  const used = {};
+  const deck = [];
+  let stall = 0;
+  for (let i = 0; deck.length < count && stall < weighted.length; i++){
+    const id = weighted[i % weighted.length].id;
+    const cap = Math.min(3, ownedCounts[id] || 0);
+    if ((used[id] || 0) < cap){
+      used[id] = (used[id] || 0) + 1;
+      deck.push(id);
+      stall = 0;
+    } else {
+      stall++;
+    }
+  }
   return deck;
 }
 

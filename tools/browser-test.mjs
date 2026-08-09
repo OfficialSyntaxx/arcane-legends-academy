@@ -661,6 +661,34 @@ if (hasWorld){
         `${vfx.slowExpiry} survived a low frame rate`);
 }
 
+// ---------------- deck archetypes (BACKLOG §5) ----------------
+// Drives the real Loadout screen: press an archetype button and confirm the deck it builds is
+// entirely made of cards the save actually owns, respects the 3-copy cap, and replaced (not
+// merged with) whatever deck was there before.
+{
+  const da = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    window.__ev("toLoadout");
+    await settle(300);
+    const before = window.__testSave().deck.slice();
+    window.__ev("autoBuild|aggro");
+    await settle(300);
+    const s = window.__testSave();
+    const owned = {}; for (const c of s.cards) owned[c.id] = (owned[c.id]||0) + 1;
+    const counts = {}; for (const id of s.deck) counts[id] = (counts[id]||0) + 1;
+    return {
+      before, after: s.deck.slice(),
+      overCap: Object.values(counts).some(n => n > 3),
+      overOwned: s.deck.some(id => counts[id] > (owned[id]||0)),
+      screen: document.getElementById("screen").innerText,
+    };
+  });
+  check("pressing a deck archetype button changes the deck", JSON.stringify(da.before) !== JSON.stringify(da.after));
+  check("the auto-built deck never exceeds 3 copies of any card", da.overCap === false);
+  check("the auto-built deck never suggests a card beyond what's owned", da.overOwned === false);
+  check("the Loadout screen shows the new deck count", /Deck \(\d+\/20\)/.test(da.screen), da.screen.slice(0,80));
+}
+
 // ---------------- deck testing laboratory (BACKLOG §5) ----------------
 // Drives the PvP screen's Lab panel for real: press an archetype button, confirm the resulting
 // duel is tagged isLab and fights a thematic 20-card deck, then force a win and confirm NOTHING

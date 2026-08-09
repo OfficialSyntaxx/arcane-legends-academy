@@ -2490,6 +2490,37 @@ check("every card in a generated deck actually comes from the pool given", (()=>
   const ids = new Set(pool.map(d => d.id));
   return ARCH.archetypeDeckFor("control", pool).every(id => ids.has(id));
 })());
+// --- autoBuildDeck: the player-facing sibling, capped by what's actually owned ---
+check("autoBuildDeck never exceeds 3 copies of a card, even if the archetype wants more", (()=>{
+  const owned = { fire_cat: 3, fire_elf: 3, fire_dragon: 3, firebolt: 3, fireball: 3, meteor: 3 };
+  const deck = ARCH.autoBuildDeck("aggro", owned, CARDS.filter(d=>d.school==="fire"));
+  const counts = {}; for (const id of deck) counts[id] = (counts[id]||0)+1;
+  return Object.values(counts).every(n => n <= 3);
+})());
+check("autoBuildDeck never suggests a card the player owns zero of", (()=>{
+  const owned = { fire_cat: 3, fire_elf: 3 };   // owns nothing else in the fire pool
+  const deck = ARCH.autoBuildDeck("aggro", owned, CARDS.filter(d=>d.school==="fire"));
+  return deck.every(id => id === "fire_cat" || id === "fire_elf");
+})());
+check("autoBuildDeck fills all 20 slots when the collection can support it", (()=>{
+  const owned = {}; for (const c of CARDS) owned[c.id] = 3;   // three of literally everything
+  return ARCH.autoBuildDeck("control", owned, CARDS).length === 20;
+})());
+check("autoBuildDeck returns a legitimate PARTIAL deck when the collection can't fill it — not a hang", (()=>{
+  const owned = { fire_cat: 2 };
+  const deck = ARCH.autoBuildDeck("aggro", owned, CARDS.filter(d=>d.school==="fire"));
+  return deck.length === 2 && deck.every(id => id === "fire_cat");
+})());
+check("autoBuildDeck on an empty collection returns an empty deck, not a crash", (()=>{
+  return ARCH.autoBuildDeck("aggro", {}, CARDS.filter(d=>d.school==="fire")).length === 0;
+})());
+check("autoBuildDeck respects ownership across the WHOLE catalog, not just one school", (()=>{
+  // A real player deck already mixes schools (the starter deck does) — auto-build should too.
+  const owned = { fire_cat: 3, ice_golem: 3, pixie: 3, novice: 3, firebolt: 3 };
+  const deck = ARCH.autoBuildDeck("midrange", owned, CARDS);
+  const schools = new Set(deck.map(id => CARD_MAP[id].school));
+  return schools.size > 1;
+})());
 // --- assigning an archetype from what the enemy visibly is ---
 check("a boss is always the boss archetype regardless of its model name", ARCH.archetypeFor({model:"whatever.glb", boss:true}) === "boss");
 check("dragons, slimes, skeletons and bats/wraiths get their own personality", (()=>{

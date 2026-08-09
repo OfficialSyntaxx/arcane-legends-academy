@@ -233,6 +233,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **PvP ranking & seasons** (`pvprank.js`) — seven tiers, streak-bonus match results, monthly UTC seasons with a soft reset and a personal history. See §6.16.
 - **School mechanics & ultimates** (`schoolmagic.js`) — a same-school spell bonus and a once-per-duel ultimate per school, both flowing through a new reusable `FX_HANDLERS` effect dispatch table. See §6.18.
 - **Deck Testing Laboratory** (`index.html`) — play your current deck against any AI personality with zero rewards and zero record kept. See §6.20.
+- **Deck Archetypes** (`archetypes.js` `autoBuildDeck`) — one-click builds a deck from your own collection, weighted like an AI opponent's, capped by what you own. See §6.22.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -558,7 +559,29 @@ and had no way to ever gain the newer spell affinity bonus or ultimates.
 - Online-rules tests: **34 → 42**, covering the affinity bonus on both creatures and spells, charge
   accrual, the ultimate action's validation and effect, and `viewFor`'s exposure of the new fields.
 
-### 6.22 Retention
+### 6.22 Deck Archetypes (`archetypes.js` `autoBuildDeck`)
+Building a good 20-card deck by hand, one owned card at a time, is real work a new player has no
+grounding for — and the game already has the exact preference data an experienced deckbuilder
+would apply: `archetypes.js`'s per-personality weighting, built for AI opponents. `autoBuildDeck`
+turns that same table around for the player.
+
+- **Refactored, not duplicated**: `archetypeDeckFor`'s preference weighting was pulled out into a
+  shared `weightedPicksFor(archetypeId, pool)`. `archetypeDeckFor` (AI opponents, infinite supply)
+  and `autoBuildDeck` (players, capped by ownership) are two different fills over the *same*
+  weighted preference list, not two copies of the weighting logic.
+- **Capped by what's actually owned**: at most 3 copies of any card, and never a card the player
+  owns zero of. `archetypeDeckFor` cycles its weighted list by plain index modulo, which assumes
+  infinite supply and would happily suggest a fourth copy; `autoBuildDeck` instead tracks a
+  per-card `used` count against `min(3, owned)` and stops after a full cycle over the weighted list
+  adds nothing — every eligible card is either capped or the collection has none left, and a
+  **partial deck is the honest result**, not a bug to loop forever chasing.
+- **Boss excluded** from the player-facing picker (`ARCH.ARCHETYPE_IDS` minus `"boss"` in the
+  Loadout panel) — that escalation curve is a monster mechanic (§6.14), not a deckbuilding style.
+- Wired into the Loadout screen as one-click buttons that **replace** the current deck outright —
+  a clean starting point to hand-tune from, the same "auto-build then adjust" pattern most deck
+  builders in this genre use, not a merge that could silently exceed the 3-copy cap.
+
+### 6.23 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -597,10 +620,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 343 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
-node tools/logic-test.mjs    # 34 online-rules checks
+node tools/test.mjs          # 443 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (109 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (131 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -635,7 +658,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 343 engine / 34 online-rules / 109 real-browser (layout + gestures + world +
+**All tests green:** 443 engine / 42 online-rules / 131 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -682,7 +705,22 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
+**Last landed: an end-to-end audit, then Deck Archetypes** (§6.22). Asked to check the previous
+stretch of work for anything left unfinished before continuing: the working tree was already clean
+and every commit pushed, but `CLAUDEREADME.md` itself had drifted — a "how to run tests" section
+and an "All tests green" line both still quoting 343/34/109, long overtaken by real growth. Fixed,
+because those read as *current* guidance rather than history, and a stale number there actively
+misleads rather than merely aging. Then **Deck Archetypes** (BACKLOG §5): `autoBuildDeck` in
+`archetypes.js` one-click builds a 20-card deck from the player's own collection, weighted the same
+way an AI opponent's deck of that personality would be — sharing its weighting table with
+`archetypeDeckFor` via a new `weightedPicksFor` rather than duplicating the preference logic. Caps
+at 3 owned copies, never invents a card the player doesn't have, and returns an honest partial deck
+(not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
+card evolution, card backs and booster-opening animations left unstarted.
+
+Tests: **449 engine / 42 online-rules / 135 browser / 8 viewports / model-check clean.**
+
+**Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —
 and it turned out to have **no player-school concept at all**: online duels were already missing
 the pre-existing creature affinity bonus, and had no way to ever gain the newer spell affinity

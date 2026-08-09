@@ -16,6 +16,20 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### An end-to-end audit, then Deck Archetypes — *pending*
+- **Audit**: asked to check the previous stretch of work for anything left unfinished. Working
+  tree was clean and every commit pushed, but `CLAUDEREADME.md` had drifted — a "how to run tests"
+  section and an "All tests green" line both still quoting 343/34/109, long overtaken by real
+  growth. Fixed, since those read as current guidance, not history.
+- **Deck Archetypes** (§5): `autoBuildDeck` in `archetypes.js` one-click builds a 20-card deck from
+  the player's own collection, weighted the same way an AI opponent's deck of that personality
+  would be — refactored `archetypeDeckFor`'s preference weighting into a shared
+  `weightedPicksFor` rather than duplicating it for the player-facing version. Caps at 3 owned
+  copies, never invents a card the player doesn't have, and returns an honest partial deck (not a
+  hang) when the collection can't fill the archetype yet. Wired into the Loadout screen as
+  one-click buttons that **replace** the current deck.
+- *449 engine / 42 online / 135 browser.*
+
 ### Online/local combat parity — `4ae15ef`
 - **`logic.js` (the online duel referee) had NO player-school concept at all.** It runs sandboxed
   with no imports, so it never automatically inherited anything landed in `game.js`: online duels

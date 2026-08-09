@@ -157,7 +157,12 @@
 - [x] Favorite cards — the one stored bit of the codex; everything else about a collection is derived
 - [ ] Card backs
 - [ ] Booster opening animations
-- [ ] Deck archetypes
+- [x] Deck archetypes — `archetypes.js` `autoBuildDeck`: one-click builds a 20-card deck from your
+  OWN collection, weighted the same way an AI opponent of that personality would be (Aggro/Control/
+  Tempo/Midrange — Boss excluded, that escalation is a monster mechanic, not a player build). Caps
+  at 3 copies and never suggests a card you don't own; a collection too thin for the archetype gets
+  an honest partial deck, not a hang or an invented card. Shares its weighting table with
+  `archetypeDeckFor` (refactored into `weightedPicksFor`) rather than duplicating the preference logic.
 - [x] Deck testing laboratory — a PvP-screen panel: play your current deck against any of the five
   AI personalities (`archetypes.js`), fighting a real thematic 20-card deck. Pays out nothing — no
   gold, no cards, no PvP win/loss, no rank change — a lab that pays out is a farm, not a lab
@@ -224,7 +229,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 443 engine / 42 online / 131 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 449 engine / 42 online / 135 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -286,7 +291,11 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **online/local combat parity** (§1 "Combat rules cleanup") —
+**Changes made, most recent first:** **an end-to-end audit** (nothing left uncommitted, full suite
+re-run green, stale test-count claims in `CLAUDEREADME.md` corrected) followed by **Deck
+Archetypes** (`archetypes.js` `autoBuildDeck` — one-click builds a deck from your own collection,
+weighted like an AI opponent's, sharing its weighting table with `archetypeDeckFor` via a new
+`weightedPicksFor` instead of duplicating it) → **online/local combat parity** (§1 "Combat rules cleanup") —
 `logic.js`, the online duel engine, had no player-school concept at all, so every online duel was
 missing creature school affinity and had no way to ever gain the newer spell affinity bonus or
 school ultimates; `setDeck` now carries a school and `logic.js` carries its own generated copy of
@@ -325,8 +334,22 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **§1's "Combat rules cleanup" is closed** — the online and local duel engines now
-match stat-for-stat. `logic.js` runs sandboxed with no imports, so it never picked up a player's
+**Next step:** **An end-to-end audit, then Deck Archetypes.** Asked to check the last stretch of
+work for anything left unfinished before continuing: working tree was already clean and every
+commit pushed, but `CLAUDEREADME.md` had several **stale current-state test counts** (a "how to
+run tests" section still quoting 343/34/109 and an "All tests green" line quoting the same, both
+long overtaken by real growth) — fixed, since those read as current guidance, not history, and
+stale numbers there are actively misleading rather than merely out of date. Then **Deck Archetypes**
+(§5): `autoBuildDeck` in `archetypes.js` one-click builds a 20-card deck from the player's own
+collection, weighted the same way an AI opponent's deck of that personality would be — refactored
+`archetypeDeckFor`'s preference weighting out into a shared `weightedPicksFor` rather than
+duplicating it for the player-facing version. Caps at 3 owned copies, never invents a card the
+player doesn't have, and returns an honest partial deck (not a hang) when the collection is too
+thin for the archetype. Engine tests: 443 → 449; browser: 131 → 135.
+
+Before that: **§1's "Combat rules cleanup" partially closed** (one of three sub-bullets) — the
+online and local duel engines now match stat-for-stat on school mechanics. `logic.js` runs
+sandboxed with no imports, so it never picked up a player's
 chosen school at all: every online duel was quietly missing the creature school-affinity bonus
 `game.js` already had, and once the spell affinity bonus and school ultimates landed locally
 (this session's earlier work) online duels had no way to ever gain them either — an online-only

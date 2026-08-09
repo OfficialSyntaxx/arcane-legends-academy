@@ -1295,6 +1295,15 @@ function renderLoadout(el){
       </div></div>`;
   }
   h += `</div></div>`;
+  // deck archetypes (BACKLOG §5): auto-build a deck from what you actually own, weighted the same
+  // way an AI opponent's deck of that personality would be. REPLACES the current deck — a clean
+  // starting point to hand-tune from, not a merge.
+  h += `<div class="panel"><h3>🧩 Deck Archetypes</h3><p class="sub">Auto-build a deck from your collection, weighted for one playstyle. Replaces your current deck.</p><div class="row" style="flex-wrap:wrap;gap:6px">`;
+  for (const id of ARCH.ARCHETYPE_IDS){
+    if (id === "boss") continue;   // boss escalation is a monster mechanic, not a player build
+    h += `<button class="btn" onclick="window.__ev('autoBuild|${id}')">${LAB_ICON[id]||"⚔️"} ${ARCH.ARCHETYPES[id].name}</button>`;
+  }
+  h += `</div></div>`;
   // deck
   h += `<div class="panel"><h3>🃏 Deck (${S.deck.length}/${G.MAX_DECK})</h3><div class="sub">${STR.deck_need}</div><div class="row">`;
   const counts = G.deckCounts(S.deck);
@@ -1324,6 +1333,15 @@ window.__EV.unequip = (slot)=>{ G.unequip(S,slot); refreshGear(); render(); };
 window.__EV.sellEq = (uid)=>{ const r=G.sellEquipment(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; refreshGear(); render(); };
 window.__EV.deckAdd = (id)=>{ const r=G.addToDeck(S,id); if(!r.ok) err(r.err==="full"?"Deck full (20)":r.err==="max"?"Max 3 copies":r.err==="copies"?"You don't own that many":"Error"); render(); };
 window.__EV.deckRm = (id)=>{ G.removeFromDeck(S,id); render(); };
+window.__EV.autoBuild = (archetype)=>{
+  const owned = {}; for (const c of S.cards) owned[c.id] = (owned[c.id]||0)+1;
+  const deck = ARCH.autoBuildDeck(archetype, owned, CARDS);
+  S.deck = deck;
+  save();
+  const short = deck.length < G.MAX_DECK;
+  toast(`${ARCH.ARCHETYPES[archetype].name} deck built: ${deck.length}/${G.MAX_DECK} cards.${short?" Collect more to fill it out.":""}`);
+  render();
+};
 
 // ================= MARKET =================
 function renderMarket(el){
