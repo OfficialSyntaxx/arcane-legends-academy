@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Collection & Academy depth — 2026-08-08 → 09
 
-### The Codex, and this changelog — *pending*
+### The Codex, and this changelog — `e0bf4a9`
 - **`codex.js`**: the whole catalog browsable — six filters (All / Owned / **Missing** / Favourites
   / Special / Graded), a school filter, a search over names and card text, five sorts, per-school
   completion bars and **nine collection achievements**.
