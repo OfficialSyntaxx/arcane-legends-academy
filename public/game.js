@@ -67,7 +67,15 @@ export function newGame(){
     // NPC reputation (reputation.js). Only quest givers earn any right now — see that module
     // for why this is a flat {npcKey: number} map rather than a richer per-NPC shape.
     reputation:{},
-    auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false },
+    auctions:[],
+    // Auction history (BACKLOG §6 "Auction history / price history"). Recorded once a listing
+    // SETTLES — the outcome of NPC bidding, not something that can be recomputed from `auctions`
+    // (which only ever holds LIVE listings and drops a sale the instant it pays out). Newest
+    // first, capped so it stays a history rather than an ever-growing log — the same shape
+    // pvprank.js's season history already uses. Honestly local: this project has no persistent
+    // server, so it can only ever be the player's OWN past sales, never a cross-player price feed.
+    marketHistory:[],
+    slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false },
   };
 }
 export function load(){
@@ -100,6 +108,7 @@ function migrate(s){
   // quit during character creation never saw the picker again and was silently stuck on Balance.
   if (s.flags.schoolPicked === undefined) s.flags.schoolPicked = true;
   if (!s.auctions) s.auctions = [];
+  if (!Array.isArray(s.marketHistory)) s.marketHistory = [];
   if (!s.worldState) s.worldState = { zone:"academy", visited:["academy"], dungeons:{} };
   if (!Array.isArray(s.worldState.visited)) s.worldState.visited = ["academy"];
   // WORLDSPEC §6: per-dungeon progress (cleared rooms, boss kills) lives in the save.
@@ -494,9 +503,24 @@ export function auctionTick(s){
     const pay = a.bid || a.price;
     s.gold += pay;
     settled.push({ id:a.id, card:a.card, pay, bidder:a.bidder });
+    // Auction history: recorded HERE, at the moment a listing actually settles — this is the one
+    // place the outcome (did it sell over reserve, who bought it) exists at all.
+    s.marketHistory = s.marketHistory || [];
+    s.marketHistory.unshift({ cardId:a.card.id, price:a.price, pay, bidder:a.bidder, at:now });
+    s.marketHistory = s.marketHistory.slice(0, 200);
     return false;
   });
   return settled;
+}
+/** A card TYPE's own past sales, newest first — the player's own history, not a price feed. */
+export function priceHistoryFor(s, cardId, limit=10){
+  return (s.marketHistory || []).filter(h => h.cardId === cardId).slice(0, limit);
+}
+/** The average of what a card TYPE has actually sold for, or null with no sales recorded yet. */
+export function avgSalePrice(s, cardId){
+  const h = (s.marketHistory || []).filter(x => x.cardId === cardId);
+  if (!h.length) return null;
+  return Math.round(h.reduce((a, x) => a + x.pay, 0) / h.length);
 }
 // Settle any auctions that ran out while the game was closed. Called once on load: without it,
 // a listing left running across a session would sit in the list forever until the market screen

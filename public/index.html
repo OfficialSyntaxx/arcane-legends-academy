@@ -1497,7 +1497,12 @@ function renderMarket(el){
   if (S.auctions.length===0) h += `<div class="sub">${STR.no_auctions}</div>`;
   for (const a of S.auctions){
     const c = CARD_MAP[a.card.id];
-    const left = Math.max(0, Math.ceil((a.ends - performance.now())/1000));
+    // BUG (found while adding price history nearby): `a.ends` is a Date.now() wall-clock
+    // timestamp (fixed to be exactly that so a listing survives a reload — see listAuction's own
+    // comment), but this was comparing it against performance.now(), which is relative to page
+    // navigation start, not the Unix epoch. The subtraction was still ~1.7 trillion regardless of
+    // real time left, so the countdown never read anywhere near "60s" — it read millions.
+    const left = Math.max(0, Math.ceil((a.ends - Date.now())/1000));
     h += `<div class="lrow"><span class="ic">${gradeForRoll(a.card.roll).icon}</span>
       <div class="grow"><div class="t">${c.name}</div>
       <div class="d">${gradeForRoll(a.card.roll).name} · ${a.card.graded?"graded":"ungraded"} · bid ${a.bid||a.price}g</div></div>
@@ -1511,6 +1516,30 @@ function renderMarket(el){
     h += cardFace(def, { inst:c, grade:c.graded?c.roll:null, value:G.instanceValue(c), onclick:`listA|${c.uid}` });
   }
   h += `</div></div>`;
+  // Auction history (BACKLOG §6 "Auction history / price history") — the player's own past
+  // sales, honestly local: this project has no persistent server, so it can never be a real
+  // cross-player price feed, the same reason PvP has a season history instead of a leaderboard.
+  h += `<div class="panel"><h3>📈 Price History</h3>`;
+  if (!S.marketHistory.length){
+    h += `<div class="sub">Nothing has sold yet — list a card above and let it run its 60s.</div>`;
+  } else {
+    const byCard = {};
+    for (const rec of S.marketHistory){ (byCard[rec.cardId] = byCard[rec.cardId] || []).push(rec); }
+    const cardIds = Object.keys(byCard).sort((a,b) => byCard[b].length - byCard[a].length).slice(0, 12);
+    h += `<div class="row" style="flex-wrap:wrap">`;
+    for (const id of cardIds){
+      const c = CARD_MAP[id]; if (!c) continue;
+      const avg = G.avgSalePrice(S, id);
+      const recent = G.priceHistoryFor(S, id, 3);
+      h += `<div class="panel" style="flex:1;min-width:160px">
+        <div style="font-weight:700">${c.name}</div>
+        <div class="sub">Avg sale: <b style="color:var(--gold)">${avg}g</b> · ${byCard[id].length} sold</div>
+        <div class="sub">Recent: ${recent.map(r=>`${r.pay}g`).join(", ")}</div>
+      </div>`;
+    }
+    h += `</div>`;
+  }
+  h += `</div>`;
   el.innerHTML = h;
 }
 window.__EV.buy = (id)=>{ const r=G.buyCard(S,id); r.ok?toast("Purchased!"):err("Not enough gold"); render(); };

@@ -240,6 +240,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Booster Pack Opening** (`index.html`) — a CSS flip-card reveal for the 5 cards a pack mints, reusing the app's existing generic overlay. See §6.24.
 - **Card Backs** (`cardbacks.js`) — 9 procedural CSS backs unlocked by codex achievements, no new grind. See §6.25.
 - **Enchanting** (`items.js` `ENCHANTS`) — a new skill + per-item stat runes, reusing bars already smelted via Smithing. See §6.26.
+- **Auction History / Price History** (`game.js` `marketHistory`) — a per-card sale history + average, plus a real countdown-display bug fixed alongside it. See §6.27.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -691,7 +692,32 @@ stats and nothing else to spend materials or a skill level on beyond forging the
   `equipStats` actually moves (not just a UI label), confirms a level-gated rune shows disabled in
   the real DOM, and confirms re-enchanting replaces rather than stacks.
 
-### 6.27 Retention
+### 6.27 Auction History / Price History (`game.js`, BACKLOG §6)
+The Auction House (§3, `listAuction`/`auctionTick`) already worked — a settled auction paid the
+seller and vanished, with no trace it had ever existed. Nothing answered "what has this card
+actually been selling for."
+
+- **`s.marketHistory`**, recorded the moment a listing SETTLES inside `auctionTick` — the one
+  place the outcome (did it sell over reserve, who bought it) exists at all. Capped at 200, newest
+  first, the same shape `pvprank.js`'s season history already established.
+- **`priceHistoryFor(s, cardId)`/`avgSalePrice(s, cardId)`** are pure derived queries over that
+  history — everything about "what has sold" is read from `marketHistory`, never a second running
+  tally that could drift from it.
+- **Honestly local, deliberately.** This project has no persistent server (§3) — `marketHistory`
+  can only ever be the player's own past sales, never a real cross-player price feed. Shown as a
+  new "📈 Price History" panel on the Market screen, the same honesty already applied to PvP's
+  season history over a fake leaderboard.
+- **A real bug found while adding it, fixed alongside**: the Auction House's own countdown display
+  compared `a.ends` (a `Date.now()` wall-clock timestamp, deliberately fixed to survive a reload —
+  see `listAuction`'s own comment) against `performance.now()` (relative to page navigation, a
+  completely different epoch). The subtraction was still on the order of 1.7 trillion regardless
+  of real time left, so a fresh 60-second listing displayed as millions of seconds remaining.
+  Visually confirmed via a real render before and after: `⏱ 60s` now, not `⏱ 1731024...s`.
+- Covered by `tools/browser-test.mjs`: lists a real auction through the real Market screen and
+  confirms the countdown reads a sane ≤60s, and confirms the Price History panel surfaces a real
+  average computed from seeded history, not a placeholder string.
+
+### 6.28 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -733,7 +759,7 @@ Individually:
 node tools/test.mjs          # 443 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (156 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (159 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -840,7 +866,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **470 engine / 42 online-rules / 156 browser / 8 viewports / model-check clean.**
+Tests: **477 engine / 42 online-rules / 159 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —

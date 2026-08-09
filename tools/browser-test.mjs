@@ -1427,6 +1427,46 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   await ectx.close();
 }
 
+// ---------------- auction countdown fix + price history (BACKLOG §6) ----------------
+// A real bug found while adding price history nearby: the countdown compared a Date.now()
+// wall-clock deadline against performance.now() (a different epoch entirely), so a fresh 60s
+// listing read as millions of seconds left. Drives the real Market screen to confirm the fix and
+// the new Price History panel both land correctly, through the real render path.
+{
+  const mctx = await browser.newContext({ viewport:{width:420,height:1100} });
+  const merrs = [];
+  const mpage = await mctx.newPage();
+  mpage.on("pageerror", e => merrs.push(String(e)));
+  await mpage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await mpage.waitForTimeout(900);
+  const market = await mpage.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const s = window.__testSave();
+    const id = s.cards[0].id;
+    s.marketHistory = [
+      { cardId:id, price:50, pay:65, bidder:"NPC", at:Date.now()-500000 },
+      { cardId:id, price:40, pay:40, bidder:null, at:Date.now()-900000 },
+    ];
+    document.querySelector('[data-screen="market"]').click();
+    await settle(300);
+    window.__ev("listA|" + s.cards[0].uid);
+    document.querySelector('[data-screen="market"]').click();
+    await settle(300);
+    const rows = [...document.querySelectorAll(".lrow")].map(r => r.textContent.trim());
+    const historyText = document.getElementById("screen").innerText;
+    return { rows, historyText };
+  });
+  check("no uncaught page errors on the Market screen", merrs.length === 0, merrs.slice(0,3).join(" | "));
+  check("a fresh 60s auction listing shows a real ~60s countdown, not the performance.now() bug", (()=>{
+    const row = market.rows.find(r => /⏱/.test(r));
+    if (!row) return false;
+    const m = row.match(/⏱\s*(\d+)s/);
+    return !!m && Number(m[1]) <= 60 && Number(m[1]) > 0;
+  })(), market.rows.join(" | "));
+  check("the Price History panel shows a real average from marketHistory, not a placeholder", /Avg sale:/.test(market.historyText) && /2 sold/.test(market.historyText));
+  await mctx.close();
+}
+
 // ---------------- debug dashboard (public/debug.html) ----------------
 // A separate page from the game itself — plays a bit of the real game first (via the game's own
 // #app in dctx above would pollute state, so a fresh context) to give the dashboard a real save

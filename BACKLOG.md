@@ -210,8 +210,19 @@
 - [ ] Advanced Scribing
 - [ ] Resource node regeneration
 - [ ] Rare resource variants
-- [ ] Player marketplace
-- [ ] Auction history / price history
+- [x] Player marketplace — pre-existing, re-checked against the codebase: `listAuction`/
+  `auctionTick`/`settleAuctions` in `game.js` (a simulated auction house, honestly labelled —
+  NPCs bid over 60s real-time listings, persisted to `localStorage` across reloads). Not a
+  cross-player market: this project has no persistent server, the same constraint that shaped
+  PvP's season history over a fake leaderboard.
+- [x] Auction history / price history — `s.marketHistory`: recorded the moment a listing SETTLES
+  (`auctionTick`), the one place the outcome exists at all — capped at 200, newest first, the same
+  shape `pvprank.js`'s season history uses. `priceHistoryFor`/`avgSalePrice` derive per-card-type
+  queries over it. Honestly local (the player's own past sales) — this project has no persistent
+  server, so it can never be a real cross-player price feed. Shown in a new Market screen panel.
+  A real bug found while adding it: the auction countdown compared a `Date.now()` wall-clock
+  deadline against `performance.now()` (a different epoch entirely), so a fresh 60s listing
+  displayed as millions of seconds left — fixed alongside
 - [ ] Collection value analytics
 
 ## 7. Pets, Housing & Cosmetics
@@ -270,7 +281,7 @@
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 470 engine / 42 online / 156 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback/enchant flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 477 engine / 42 online / 159 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback/enchant/market flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -332,7 +343,11 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Enchanting** (§6 — a new skill + `items.js` `ENCHANTS`, 3
+**Changes made, most recent first:** **an audit, then Auction history / price history** (§6 —
+`s.marketHistory` recorded at settle time, `priceHistoryFor`/`avgSalePrice`, a new Market-screen
+panel, honestly local; also found and fixed a real pre-existing bug in the auction countdown
+comparing a wall-clock deadline against `performance.now()`; also re-checked "Player marketplace"
+as already built and checked it off) → **Enchanting** (§6 — a new skill + `items.js` `ENCHANTS`, 3
 stats × 3 tiers applied to one specific owned equipment instance, reusing bars already smelted via
 Smithing rather than a new resource chain; one enchant per item, `equipStats` folds it in before
 the Armory percentage multiplier) → **card backs** (`cardbacks.js` — 9 procedural CSS backs
@@ -384,7 +399,22 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Enchanting is done** (§6, `items.js` `ENCHANTS`). §6 Crafting & Economy was
+**Next step:** **A quick audit before continuing, then Auction history / price history is done**
+(§6). Working tree was clean, everything already pushed. Checking §6's remaining unstarted items
+turned up that "Player marketplace" was already fully built (`listAuction`/`auctionTick`/
+`settleAuctions`, a simulated NPC-bidding auction house honestly labelled as such, no cross-player
+market) — just never checked off, so it's checked off now with that note. Then `s.marketHistory`:
+recorded the moment a listing SETTLES (the one place the outcome exists), capped at 200, newest
+first, the same shape `pvprank.js`'s season history already uses. `priceHistoryFor`/`avgSalePrice`
+are pure derived queries over it, surfaced in a new Market-screen "📈 Price History" panel.
+Honestly local — no persistent server, so it can never be a real cross-player price feed, same
+constraint that shaped everything else this project has refused to fake. A real, previously
+unnoticed bug caught and fixed while adding it: the Auction House's own countdown compared a
+`Date.now()` wall-clock deadline against `performance.now()` (a different epoch entirely), so a
+fresh 60-second listing displayed as millions of seconds remaining — confirmed both before and
+after via a real render.
+
+Before that: **Enchanting** (§6, `items.js` `ENCHANTS`). §6 Crafting & Economy was
 entirely unstarted; equipment (§2/§6.10) had metal×slot stats and nothing else to spend a skill
 level or materials on beyond the one-time forge. A new `enchanting` skill gates 3 stats (atk/def/
 hp) × 3 tiers, each a flat bonus applied to ONE specific owned equipment instance — two Bronze

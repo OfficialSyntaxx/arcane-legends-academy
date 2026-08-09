@@ -1113,6 +1113,53 @@ const legacyGold = sLegacy.gold;
 G.settleAuctions(sLegacy);
 check("a legacy performance.now() auction is settled, not stranded", sLegacy.auctions.length === 0 && sLegacy.gold > legacyGold);
 
+// ---- 8.6 auction history / price history (BACKLOG §6) ----
+check("a settled auction is recorded into marketHistory, a live listing is not", (()=>{
+  const s = G.newGame();
+  const cardId = s.cards[0].id;
+  G.listAuction(s, s.cards[0].uid, 50);
+  const beforeSettle = s.marketHistory.length;
+  s.auctions[0].ends = Date.now() - 1;
+  G.auctionTick(s);
+  return beforeSettle === 0 && s.marketHistory.length === 1 && s.marketHistory[0].cardId === cardId;
+})());
+check("priceHistoryFor returns only that card TYPE's sales, newest first", (()=>{
+  const s = G.newGame();
+  const twoOfSameType = s.cards.filter(c => c.id === s.cards[0].id);
+  if (twoOfSameType.length < 2) return true;   // starter deck shape guard, not the thing under test
+  const id = twoOfSameType[0].id;
+  G.listAuction(s, twoOfSameType[0].uid, 30); s.auctions[0].ends = Date.now() - 2000; G.auctionTick(s);
+  G.listAuction(s, twoOfSameType[1].uid, 40); s.auctions[0].ends = Date.now() - 1; G.auctionTick(s);
+  const h = G.priceHistoryFor(s, id);
+  return h.length === 2 && h[0].price === 40 && h[1].price === 30;   // newest (most recently settled) first
+})());
+check("priceHistoryFor never returns another card type's sales", (()=>{
+  const s = G.newGame();
+  const otherId = s.cards.find(c => c.id !== s.cards[0].id);
+  if (!otherId) return true;
+  G.listAuction(s, s.cards[0].uid, 50); s.auctions[0].ends = Date.now() - 1; G.auctionTick(s);
+  return G.priceHistoryFor(s, otherId.id).length === 0;
+})());
+check("avgSalePrice is null with no sales recorded for that card type yet", (()=>{
+  const s = G.newGame();
+  return G.avgSalePrice(s, s.cards[0].id) === null;
+})());
+check("avgSalePrice averages the actual PAYOUT, not the asking price", (()=>{
+  const s = G.newGame();
+  const twoOfSameType = s.cards.filter(c => c.id === s.cards[0].id);
+  if (twoOfSameType.length < 2) return true;
+  const id = twoOfSameType[0].id;
+  s.marketHistory = [{ cardId:id, price:50, pay:50, bidder:null, at:1 }, { cardId:id, price:50, pay:70, bidder:"NPC", at:2 }];
+  return G.avgSalePrice(s, id) === 60;
+})());
+check("marketHistory is capped rather than growing forever", (()=>{
+  const s = G.newGame();
+  s.marketHistory = Array.from({length:200}, (_,i) => ({ cardId:"x", price:10, pay:10, bidder:null, at:i }));
+  G.listAuction(s, s.cards[0].uid, 50); s.auctions[0].ends = Date.now() - 1; G.auctionTick(s);
+  return s.marketHistory.length === 200;
+})());
+check("game.js newGame() starts marketHistory as an empty array", Array.isArray(G.newGame().marketHistory) && G.newGame().marketHistory.length === 0);
+
 // ---- 8.6 school picker survives a quit during character creation ----
 const freshSave = G.newGame();
 check("a new game has not picked a school yet", freshSave.flags.schoolPicked === false);

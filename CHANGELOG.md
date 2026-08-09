@@ -16,6 +16,21 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### Auction history / price history, and a real countdown bug fixed — *pending*
+- **Audit first**: checking §6's remaining unstarted items found "Player marketplace" already
+  fully built (`listAuction`/`auctionTick`/`settleAuctions` — a simulated NPC-bidding auction
+  house, honestly labelled, no cross-player market) — just never checked off.
+- **`s.marketHistory`**: recorded the moment a listing SETTLES inside `auctionTick`, capped at 200,
+  newest first, the same shape `pvprank.js`'s season history already uses.
+  `priceHistoryFor`/`avgSalePrice` are pure derived queries over it, shown in a new "📈 Price
+  History" panel on the Market screen. Honestly local — no persistent server, so it can never be a
+  real cross-player price feed.
+- **A real bug found and fixed while adding it**: the Auction House's own countdown compared
+  `a.ends` (a `Date.now()` wall-clock deadline) against `performance.now()` (a different epoch
+  entirely), so a fresh 60-second listing displayed as millions of seconds remaining. Confirmed
+  both before and after via a real render (`⏱ 60s` now, not `⏱ 1731024...s`).
+- *477 engine / 42 online / 159 browser.*
+
 ### Enchanting — `507e196`
 - §6 Crafting & Economy was entirely unstarted; equipment (§2/§6.10) had metal×slot stats and
   nothing else to spend a skill level or materials on beyond the one-time forge.
