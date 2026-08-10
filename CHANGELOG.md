@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Fast travel — 2026-08-10
 
-### Fast travel — *pending*
+### Fast travel — `a36d307`
 - BACKLOG §3. `changeZone(toZoneId, fromZoneId, spawnOverride)` already tears down the current zone
   and rebuilds the target from `worldconfig.js`, and `entryPointFor` already falls back to a zone's
   own default `spawn` point whenever there's no reciprocal exit to line up against — exactly what
