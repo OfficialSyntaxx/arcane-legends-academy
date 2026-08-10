@@ -1086,6 +1086,52 @@ let net = 0;
 for (let i=0;i<20;i++){ const c = MATERIALS.find(m=>m.id==="copper"); G.gather(s4,c); net += c.value; }
 check("gathering 20 copper nets positive value", net > 0);
 
+// ---- resource node regeneration (BACKLOG §6) ----
+check("gathering the same material twice back-to-back is refused with a cooldown", (()=>{
+  const s = G.newGame();
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const now = Date.now();
+  const first = G.gather(s, copper, now);
+  const second = G.gather(s, copper, now);        // same instant — no time has passed
+  return first.ok === true && second.ok === false && second.err === "cooldown" && second.remaining > 0;
+})());
+check("the cooldown clears once real time has passed", (()=>{
+  const s = G.newGame();
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const now = Date.now();
+  G.gather(s, copper, now);
+  const third = G.gather(s, copper, now + G.regenMsFor(copper) + 1);
+  return third.ok === true;
+})());
+check("a cooldown on one material never blocks gathering a different one", (()=>{
+  const s = G.newGame();
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const oak = MATERIALS.find(m => m.id === "oak_log");
+  const now = Date.now();
+  G.gather(s, copper, now);
+  return G.gather(s, oak, now).ok === true;
+})());
+check("gatherCooldownRemaining is a pure read — it never mutates the save", (()=>{
+  const s = G.newGame();
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const now = Date.now();
+  G.gather(s, copper, now);
+  const before = JSON.stringify(s.gatherCooldowns);
+  G.gatherCooldownRemaining(s, "copper", now);
+  return JSON.stringify(s.gatherCooldowns) === before;
+})());
+check("regenMsFor scales with the material's own level (rarer takes longer)", (()=>{
+  const copper = MATERIALS.find(m => m.id === "copper");     // lvl 1
+  const runite = MATERIALS.find(m => m.id === "runite");     // lvl 70
+  return G.regenMsFor(runite) > G.regenMsFor(copper);
+})());
+check("a save that predates node regeneration migrates with no cooldowns active", (()=>{
+  const old = G.newGame(); delete old.gatherCooldowns;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  return typeof s.gatherCooldowns === "object" && G.gatherCooldownRemaining(s, "copper") === 0;
+})());
+
 // ---- 8. auctions ----
 const s5 = G.newGame();
 const c0 = s5.cards[0];
@@ -1233,10 +1279,13 @@ check("the onboarding chain can actually be completed", (()=>{
   G.setSchool(s, "fire"); s.flags.schoolPicked = true;
 
   advance();                                   // gather
-  // gather enough of the three refinable sources to make one of each scribing input
+  // gather enough of the three refinable sources to make one of each scribing input. Each material
+  // now has a real regen cooldown (BACKLOG §6), so repeated gathers of the SAME source need a
+  // clock that actually advances past it, the way a real play session spread over time would.
+  let clock = Date.now();
   for (const cm of CARD_MATERIALS){
     const src = MATERIALS.find(m => cm.from.includes(m.id));
-    for (let i = 0; i < 3; i++) G.gather(s, src);
+    for (let i = 0; i < 3; i++){ G.gather(s, src, clock); clock += G.regenMsFor(src) + 1; }
   }
 
   advance();                                   // refine
@@ -2208,14 +2257,18 @@ check("Penmanship raises the scribe roll", (()=>{
   return LSN.masteryFor(skilled).scribeBonus > 0 && LSN.masteryFor(G.newGame()).scribeBonus === 0;
 })());
 check("Husbandry can yield a second unit, and never does without the class", (()=>{
+  // Each gather now carries a real regen cooldown (BACKLOG §6), so repeated gathers of the same
+  // material need an explicit advancing clock rather than relying on real wall-clock time between
+  // calls in a tight loop.
   const mat = MATERIALS.find(m => m.id === "oak_log");
+  const step = G.regenMsFor(mat) + 1;
   const plain = G.newGame();
-  let extras = 0;
-  for (let i = 0; i < 200; i++){ plain.inventory = {}; extras += G.gather(plain, mat).extra ? 1 : 0; }
+  let extras = 0, clock = Date.now();
+  for (let i = 0; i < 200; i++){ plain.inventory = {}; extras += G.gather(plain, mat, clock).extra ? 1 : 0; clock += step; }
   if (extras !== 0) return false;                          // no class, never a bonus
   const skilled = taught("gatherBonus");
   let got = 0;
-  for (let i = 0; i < 600; i++){ skilled.inventory = {}; got += G.gather(skilled, mat).extra ? 1 : 0; }
+  for (let i = 0; i < 600; i++){ skilled.inventory = {}; got += G.gather(skilled, mat, clock).extra ? 1 : 0; clock += step; }
   return got > 0;
 })());
 check("a save that predates classes migrates cleanly", (()=>{

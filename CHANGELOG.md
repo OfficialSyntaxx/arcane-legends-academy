@@ -14,6 +14,28 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Resource node regeneration — 2026-08-10
+
+### Resource node regeneration — *pending*
+- BACKLOG §6. Gathering was previously unlimited and instant, gated only by a client-only 1.4s UI
+  debounce that lived in `index.html`'s own state, not the save — it never survived a reload and
+  was never a real limit, just a click-spam guard.
+- Per-MATERIAL cooldown, not per-node-instance: the outdoor zones scatter many copies of the same
+  node from a deterministic seed with no stable per-instance id chunk streaming preserves across a
+  reload, so a cooldown on the material itself is the one thing the hub's one-node-per-ore layout
+  and the outdoor zones' scattered layout can share honestly.
+- `s.gatherCooldowns: {matId -> readyAtMs}` (sparse), `gatherCooldownRemaining` a pure read,
+  `regenMsFor(mat)` scaling with the material's own level requirement (~9s at level 1, ~43s at
+  level 70) — meaningful without ever reaching OSRS-punishing minutes on a mobile-first game.
+- One choke point: `gather(s, mat, now)` is the single function both the Skills-screen button and
+  the 3D world's `onGather` callback call, so the fix cannot be bypassed by using the other path.
+- The Skills screen's Gather buttons show a live countdown while on cooldown (a 1s `setInterval`
+  gated to the screen, the same pattern the Market's auction countdown already uses).
+- Two pre-existing engine tests (onboarding chain, Husbandry) gathered the same material repeatedly
+  with no time between calls — exactly what a real cooldown should refuse — fixed by driving an
+  explicit advancing clock through the new `now` parameter, not weakened.
+- *511 engine / 42 online / 183 browser.*
+
 ## Hidden treasure — 2026-08-10
 
 ### Hidden treasure — `15cf746`

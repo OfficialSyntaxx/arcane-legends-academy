@@ -33,6 +33,7 @@ export const STR = {
   level: "Level",
   no_resources: "Not enough resources",
   level_too_low: "Your level is too low",
+  gather_regenerating: "Regenerating — {s}s left",
 
   // loadout
   loadout_title: "Loadout & Deck",

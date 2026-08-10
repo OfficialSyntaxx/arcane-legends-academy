@@ -36,6 +36,9 @@ export function newGame(){
     skills:{ mining:1, fishing:1, woodcutting:1, smithing:1, alchemy:1, scribing:1, enchanting:1 },
     skillXp:{ mining:0, fishing:0, woodcutting:0, smithing:0, alchemy:0, scribing:0, enchanting:0 },
     inventory:{}, cards, equipment:[],
+    // Resource node regeneration (BACKLOG §6). matId -> the timestamp (ms) it's gatherable again.
+    // Only materials actually gathered ever get an entry — an empty object is "everything ready."
+    gatherCooldowns:{},
     loadout:{ wand:null, hat:null, robe:null, boots:null, amulet:null },
     deck,
     // `name` starts EMPTY on purpose: charcreate.js derives "creation unfinished" from a missing
@@ -157,6 +160,7 @@ function migrate(s){
   if (!Array.isArray(s.favorites)) s.favorites = [];
   if (!s.cardBack || !CB.BACK_MAP[s.cardBack]) s.cardBack = CB.DEFAULT_BACK;
   if (!s.title || !ACHV.TITLES.some(t => t.id === s.title)) s.title = ACHV.DEFAULT_TITLE;
+  if (!s.gatherCooldowns || typeof s.gatherCooldowns !== "object") s.gatherCooldowns = {};
   // PvP rank. An older save has real wins/losses but never had a rank — it starts at Bronze
   // rather than being credited retroactively, because there is no recorded ORDER for those old
   // results to replay through the streak/season maths.
@@ -307,14 +311,47 @@ export function validateTreasureRewards(placedTreasureIds){
 
 // ---------- Skills: gather / craft ----------
 export function canGather(s, mat){ return skillLevel(s, mat.skill) >= mat.lvl; }
-export function gather(s, mat){
+
+// ---------------------------------------------------------------- resource node regeneration
+// (BACKLOG §6 "Resource node regeneration"). Gathering was previously unlimited and instant —
+// spam a node (or, since the Skills screen's own Gather buttons hit the exact same function, the
+// UI shortcut that bypasses the 3D world entirely) as fast as the client-only 1.4s UI debounce in
+// index.html allowed. That debounce is not in the save, so it does not survive a reload and was
+// never a real limit, just a click-spam guard.
+//
+// WHY PER-MATERIAL, NOT PER-INSTANCE: the outdoor zones scatter many copies of the same node
+// (`count` in zones.json) via a deterministic seed, with no stable per-instance id to hang save
+// state off — WORLDSPEC's chunk streaming tears the meshes down and rebuilds them from that same
+// seed on every load, so "instance #14 of copper in the forest" is not an identity that survives a
+// reload either. A cooldown on the MATERIAL itself is the one thing both the hub's one-node-per-ore
+// layout and the outdoor zones' scattered many-per-ore layout can share honestly, and it closes the
+// same exploit either way: gather one, and every node (and the Skills-screen shortcut) of that
+// material goes quiet for a while, not just the one you happened to click.
+//
+// Cooldown scales with the material's own level requirement — the same "later/rarer costs more"
+// shape quest rewards and treasure gold already follow — so a level-1 copper vein clears fast and a
+// level-70 runite vein takes meaningfully longer, without ever reaching OSRS-punishing durations
+// (a casual, mobile-first game should not make a player wait minutes to gather again).
+export function regenMsFor(mat){ return Math.round(8000 + mat.lvl * 500); }
+
+/** Milliseconds until `mat` can be gathered again (0 = ready now). Pure read, no mutation. */
+export function gatherCooldownRemaining(s, matId, now = Date.now()){
+  const readyAt = (s.gatherCooldowns || {})[matId] || 0;
+  return Math.max(0, readyAt - now);
+}
+
+export function gather(s, mat, now = Date.now()){
   if (!canGather(s, mat)) return { ok:false, err:"level" };
+  const remaining = gatherCooldownRemaining(s, mat.id, now);
+  if (remaining > 0) return { ok:false, err:"cooldown", remaining };
   // "Husbandry", taught in the field-studies classes: a chance at a second unit. One of the four
   // places a lesson changes an existing system rather than adding a number to a screen.
   const bonus = masteries(s).gatherBonus;
   const extra = bonus > 0 && rng() * 100 < bonus ? 1 : 0;
   addItem(s, mat.id, 1 + extra); addSkillXp(s, mat.skill, mat.xp);
   dailyProgress(s, "gather");
+  if (!s.gatherCooldowns) s.gatherCooldowns = {};
+  s.gatherCooldowns[mat.id] = now + regenMsFor(mat);
   return { ok:true, item:mat, xp:mat.xp, extra };
 }
 export function canCraft(s, spec){ return skillLevel(s,"smithing") >= spec.lvl && hasItems(s, spec.req); }

@@ -1143,10 +1143,13 @@ function renderSkills(el){
   h += `<h3>⛏️ Gather</h3><div class="row">`;
   for (const m of MATERIALS){
     const can = G.canGather(S,m);
+    const remaining = G.gatherCooldownRemaining(S, m.id);
+    const regenerating = remaining > 0;
+    const label = !can ? "Lv too low" : regenerating ? `${Math.ceil(remaining/1000)}s` : "Gather";
     h += `<div class="panel" style="flex:1;min-width:150px">
       <div style="font-weight:700"><span class="ic">${m.icon}</span> ${m.name}</div>
       <div class="sub">${SKILLS[m.skill].name} ${m.lvl} · +${m.xp} xp</div>
-      <button class="btn sm ${can&&gatherCooldown<=0?"ok":""}" ${can?"":"disabled"} onclick="window.__ev('gather|${m.id}')">${can?"Gather":"Lv too low"}</button>
+      <button class="btn sm ${can&&!regenerating?"ok":""}" ${can&&!regenerating?"":"disabled"} onclick="window.__ev('gather|${m.id}')">${label}</button>
     </div>`;
   }
   h += `</div>`;
@@ -1219,7 +1222,9 @@ window.__EV.gather = (id)=>{
   const m = MATERIALS.find(x=>x.id===id);
   const r = G.gather(S,m);
   if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); AUDIO.play("gather"); gatherCooldown = 1.4; }
+  else if (r.err === "cooldown") err(STR.gather_regenerating.replace("{s}", Math.ceil(r.remaining/1000)));
   else err(LTL);
+  save();
   render();
 };
 window.__EV.smelt = (id)=>{ const b=BARS.find(x=>x.id===id); const r=G.smelt(S,b); r.ok?toast(`+${b.icon} ${b.name}`):err(LTL); render(); };
@@ -2245,6 +2250,7 @@ function spawnWorld(canvas, zone, spawnAt){
       if (!m) return;
       const r = G.gather(S, m);
       if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); AUDIO.play("gather"); gatherCooldown = 1.4; }
+      else if (r.err === "cooldown") err(STR.gather_regenerating.replace("{s}", Math.ceil(r.remaining/1000)));
       else err(LTL);
       save();
     },
@@ -2745,6 +2751,8 @@ async function boot(){
   setInterval(()=>{ if (gatherCooldown>0) gatherCooldown-=0.1; }, 100);
   // auction tick
   setInterval(()=>{ if (screen==="market") render(); }, 1000);
+  // live countdown on the Skills screen's Gather buttons (BACKLOG §6 "Resource node regeneration")
+  setInterval(()=>{ if (screen==="skills") render(); }, 1000);
   setInterval(()=>{ G.save(S); }, 3000);
 }
 boot();

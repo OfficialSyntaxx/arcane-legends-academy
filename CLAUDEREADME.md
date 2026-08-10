@@ -246,6 +246,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Achievements & player titles** (`achievements.js`) — 10 account-wide achievements spanning quests, dungeon bosses, PvP rank, wealth, crafting and reputation, each unlocking a title the player can equip next to their name. See §6.30.
 - **Fast travel** (`index.html`, no new module) — a map button in the 3D world instantly warps to any outdoor zone the player has already walked to, reusing `changeZone`/`entryPointFor` exactly as a real gateway would. See §6.31.
 - **Hidden treasure** (`structures.js`/`zones.json` + `game.js` `claimTreasure`) — authored, off-path caches in every outdoor zone that pay out gold once and never respawn. See §6.32.
+- **Resource node regeneration** (`game.js` `gather`/`gatherCooldownRemaining`) — gathering a material puts THAT material on a real, persisted, level-scaled cooldown, closing the previous unlimited-instant-gather loophole (including the Skills-screen shortcut). See §6.33.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -866,7 +867,45 @@ finding one rewards actually exploring the corners of the map.
   the id is recorded and the mesh is gone, and a second trigger (nothing left to hit) never pays out
   twice.
 
-### 6.33 Retention
+### 6.33 Resource node regeneration (`game.js`, `index.html`, BACKLOG §6)
+Gathering was previously unlimited and instant: spam a node (or, since the Skills screen's own
+Gather buttons call the exact same `gather()`, the UI shortcut that bypasses the 3D world entirely)
+as fast as the client-only 1.4s UI debounce allowed. That debounce lived in `index.html`'s own
+local state, not the save, so it never survived a reload and was never a real limit.
+
+- **Per-MATERIAL cooldown, not per-node-instance.** The outdoor zones scatter many copies of the
+  same node (`count` in `zones.json`) from a deterministic seed with no stable per-instance id to
+  hang save state off — chunk streaming tears the meshes down and rebuilds them from that same seed
+  on every load, so "instance #14 of copper in the forest" is not an identity that survives a
+  reload either. A cooldown on the material itself is the one thing both the hub's one-node-per-ore
+  layout and the outdoor zones' scattered layout can share honestly, and it closes the exploit
+  either way: gather one copper vein, and every copper node (and the Skills-screen shortcut) goes
+  quiet for a while, not just the one just clicked.
+- **`s.gatherCooldowns: {matId -> readyAtMs}`** — sparse (only materials actually gathered get an
+  entry), the one stored bit; `gatherCooldownRemaining(s, matId, now)` is a pure read deriving the
+  remaining wait every time.
+- **`regenMsFor(mat)` scales with the material's own level requirement** — the same "later/rarer
+  costs more" shape quest rewards and treasure gold already follow. A level-1 vein clears in ~9s, a
+  level-70 one in ~43s — enough to matter without ever reaching OSRS-punishing minutes on a
+  mobile-first game.
+- **One choke point, both gather paths.** `gather(s, mat, now)` is the single function both the
+  Skills-screen button and the 3D world's `onGather` callback call — so the fix lives in one place
+  and cannot be bypassed by using the other path.
+- The Skills screen's Gather buttons show a live countdown (`Ns`, disabled) while on cooldown,
+  refreshed by a 1s `setInterval` gated to `screen==="skills"`, the same pattern the Market screen's
+  auction countdown already uses. Trying anyway (world prompt or a stale DOM) surfaces
+  `STR.gather_regenerating` rather than the generic "level too low" message.
+- Covered by `tools/test.mjs` (same-instant refusal, clears after real time passes, one material's
+  cooldown never blocks another, pure-read guarantee, level-scaling, migration) and
+  `tools/browser-test.mjs` against the real Skills screen: gathering disables only that material's
+  own button with a live countdown, a different material stays clickable, and calling the handler
+  again is refused server-side, not just hidden behind a disabled attribute.
+- Two pre-existing engine tests broke and were fixed, not weakened: the onboarding-chain test and
+  the Husbandry test both gathered the same material several times in a tight loop with no time
+  between calls — exactly what real cooldowns should refuse. Both now drive an explicit advancing
+  clock through `gather`'s `now` parameter, the way a real play session spread over time would.
+
+### 6.34 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -905,10 +944,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 505 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 511 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (177 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (183 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -955,7 +994,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 505 engine / 42 online-rules / 177 real-browser (layout + gestures + world +
+**All tests green:** 511 engine / 42 online-rules / 183 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -1002,7 +1041,20 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Hidden treasure** (§6.32, BACKLOG §3 "Hidden areas / treasure"). A handful of
+**Last landed: Resource node regeneration** (§6.33, BACKLOG §6). Gathering was previously unlimited
+and instant, gated only by a client-only 1.4s debounce that never survived a reload. Now a real,
+persisted, level-scaled cooldown lives PER MATERIAL (`s.gatherCooldowns`) rather than per node
+instance — the outdoor zones scatter many copies of the same node from a deterministic seed with no
+stable per-instance id chunk streaming preserves across a reload, so a material-wide cooldown is the
+one thing the hub's one-node-per-ore layout and the outdoor zones' scattered layout can share
+honestly. One choke point (`gather(s, mat, now)`) closes the loophole for both the 3D world AND the
+Skills-screen shortcut that calls the same function. Two pre-existing engine tests (onboarding
+chain, Husbandry) broke and were fixed properly — both gathered the same material repeatedly with
+no time between calls, which real cooldowns should refuse — by driving an explicit advancing clock
+through the new `now` parameter. 511 engine / 42 online-rules / 183 real-browser / `check:models`,
+all green.
+
+**Before that: Hidden treasure** (§6.32, BACKLOG §3 "Hidden areas / treasure"). A handful of
 authored, off-path caches per outdoor zone, following the existing WORLDSPEC §10 authoring split —
 the academy's live in `structures.js` (generated into `zones.json`, never hand-edited), the
 forest's and lake's directly in `zones.json`. Ids are globally unique across every zone (a found
@@ -1071,7 +1123,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **505 engine / 42 online-rules / 177 browser / 8 viewports / model-check clean.**
+Tests: **511 engine / 42 online-rules / 183 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —

@@ -218,7 +218,10 @@
 - [ ] Rune crafting
 - [ ] Cooking
 - [ ] Advanced Scribing
-- [ ] Resource node regeneration
+- [x] Resource node regeneration — a real, persisted, level-scaled cooldown per MATERIAL
+  (`s.gatherCooldowns`, `game.js` `gather`/`gatherCooldownRemaining`), not per node instance (the
+  outdoor zones' scattered nodes have no stable per-instance id chunk streaming preserves); one
+  choke point closes the loophole for both the 3D world and the Skills-screen shortcut.
 - [ ] Rare resource variants
 - [x] Player marketplace — pre-existing, re-checked against the codebase: `listAuction`/
   `auctionTick`/`settleAuctions` in `game.js` (a simulated auction house, honestly labelled —
@@ -360,7 +363,14 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Hidden areas / treasure** (§3 — authored off-path caches per
+**Changes made, most recent first:** **Resource node regeneration** (§6 — gathering was previously
+unlimited and instant, gated only by a client-only 1.4s debounce that never survived a reload; now
+a real, persisted, level-scaled cooldown per MATERIAL, not per node instance, since the outdoor
+zones' scattered nodes have no stable per-instance id chunk streaming preserves across a reload;
+one choke point, `gather(s, mat, now)`, closes the loophole for both the 3D world and the
+Skills-screen shortcut that calls the same function; two pre-existing engine tests that gathered
+the same material repeatedly with no time between calls were fixed to drive an explicit advancing
+clock rather than weakened) → **Hidden areas / treasure** (§3 — authored off-path caches per
 outdoor zone, academy's in `structures.js`/generated into `zones.json` via `tools/sync-zones.mjs`
 following the existing WORLDSPEC §10 authoring split, forest's/lake's hand-authored directly in
 `zones.json`; `game.js` `claimTreasure` is the source of truth on whether a cache is claimed, not
@@ -449,7 +459,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Hidden areas / treasure is done** (§3). Covered by `tools/test.mjs` (id
+**Next step:** **Resource node regeneration is done** (§6). Covered by `tools/test.mjs` (cooldown
+gating, clears after real time passes, per-material isolation, pure-read guarantee, level-scaling,
+migration) and `tools/browser-test.mjs` against the real Skills screen. 511 engine / 42
+online-rules / 183 real-browser / `check:models`, all green.
+
+Before that: **Hidden areas / treasure is done** (§3). Covered by `tools/test.mjs` (id
 uniqueness, reward-table symmetry, claim/refuse-repeat/reject-unknown) and `tools/browser-test.mjs`
 against the real 3D world. 505 engine / 42 online-rules / 177 real-browser / `check:models`, all
 green.

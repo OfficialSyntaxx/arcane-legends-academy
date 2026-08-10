@@ -1523,6 +1523,51 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   await ectx.close();
 }
 
+// ---------------- resource node regeneration (BACKLOG §6) ----------------
+// Drives the real Skills screen's Gather button: gathering once actually disables its OWN button
+// with a live countdown, a DIFFERENT material's button stays clickable, and pressing the disabled
+// button's underlying event still refuses server-side rather than trusting the DOM's disabled
+// attribute alone.
+{
+  const rctx = await browser.newContext({ viewport:{width:420,height:1400} });
+  const rerrs = [];
+  const rpage = await rctx.newPage();
+  rpage.on("pageerror", e => rerrs.push(String(e)));
+  await rpage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await rpage.waitForTimeout(900);
+  const node = await rpage.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    document.querySelector('[data-screen="skills"]').click();
+    await settle(200);
+    const copperBtn = () => [...document.querySelectorAll(".panel")]
+      .find(p => p.textContent.includes("Copper Ore"))?.querySelector("button");
+    const tinBtn = () => [...document.querySelectorAll(".panel")]
+      .find(p => p.textContent.includes("Tin Ore"))?.querySelector("button");
+    const copperBefore = copperBtn().disabled;
+    const invBefore = window.__testSave().inventory.copper || 0;
+    window.__ev("gather|copper");
+    await settle(150);
+    const invAfterFirst = window.__testSave().inventory.copper || 0;
+    const copperAfter = copperBtn();
+    const copperDisabled = copperAfter.disabled;
+    const copperLabel = copperAfter.textContent.trim();
+    const tinStillOpen = !tinBtn().disabled;
+    // the DOM's disabled attribute is a courtesy, not the real gate — call the handler directly,
+    // the same "server-side, not just UI" discipline the enchant-picker test above already holds.
+    window.__ev("gather|copper");
+    await settle(100);
+    const invAfterSecond = window.__testSave().inventory.copper || 0;
+    return { copperBefore, invBefore, invAfterFirst, copperDisabled, copperLabel, tinStillOpen, invAfterSecond };
+  });
+  check("no uncaught page errors while gathering", rerrs.length === 0, rerrs.slice(0,3).join(" | "));
+  check("a fresh material's Gather button starts enabled", node.copperBefore === false);
+  check("gathering actually adds the material to the live save", node.invAfterFirst === node.invBefore + 1, JSON.stringify(node));
+  check("that material's own button disables with a live countdown, not just a relabel", node.copperDisabled === true && /\ds$/.test(node.copperLabel), node.copperLabel);
+  check("a different material's button is unaffected by another material's cooldown", node.tinStillOpen === true);
+  check("calling the handler again while on cooldown is refused server-side, not just hidden in the DOM", node.invAfterSecond === node.invAfterFirst);
+  await rctx.close();
+}
+
 // ---------------- auction countdown fix + price history (BACKLOG §6) ----------------
 // A real bug found while adding price history nearby: the countdown compared a Date.now()
 // wall-clock deadline against performance.now() (a different epoch entirely), so a fresh 60s
