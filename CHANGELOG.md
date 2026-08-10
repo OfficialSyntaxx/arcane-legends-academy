@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Rare resource variants — 2026-08-10
 
-### Rare resource variants — *pending*
+### Rare resource variants — `9a8b577`
 - BACKLOG §6. A flat, un-boosted 6% chance on every successful gather to ALSO yield a "Pristine"
   find of that same material — a lucky flourish alongside the ordinary yield, never instead of it.
 - Sell-only by design: not usable in any craft/refine/smelt recipe. Adding a second tradeable id to
