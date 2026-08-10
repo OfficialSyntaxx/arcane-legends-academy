@@ -3,6 +3,7 @@
 // synced to the logic.js duel engine. Uses window.THREE (global).
 import { modelUrl, CDN } from "./cdn.js";
 import { effectFor, ORIGIN } from "./vfx.js";
+import { creatureFor, CREATURES } from "./creatures.js";
 const MAX_SLOTS = 5;
 const SCHOOL_COLORS = {
   fire: 0xff5a3c, ice: 0x6fc3ff, storm: 0xa06bff, myth: 0xffd766,
@@ -17,6 +18,30 @@ const MODELS = {
   slime: 'creature_Slime.glb',
   skeleton: 'enemy_skeleton.glb',
   mage: 'npc_mage.glb',
+  dino: 'creature_Dino.glb',
+  orc: 'creature_Orc.glb',
+  demon: 'creature_Demon.glb',
+  frog: 'creature_Frog.glb',
+  mushroom: 'creature_MushroomKing.glb',
+  fish: 'creature_Fish.glb',
+  bunny: 'creature_Bunny.glb',
+  yeti: 'creature_Yeti.glb',
+  alien: 'creature_Alien.glb',
+  chicken: 'creature_Chicken.glb',
+  panda: 'creature_Panda.glb',
+  deer: 'creature_Deer.glb',
+  ghost: 'creature_Ghost.glb',
+  cat: 'creature_Cat.glb',
+  dog: 'creature_Dog.glb',
+  pigeon: 'creature_Pigeon.glb',
+  ninja: 'creature_Ninja.glb',
+  goleling: 'creature_Goleling.glb',
+  squidle: 'creature_Squidle.glb',
+  armabee: 'creature_Armabee.glb',
+  alpaking: 'creature_Alpaking.glb',
+  hywirl: 'creature_Hywirl.glb',
+  cactoro: 'creature_Cactoro.glb',
+  wizard: 'creature_Wizard.glb',
   default: 'enemy_skeleton.glb',
 };
 const LOCAL = name => './assets/models/' + name;
@@ -26,6 +51,29 @@ function modelFor(cardId, name) {
   if (/bat/.test(n)) return MODELS.bat;
   if (/slime|blob|ooze/.test(n)) return MODELS.slime;
   if (/skeleton|bone/.test(n)) return MODELS.skeleton;
+  if (/dino|dinosaur|rex/.test(n)) return MODELS.dino;
+  if (/orc|goblin|troll/.test(n)) return MODELS.orc;
+  if (/demon|devil|imp|ghoul/.test(n)) return MODELS.demon;
+  if (/frog|toad/.test(n)) return MODELS.frog;
+  if (/mushroom|shroom|fungus/.test(n)) return MODELS.mushroom;
+  if (/fish|shark|crab|shrimp/.test(n)) return MODELS.fish;
+  if (/bunny|rabbit/.test(n)) return MODELS.bunny;
+  if (/yeti|giant|ogre|golem/.test(n)) return MODELS.yeti;
+  if (/alien/.test(n)) return MODELS.alien;
+  if (/chicken|rooster|bird/.test(n)) return MODELS.chicken;
+  if (/panda|bear/.test(n)) return MODELS.panda;
+  if (/deer|stag|elk/.test(n)) return MODELS.deer;
+  if (/ghost|wraith|spirit|reaper|vampire/.test(n)) return MODELS.ghost;
+  if (/cat|kitten|feline/.test(n)) return MODELS.cat;
+  if (/dog|hound|wolf|pup/.test(n)) return MODELS.dog;
+  if (/pigeon|dove|poop|bird/.test(n)) return MODELS.pigeon;
+  if (/ninja|assassin|shadow/.test(n)) return MODELS.ninja;
+  if (/golem|rock|stone|goleling/.test(n)) return MODELS.goleling;
+  if (/squid|kraken|octopus|tentacle|shark/.test(n)) return MODELS.squidle;
+  if (/bee|wasp|hornet|armabee/.test(n)) return MODELS.armabee;
+  if (/alpaca|llama|alpaking/.test(n)) return MODELS.alpaking;
+  if (/whirl|elemental|cyclone|hywirl|wind/.test(n)) return MODELS.hywirl;
+  if (/cactus|cactoro/.test(n)) return MODELS.cactoro;
   if (/mage|wizard|elf|pixie|walker|novice|assistant|fairy/.test(n)) return MODELS.mage;
   return MODELS.default;
 }
@@ -178,6 +226,23 @@ export function createBattle3d(canvas) {
       group.add(model);
       entry.model = model;
       if (clip) { entry.mixer = new THREE.AnimationMixer(model); entry.mixer.clipAction(clip).play(); }
+      // floating trait label: name + passive, so each creature reads as its own identity
+      const spec = creatureFor(modelName);
+      if (spec){
+        const cv = document.createElement('canvas'); cv.width = 512; cv.height = 96;
+        const g = cv.getContext('2d');
+        g.fillStyle = 'rgba(10,6,24,0.72)'; g.fillRect(0, 0, 512, 96);
+        g.strokeStyle = 'rgba(255,201,77,0.7)'; g.lineWidth = 3; g.strokeRect(1, 1, 510, 94);
+        g.fillStyle = '#ffc94d'; g.font = 'bold 40px sans-serif'; g.textAlign = 'center';
+        g.fillText(spec.name, 256, 44);
+        g.fillStyle = '#8fd0ff'; g.font = '24px sans-serif';
+        g.fillText(spec.passive.length > 42 ? spec.passive.slice(0, 42) + '…' : spec.passive, 256, 78);
+        const tex = new THREE.CanvasTexture(cv);
+        const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, fog: false }));
+        label.scale.set(2.4, 0.45, 1); label.position.y = 2.6;
+        group.add(label);
+        entry.label = label;
+      }
     });
   }
   function removeAt(side, i) {

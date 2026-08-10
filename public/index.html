@@ -23,7 +23,7 @@
   --accent:#ffc94d; --accent-glow:rgba(255,201,77,.45); --accent-dim:rgba(255,201,77,.22);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
-html,body{margin:0;height:100%;background:#0d0a1f;color:var(--ink);
+html,body{margin:0;height:100%;background:#12141a;color:var(--ink);
   font-family:"Segoe UI",system-ui,-apple-system,sans-serif;overflow:hidden;
   overscroll-behavior:none;text-size-adjust:100%;-webkit-text-size-adjust:100%;}
 /* safe-area insets, so nothing hides under a notch or the home indicator */
@@ -49,15 +49,17 @@ html,body{margin:0;height:100%;background:#0d0a1f;color:var(--ink);
 .statbtn{cursor:pointer;font-family:inherit;color:var(--ink);min-height:34px;min-width:44px;
   justify-content:center;font-size:17px;line-height:1;touch-action:manipulation;}
 
-/* nav */
-#nav{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;background:rgba(20,14,40,.9);border-bottom:1px solid var(--line);
-  z-index:5;flex-shrink:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+/* nav — bottom tab bar (mobile RPG convention) */
+#nav{display:flex;gap:4px;padding:8px calc(10px + var(--sal)) calc(8px + var(--sab)) calc(10px + var(--sar));
+  background:rgba(18,20,26,.94);backdrop-filter:blur(10px);border-top:1px solid var(--line);
+  flex-shrink:0;overflow-x:auto;scrollbar-width:none;z-index:6;}
 #nav::-webkit-scrollbar{display:none;}
-.navbtn{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 12px;border-radius:10px;
-  border:1px solid transparent;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;min-width:64px;min-height:48px;}
-.navbtn .ic{font-size:20px;}
+.navbtn{flex:1 1 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px 4px;border-radius:12px;
+  border:1px solid transparent;background:transparent;color:var(--muted);font-size:10px;cursor:pointer;min-width:44px;min-height:52px;transition:color .15s,background .15s;}
+.navbtn .ic{font-size:19px;transition:transform .15s;}
 @media (hover:hover){ .navbtn:hover{background:var(--panel2);color:var(--ink);} }
 .navbtn.on{background:var(--panel2);color:var(--accent);border-color:var(--accent);box-shadow:0 0 12px -3px var(--accent-glow);}
+.navbtn.on .ic{transform:translateY(-1px);}
 
 /* screens */
 /* The duel arena is a BAND, not a half-screen. It used to be flex:1 alongside #screen, so the
@@ -124,6 +126,8 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .card .val{position:absolute;bottom:4px;right:4px;font-size:10px;color:var(--gold);background:rgba(0,0,0,.55);padding:1px 5px;border-radius:6px;}
 .card .slot{position:absolute;top:4px;right:4px;font-size:13px;background:rgba(0,0,0,.5);border-radius:8px;padding:1px 5px;}
 .card.sel{outline:3px solid var(--gold);transform:translateY(-6px);}
+.card.target{outline:3px solid #4fd0ff;box-shadow:0 0 16px rgba(79,208,255,.65), inset 0 0 12px rgba(79,208,255,.25);transform:translateY(-6px);}
+.card.target:hover{outline-color:#7fe0ff;box-shadow:0 0 22px rgba(79,208,255,.9), inset 0 0 14px rgba(79,208,255,.35);}
 .card.disabled{opacity:.45;cursor:not-allowed;}
 .card.tired{opacity:.6;}
 .card .tired-ic{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:20px;opacity:.9;text-shadow:0 0 6px #000;}
@@ -227,8 +231,8 @@ body.has-touch .worldbtn{display:flex;}
 
 /* modals: keep them inside the safe area and off the screen edges on small phones */
 #objective{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:0 8px 6px;
-  background:linear-gradient(90deg,rgba(122,92,255,.22),rgba(122,92,255,.06));
-  border:1px solid rgba(160,130,255,.45);border-radius:12px;font-size:13px;}
+  background:linear-gradient(90deg,rgba(201,168,106,.14),rgba(201,168,106,.04));
+  border:1px solid rgba(220,195,151,.35);border-radius:12px;font-size:13px;}
 #objective .obj-tick{font-size:15px;flex:0 0 auto}
 #objective .obj-main{flex:1;min-width:0}
 #objective .obj-title{font-weight:700;color:var(--gold)}
@@ -248,7 +252,7 @@ body.has-touch .worldbtn{display:flex;}
   #topbar{gap:6px;padding-left:10px;padding-right:10px;}
   #topbar .logo{font-size:16px;}
   .stat{font-size:13px;padding:4px 10px;}
-  .navbtn{min-width:56px;font-size:11px;padding:6px 9px;}
+  .navbtn{min-width:44px;font-size:10px;padding:6px 4px;}
   .navbtn .ic{font-size:18px;}
   #screen{padding:12px 10px calc(36px + var(--sab));}
   .panel{padding:12px;border-radius:12px;}
@@ -264,7 +268,7 @@ body.has-touch .worldbtn{display:flex;}
   #topbar .logo{font-size:0;margin-right:auto;}
   #topbar .logo::before{content:"✦";font-size:20px;}
   .stat{font-size:12px;padding:3px 8px;gap:4px;}
-  .navbtn{min-width:50px;font-size:10px;padding:5px 7px;}
+  .navbtn{min-width:38px;font-size:9px;padding:5px 3px;}
   #screen{padding:10px 8px calc(32px + var(--sab));}
   .row{gap:8px;}
   .btn{padding:9px 12px;font-size:13px;}
@@ -313,7 +317,6 @@ body.has-touch .worldbtn{display:flex;}
     <div class="stat">🧙 <b id="sXp">0</b></div>
     <button id="muteBtn" class="stat statbtn" aria-label="Toggle sound" onclick="window.__ev('toggleMute')">🔊</button>
   </div>
-  <div id="nav"></div>
   <!-- Onboarding objective bar. Present on every screen including the 3D world, because the
        chain sends the player back and forth between them and an objective you can only see on
        one screen is an objective you lose track of. -->
@@ -324,7 +327,7 @@ body.has-touch .worldbtn{display:flex;}
     <canvas id="battle3d"></canvas>
   </div>
   <div id="screen"></div>
-  <div id="worldWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#1a1440">
+  <div id="worldWrap" style="display:none;position:relative;flex:1;overflow:hidden;background:#14161c">
     <canvas id="world"></canvas>
     <div id="worldHud"></div>
     <div id="joy"><div id="joyKnob"></div></div>
@@ -333,6 +336,7 @@ body.has-touch .worldbtn{display:flex;}
     <button id="zoomOut" class="worldbtn" aria-label="Zoom out">−</button>
     <button id="mapBtn" aria-label="Fast travel" onclick="window.__ev('openFastTravel')">🗺️</button>
   </div>
+  <div id="nav"></div>
 </div>
 <div id="toast"></div>
 <div id="err"></div>
@@ -354,10 +358,11 @@ body.has-touch .worldbtn{display:flex;}
   </div>
 </div>
 <div id="schoolPicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:99;overflow-y:auto">
-  <div style="max-width:680px;margin:10vh auto;background:var(--panel);border:1px solid var(--gold);border-radius:22px;padding:30px;text-align:center">
+  <div style="max-width:680px;margin:8vh auto;background:var(--panel);border:1px solid var(--gold);border-radius:22px;padding:20px;text-align:center">
     <div style="color:var(--gold);font-weight:800;font-size:26px">Choose Your School</div>
+    <canvas id="spPreview" width="260" height="260" style="display:block;margin:6px auto 0;border-radius:14px;background:radial-gradient(circle at 50% 35%,#2a2a5a,#120c26)"></canvas>
     <div style="color:var(--muted);font-size:14px;margin-top:8px" id="spSub">Answer a few questions and the Academy will suggest the school that fits you best.</div>
-    <div id="spBody" style="margin-top:20px"></div>
+    <div id="spBody" style="margin-top:16px"></div>
   </div>
 </div>
 <!-- Character creation (BACKLOG §2). The 3D preview canvas lives here rather than reusing the
@@ -380,6 +385,7 @@ body.has-touch .worldbtn{display:flex;}
 <script src="./vendor/three.min.js"></script>
 <script src="./vendor/GLTFLoader.js"></script>
 <script src="./vendor/DRACOLoader.js"></script>
+<script src="./analytics.js"></script>
 <script type="module">
 import { STR } from "./strings.js";
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
@@ -390,8 +396,10 @@ import { createAudio, SFX } from "./audio.js";
 import { createBattle3d } from "./battle3d.js";
 import * as VFX from "./vfx.js";
 import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
+import { modelUrl } from "./cdn.js";
 import { loadDungeons, dungeonZone } from "./dungeons.js";
 import * as ONBOARD from "./onboarding.js";
+import * as ADVICE from "./advice.js";
 import * as ZQ from "./zonequests.js";
 import * as REP from "./reputation.js";
 import * as ACADEMY from "./academy.js";
@@ -408,6 +416,7 @@ import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
 import * as EQ3 from "./equipment3d.js";
 import { createPreview } from "./preview3d.js";
+import { CREATURES, traitForCard } from "./creatures.js";
 
 // ================= state =================
 let S = G.load();
@@ -486,7 +495,69 @@ function showSchoolPicker(){
   spAnswers = [];
   $("schoolPicker").style.display = "block";
   $("spSub").textContent = "Answer a few questions and the Academy will suggest the school that fits you best.";
+  setupCharacterPreview();
   renderSPQuestion(0);
+}
+
+// ---- live 3D character preview (rotating player wizard, tinted by school) ----
+let spCtx = null;
+function setupCharacterPreview(){
+  if (spCtx && spCtx.renderer) return;
+  const cv = $("spPreview"); if (!cv) return;
+  try {
+    const W = window.THREE;
+    const renderer = new W.WebGLRenderer({ canvas: cv, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setSize(260, 260, false);
+    renderer.outputEncoding = W.sRGBEncoding;
+    renderer.toneMapping = W.ACESFilmicToneMapping;
+    const scene = new W.Scene();
+    scene.add(new W.AmbientLight(0xffffff, 0.7));
+    const sun = new W.DirectionalLight(0xffffff, 1.1); sun.position.set(3, 5, 4); scene.add(sun);
+    const rim = new W.DirectionalLight(0x8855ff, 0.4); rim.position.set(-3, 4, -3); scene.add(rim);
+    const cam = new W.PerspectiveCamera(45, 1, 0.1, 100);
+    cam.position.set(2.1, 1.7, 3.6); cam.lookAt(0, 0.95, 0);
+    const group = new W.Group(); scene.add(group);
+    spCtx = { renderer, scene, camera: cam, group, model: null, mixer: null, raf: 0, running: false };
+    new W.GLTFLoader().load(modelUrl('player_wizard.glb'), gltf => {
+      const m = gltf.scene;
+      m.updateMatrixWorld(true);
+      let minY = Infinity, maxY = -Infinity;
+      m.traverse(o => { const p = new W.Vector3(); o.getWorldPosition(p); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); });
+      const h = maxY - minY, s = h > 0.001 ? 1.8 / h : 1;
+      m.scale.setScalar(s); m.position.y -= minY * s;
+      group.add(m);
+      spCtx.model = m;
+      if (gltf.animations && gltf.animations.length){ spCtx.mixer = new W.AnimationMixer(m); spCtx.mixer.clipAction(gltf.animations[0]).play(); }
+      setPreviewColor(S && S.school ? SCHOOLS[S.school].color : 0x6a5b9e);
+      startCharacterPreview();
+    }, undefined, () => { console.warn("preview model failed to load"); });
+  } catch(e){ console.warn("character preview unavailable:", e && e.message); }
+}
+function startCharacterPreview(){
+  if (!spCtx || spCtx.running) return;
+  spCtx.running = true;
+  const loop = () => {
+    spCtx.raf = requestAnimationFrame(loop);
+    if (spCtx.group) spCtx.group.rotation.y += 0.012;
+    if (spCtx.mixer) spCtx.mixer.update(0.016);
+    spCtx.renderer.render(spCtx.scene, spCtx.camera);
+  };
+  loop();
+}
+function stopCharacterPreview(){
+  if (spCtx){ spCtx.running = false; cancelAnimationFrame(spCtx.raf); }
+}
+function setPreviewColor(hex){
+  if (!spCtx || !spCtx.model) return;
+  const c = new window.THREE.Color(hex);
+  spCtx.model.traverse(o => {
+    if (o.isMesh){
+      if (!o.userData.baseColor) o.userData.baseColor = o.material.color.clone();
+      if (o.material) o.material = o.material.clone();
+      o.material.color.copy(o.userData.baseColor).lerp(c, 0.45);
+    }
+  });
 }
 function renderSPQuestion(i){
   const q = SCHOOL_Q[i];
@@ -495,6 +566,7 @@ function renderSPQuestion(i){
 }
 function renderSPSuggest(sug){
   const sc = SCHOOLS[sug];
+  setPreviewColor(sc.color);
   $("spSub").textContent = "The Academy suggests...";
   $("spBody").innerHTML = `<div style="font-size:52px;margin:8px 0">${SCHOOL_ICON[sug]}</div>
     <div style="font-weight:800;font-size:30px;color:${sc.color}">${sc.name} School</div>
@@ -505,10 +577,10 @@ function renderSPSuggest(sug){
     </div>`;
 }
 function renderSPAll(){
-  $("spSub").textContent = "Pick your school:";
+  $("spSub").textContent = "Pick your school (hover to preview):";
   $("spBody").innerHTML = `<div class="row" style="justify-content:center">` + Object.keys(SCHOOLS).map(s=>{
     const sc = SCHOOLS[s];
-    return `<button class="panel" style="flex:1;min-width:130px;cursor:pointer;border:2px solid ${sc.color}" onclick="window.__ev('chooseSchool|${s}')"><div style="font-size:30px;margin-top:6px">${SCHOOL_ICON[s]}</div><div style="font-weight:800;color:${sc.color};margin:4px 0">${sc.name}</div><div style="font-size:11px;color:var(--muted)">${SCHOOL_DESC[s].split(".")[0]}.</div></button>`;
+    return `<button class="panel" style="flex:1;min-width:130px;cursor:pointer;border:2px solid ${sc.color}" onclick="window.__ev('chooseSchool|${s}')" onmouseover="window.__EV.previewSchool('${s}')"><div style="font-size:30px;margin-top:6px">${SCHOOL_ICON[s]}</div><div style="font-weight:800;color:${sc.color};margin:4px 0">${sc.name}</div><div style="font-size:11px;color:var(--muted)">${SCHOOL_DESC[s].split(".")[0]}.</div></button>`;
   }).join("") + `</div>`;
 }
 function showOverlay(title, html){ $("ovTitle").textContent = title; $("ovBody").innerHTML = html; $("overlay").style.display = "block"; }
@@ -569,6 +641,59 @@ function buildClasses(){
   return h;
 }
 
+// ---- Creature Codex: the 39 deployed creatures and their battle identities ----
+// NAMED "Bestiary" in its own events (openBestiary/bestiaryFilter), not "Codex" — this project
+// already has an unrelated "Card Codex" (buildCodex(), window.__EV.openCodex, below) for the
+// collection browser. Reusing the same event name here would silently clobber whichever handler
+// got assigned last, and a player opening "the Codex" from two different buttons would land on
+// two different, unrelated screens depending on load order.
+function renderCreatureBestiary(filter){
+  const SCHOOL_ICONL = SCHOOL_ICON || {};
+  const entries = Object.entries(CREATURES).filter(([k,c])=>!filter || c.cat.toLowerCase()===filter.toLowerCase() || c.school===filter);
+  let h = `<div class="sub" style="margin-bottom:10px">${entries.length} creatures · each with a unique battle identity</div><div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap;justify-content:center">`;
+  const cats = [...new Set(Object.values(CREATURES).map(c=>c.cat))];
+  h += `<button class="btn sm ${!filter?'on':''}" onclick="window.__ev('bestiaryFilter|')">All</button>` + cats.map(c=>`<button class="btn sm ${filter===c?'on':''}" onclick="window.__ev('bestiaryFilter|${c}')">${c}</button>`).join("") + `</div>`;
+  h += `<div class="row" style="flex-wrap:wrap;justify-content:center;gap:10px">`;
+  for (const [k,c] of entries){
+    const sc = SCHOOLS[c.school];
+    h += `<div class="panel" style="width:255px;text-align:left;padding:12px;border-top:3px solid ${sc?sc.color:'#888'}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800;font-size:15px;color:${sc?sc.color:'#fff'}">${c.name}</div>
+        <div style="font-size:11px;color:var(--muted)">${(SCHOOL_ICON[c.school]||'')} ${c.cat}</div>
+      </div>
+      <div class="sub">⚔️ ${c.atk} atk · ❤️ ${c.hp} hp · 💧 ${c.cost} pip</div>
+      <div style="font-size:12px;margin-top:6px;color:var(--ink)"><b style="color:var(--gold)">Abil:</b> ${c.ability}</div>
+      <div style="font-size:12px;margin-top:3px;color:var(--ink)"><b style="color:#8fd0ff">Passive:</b> ${c.passive}</div>
+    </div>`;
+  }
+  h += `</div>`;
+  showOverlay("🐾 Creature Bestiary", h);
+}
+if (window.__EV){ window.__EV.bestiaryFilter = (f)=>renderCreatureBestiary(f); window.__EV.openBestiary = ()=>renderCreatureBestiary(""); }
+// ---- Display Case: showcase the player's slabbed (Mint/Gem Mint) cards ----
+function renderDisplayCases(){
+  const slabs = S.cards.filter(c => c.graded && gradeForRoll(c.roll).slab)
+    .sort((a,b)=>gradeForRoll(b.roll).g - gradeForRoll(a.roll).g || (b.serial||0)-(a.serial||0));
+  let h = `<div class="sub" style="margin-bottom:10px">${slabs.length} slabbed masterpiece${slabs.length===1?"":"s"} · Mint & Gem Mint cards with serial numbers</div>`;
+  if (slabs.length === 0){
+    h += `<div class="panel" style="text-align:center;padding:30px">No slabs yet — grade a card to 💎 <b>Mint</b> (80+) or 💠 <b>Gem Mint</b> (90+) to put it on display.</div>`;
+  } else {
+    h += `<div class="row" style="flex-wrap:wrap;justify-content:center;gap:14px">`;
+    for (const c of slabs){
+      const g = gradeForRoll(c.roll), def = CARD_MAP[c.id];
+      h += `<div class="panel" style="width:210px;text-align:center;border-top:3px solid ${RARITY[def.rarity].color}">
+        <div style="font-size:34px;margin-top:4px">${SCHOOL_ICON[def.school]}</div>
+        <div style="font-weight:800;font-size:16px">${def.name}</div>
+        <div style="font-size:26px;margin:6px 0">${g.icon} <span style="color:var(--gold)">${g.name}</span></div>
+        <div class="sub">Serial <b style="color:var(--gold)">#${c.serial}</b></div>
+        <div class="sub" style="color:var(--gold)">🪙 ${cardValue(def.id, c.roll)}</div>
+      </div>`;
+    }
+    h += `</div>`;
+  }
+  showOverlay("🖼️ Display Case", h);
+}
+if (window.__EV){ window.__EV.openDisplayCase = ()=>renderDisplayCases(); }
 function buildScribing(){
   let h = `<p class="sub">Refine wood, fish, and ore into card materials, then scribe a spell card. Higher Scribing skill yields better grades.</p><div class="row">`;
   for (const cm of CARD_MATERIALS){
@@ -619,6 +744,7 @@ function cardFace(c, opts={}){
   const cls = ["card"];
   if (opts.wide) cls.push("wide");
   if (opts.sel) cls.push("sel");
+  if (opts.target) cls.push("target");
   if (opts.disabled) cls.push("disabled");
   if (opts.tired) cls.push("tired");
   if (opts.slab) cls.push("slab");
@@ -667,11 +793,13 @@ window.__EV.spPick = (i,j)=>{
   else { const tally={}; for(const s of spAnswers) tally[s]=(tally[s]||0)+1; const sug=Object.entries(tally).sort((a,b)=>b[1]-a[1])[0][0]; renderSPSuggest(sug); }
 };
 window.__EV.spAll = ()=>renderSPAll();
+window.__EV.previewSchool = (s)=>setPreviewColor(SCHOOLS[s].color);
 window.__EV.chooseSchool = (s)=>{
   G.setSchool(S, s); S.flags.schoolPicked = true;
   G.issueSchoolStarter(S, s);
   applyAccent();
   save();
+  stopCharacterPreview();
   $("schoolPicker").style.display = "none";
   if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
   toast(`Welcome to the ${SCHOOLS[s].name} School! Your school's cards were added to your collection.`); render();
@@ -783,21 +911,35 @@ const NAV = [
   ["world","🌍","World"],["home","🏰",STR.nav_home],["skills","⛏️",STR.nav_skills],["collection","🃏",STR.nav_collection],
   ["loadout","🗡️",STR.nav_loadout],["market","🛒",STR.nav_market],["quests","📜",STR.nav_quests],["pvp","⚔️",STR.nav_pvp],
 ];
-// Onboarding objective bar. Rebuilt on every render because every step is DERIVED from the save
-// (see onboarding.js) — there is no state here to keep in sync, it just re-asks the questions.
+// Objective bar. During onboarding it shows the guided chain; once that's complete it becomes
+// the ongoing "Adventurer's Path" (advice.js) — always suggesting the next meaningful action in
+// the gather→refine→scribe→grade→duel→housing loop. Both are DERIVED from the save, so there is
+// no here state to keep in sync — it just re-asks the questions on every render.
 function buildObjective(){
   const bar = $("objective");
   const step = ONBOARD.currentStep(S);
-  if (!step || S.flags.onboardingHidden){ bar.style.display = "none"; return; }
-  const p = ONBOARD.progress(S);
-  const where = step.where ? ` — ${step.where}` : "";
-  const canGo = step.goto && step.goto !== screen && step.goto !== "duel";
+  if (step && !S.flags.onboardingHidden){
+    const p = ONBOARD.progress(S);
+    const where = step.where ? ` — ${step.where}` : "";
+    const canGo = step.goto && step.goto !== screen && step.goto !== "duel";
+    bar.innerHTML =
+      `<span class="obj-tick">🎓</span>` +
+      `<span class="obj-main"><div class="obj-title">${p.index}/${p.total} · ${step.title}</div>` +
+      `<div class="obj-why">${step.why}${where}</div></span>` +
+      (canGo ? `<button class="btn gold" onclick="window.__ev('objGo')">Go</button>` : ``) +
+      `<button class="btn" onclick="window.__ev('objHide')" aria-label="Hide guide">✕</button>`;
+    bar.style.display = "flex"; return;
+  }
+  // Onboarding done (or hidden) → ongoing loop guidance.
+  if (S.flags.adviceHidden){ bar.style.display = "none"; return; }
+  const a = ADVICE.nextAdvice(S);
+  if (!a){ bar.style.display = "none"; return; }
+  const canGo = a.goto && a.goto !== screen && a.goto !== "duel";
   bar.innerHTML =
-    `<span class="obj-tick">🎓</span>` +
-    `<span class="obj-main"><div class="obj-title">${p.index}/${p.total} · ${step.title}</div>` +
-    `<div class="obj-why">${step.why}${where}</div></span>` +
-    (canGo ? `<button class="btn gold" onclick="window.__ev('objGo')">Go</button>` : ``) +
-    `<button class="btn" onclick="window.__ev('objHide')" aria-label="Hide guide">✕</button>`;
+    `<span class="obj-tick">${a.icon}</span>` +
+    `<span class="obj-main"><div class="obj-title">${a.title}</div><div class="obj-why">${a.why}</div></span>` +
+    (canGo ? `<button class="btn gold" onclick="window.__ev('adviceGo')">Go</button>` : ``) +
+    `<button class="btn" onclick="window.__ev('adviceHide')" aria-label="Hide guide">✕</button>`;
   bar.style.display = "flex";
 }
 window.__EV.objGo = ()=>{
@@ -807,10 +949,24 @@ window.__EV.objGo = ()=>{
   render();
 };
 window.__EV.objHide = ()=>{ S.flags.onboardingHidden = true; save(); render(); };
+window.__EV.adviceGo = ()=>{
+  const a = ADVICE.nextAdvice(S);
+  if (!a) return;
+  screen = a.goto === "world" ? "world" : a.goto;
+  render();
+};
+window.__EV.adviceHide = ()=>{ S.flags.adviceHidden = true; save(); render(); };
 
 function buildNav(){
   $("nav").innerHTML = NAV.map(([id,ic,label])=>`<button class="navbtn ${id===screen?"on":""}" data-screen="${id}"><span class="ic">${ic}</span>${label}</button>`).join("");
-  document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>{ screen=b.dataset.screen; render(); });
+  document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>{ screen=b.dataset.screen; if (window.__analytics) window.__analytics.track("tab_click", { tab: screen }); render(); });
+}
+// Show the equipped wand-slot weapon on the 3D player (visual equipment).
+function syncPlayerWeapon(){
+  if (!world || !world.setWeapon) return;
+  const uid = S.loadout.wand;
+  const eq = uid ? S.equipment.find(e => e.uid === uid) : null;
+  world.setWeapon(eq ? eq.metal : null);
 }
 function render(){
   AUDIO.setContext(screen === "world" ? "world" : (screen === "duel" || screen === "online") ? "duel" : "menu");
@@ -825,6 +981,7 @@ function render(){
     battleWrap.style.display = "none";
     if (battle3d) battle3d.stop();
     if (world) world.resize();
+    syncPlayerWeapon();
     refreshTop();
     return;
   }
@@ -1059,6 +1216,20 @@ function renderHome(el){
     <div class="grow"><b>${dl.text}</b> · ${dl.progress}/${dl.target} <span class="sub">${dl.claimed?"claimed":"reward: gold + 2 cards"}</span></div>
     <button class="btn gold ${(dl.claimed||dl.progress<dl.target)?"":"ok"}" ${(dl.claimed||dl.progress<dl.target)?"disabled":""} onclick="window.__ev('claimDaily')">${dl.claimed?"Claimed":"Claim"}</button>
   </div></div>`;
+  // academy classes (real curriculum content)
+  const cs = G.classesState(S);
+  h += `<div class="panel" style="margin-top:12px"><h3>🎓 Attend a Class</h3>`;
+  h += `<div class="sub" style="margin-bottom:8px">${cs.usedToday ? "You've attended a class today — come back tomorrow." : "Pick a class to study. One per day, each grants academy-rank progress."}</div>`;
+  h += `<div class="row" style="flex-wrap:wrap;gap:8px">`;
+  for (const c of cs.classes){
+    h += `<div class="panel" style="flex:1;min-width:170px">
+      <div style="font-weight:700">${c.icon} ${c.name}</div>
+      <div class="sub">${c.desc}</div>
+      <div class="sub" style="color:var(--gold)">+${c.score} rank · 🪙${c.cost}</div>
+      <button class="btn sm gold" ${(cs.usedToday || S.gold<c.cost)?"disabled":""} onclick="window.__ev('attendClass|${c.id}')">Attend</button>
+    </div>`;
+  }
+  h += `</div></div>`;
   // your school
   h += `<div class="panel" style="margin-top:12px"><h3>🎓 Your School: ${SCHOOLS[S.school].name}</h3><div class="row" style="align-items:center">
     <div class="grow sub">${SCHOOL_DESC[S.school]} Your school's creatures gain +1 attack, and your spells deal bonus damage against their counter-school.</div>
@@ -1125,6 +1296,7 @@ window.__EV.buyHome = ()=>{ const r=G.buyHome(S); r.ok?toast("🏰 Dorm claimed!
 window.__EV.upgrade = (id)=>{ const r=G.upgradeHome(S,id); r.ok?toast("Upgraded!"):err(r.err==="gold"?"Not enough gold":r.err==="timber"?"Need timber (chop wood)":"Max"); render(); };
 window.__EV.toPvp = ()=>{ screen="pvp"; render(); };
 window.__EV.claimDaily = ()=>{ const r=G.claimDaily(S); if(r.ok){ toast(`📅 Daily complete! +${r.reward}g +${r.drops.length} cards`); winSfx(); } save(); render(); };
+window.__EV.attendClass = (id)=>{ const r=G.attendClass(S,id); if(r.ok){ toast(`🎓 Class complete! +${r.gained} academy rank`); winSfx(); } else err(r.err==="gold"?"Not enough gold":r.err==="today"?"You already attended a class today":r.err==="locked"?"That class isn't available yet":"Cannot attend"); save(); render(); };
 window.__EV.openSchoolPicker = ()=>{ showSchoolPicker(); };
 
 // ================= SKILLS =================
@@ -1262,7 +1434,9 @@ function renderCollection(el){
   h += `<div class="row" style="margin-bottom:10px">
     <button class="btn gold" onclick="window.__ev('pack')">🃏 Open Pack (${G.PACK_COST}g)</button>
     <button class="btn" onclick="window.__ev('toLoadout')">🗡️ ${STR.nav_loadout}</button>
-    <button class="btn" onclick="window.__ev('openCodex')">📖 Codex</button></div>`;
+    <button class="btn" onclick="window.__ev('openCodex')">📖 Codex</button>
+    <button class="btn" onclick="window.__ev('openBestiary')">🐾 Creature Bestiary</button>
+    <button class="btn" onclick="window.__ev('openDisplayCase')">🖼️ Display Case</button></div>`;
   // Printings tally, so a collection is something to look at and not just a pile. Derived from
   // the cards every render — nothing about it is stored.
   const tally = VAR.tallyFor(S.cards);
@@ -1592,6 +1766,10 @@ function renderLoadout(el){
 window.__EV.equip = (uid)=>{ G.equip(S,uid); refreshGear(); render(); };
 window.__EV.unequip = (slot)=>{ G.unequip(S,slot); refreshGear(); render(); };
 window.__EV.sellEq = (uid)=>{ const r=G.sellEquipment(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; refreshGear(); render(); };
+// syncPlayerWeapon() (world.setWeapon, wand-only) also runs on every render() while the world
+// screen is active, so it stays in sync a moment later either way — refreshGear() (equipment3d.js,
+// wand+amulet, world AND the character-preview) is the fuller of the two and is what these
+// handlers call directly.
 // Enchanting (BACKLOG §6): a picker in the generic overlay, one row per rune. Reuses the same
 // "row shows what it costs, disables what you can't afford yet" shape the Skills tab's own
 // crafting rows already use, rather than inventing a second UI language for it.
@@ -1870,20 +2048,20 @@ function renderDuel(el){
   const myTurn = battle.turn==="you";
   let h = `<h2>⚔️ ${battle.enemyName||"Duel"}</h2>`;
   const resultText = over.draw ? STR.you_draw : (over.winner==="you" ? STR.you_win : STR.you_lose);
-  h += `<div id="duelStatus">${over.over ? resultText : (myTurn?STR.your_turn:STR.enemy_turn)}</div>`;
+  h += `<div id="duelStatus">${over.over ? resultText : (pendingTarget && pendingTarget.kind==="bolt" ? "🎯 Choose a target for Firespell!" : (pendingTarget && pendingTarget.kind==="tongue" ? "👅 Choose an enemy to steal attack from!" : (myTurn?STR.your_turn:STR.enemy_turn)))}</div>`;
   if (over.over && over.reason === "turn limit") h += `<div style="text-align:center;font-size:12px;color:var(--muted)">${STR.turn_limit}</div>`;
   h += `<div id="duelTimer" style="text-align:center;font-size:20px;font-weight:800;color:${duelTimeLeft<=10?"var(--danger)":"var(--gold)"}">${myTurn&&!over.over?duelTimeLeft+"s":"—"}</div>`;
   h += `<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:6px">You: ${(you.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${(you.traps||[]).length?`· 🪤${you.traps.length}`:""} &nbsp;|&nbsp; Enemy: ${(enemy.field||[]).map(f=>CARD_MAP[f.id].name).join(" · ")||"no field"} ${(enemy.traps||[]).length?`· 🪤${enemy.traps.length}`:""}</div>`;
   h += `<div style="text-align:center;font-size:12px;color:var(--gold);margin-bottom:6px">🎓 ${SCHOOLS[you.school].name} School vs ${SCHOOLS[enemy.school].name} School</div>`;
   // enemy zone
-  const canTargetWiz = pendingTarget && (pendingTarget.kind==="spell" || pendingTarget.kind==="attack");
+  const canTargetWiz = pendingTarget && (pendingTarget.kind==="spell" || pendingTarget.kind==="attack" || pendingTarget.kind==="bolt");
   h += `<div class="duelzone bg"><div class="zonecap">${battle.enemyName||"Enemy"}</div>`;
   h += `<div class="wizbar" ${canTargetWiz?`style="cursor:crosshair" onclick="window.__ev('dmgWiz')"`:""}><div class="bar"><div style="width:${Math.max(0,enemy.hp/enemy.maxHp*100)}%"></div></div>
     <div style="font-size:12px">${enemy.hp}/${enemy.maxHp} HP${enemy.shield?` · 🛡${enemy.shield}`:""}</div></div>`;
   h += `<div class="board">`;
   for (let i=0;i<enemy.board.length;i++){
     const c = enemy.board[i]; const def = CARD_MAP[c.id];
-    h += cardFace(def, { sel:false, tired:c.exhausted||c.summoning,
+    h += cardFace(def, { sel:false, target: !!pendingTarget, tired:c.exhausted||c.summoning,
       onclick: pendingTarget ? `dmgTarget|${i}` : "" });
   }
   h += `</div></div>`;
@@ -1977,6 +2155,11 @@ function castVfx(cardId, side, targetIdx){
 }
 window.__EV.play = (idx)=>{
   const cid = battle.you.hand[idx];
+  const c = CARD_MAP[cid];
+  // Firespell-type creatures: ask the player to pick a target first (AI keeps random fallback)
+  const rules = (c && c.type === "creature" && (traitForCard(cid, c.name) || {}).rules) || {};
+  if (rules.onPlayBolt){ pendingTarget = { kind:"bolt", idx }; render(); return; }
+  if (rules.onPlayStealAtk){ pendingTarget = { kind:"tongue", idx }; render(); return; }
   const r=G.playCard(battle, battle.you, idx, null);
   if(r.ok){ AUDIO.play("card"); castVfx(cid, "you", null); }
   render();
@@ -1996,6 +2179,14 @@ window.__EV.dmgTarget = (ti)=>{
     const cid = battle.you.hand[pendingTarget.idx];
     const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"creature", idx:ti});
     pendingTarget = null; if(r.ok){ sfx(dmgSfx); castVfx(cid, "you", ti); } render();
+  } else if (pendingTarget && pendingTarget.kind==="bolt"){
+    const cid = battle.you.hand[pendingTarget.idx];
+    const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"creature", idx:ti});
+    pendingTarget = null; if(r.ok){ sfx(dmgSfx); castVfx(cid, "you", ti); } render();
+  } else if (pendingTarget && pendingTarget.kind==="tongue"){
+    const cid = battle.you.hand[pendingTarget.idx];
+    const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"creature", idx:ti});
+    pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
   } else if (pendingTarget && pendingTarget.kind==="attack"){
     const r = G.attack(battle, pendingTarget.idx, "creature", ti);
     pendingTarget = null; if(r.ok) sfx(dmgSfx); render();
@@ -2003,6 +2194,10 @@ window.__EV.dmgTarget = (ti)=>{
 };
 window.__EV.dmgWiz = ()=>{
   if (pendingTarget && pendingTarget.kind==="spell"){
+    const cid = battle.you.hand[pendingTarget.idx];
+    const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"wiz"});
+    pendingTarget = null; if(r.ok){ sfx(dmgSfx); castVfx(cid, "you", null); } render();
+  } else if (pendingTarget && pendingTarget.kind==="bolt"){
     const cid = battle.you.hand[pendingTarget.idx];
     const r = G.playCard(battle, battle.you, pendingTarget.idx, {kind:"wiz"});
     pendingTarget = null; if(r.ok){ sfx(dmgSfx); castVfx(cid, "you", null); } render();
@@ -2463,6 +2658,7 @@ function changeZone(toZoneId, fromZoneId, spawnOverride){
   if (zoning || !worldCfg) return;
   const target = worldCfg.get(toZoneId);
   if (!target){ console.warn("exit to unknown zone", toZoneId); return; }
+  if (window.__analytics) window.__analytics.track("zone_visit", { zone: toZoneId, from: fromZoneId || null });
   zoning = true;
   const canvas = $("world");
   const spawnAt = spawnOverride || entryPointFor(worldCfg, toZoneId, fromZoneId);
@@ -2518,6 +2714,7 @@ async function initWorld(){
     const wanted = new URLSearchParams(location.search).get("zone") || (S.worldState && S.worldState.zone);
     activeZone = (wanted && worldCfg.get(wanted)) || worldCfg.get(worldCfg.hub);
     if (wanted && !worldCfg.get(wanted)) console.warn("unknown zone \"" + wanted + "\", using the hub");
+    if (window.__analytics && activeZone) window.__analytics.track("zone_visit", { zone: activeZone.id });
   } catch(e){
     console.warn("world config unavailable, using built-in academy:", e && e.message);
   }

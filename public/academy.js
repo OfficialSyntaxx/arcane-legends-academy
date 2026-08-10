@@ -52,3 +52,24 @@ export function progressToNext(score){
 
 /** Apply a perk percentage to an amount, rounded — the one bit of arithmetic every call site needs. */
 export function applyBonus(amount, pct){ return Math.round(amount * (1 + pct / 100)); }
+
+// ---- Academy classes (real curriculum content beyond the numeric perks) ----
+// Each year unlocks further classes. Attending one costs gold and grants `score` academy-rank
+// progress (a stored bonus the player earns by showing up). One class per day.
+export const CLASSES = [
+  { id:"dueling",    name:"Dueling",      icon:"⚔️", cost:20, score:3, minYear:0, desc:"Practice your dueling form and card timing." },
+  { id:"potions",    name:"Potions",      icon:"🧪", cost:25, score:4, minYear:1, desc:"Brew hardier drafts and stronger remedies." },
+  { id:"summoning",  name:"Summoning",    icon:"🐉", cost:30, score:5, minYear:2, desc:"Study the creatures and their battle instincts." },
+  { id:"scribing",   name:"Scribing",     icon:"📜", cost:35, score:6, minYear:3, desc:"Refine your cardcraft and grading eye." },
+  { id:"alchemy",    name:"Alchemy",      icon:"⚗️", cost:40, score:7, minYear:4, desc:"Master the transmutations of the deep cauldron." },
+  { id:"battlemagic",name:"Battle Magic", icon:"✨", cost:50, score:8, minYear:5, desc:"Advanced combat spellcraft for the arena." },
+  { id:"archmagistery",name:"Archmagistery", icon:"👑", cost:60, score:10, minYear:6, desc:"Master-level study at the VeryTop of the tower." },
+];
+/** Classes a player at this score can attend (their current year unlocks them). */
+export function classesFor(score){
+  const yi = yearIndexFor(score);
+  return CLASSES.filter(c => c.minYear <= yi);
+}
+export function classDef(id){ return CLASSES.find(c => c.id === id) || null; }
+export function classCost(id){ const c = classDef(id); return c ? c.cost : 0; }
+export function classScoreGain(id){ const c = classDef(id); return c ? c.score : 0; }

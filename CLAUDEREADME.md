@@ -1094,27 +1094,27 @@ gates every push.
 **What's working, end to end:**
 - Full card/duel/economy loop: schools, elemental matrix, all 4 card types, grading/slabs,
   scribing, skills, equipment, home/guild, market/auctions, daily quests, local + online PvP.
-- **A multi-zone 3D world**, not just a single campus: the `academy` hub, a streaming outdoor
-  zone (`whispering_forest`, reached through a walkable gateway) with its own NPCs and field
-  quests, and an instanced dungeon (`cinderhollow_caverns`, reached through a doorway in the
-  forest) with persistent kill/room/boss progress. All of **WORLDSPEC §9's five implementation
-  steps are done** — config/data model, terrain, chunk streaming, zone transitions, dungeon
-  instancing.
-- **Painted terrain** (vertex-colour height bands, rock on slopes, shorelines, mottling) — no
-  textures, so no assets to author or compress for the ground.
-- **A rigged, animated player character** with a proper standing pose (not a bind-pose T-pose),
-  scaled correctly (`CHARACTER_HEIGHT = 2.6`), via `tools/rig-character.py` for any future
-  unrigged generated character.
-- **A guided first session** (`onboarding.js`) that actually walks a new player through the whole
-  loop, and **field quests** (`zonequests.js`) that give the forest a reason to exist.
-- **Spell VFX** (six procedural archetypes) and a **duel arena that reads as a place** (colonnade,
-  rune circle, raised pads) rather than a flat coloured disc.
-- **Academy curriculum + NPC reputation** (`academy.js` / `reputation.js`) — the academy rank that
-  used to be a cosmetic label now unlocks real perks (quest gold bonus, market discount, XP
-  bonus), and standing with quest-givers stacks its own bonus on top.
-- **Model integrity is actively checked** (`tools/model-check.mjs`) after finding four silently
-  broken GLBs in the repo that no existing test caught (`world.js` degrades a load/render failure
-  to the procedural stand-in with only a console warning — invisible in play).
+- **Four baked GLB map zones** wired in as the world (`ZONE_MAPS` in `worldconfig.js`): the
+  **Plains/Academy hub, Whispering Forest, Ashen Mountains, and a Snow zone (Frostborne Peaks)** —
+  each a full ~56-unit baked map (right-sized, recentered, saturated, no black bakes), loaded as
+  the zone's terrain+structures base layer. Plus the procedural zones, dungeons, chunk streaming
+  and WORLDSPEC §9 steps 1–5.
+- **Full collision** against the map geometry for BOTH the player and the camera: `mapBlocks`
+  blocks buildings, trees/rocks and steep terrain (2D footprint + elevated-surface raycast),
+  the player walks on the map surface (raycast `mapSurfaceY`), and the camera never sinks into
+  hills or clips through structures.
+- **A guided, connected loop**: `onboarding.js` walks a new player through the first session, and
+  `advice.js` ("Adventurer's Path") keeps guiding the SAME loop forever after — the objective bar
+  always suggests the next action (scribe→housing→grade→duel→refine→pack→gather→explore)
+  derived from the save.
+- **Client analytics** behind `/api/analytics` (JSON) + `/api/dashboard` (HTML): sessions,
+  zones, tab clicks, uncaught errors, movement-stuck, world/map load, low-FPS, and advice
+  shown→clicked — all D1-backed, with a readable dashboard.
+- **A redesigned mobile UI**: bottom nav bar (8 tabs fit on mobile) with a muted charcoal +
+  champagne-gold palette instead of the cartoonish purple.
+- **Input & camera feel**: touch-joystick inversion fixed, time-based smooth camera follow.
+- Plus everything earlier: painted terrain, rigged player, spell VFX, field quests, curriculum +
+  reputation, the 39-creature combat pass, model-integrity checks.
 
 **SCALE: 1 world unit = 1 metre.** Characters are `CHARACTER_HEIGHT = 2.6` (not 1.8 — that read as
 anatomically correct but *looked* tiny, because the normalisation measures the full bounding box
@@ -1554,12 +1554,11 @@ collision only** — duels never place the player inside its footprint; pressing
 switches `screen` to `"duel"` and renders the separate `battle3d.js` procedural pit instead, so the
 landmark's own walkability/platform never matters gameplay-wise. Pushed as `208aa7a`.
 
-Before that, in order: Academy curriculum + NPC reputation (§6.7), spell VFX and a rebuilt duel
-arena (the *procedural* in-duel one, `battle3d.js` — not to be confused with the outdoor landmark
-above), field quests for the Whispering Forest, the onboarding chain, dungeon-enemy persistence
-(fixing a gap left by the initial dungeon-instancing commit — kills weren't actually sticking), a
-rigged player character with a standing pose, painted terrain, and WORLDSPEC steps 3–5 (chunk
-streaming, zone transitions, dungeon instancing).
+**Before that, in order:** client analytics + dashboard (`/api/analytics` + `/api/dashboard`,
+D1-backed, 2026-08-08) → the UI redesign (bottom nav bar + muted charcoal/gold palette) → input
+inversion fix + smooth camera + noclip/collision fixes → player + camera collision against the
+GLB map geometry → the 4 re-exported baked maps wired in as zone visuals → the earlier creature
+combat pass, character creation, Ashen/forest content, and WORLDSPEC steps 1–5.
 
 ### The Dorm phases (D1–D4) — ✅ DONE
 
@@ -1609,24 +1608,26 @@ The phases as planned, ordered smallest-playable-first — all four now shipped:
 4. Everything else unstarted is tracked in `BACKLOG.md` — PvP ranking/leaderboards, guilds, pets,
    card variants/evolution, and the long-term endgame section are all still `[ ]`.
 
-**Suggestions worth considering (not yet on the backlog, flagged while working nearby):**
-- **A second landmark pass on the arena's collision circle.** It was kept at the old model's
-  radius (r=13) by inheritance, not re-measured against the new mesh's actual footprint. Tests
-  confirm no camera clipping, but if the visual rim and the invisible collision wall ever look
-  mismatched to a player walking the edge, re-measure `w`/`d` in `structures.js` against the new
-  GLB's bounding box the way `ASSETS.md` §Import checklist describes.
-- **The outdoor arena landmark could eventually BE the duel space**, matching the Wizard101
-  reference more closely — walk up, get visually drawn toward the platform, camera cuts to the
-  `battle3d.js` view. Right now the two are unconnected (a decorative building outside, a fully
-  separate procedural scene for the fight). Not urgent, but worth a design pass once step 6
-  content is in, since it's the kind of polish that reads as "one game" rather than "a menu on
-  top of a 3D backdrop."
-- **A general "verify before trusting" pattern for future asset swaps**: this session's arena
-  work is a decent template — render standalone, render post-compression, run `model-check.mjs`,
-  confirm via debug hooks in-game, then run the *specific* existing test that would catch the
-  failure mode you're worried about (here: the camera-collision orbit check) rather than assuming
-  a fresh screenshot proves anything on its own. Worth keeping as the default checklist for any
-  future generated-model integration, character or landmark alike.
+**Immediate next candidates (BACKLOG §2–§3, in the recommended order):**
+1. **Phase B — Dorm customization + physical showcases.** Make the dorm a real 3D space you
+   furnish: place KayKit furniture on a grid, turn the **Display Case** into a physical shelf that
+   shows your slabs in 3D, plus a **trophy wall** for boss kills. Smallest version: a furniture
+   grid + one physical slab shelf.
+2. **Phase C — Pets / familiars.** Leverages the 39 creatures: a familiar follows you in the 3D
+   world, levels, and gives small bonuses (card pull, gather bonus, a duel trait).
+3. **Phase D — Lake Arcanum (4th zone) + world feel.** Author a new zone against the existing
+   schemas (WORLDSPEC step 6), plus fast travel, day/night, weather.
+4. **Phase E — PvP ranking + leaderboards.**
+5. **Phase F — Deepen collection & combat** (card evolution/variants, multi-phase bosses, enemy
+   archetypes, school-specific mechanics + ultimates).
+6. **Phase G — Achievements, titles, social** (guilds, marketplace).
+
+**Suggestions flagged while working nearby:**
+- **Balance the creature passives** — tuned by design intent, not playtest; some may be strong.
+- **The outdoor Duel Arena landmark** is still decorative-only (duels render in the separate
+  `battle3d.js` pit); making the landmark the actual duel space is a polish pass.
+- **Use the advice analytics** (shown→click) to find where the player loop actually stalls before
+  deepening any single system.
 
 **Refinements flagged during the docs review (2026-08-08)** — all four are now done, and were done
 as part of the dorm work rather than left as notes:

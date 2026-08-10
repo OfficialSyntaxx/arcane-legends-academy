@@ -303,17 +303,21 @@ if (hasWorld){
   // --- terrain: the player must actually ride the heightmap ---
   // REGRESSION: the update loop pinned player.position.y = 0 every frame and the idle-bob
   // animation set an absolute Y, so the terrain rendered but nothing stood on it.
+  //
+  // Compared against `world.groundYAt(x,z)` — the SAME height function the engine itself places
+  // the player with — rather than recomputing `terrain.js` heightAt independently. Some zones are
+  // now backed by a baked GLB map (`worldconfig.js` ZONE_MAPS) and ride that mesh's real surface
+  // instead of the procedural formula; asking the engine directly means this check is correct for
+  // whichever source a given zone actually uses, present or future, with nothing to keep in sync.
   const terr = await page.evaluate(async () => {
-    const ter = await import("./terrain.js");
     const wc  = await import("./worldconfig.js");
     const cfg = await wc.loadWorldConfig();
-    const z = cfg.get(cfg.hub), flats = ter.flatsForZone(z);
     const out = [];
     for (const [x, zz] of [[40,40],[48,48],[55,55],[-55,-55]]){
       window.__world.teleport(x, zz);
       await new Promise(r => setTimeout(r, 160));
       const d = window.__worldDebug();
-      out.push({ want: +ter.heightAt(x, zz, z.terrain, flats).toFixed(3), got: +d.playerExact[1].toFixed(3) });
+      out.push({ want: +window.__world.groundYAt(x, zz).toFixed(3), got: +d.playerExact[1].toFixed(3) });
     }
     return { out, zones: cfg.zoneIds.length };
   });
@@ -554,16 +558,25 @@ if (hasWorld){
     window.__testGather && window.__testGather();
     await new Promise(r => setTimeout(r, 200));
     const advanced = text();
-    // dismissing it must stick
+    // Dismissing the ONBOARDING guide (objHide) hands off to the ongoing "Adventurer's Path"
+    // advisor (advice.js) rather than hiding the bar outright — the bar is still shown, just with
+    // different content, until the advisor itself is dismissed (adviceHide). That handoff is the
+    // one that must stick.
     window.__ev("objHide");
     await new Promise(r => setTimeout(r, 150));
-    return { ...out, advanced, hiddenAfter: bar().style.display };
+    const afterObjHide = { display: bar().style.display, text: text() };
+    window.__ev("adviceHide");
+    await new Promise(r => setTimeout(r, 150));
+    return { ...out, advanced, afterObjHide, hiddenAfter: bar().style.display };
   });
   check("the objective bar is visible on a fresh save", ob.shown === "flex", ob.start);
   check("the objective advances as steps are completed",
         ob.afterSchool !== ob.start && ob.advanced !== ob.afterSchool,
         `${ob.start} -> ${ob.afterSchool} -> ${ob.advanced}`);
-  check("the objective bar can be dismissed", ob.hiddenAfter === "none", ob.hiddenAfter);
+  check("dismissing onboarding hands off to the ongoing advisor rather than just hiding the bar",
+        ob.afterObjHide.display === "flex" && ob.afterObjHide.text !== ob.advanced,
+        JSON.stringify(ob.afterObjHide));
+  check("dismissing the advisor itself actually hides the bar", ob.hiddenAfter === "none", ob.hiddenAfter);
 }
 
 // ---------------- spell VFX (BACKLOG §4) ----------------

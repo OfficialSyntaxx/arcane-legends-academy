@@ -961,8 +961,8 @@
         },
         {
           "toZone": "ashen_mountains",
-          "x": 0,
-          "z": -158
+          "x": 158,
+          "z": 0
         }
       ],
       "treasures": [
@@ -1155,48 +1155,195 @@
       "id": "ashen_mountains",
       "name": "Ashen Mountains",
       "spawn": {
-        "x": 0,
-        "z": 100
+        "x": -100,
+        "z": 0
       },
       "bounds": {
-        "minX": -160,
-        "maxX": 160,
-        "minZ": -160,
-        "maxZ": 160
+        "minX": -120,
+        "maxX": 120,
+        "minZ": -120,
+        "maxZ": 120
       },
       "terrain": {
-        "seed": 913377,
-        "scale": 70,
-        "amplitude": 18,
+        "seed": 55123,
+        "scale": 42,
+        "amplitude": 9,
         "baseHeight": 0,
-        "waterLevel": null,
+        "waterLevel": -2.5,
         "biome": "mountains"
       },
       "chunkSize": 32,
       "loadRadius": 70,
       "unloadRadius": 100,
-      "npcs": [],
-      "resourceNodes": [],
-      "props": [],
-      "enemies": [],
-      "dungeonEntrances": [],
-      "treasures": [
+      "props": [
         {
-          "id": "ashen_summit_cache",
-          "x": 60,
-          "z": -60
+          "url": "./assets/models/kaykit_rock.glb",
+          "count": 60,
+          "h": 2.2
         },
         {
-          "id": "ashen_ridge_cache",
-          "x": -70,
-          "z": -40
+          "url": "./assets/models/nat_CommonTree_1.glb",
+          "count": 22,
+          "h": 7,
+          "minDistFromSpawn": 12
+        },
+        {
+          "url": "./assets/models/nat_Mushroom_Common.glb",
+          "count": 30,
+          "h": 1
+        }
+      ],
+      "resourceNodes": [
+        {
+          "kind": "crystal",
+          "id": "iron",
+          "label": "Mine Iron",
+          "count": 8
+        },
+        {
+          "kind": "crystal",
+          "id": "gold",
+          "label": "Mine Gold",
+          "count": 6
+        },
+        {
+          "kind": "crystal",
+          "id": "mithril",
+          "label": "Mine Mithril",
+          "count": 5
+        },
+        {
+          "kind": "crystal",
+          "id": "runite",
+          "label": "Mine Runite",
+          "count": 3
+        }
+      ],
+      "nodeModels": {
+        "crystal": {
+          "url": "./assets/models/kaykit_rock.glb",
+          "h": 2.2
+        }
+      },
+      "npcs": [
+        {
+          "key": "mountain_miner",
+          "role": "quest",
+          "station": "mountain_miner",
+          "label": "Foreman Grund",
+          "x": -60,
+          "z": 40,
+          "model": "trainer.glb"
+        },
+        {
+          "key": "mountain_smith",
+          "role": "quest",
+          "station": "market",
+          "label": "Smelter Voss",
+          "x": 50,
+          "z": 60,
+          "model": "merchant.glb"
+        }
+      ],
+      "enemies": [
+        {
+          "model": "creature_Skeleton.glb",
+          "name": "Ashen Skeleton",
+          "count": 10,
+          "level": 5
+        },
+        {
+          "model": "creature_Bat.glb",
+          "name": "Cinder Bat",
+          "count": 6,
+          "level": 4
+        }
+      ],
+      "dungeonEntrances": [
+        {
+          "id": "ashen_caverns",
+          "x": 90,
+          "z": -60,
+          "model": "./assets/models/dng_doorway.glb"
         }
       ],
       "exits": [
         {
           "toZone": "whispering_forest",
+          "x": -118,
+          "z": 0
+        },
+        {
+          "toZone": "snow",
+          "x": -110,
+          "z": -20
+        }
+      ],
+      "treasures": [
+        {
+          "id": "ashen_summit_cache",
+          "x": 70,
+          "z": 80
+        },
+        {
+          "id": "ashen_ridge_cache",
+          "x": -70,
+          "z": -80
+        }
+      ]
+    },
+    {
+      "id": "snow",
+      "name": "Frostborne Peaks",
+      "spawn": {
+        "x": 0,
+        "z": 0
+      },
+      "bounds": {
+        "minX": -40,
+        "maxX": 40,
+        "minZ": -40,
+        "maxZ": 40
+      },
+      "terrain": {
+        "seed": 20260806,
+        "scale": 32,
+        "amplitude": 1.5,
+        "baseHeight": 0,
+        "waterLevel": null,
+        "biome": "snow"
+      },
+      "exits": [
+        {
+          "toZone": "ashen_mountains",
+          "x": -30,
+          "z": 0
+        }
+      ],
+      "npcs": [
+        {
+          "key": "snow_keeper",
+          "role": "quest",
+          "station": "quests",
+          "label": "Frost Keeper",
           "x": 0,
-          "z": 158
+          "z": 6,
+          "model": "npc_mage.glb"
+        }
+      ],
+      "wanderers": [
+        {
+          "key": "snow_walker",
+          "main": 10485631,
+          "hat": 14676213,
+          "model": "student_emerald.glb"
+        }
+      ],
+      "treasures": [
+        {
+          "id": "snow_hollow_cache",
+          "x": 25,
+          "z": -25
         }
       ]
     }

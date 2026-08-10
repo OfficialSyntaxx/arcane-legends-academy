@@ -3,7 +3,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node tools/sync-cards.mjs --check && node tools/sync-zones.mjs --check && node tools/test.mjs && node tools/logic-test.mjs && node tools/ui-smoke.mjs",
+    "test": "node tools/sync-cards.mjs --check && node tools/sync-zones.mjs --check && node tools/test.mjs && node tools/logic-test.mjs && node tools/ui-smoke.mjs && node tools/creature-rule-test.mjs",
     "sync": "node tools/sync-cards.mjs",
     "test:engine": "node tools/test.mjs",
     "test:logic": "node tools/logic-test.mjs",
@@ -13,7 +13,8 @@
     "import": "node tools/import-asset.mjs",
     "serve": "python3 -m http.server 8080 --directory public",
     "sync:zones": "node tools/sync-zones.mjs",
-    "check:models": "node tools/model-check.mjs"
+    "check:models": "node tools/model-check.mjs",
+    "test:creatures": "node tools/creature-rule-test.mjs"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.4.2",

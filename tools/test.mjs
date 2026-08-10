@@ -11,6 +11,7 @@ import * as TER from "../public/terrain.js";
 import * as WC from "../public/worldconfig.js";
 import * as DG from "../public/dungeons.js";
 import * as OB from "../public/onboarding.js";
+import * as ADVICE from "../public/advice.js";
 import * as VFX from "../public/vfx.js";
 import * as ZQ from "../public/zonequests.js";
 import * as ACADEMY from "../public/academy.js";
@@ -1607,6 +1608,71 @@ check("completeQuest pays out more gold and xp at a higher academy score", (()=>
   G.completeQuest(high, 0);
   return (high.gold - goldBefore2) >= (low.gold - goldBefore1)
       && (high.xp - xpBefore2) >= (low.xp - xpBefore1);
+})());
+
+// ---- Academy classes (BACKLOG "Academy classes/curriculum content") ----
+check("classes unlock by year and cost gold, grant academy rank, once per day", (()=>{
+  const s = G.newGame();
+  s.gold = 500;
+  const before = G.academyScore(s);
+  const avail = G.classesState(s).classes;
+  if (!avail.some(c => c.id === "dueling")) return false;   // Novice can attend Dueling
+  const r = G.attendClass(s, "dueling");
+  const after = G.academyScore(s);
+  return r.ok && after === before + 3 && G.classesState(s).usedToday;
+})());
+check("a second class the same day is refused", (()=>{
+  const s = G.newGame(); s.gold = 500;
+  G.attendClass(s, "dueling");
+  return G.attendClass(s, "dueling").err === "today";
+})());
+check("a locked class (higher year) is refused", (()=>{
+  const s = G.newGame(); s.gold = 500;
+  return G.attendClass(s, "archmagistery").err === "locked";
+})());
+
+// ---- zone map base layers (BACKLOG "wire baked GLB maps as zone visuals") ----
+check("every ZONE_MAPS entry points at a real zone and an existing map file", (()=>{
+  for (const [zid, m] of Object.entries(WC.ZONE_MAPS)){
+    if (!WORLD.get(zid)) return false;                       // zone must exist
+    const p = path.join(ROOT_PUBLIC, "assets", "maps", m.file);
+    if (!fs.existsSync(p)) return false;                     // map file must be deployed
+  }
+  return true;
+})());
+
+// ---- Adventurer's Path / loop guidance (BACKLOG §1 "Connect existing systems") ----
+check("holding a scribing supply advises scribing a card", (()=>{
+  const s = G.newGame(); s.inventory.canvas = 1;
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "skills" && /scribe/i.test(a.title);
+})());
+check("gold without a home advises buying the guild hall", (()=>{
+  const s = G.newGame(); s.gold = 500; s.inventory.canvas = 0;
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "home" && /guild hall/i.test(a.title);
+})());
+check("an ungraded card advises grading", (()=>{
+  const s = G.newGame(); s.gold = 0; s.inventory = {}; s.deck = [];
+  s.cards = [{ uid:"x", id:"fire_cat", roll:50, graded:false }];
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "collection" && /grade/i.test(a.title);
+})());
+check("a legal deck with nothing else pending advises dueling", (()=>{
+  const s = G.newGame(); s.gold = 0; s.inventory = {};
+  s.cards = s.deck.map((id, i) => ({ uid:"c"+i, id, roll:60, graded:true }));
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "duel" && /duel/i.test(a.title);
+})());
+check("holding raw material with no legal deck advises refining", (()=>{
+  const s = G.newGame(); s.deck = []; s.cards = []; s.gold = 0; s.inventory = { iron: 1 };
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "skills" && /refine/i.test(a.title);
+})());
+check("an empty save (no cards/deck/materials) advises gathering", (()=>{
+  const s = G.newGame(); s.deck = []; s.cards = []; s.gold = 0; s.inventory = {};
+  const a = ADVICE.nextAdvice(s);
+  return !!a && a.goto === "world" && /gather/i.test(a.title);
 })());
 
 // ---- NPC reputation (BACKLOG "NPC reputation") ----

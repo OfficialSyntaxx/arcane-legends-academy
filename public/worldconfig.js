@@ -18,6 +18,22 @@ export const ZONE_DEFAULTS = {
   bounds: { minX: -200, maxX: 200, minZ: -200, maxZ: 200 },
 };
 
+// ------------------------------------------------------------------ zone map base layers
+// Some zones are backed by a full GLB map (baked terrain + structures) instead of a purely
+// procedural ground. `file` is relative to `assets/maps/`; the map is loaded as a grounded base
+// layer at (x, z) scaled by `scale`. `hideLandmarks` lists landmark keys the map duplicates
+// (e.g. the Plains/Academy map ships its own central tower, so the hub's tower landmark is
+// hidden to avoid a duplicate).
+export const ZONE_MAPS = {
+  // Each map is ~56 units wide (±28 around its centre). Position it so the zone spawn lands ON
+  // the map, with the central structure offset within the map so the player starts on open ground
+  // with the tower/spire as a landmark rather than at its base.
+  academy:           { file: "map_plains_academy.glb", scale: 1, x: 13, z: 30, hideLandmarks: ["tower"] },
+  whispering_forest: { file: "map_forest.glb",         scale: 1, x: 0,  z: 60 },
+  ashen_mountains:   { file: "map_mountains.glb",      scale: 1, x: -100, z: 20 },
+  snow:              { file: "map_snow.glb",           scale: 1, x: 0,  z: 20 },
+};
+
 // Deep-ish merge that only fills in missing keys — an author who sets one terrain field should
 // not lose the rest of the defaults.
 function withDefaults(zone){

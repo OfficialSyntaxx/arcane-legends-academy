@@ -310,6 +310,10 @@
 - [x] Expanded automated tests — 485 engine / 42 online / 166 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback/enchant/market/savebackup flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
+- [x] UI redesign — bottom nav bar (8 tabs fit on mobile) + muted charcoal/champagne palette (was cartoonish purple)
+- [x] Client analytics + dashboard — `advice.js`/`analytics.js` feed D1; `/api/analytics` (JSON) + `/api/dashboard` (HTML) track sessions, zones, tab clicks, errors, movement-stuck, world/map load, low-FPS, advice shown→click
+- [x] World collision — player + camera collide with the GLB map geometry (buildings, trees/rocks, steep terrain); no noclip, no camera clipping
+- [x] Input + camera feel — touch-joystick inversion fixed; time-based smooth camera follow
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
 - [x] Ambient world audio — procedural pad in the 3D world
 - [~] Music per zone / activity — mode changes per screen (campus/duel/menu); per-*zone* pending step 4

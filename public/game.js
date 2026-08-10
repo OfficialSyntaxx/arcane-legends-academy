@@ -9,6 +9,7 @@ import * as RANK from "./pvprank.js";
 import * as MAGIC from "./schoolmagic.js";
 import * as CB from "./cardbacks.js";
 import * as ACHV from "./achievements.js";
+import { traitForCard } from "./creatures.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
 export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
@@ -52,7 +53,7 @@ export function newGame(){
     // exactly like a card's `roll` in variants.js. `season` is set on first load, not here — a
     // fresh save has never "started" a season until load() calls settleSeason.
     pvp:{ wins:0, losses:0, rankPoints:0, streak:0, season:null, seasonBest:0, history:[] },
-    stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 },
+    stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 }, academyBonus:0,
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
     // `treasuresFound` (BACKLOG §3 "Hidden areas / treasure") is a flat list of globally-unique
@@ -86,7 +87,8 @@ export function newGame(){
     // pvprank.js's season history already uses. Honestly local: this project has no persistent
     // server, so it can only ever be the player's OWN past sales, never a cross-player price feed.
     marketHistory:[],
-    slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false },
+    slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false },
+    flags:{ starters:true, schoolPicked:false, lastClassDay:null, adviceHidden:false },
   };
 }
 // Shared by load() and importSave() — a raw parsed save object becomes a fully playable one via
@@ -146,6 +148,7 @@ function migrate(s){
   // was `if (!s.flags.schoolPicked)`, which also fired on an explicit false — so a player who
   // quit during character creation never saw the picker again and was silently stuck on Balance.
   if (s.flags.schoolPicked === undefined) s.flags.schoolPicked = true;
+  if (s.flags.adviceHidden === undefined) s.flags.adviceHidden = false;
   if (!s.auctions) s.auctions = [];
   if (!Array.isArray(s.marketHistory)) s.marketHistory = [];
   if (!s.worldState) s.worldState = { zone:"academy", visited:["academy"], dungeons:{} };
@@ -285,6 +288,7 @@ export const TREASURE_REWARDS = {
   lake_trader_cache:       { gold: 340 },
   ashen_summit_cache:      { gold: 480 },
   ashen_ridge_cache:       { gold: 480 },
+  snow_hollow_cache:       { gold: 560 },
 };
 
 /**
@@ -443,12 +447,37 @@ export function dailyLabel(s){
 // Score/tier names live in academy.js now (BACKLOG "Academy progression"), which also defines
 // what a rank actually UNLOCKS. This kept the exact formula and the seven names untouched, so an
 // existing save's rank does not shift under it — only what the rank DOES is new.
-export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won; }
+export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won + (s.academyBonus||0); }
 export function academyRank(s){ return ACADEMY.yearFor(academyScore(s)).name; }
 export function academyPerks(s){ return ACADEMY.perksFor(academyScore(s)); }
 // Techniques learned in class (lessons.js). Derived from the classes PASSED, never stored, so
 // re-tuning what a class teaches applies to every existing save with no migration.
 export function masteries(s){ return LESSONS.masteryFor(s); }
+// ---- Academy classes (a second, gold-cost curriculum track, from the parallel main branch) ----
+// Attending a class costs gold and grants academy-rank progress (stored bonus, s.academyBonus).
+// One class per day. Distinct from lessons.js's own 21-class curriculum (which teaches named
+// TECHNIQUES via LESSONS.masteryFor and costs materials/assignments, not gold) — the two systems
+// award different things (a raw score bonus vs. a mechanical technique) so they coexist rather
+// than compete.
+const today = () => new Date().toISOString().slice(0,10);
+export function classesState(s){
+  const sc = academyScore(s);
+  const usedToday = s.flags.lastClassDay === today();
+  return { classes: ACADEMY.classesFor(sc), usedToday, rank: ACADEMY.yearFor(sc).name };
+}
+export function attendClass(s, classId){
+  const def = ACADEMY.classDef(classId);
+  if (!def) return { ok:false, err:"no such class" };
+  const sc = academyScore(s);
+  const yi = ACADEMY.yearIndexFor(sc);
+  if (def.minYear > yi) return { ok:false, err:"locked" };
+  if (s.flags.lastClassDay === today()) return { ok:false, err:"today" };
+  if (s.gold < def.cost) return { ok:false, err:"gold" };
+  s.gold -= def.cost;
+  s.academyBonus = (s.academyBonus||0) + def.score;
+  s.flags.lastClassDay = today();
+  return { ok:true, gained: def.score, cost: def.cost, name: def.name };
+}
 
 // ---------- Equipment / loadout ----------
 export function equipStats(s){
@@ -715,11 +744,20 @@ function makeCreature(cardId, p){
   const c = CARD_MAP[cardId];
   const atk = c.atk + (p.atkBonus||0) + fieldAtkBonus(p) + (p.school && c.school === p.school ? 1 : 0); // school affinity
   const fx = c.fx || [];
-  return {
-    uid: uid(), id: cardId, school: c.school, name: c.name, atk, hp: c.hp, maxHp: c.hp,
-    exhausted:false, summoning:true, taunt: fx.includes("taunt"), haste: fx.includes("haste"),
-    drain: fx.includes("drain"), multi: fx.includes("multiAttack")?2:1, attacks:0, freeze:0, owner: p.id,
+  const tr = (traitForCard(cardId, c.name) || {}).rules || {};
+  const hp = c.hp + (tr.onPlayHp || 0);
+  const cr = {
+    uid: uid(), id: cardId, school: c.school, name: c.name, atk, hp, maxHp: hp,
+    exhausted:false, summoning:true, taunt: fx.includes("taunt") || !!tr.taunt, haste: fx.includes("haste") || !!tr.haste,
+    drain: fx.includes("drain") || !!tr.drain, multi: fx.includes("multiAttack")?2:1, attacks:0, freeze:0, owner: p.id,
+    shield0: tr.shield || 0, regen: tr.regen || 0, poison: tr.poison || 0, thorns: tr.thorns || 0,
+    evade: !!tr.evade, survive: !!tr.survive, spellImmune: !!tr.spellImmune, freezeImmune: !!tr.freezeImmune,
+    wizardDmg: tr.wizardDmg || 0, onAttackDmgAll: tr.onAttackDmgAll || 0, onAttackDebuff: tr.onAttackDebuff || 0,
+    healOnHit: tr.healOnHit || 0, freezeOnHit: !!tr.freezeOnHit, warband: !!tr.warband, rageAtk: tr.rageAtk || 0,
+    onPlayBolt: tr.onPlayBolt || 0, onPlayStealAtk: tr.onPlayStealAtk || 0, _R: tr,
   };
+  if (cr.multi > 1) cr.multi = tr.multi ? 2 : cr.multi;   // creature rule can force double-attack
+  return cr;
 }
 // Shuffles use the battle's own RNG so a duel is reproducible from its seed (the `gear` argument
 // was never used — the shuffle doesn't depend on equipment).
@@ -764,7 +802,7 @@ export function beginTurn(b, p){
   p.potionUsed = false;   // one potion per turn (see usePotion)
   // NB: freeze is NOT cleared here — it ticks down at the END of the frozen player's turn
   // (see endTurn), so a creature frozen on the opponent's turn actually misses one turn.
-  for (const c of p.board){ c.exhausted = false; c.attacks = 0; }
+  for (const c of p.board){ c.exhausted = false; c.attacks = 0; if (c.freezeImmune && c.freeze > 0) c.freeze = 0; if (c.regen) c.hp = Math.min(c.maxHp, c.hp + c.regen); }
 }
 export function fieldAtkBonus(p){
   let n = 0;
@@ -792,13 +830,16 @@ function resolveTarget(b, foe, target){
 // of effect anywhere in the game — a new card, a new school mechanic — means adding one entry here,
 // not threading a new `if` through every place effects can originate.
 const FX_HANDLERS = {
+  // `spellImmune` (creatures.js, via makeCreature's trait lookup) makes a creature a dead end for
+  // targeted AND board-wide spell damage — checked here, not in resolveTarget, since resolveTarget
+  // is also used to find a legal ATTACK target (creatures fight back regardless of spell immunity).
   dmg: (ctx, f) => {
     const t = resolveTarget(ctx.b, ctx.foe, ctx.zone && ctx.zone.target);
-    if (!t) return;
+    if (!t || t.spellImmune) return;
     if (t === ctx.foe) damageWizard(ctx.foe, f.n, ctx.foe.defBonus);
     else t.hp -= f.n;                         // creatures have no shield/defBonus
   },
-  dmgAll: (ctx, f) => { for (const c of [...ctx.foe.board]) c.hp -= f.n; },
+  dmgAll: (ctx, f) => { for (const c of [...ctx.foe.board]) if (!c.spellImmune) c.hp -= f.n; },
   dmgWiz: (ctx, f) => damageWizard(ctx.foe, f.n, ctx.foe.defBonus),
   heal:   (ctx, f) => { ctx.owner.hp = Math.min(ctx.owner.maxHp, ctx.owner.hp + f.n); },
   shield: (ctx, f) => { ctx.owner.shield += f.n; },
@@ -836,6 +877,35 @@ export function playCard(b, p, handIndex, target){
     }
     if (cr.haste) cr.summoning = false;
     p.board.push(cr);
+    // creature passive on-play effects (from creatures.js RULES)
+    const R = cr._R || {};
+    if (R.onPlayDmgAll){ for (const c2 of [...enemy.board]) c2.hp -= R.onPlayDmgAll; b.log.push(cr.name+" blasts all enemies for "+R.onPlayDmgAll); }
+    if (R.onPlayDmgWiz){ damageWizard(enemy, R.onPlayDmgWiz, enemy.defBonus); b.log.push(cr.name+" strikes the enemy wizard for "+R.onPlayDmgWiz); }
+    if (R.onPlayHealAll){ for (const c2 of p.board) c2.hp = Math.min(c2.maxHp, c2.hp + R.onPlayHealAll); b.log.push(cr.name+" heals allies for "+R.onPlayHealAll); }
+    if (R.onPlayBuffAll){ for (const c2 of p.board) c2.atk += R.onPlayBuffAll; b.log.push(cr.name+" buffs allies +"+R.onPlayBuffAll+" atk"); }
+    if (R.onPlayFreeze){ const live = enemy.board.filter(c=>c.hp>0); if (live.length){ live[(b.rand?Math.floor(b.rand()*live.length):0)].freeze = 1; b.log.push(cr.name+" freezes an enemy"); } }
+    if (R.onPlayDraw){ for (let i=0;i<R.onPlayDraw;i++) draw(p); b.log.push(cr.name+" draws a card"); }
+    // active abilities: Firespell (targeted/random bolt) & Tongue (steal attack from a random enemy creature)
+    if (R.onPlayBolt){
+      const targ = target;
+      if (targ && targ.kind === "creature" && enemy.board[targ.idx] && enemy.board[targ.idx].hp > 0){
+        creatureHit(enemy.board[targ.idx], R.onPlayBolt, b); b.log.push(cr.name+" fires at "+enemy.board[targ.idx].name+" for "+R.onPlayBolt);
+      } else if (targ && targ.kind === "wiz") {
+        damageWizard(enemy, R.onPlayBolt, enemy.defBonus); b.log.push(cr.name+" fires at the enemy wizard for "+R.onPlayBolt);
+      } else {
+        // random fallback (AI / no target supplied)
+        const live = enemy.board.filter(c=>c.hp>0);
+        if (live.length){ const t = live[(b.rand?Math.floor(b.rand()*live.length):0)]; creatureHit(t, R.onPlayBolt, b); b.log.push(cr.name+" fires at "+t.name+" for "+R.onPlayBolt); }
+        else { damageWizard(enemy, R.onPlayBolt, enemy.defBonus); b.log.push(cr.name+" fires at the enemy wizard for "+R.onPlayBolt); }
+      }
+    }
+    if (R.onPlayStealAtk){
+      // honor a manual target (player picks which enemy creature to steal from); else random
+      let t = null;
+      if (target && target.kind === "creature" && enemy.board[target.idx] && enemy.board[target.idx].hp > 0) t = enemy.board[target.idx];
+      else { const live = enemy.board.filter(c=>c.hp>0); if (live.length) t = live[(b.rand?Math.floor(b.rand()*live.length):0)]; }
+      if (t){ const st = Math.min(R.onPlayStealAtk, t.atk); t.atk -= st; cr.atk += st; b.log.push(cr.name+" steals "+st+" atk from "+t.name); }
+    }
     // enemy traps trigger on creature play
     if (enemy.traps && enemy.traps.length){
       const t = enemy.traps.shift();
@@ -873,6 +943,13 @@ export function useUltimate(b, p){
   applyFx(b, p, ult.fx, {});
   return { ok:true, ultimate: ult };
 }
+// Deal damage to a creature honouring its defensive creature rules (shield0, survive, evade).
+function creatureHit(cr, dmg, b){
+  const absorb = Math.min(cr.shield0 || 0, dmg); cr.shield0 = (cr.shield0||0) - absorb; dmg -= absorb;
+  cr.hp -= dmg;
+  if (cr.hp <= 0 && cr.survive && !cr.surviveUsed){ cr.surviveUsed = true; cr.hp = 1; }
+  return cr.hp <= 0;
+}
 export function attack(b, attackerIdx, targetKind, targetIdx){
   const p = b[b.turn];
   const atk = p.board[attackerIdx]; if (!atk) return {ok:false,err:"no creature"};
@@ -880,19 +957,35 @@ export function attack(b, attackerIdx, targetKind, targetIdx){
   if (atk.exhausted || atk.summoning) return {ok:false,err:"tired"};
   if (atk.attacks >= atk.multi) return {ok:false,err:"tired"};
   const enemy = b.turn==="you" ? b.enemy : b.you;
+  // warband: +1 atk per friendly living creature (beyond itself); rage: +N atk while below half HP
+  const rage = atk.rageAtk && atk.hp <= atk.maxHp / 2 ? atk.rageAtk : 0;
+  const wbAtk = (atk.warband ? Math.max(atk.atk, atk.atk + (p.board.filter(c=>c.hp>0).length - 1)) : atk.atk) + rage;
   // taunt check
   if (targetKind === "wiz" && enemy.board.some(c=>c.taunt && c.hp>0)) return {ok:false,err:"taunt"};
-  let dmg = atk.atk;
+  // on-attack creature rules (AoE stomp, wizard snipe, venom)
+  const bth = atk;
+  if (bth.onAttackDmgAll){ for (const c2 of enemy.board) if (c2.hp > 0){ creatureHit(c2, bth.onAttackDmgAll, b); } b.log.push(atk.name+" stomps all enemies for "+bth.onAttackDmgAll); }
+  if (bth.wizardDmg){ damageWizard(enemy, bth.wizardDmg, enemy.defBonus); b.log.push(atk.name+" nicks the enemy wizard for "+bth.wizardDmg); }
+  let dmg = targetKind === "creature" ? wbAtk + (atk.poison||0) : wbAtk;
   if (targetKind === "creature"){
     const t = enemy.board[targetIdx]; if (!t) return {ok:false};
     dmg += schoolBonus(atk.school, t.school);
-    t.hp -= dmg;
-    // Drain heals the ATTACKER's wizard for damage dealt (it used to heal the defender,
-    // which made every Death-school creature a liability to its own owner).
-    if (atk.drain) p.hp = Math.min(p.maxHp, p.hp + dmg);
+    let dealt = false;
+    if (t.evade && !t.evadeUsed){ t.evadeUsed = true; b.log.push(t.name+" dodges the attack!"); }
+    else {
+      const died = creatureHit(t, dmg, b);
+      dealt = true;
+      if (atk.drain) p.hp = Math.min(p.maxHp, p.hp + dmg);
+      if (t.healOnHit && t.hp > 0) t.hp = Math.min(t.maxHp, t.hp + t.healOnHit);
+      if (t.freezeOnHit && t.hp > 0){ atk.freeze = 1; b.log.push(t.name+" froze "+atk.name); }
+      if (bth.onAttackDebuff) t.atk = Math.max(0, t.atk - bth.onAttackDebuff);
+      if (died) b.log.push(t.name+" died");
+    }
     enemy.board = enemy.board.filter(c=>c.hp>0);
-    // retaliation (damage taken — never a drain heal)
-    if (t.hp > 0) atk.hp -= t.atk;
+    // thorns reflect
+    if (dealt && t.thorns && atk.hp > 0){ creatureHit(atk, t.thorns, b); b.log.push(atk.name+" takes "+t.thorns+" thorns damage"); }
+    // retaliation (never a drain heal on the defender's behalf)
+    if (t.hp > 0 && dealt){ creatureHit(atk, t.atk, b); }
   } else {
     damageWizard(enemy, dmg, enemy.defBonus);
     if (atk.drain) p.hp = Math.min(p.maxHp, p.hp + dmg);
@@ -900,6 +993,7 @@ export function attack(b, attackerIdx, targetKind, targetIdx){
   atk.attacks++;
   if (atk.attacks >= atk.multi) atk.exhausted = true;
   p.board = p.board.filter(c=>c.hp>0);
+  enemy.board = enemy.board.filter(c=>c.hp>0);
   // defender traps trigger on attack
   if (enemy.traps && enemy.traps.length){
     const t = enemy.traps.shift();

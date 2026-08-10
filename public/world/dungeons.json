@@ -483,6 +483,216 @@
       "bossFloorColor": 1919562,
       "lightTint": 4881038,
       "lightScale": 1.2
+    },
+    {
+      "id": "ashen_caverns",
+      "name": "Ashen Caverns",
+      "entranceZone": "ashen_mountains",
+      "entranceX": 90,
+      "entranceZ": -60,
+      "background": 2756362,
+      "wallHeight": 8,
+      "corridorWidth": 6,
+      "spawnRoom": "entry",
+      "rooms": [
+        {
+          "id": "entry",
+          "x": 0,
+          "z": 0,
+          "w": 24,
+          "d": 20,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -9,
+              "z": 7,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 9,
+              "z": 7,
+              "size": 2.6
+            },
+            {
+              "model": "dng_doorway.glb",
+              "x": 0,
+              "z": -7,
+              "size": 5
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Slime.glb",
+              "name": "Ember Slime",
+              "level": 5,
+              "x": -6,
+              "z": -3,
+              "size": 1.5
+            },
+            {
+              "model": "creature_Slime.glb",
+              "name": "Ember Slime",
+              "level": 5,
+              "x": 6,
+              "z": -4,
+              "size": 1.5
+            }
+          ]
+        },
+        {
+          "id": "forge",
+          "x": 0,
+          "z": 34,
+          "w": 30,
+          "d": 22,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -12,
+              "z": -8,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 12,
+              "z": -8,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": -12,
+              "z": 8,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 12,
+              "z": 8,
+              "size": 2.6
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Ash Skeleton",
+              "level": 7,
+              "x": -8,
+              "z": 2,
+              "size": 2.4
+            },
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Ash Skeleton",
+              "level": 7,
+              "x": 8,
+              "z": 3,
+              "size": 2.4
+            },
+            {
+              "model": "creature_Bat.glb",
+              "name": "Cinder Bat",
+              "level": 6,
+              "x": 0,
+              "z": -6,
+              "size": 1.3
+            }
+          ]
+        },
+        {
+          "id": "deepmines",
+          "x": 38,
+          "z": 34,
+          "w": 22,
+          "d": 18,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -8,
+              "z": 6,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 8,
+              "z": 6,
+              "size": 2.6
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Bat.glb",
+              "name": "Cinder Bat",
+              "level": 6,
+              "x": -5,
+              "z": 0,
+              "size": 1.3
+            },
+            {
+              "model": "enemy_skeleton.glb",
+              "name": "Cave Warden",
+              "level": 8,
+              "x": 5,
+              "z": -2,
+              "size": 2.6
+            }
+          ]
+        },
+        {
+          "id": "emberhall",
+          "x": 0,
+          "z": 74,
+          "w": 34,
+          "d": 30,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -14,
+              "z": -11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 14,
+              "z": -11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": -14,
+              "z": 11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 14,
+              "z": 11,
+              "size": 3.2
+            }
+          ],
+          "boss": {
+            "model": "creature_Dragon.glb",
+            "name": "The Ember Wyrm",
+            "level": 12,
+            "hp": 260,
+            "size": 7
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "entry",
+          "to": "forge"
+        },
+        {
+          "from": "forge",
+          "to": "deepmines"
+        },
+        {
+          "from": "forge",
+          "to": "emberhall"
+        }
+      ]
     }
   ]
 }
