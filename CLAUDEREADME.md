@@ -243,6 +243,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Auction History / Price History** (`game.js` `marketHistory`) — a per-card sale history + average, plus a real countdown-display bug fixed alongside it. See §6.27.
 - **Save Backup / Import / Export** (`game.js` `exportSave`/`importSave`) — download/restore the whole save as a real file, conservative validation, confirmation before overwrite. See §6.28.
 - **UI depth & school accenting, world sky gradient** (`index.html`, `world.js`) — panel/button box-shadows, a runtime `--accent` retint driven by the player's actual school, and a real gradient sky replacing the flat clear colour outdoors. See §6.29.
+- **Achievements & player titles** (`achievements.js`) — 10 account-wide achievements spanning quests, dungeon bosses, PvP rank, wealth, crafting and reputation, each unlocking a title the player can equip next to their name. See §6.30.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -780,7 +781,36 @@ new assets:
   save fields, and nothing a `validateX()` would meaningfully assert beyond "the page still boots
   with no errors," which the existing `npm run test:browser` suite already covers on every screen.
 
-### 6.30 Retention
+### 6.30 Achievements & player titles (`achievements.js`, BACKLOG §1/§2 "Achievements and player titles")
+The last unchecked line in §1/§2's original scope. `codex.js` already had achievements, but scoped
+deliberately to the card collection (its own header says so); `pvprank.js` already had `titleFor`,
+but scoped to PvP rank alone and always-current rather than equippable. Neither was "player
+achievements" as a whole — nothing covered field quests, dungeon bosses, wealth, crafting or
+reputation, and nothing let a player pick a title to actually wear.
+
+- **10 achievements, everything BUT the collection**: complete every field quest (`ZONE_QUESTS`),
+  defeat each dungeon boss (`worldState.dungeons[...].bossDead`), win 50 duels, hold 5,000 gold at
+  once, reach skill level 20 in any craft, reach wizard level 20, reach Gold/Grandmaster PvP rank
+  (reusing `pvprank.js`'s own `TIERS`/`titleFor` rather than re-deriving tier names), and reach
+  Honored standing with any quest giver.
+- **Derived every time, same rule as `codex.js`**: an achievement reads the save's live state on
+  every read, so a "Gold Hoarder" who spent the gold is not currently a gold hoarder — the honest
+  behaviour, covered by a test that spends the gold back down and confirms the achievement un-earns.
+- **Titles follow `cardbacks.js`'s exact shape**: which titles are UNLOCKED is derived from
+  achievements every time; WHICH ONE IS EQUIPPED is the one stored bit (`save.title`), the same
+  "everything else is derived, a choice is what gets stored" rule as `save.cardBack`/`favorites`.
+- Wired into the Codex overlay as two new panels (Achievements, Titles) right after the existing
+  card-backs gallery, and the equipped title shows next to the player's name on the Dorm header —
+  the one place a title is actually seen, mirroring how a card back shows on the pack reveal.
+- Covered by `tools/test.mjs` (achievement/title derivation, lock/unlock, `setTitle`, migration)
+  and `tools/browser-test.mjs` (a locked title can't be equipped, earning the matching achievement
+  unlocks it for real, the equipped title shows on the Dorm header and in the Codex gallery).
+- A pre-existing selector bug surfaced and fixed along the way: the card-backs browser test grabbed
+  its gallery HTML via `#ovBody .panel:last-child`, which silently started reading the WRONG panel
+  the moment the new Titles panel landed after it — fixed by selecting on heading text instead of
+  position, which is what it should have done from the start.
+
+### 6.31 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -819,10 +849,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 485 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 497 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (166 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (171 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -869,7 +899,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 485 engine / 42 online-rules / 166 real-browser (layout + gestures + world +
+**All tests green:** 497 engine / 42 online-rules / 171 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -916,7 +946,25 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: an honest UI/theme critique, then three fixes** (§6.29) — asked point-blank whether
+**Last landed: Achievements & player titles** (§6.30, BACKLOG §1/§2) — the last unchecked line in
+§1/§2's original scope. 10 account-wide achievements spanning field quests, dungeon bosses, PvP
+rank, wealth, crafting and reputation — deliberately everything the collection-scoped `codex.js`
+achievements and the PvP-scoped `pvprank.js` title didn't cover — each unlocking a title a player
+can equip next to their name, following `cardbacks.js`'s exact "unlock is derived, equip is the one
+stored bit" shape. Verified with both `tools/test.mjs` (including that a "Gold Hoarder" un-earns
+the achievement the moment the gold is spent — the same honest-derivation rule `codex.js` already
+holds) and a real Playwright flow in `tools/browser-test.mjs` (a locked title can't be equipped,
+earning the matching achievement unlocks it for real, the equipped title shows on both the Dorm
+header and the Codex gallery). A pre-existing bug surfaced and fixed along the way: the card-backs
+browser test grabbed its panel via `#ovBody .panel:last-child`, which silently started reading the
+wrong panel the instant the new Titles panel landed after it — fixed by selecting on heading text.
+Also had to chase the pre-existing save/import `setInputFiles` flake going from occasional to
+consistent once one more browser context landed ahead of it in the same long-lived shared browser
+instance — fixed with a one-retry wrapper rather than a bigger timeout, since the failure is a
+one-off stall, not a slow operation. All tests confirmed green: 497 engine / 42 online-rules / 171
+real-browser / `check:models`.
+
+**Before that: an honest UI/theme critique, then three fixes** (§6.29) — asked point-blank whether
 the UI "looked developed," the answer was no (flat panels, a static gold accent regardless of
 school, a flat-colour sky despite fog/reflections already existing), and all three were fixed:
 panel/button depth via `box-shadow`, a `--accent` CSS variable retinted at runtime from the
@@ -928,7 +976,7 @@ actionability-checked one because the character-creation overlay can still be co
 a fresh save; two fixed `waitForTimeout` sleeps were replaced with `page.waitForFunction` polling
 the real DOM condition; `setInputFiles` got a resilient wrapper with its own timeout so an
 environment hiccup fails one check with a diagnostic instead of killing the whole suite) — all
-tests confirmed green afterward: 485 engine / 42 online-rules / 166 real-browser / `check:models`.
+tests confirmed green afterward: 497 engine / 42 online-rules / 171 real-browser / `check:models`.
 
 **Before that: an end-to-end audit, then Deck Archetypes** (§6.22). Asked to check the previous
 stretch of work for anything left unfinished before continuing: the working tree was already clean
@@ -943,7 +991,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **485 engine / 42 online-rules / 166 browser / 8 viewports / model-check clean.**
+Tests: **497 engine / 42 online-rules / 171 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —

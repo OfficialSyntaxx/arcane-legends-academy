@@ -1368,7 +1368,9 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
     window.__ev("openCodex");
     await settle(200);
     document.getElementById("overlay").scrollTop = document.getElementById("overlay").scrollHeight;
-    const galleryHtml = document.querySelector("#ovBody .panel:last-child").innerHTML;
+    // select by heading text, not position — achievements.js's Titles panel now sits after this
+    // one, so ":last-child" would grab the wrong panel.
+    const galleryHtml = [...document.querySelectorAll("#ovBody .panel")].find(p => /Card Backs/.test(p.innerHTML))?.innerHTML || "";
     return { stillDefault, equippedAfterUnlock, packBackHtml, galleryHtml };
   });
   check("no uncaught page errors while equipping card backs", berrs.length === 0, berrs.slice(0,3).join(" | "));
@@ -1377,6 +1379,48 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   check("the equipped back's colour shows on the pack reveal's face-down side", /linear-gradient\(135deg,#16213e/.test(backs.packBackHtml), backs.packBackHtml.slice(0,120));
   check("the Codex gallery shows the Card Backs section with the equip highlighted", /Card Backs/.test(backs.galleryHtml) && /var\(--gold\)/.test(backs.galleryHtml));
   await bctx.close();
+}
+
+// ---------------- achievements & player titles (BACKLOG §1/§2) ----------------
+// Drives the real Codex "Achievements"/"Titles" panels and the real event handler: a locked title
+// can't be equipped, an achievement actually earned unlocks its matching title, equipping it shows
+// next to the player's name on the Dorm screen (the one real place a title shows).
+{
+  const tctx = await browser.newContext({ viewport:{width:420,height:900} });
+  const terrs = [];
+  const tpage = await tctx.newPage();
+  tpage.on("pageerror", e => terrs.push(String(e)));
+  await tpage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await tpage.waitForTimeout(900);
+  const titles = await tpage.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const s = window.__testSave();
+    // locked: try to equip a title with zero achievements done
+    const beforeTitle = s.title;
+    window.__EV.titleEquip("wyrmslayer");
+    const stillDefault = window.__testSave().title === beforeTitle;
+    // earn "wyrmslayer" for real the way a player would — defeat the Cinder Wyrm — is slow and
+    // flaky here, so seed the world-state flag directly the way the engine tests already do.
+    s.worldState.dungeons.cinderhollow_caverns = { bossDead: true };
+    window.__EV.titleEquip("wyrmslayer");
+    const equippedAfterUnlock = window.__testSave().title === "wyrmslayer";
+    // the Dorm header shows it next to the player's name
+    document.querySelector('.navbtn[data-screen="home"]').click();
+    await settle(150);
+    const nameHtml = document.querySelector(".panel .grow") ? document.querySelector(".panel .grow").innerHTML : "";
+    // the Codex "Titles" panel reflects the same equipped state
+    window.__ev("openCodex");
+    await settle(200);
+    document.getElementById("overlay").scrollTop = document.getElementById("overlay").scrollHeight;
+    const galleryHtml = [...document.querySelectorAll("#ovBody .panel")].find(p => /Titles/.test(p.innerHTML))?.innerHTML || "";
+    return { stillDefault, equippedAfterUnlock, nameHtml, galleryHtml };
+  });
+  check("no uncaught page errors while equipping titles", terrs.length === 0, terrs.slice(0,3).join(" | "));
+  check("a locked title cannot be equipped", titles.stillDefault === true);
+  check("earning the matching achievement unlocks and allows equipping its title", titles.equippedAfterUnlock === true);
+  check("the equipped title shows next to the player's name on the Dorm screen", /Wyrmslayer/.test(titles.nameHtml), titles.nameHtml.slice(0,160));
+  check("the Codex Titles panel reflects the same equipped title", /Titles/.test(titles.galleryHtml) && /Wyrmslayer/.test(titles.galleryHtml));
+  await tctx.close();
 }
 
 // ---------------- enchanting (BACKLOG §6) ----------------
@@ -1484,9 +1528,15 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   // reproduce it). An uncaught timeout there kills the WHOLE process, silently skipping every check
   // after it — worse than a normal check() failure. Give it its own generous timeout and a
   // diagnostic instead of letting the process die.
+  // One retry: the hang is a one-off stall in this shared, long-lived browser instance (confirmed
+  // not reproducible in an isolated single-context repro), not a logic error, so a second attempt
+  // after the first's timeout has a real chance of going through cleanly.
   const pickFile = async (selector, filePath) => {
-    try { await spage.setInputFiles(selector, filePath, { timeout: 15000 }); return true; }
-    catch(e){ console.log(`  ⚠ setInputFiles(${selector}) did not complete: ${e.message.split("\n")[0]}`); return false; }
+    for (let attempt = 1; attempt <= 2; attempt++){
+      try { await spage.setInputFiles(selector, filePath, { timeout: 15000 }); return true; }
+      catch(e){ console.log(`  ⚠ setInputFiles(${selector}) attempt ${attempt} did not complete: ${e.message.split("\n")[0]}`); }
+    }
+    return false;
   };
   // A synthetic click via evaluate(), not Playwright's actionability-checked page.click() — a
   // fresh save's character-creation overlay can still be covering the nav bar at this point
@@ -1517,12 +1567,15 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
     () => (document.getElementById("ovBody") || {}).innerText?.includes("ImportedWizard"),
     { timeout: 5000 }
   ).catch(() => {});   // let the check() below fail with a clear diagnostic rather than throwing here
-  const overlayText = await spage.evaluate(() => document.getElementById("ovBody").innerText);
+  const overlayText = await spage.evaluate(() => document.getElementById("ovBody")?.innerText || "");
   const goldBeforeConfirm = await spage.evaluate(() => window.__testSave().gold);
   // Synthetic click, not Playwright's actionability-checked click — the confirmation overlay
   // (z-index 97) sits UNDER the still-open character-creation overlay (z-index 100) in this
   // charcreate-free context, which real pointer hit-testing correctly refuses to click through.
-  await spage.evaluate(() => document.querySelector("#ovBody .btn.danger").click());
+  // Optional-chained: if pickFile above never completed (the setInputFiles flake), the confirm
+  // button never appeared — click on nothing should fail the checks below with a clear diagnostic,
+  // not throw an uncaught exception that kills the whole suite.
+  await spage.evaluate(() => document.querySelector("#ovBody .btn.danger")?.click());
   await spage.waitForTimeout(300);
   const after = await spage.evaluate(() => ({
     name: window.__testSave().name, gold: window.__testSave().gold,

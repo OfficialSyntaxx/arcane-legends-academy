@@ -21,6 +21,7 @@ import * as ARCH from "../public/archetypes.js";
 import * as RANK from "../public/pvprank.js";
 import * as MAGIC from "../public/schoolmagic.js";
 import * as CB from "../public/cardbacks.js";
+import * as ACHV from "../public/achievements.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -2838,6 +2839,63 @@ check("game.js newGame() equips the default card back", G.newGame().cardBack ===
 check("game.js load() never leaves cardBack unset or pointing at a fake back", (()=>{
   const s = G.load();
   return !!s.cardBack && !!CB.BACK_MAP[s.cardBack];
+})());
+
+// ---------------------------------------------------------------- achievements.js (BACKLOG §1/§2)
+check("validateAchievements reports no problems", ACHV.validateAchievements().length === 0);
+check("a fresh save has earned none of the achievements", (()=>{
+  const s = G.newGame();
+  return ACHV.achievementsFor(s).every(a => a.done === false);
+})());
+check("wayfarer completes exactly when every field quest is done", (()=>{
+  const s = G.newGame();
+  s.zoneQuests.done = ZQ.ZONE_QUESTS.map(q => q.id).slice(0, -1);
+  const notYet = ACHV.achievementsFor(s).find(a => a.id === "wayfarer");
+  s.zoneQuests.done = ZQ.ZONE_QUESTS.map(q => q.id);
+  const done = ACHV.achievementsFor(s).find(a => a.id === "wayfarer");
+  return notYet.done === false && done.done === true;
+})());
+check("wyrmslayer and vault_breaker read their own dungeon's bossDead, not each other's", (()=>{
+  const s = G.newGame();
+  s.worldState.dungeons.cinderhollow_caverns = { bossDead: true };
+  const list = ACHV.achievementsFor(s);
+  return list.find(a => a.id === "wyrmslayer").done === true
+      && list.find(a => a.id === "vault_breaker").done === false;
+})());
+check("gold_hoarder is derived live — spending the gold un-earns it", (()=>{
+  const s = G.newGame();
+  s.gold = 5000;
+  const before = ACHV.achievementsFor(s).find(a => a.id === "gold_hoarder").done;
+  s.gold = 0;
+  const after = ACHV.achievementsFor(s).find(a => a.id === "gold_hoarder").done;
+  return before === true && after === false;
+})());
+check("the default title is always unlocked, with no achievement gate", (()=>{
+  return ACHV.isTitleUnlocked(ACHV.DEFAULT_TITLE, []) === true;
+})());
+check("every non-default title is locked until its achievement is done", (()=>{
+  return ACHV.TITLES.filter(t => t.id !== ACHV.DEFAULT_TITLE).every(t => ACHV.isTitleUnlocked(t.id, []) === false)
+      && ACHV.isTitleUnlocked("wyrmslayer", ["wyrmslayer"]) === true;
+})());
+check("equippedTitle falls back to the default for a fresh or bad save", (()=>{
+  return ACHV.equippedTitle({}).id === ACHV.DEFAULT_TITLE
+      && ACHV.equippedTitle({ title: "not-a-real-id" }).id === ACHV.DEFAULT_TITLE
+      && ACHV.equippedTitle(null).id === ACHV.DEFAULT_TITLE;
+})());
+check("setTitle refuses a locked title and leaves the save unchanged", (()=>{
+  const save = { title: ACHV.DEFAULT_TITLE };
+  const r = ACHV.setTitle(save, "grandmaster", []);
+  return r.ok === false && save.title === ACHV.DEFAULT_TITLE;
+})());
+check("setTitle accepts an unlocked title", (()=>{
+  const save = { title: ACHV.DEFAULT_TITLE };
+  const r = ACHV.setTitle(save, "wyrmslayer", ["wyrmslayer"]);
+  return r.ok === true && save.title === "wyrmslayer";
+})());
+check("game.js newGame() equips the default title", G.newGame().title === ACHV.DEFAULT_TITLE);
+check("game.js load() never leaves title unset or pointing at a fake title", (()=>{
+  const s = G.load();
+  return !!s.title && ACHV.TITLES.some(t => t.id === s.title);
 })());
 
 // ---------------------------------------------------------------- enchanting (BACKLOG §6)

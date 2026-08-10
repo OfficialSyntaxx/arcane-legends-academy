@@ -395,6 +395,7 @@ import * as ARCH from "./archetypes.js";
 import * as RANK from "./pvprank.js";
 import * as MAGIC from "./schoolmagic.js";
 import * as CB from "./cardbacks.js";
+import * as ACHV from "./achievements.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -1007,7 +1008,7 @@ function renderHome(el){
   const look = CC.appearanceFor(S);
   let h = `<h2>${STR.hall_title}</h2>
     <div class="panel" style="margin-bottom:10px"><div class="row" style="align-items:center">
-      <div class="grow"><div style="font-weight:800;font-size:17px">${esc(S.name || CC.DEFAULT_NAME)}</div>
+      <div class="grow"><div style="font-weight:800;font-size:17px">${esc(S.name || CC.DEFAULT_NAME)}${ACHV.equippedTitle(S).id===ACHV.DEFAULT_TITLE?"":` <span style="color:var(--accent);font-weight:700;font-size:13px">"${esc(ACHV.equippedTitle(S).name)}"</span>`}</div>
         <div class="sub">${SCHOOL_ICON[S.school]} ${SCHOOLS[S.school].name} · ${look.label}${look.aura==null?"":" · aura"}</div></div>
       <button class="btn sm" onclick="window.__ev('openCharCreate')">✨ Appearance</button>
     </div></div>`;
@@ -1347,6 +1348,28 @@ function buildCodex(){
     </div>`;
   }
   h += `</div></div>`;
+
+  // account-wide achievements + player titles (achievements.js) — everything BESIDES the
+  // collection: field quests, dungeon bosses, PvP rank, wealth, crafting, reputation.
+  const achv = ACHV.achievementsFor(S);
+  const achvDoneIds = achv.filter(a => a.done).map(a => a.id);
+  const equippedTitle = ACHV.equippedTitle(S).id;
+  h += `<div class="panel" style="margin-top:14px"><h3>🏆 Achievements</h3><div class="row" style="flex-wrap:wrap">`;
+  for (const a of achv){
+    h += `<div class="kpi" style="min-width:150px;${a.done?"":"opacity:.6"}">
+      <div class="lv" style="font-size:18px">${a.icon} ${a.done?"✔":""}</div>
+      <div class="nm">${a.name}</div>
+      <div style="font-size:10px;color:var(--muted)">${a.desc}</div>
+      ${a.done?"":`<div class="pbar" style="margin-top:4px"><div style="width:${a.pct}%"></div></div>
+      <div style="font-size:10px;color:var(--muted)">${a.have}/${a.need}</div>`}</div>`;
+  }
+  h += `</div></div>`;
+  h += `<div class="panel" style="margin-top:14px"><h3>🎖️ Titles</h3><p class="sub">Unlocked by the achievements above. Pick one to show next to your name.</p><div class="row" style="flex-wrap:wrap">`;
+  for (const t of ACHV.TITLES){
+    const unlocked = ACHV.isTitleUnlocked(t.id, achvDoneIds);
+    h += `<button class="btn ${t.id===equippedTitle?"primary":""}" style="${unlocked?"":"opacity:.4;cursor:not-allowed"}" ${unlocked?`onclick="window.__ev('titleEquip|${t.id}')"`:""} title="${unlocked?t.name:t.name+" (locked)"}">${unlocked?"":"🔒 "}${t.name}</button>`;
+  }
+  h += `</div></div>`;
   return h;
 }
 function refreshCodex(){
@@ -1370,6 +1393,11 @@ window.__EV.backEquip = (id)=>{
   const doneIds = CX.achievementsFor(CARDS, S.cards).filter(a=>a.done).map(a=>a.id);
   const r = CB.setBack(S, id, doneIds);
   if (r.ok){ save(); toast(`${CB.BACK_MAP[id].emblem} ${CB.BACK_MAP[id].name} equipped`); refreshCodex(); }
+};
+window.__EV.titleEquip = (id)=>{
+  const doneIds = ACHV.achievementsFor(S).filter(a=>a.done).map(a=>a.id);
+  const r = ACHV.setTitle(S, id, doneIds);
+  if (r.ok){ save(); toast(`🎖️ "${ACHV.equippedTitle(S).name}" equipped`); refreshCodex(); render(); }
 };
 // Booster opening (BACKLOG §5): opening a pack used to be a toast and nothing else — the five
 // cards it minted appeared in the collection with no moment to look at what you got. Reused the

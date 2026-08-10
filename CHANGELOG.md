@@ -14,6 +14,32 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Achievements & player titles — 2026-08-10
+
+### Achievements & player titles — *pending*
+- The last unchecked line in BACKLOG §1/§2's original scope: `codex.js` already had achievements
+  (scoped to the card collection, by its own header) and `pvprank.js` already had `titleFor`
+  (scoped to PvP rank, always-current rather than equippable) — neither was "player achievements,"
+  and nothing let a player choose a title to actually wear.
+- New `achievements.js`, 10 account-wide achievements covering everything those two didn't: every
+  field quest complete, each dungeon boss defeated, 50 duels won, 5,000 gold held at once, skill
+  level 20 in any craft, wizard level 20, Gold/Grandmaster PvP rank (reusing `pvprank.js`'s own
+  `TIERS`/`titleFor` rather than re-deriving tier names), Honored standing with any quest giver.
+- Derived every time, same rule as `codex.js`'s own achievements: reads the save's live state on
+  every read, so losing the gold or the rank un-earns it — the honest behaviour, not a bug.
+- Titles follow `cardbacks.js`'s exact shape: which titles are UNLOCKED is derived from
+  achievements every time; WHICH ONE IS EQUIPPED is the one stored bit (`save.title`).
+- Two new Codex panels (Achievements, Titles) after the existing card-backs gallery; the equipped
+  title shows next to the player's name on the Dorm header — the one place a title is actually seen.
+- A pre-existing bug found and fixed along the way: the card-backs browser test read its gallery
+  HTML via `#ovBody .panel:last-child`, which silently started reading the wrong panel the moment
+  the new Titles panel landed after it — fixed by selecting on heading text instead of position.
+- A pre-existing `setInputFiles` flake (save/import browser tests) went from occasional to
+  consistent once one more browser context landed ahead of it in the same long-lived shared browser
+  instance — fixed with a one-retry wrapper, since the failure is a one-off stall, not a slow
+  operation a bigger timeout would help.
+- *497 engine / 42 online / 171 browser.*
+
 ## UI theme pass — 2026-08-10
 
 ### Panel depth, school accenting, world sky gradient — `1ed45f3`

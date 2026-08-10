@@ -80,7 +80,11 @@
 - [x] Trophy room — DONE (D3). Trophies are never stored: they are derived from
   `worldState.dungeons[...].bossDead`, so they cannot disagree with the world. Beat the Cinder
   Wyrm and one appears in the room's corner.
-- [ ] Achievements and player titles
+- [x] Achievements and player titles — `achievements.js`: 10 account-wide achievements (field
+  quests, dungeon bosses, PvP rank, wealth, crafting, reputation — everything the collection-scoped
+  `codex.js` achievements and PvP-scoped `pvprank.js` title didn't already cover), each unlocking a
+  title equipped the same way `cardbacks.js` equips a back (unlock derived, equip is the one stored
+  bit). Shown next to the player's name on the Dorm header.
 
 ## 3. Open World
 
@@ -350,7 +354,16 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **UI depth, school accenting, world sky gradient** (`index.html`,
+**Changes made, most recent first:** **Achievements and player titles** (§1/§2 — `achievements.js`:
+the last unchecked line in §1/§2's original scope; 10 account-wide achievements deliberately
+covering everything the collection-scoped `codex.js` achievements and PvP-scoped `pvprank.js` title
+already covered would NOT — field quests, dungeon bosses, PvP rank, wealth, crafting, reputation —
+each unlocking a title equipped the same "unlock derived, equip is the one stored bit" way
+`cardbacks.js` equips a back; shown on the Dorm header and a new Codex "Titles" panel; a
+pre-existing card-backs browser-test selector bug found and fixed along the way, and a pre-existing
+save/import `setInputFiles` flake chased from occasional to consistent by one more browser context
+landing ahead of it, fixed with a one-retry wrapper) → **UI depth, school accenting, world sky
+gradient** (`index.html`,
 `world.js` — asked for an honest critique of whether the UI/theme "looked developed"; answer was
 no, so panels/buttons got real `box-shadow` depth, a new `--accent`/`--accent-glow`/`--accent-dim`
 CSS-variable system retints the top bar and active nav tab from the player's actual
@@ -418,7 +431,13 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **UI depth/school accenting/world sky gradient is done**, ad hoc (not a pre-listed
+**Next step:** **Achievements and player titles is done** (§1/§2 — the last unchecked line in that
+section). Covered by `tools/test.mjs` (derivation, un-earning when state regresses, lock/unlock,
+`setTitle`, migration) and `tools/browser-test.mjs` (a locked title can't be equipped, earning the
+achievement unlocks it for real, shows on the Dorm header and the Codex gallery). 497 engine / 42
+online-rules / 171 real-browser / `check:models`, all green.
+
+Before that: **UI depth/school accenting/world sky gradient is done**, ad hoc (not a pre-listed
 backlog line — a direct response to being asked whether the UI looked developed). No new save
 fields, no new module, nothing a `validateX()` would meaningfully assert beyond "the page still
 boots" — already covered by the existing `npm run test:browser` suite on every screen it touched.

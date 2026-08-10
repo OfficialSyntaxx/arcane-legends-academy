@@ -74,6 +74,7 @@ import * as LSN from "./lessons.js";
 import * as WC from "./worldconfig.js";
 import * as DG from "./dungeons.js";
 import * as ZQ from "./zonequests.js";
+import * as ACHV from "./achievements.js";
 
 const root = document.getElementById("root");
 const foot = document.getElementById("foot");
@@ -153,6 +154,10 @@ function saveSection(s){
       ${kv("Daily quest", `${s.daily.type} ${s.daily.progress}/${s.daily.target}${s.daily.claimed?" (claimed)":""}`)}
     </div>
     <div class="panel" style="grid-column:1/-1"><h2>NPC Reputation</h2>${repRows}</div>
+    <div class="panel" style="grid-column:1/-1"><h2>Achievements &amp; Titles (achievements.js)</h2>
+      ${kv("Equipped title", esc(ACHV.equippedTitle(s).name))}
+      ${ACHV.achievementsFor(s).map(a=>`<div class="kv"><span class="k">${a.icon} ${esc(a.name)}</span><span class="v">${a.done?"✓":`${a.have}/${a.need}`}</span></div>`).join("")}
+    </div>
   </div>`;
 }
 
@@ -200,6 +205,7 @@ function integritySection(){
     ["schoolmagic.js — affinity bonuses, ultimates", MAGIC.validateSchoolMagic()],
     ["variants.js — printing weights, first editions", VAR.validateVariants()],
     ["lessons.js — 21 classes vs. curriculum years + skills", LSN.validateLessons({ years: ACADEMY.YEARS.length, skillIds: Object.keys(SKILLS) })],
+    ["achievements.js — achievable targets, titles, no duplicate ids", ACHV.validateAchievements()],
   ];
   if (world){
     const zoneProblems = world.zoneIds.flatMap(id => WC.validateZone(world.get(id), { zoneIds: world.zoneIds }));
