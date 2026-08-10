@@ -1,6 +1,6 @@
 // Wizard TCG — engine (saved state, skills, economy, market, auctions, housing, duels, AI)
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, SCHOOL_BONUS, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
-import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats } from "./items.js";
+import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats, PRISTINE_CHANCE, pristineIdFor, pristineVariantFor, isPristineId, baseMatIdFor } from "./items.js";
 import * as ACADEMY from "./academy.js";
 import * as LESSONS from "./lessons.js";
 import * as VAR from "./variants.js";
@@ -352,7 +352,12 @@ export function gather(s, mat, now = Date.now()){
   dailyProgress(s, "gather");
   if (!s.gatherCooldowns) s.gatherCooldowns = {};
   s.gatherCooldowns[mat.id] = now + regenMsFor(mat);
-  return { ok:true, item:mat, xp:mat.xp, extra };
+  // Rare resource variants (BACKLOG §6): a flat, un-boosted chance at a Pristine find alongside the
+  // ordinary yield — a lucky flourish on top of the gather, not instead of it, so a Pristine hit
+  // never costs the player the material they came for.
+  const pristine = rng() * 100 < PRISTINE_CHANCE;
+  if (pristine) addItem(s, pristineIdFor(mat.id), 1);
+  return { ok:true, item:mat, xp:mat.xp, extra, pristine };
 }
 export function canCraft(s, spec){ return skillLevel(s,"smithing") >= spec.lvl && hasItems(s, spec.req); }
 export function smelt(s, bar){
@@ -564,7 +569,12 @@ export function buyCard(s, id){
   return { ok:true, price };
 }
 export function sellItem(s, itemId, qty=1){
-  const mat = MATERIALS.find(m=>m.id===itemId) || BARS.find(b=>b.id===itemId) || POTIONS.find(p=>p.id===itemId);
+  // A pristine id (BACKLOG §6 "Rare resource variants") isn't in MATERIALS/BARS/POTIONS itself —
+  // it's a derived sell-only bonus on top of a real material, resolved back to it here so this is
+  // the ONE place that needs to know pristine ids exist, not every table in items.js.
+  const mat = isPristineId(itemId)
+    ? pristineVariantFor(MATERIALS.find(m => m.id === baseMatIdFor(itemId)))
+    : MATERIALS.find(m=>m.id===itemId) || BARS.find(b=>b.id===itemId) || POTIONS.find(p=>p.id===itemId);
   if (!mat || (s.inventory[itemId]||0) < qty) return {ok:false};
   s.inventory[itemId] -= qty; s.gold += mat.value * qty;
   return { ok:true, value: mat.value*qty };

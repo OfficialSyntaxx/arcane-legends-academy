@@ -222,7 +222,9 @@
   (`s.gatherCooldowns`, `game.js` `gather`/`gatherCooldownRemaining`), not per node instance (the
   outdoor zones' scattered nodes have no stable per-instance id chunk streaming preserves); one
   choke point closes the loophole for both the 3D world and the Skills-screen shortcut.
-- [ ] Rare resource variants
+- [x] Rare resource variants — a flat 6% chance on every gather to ALSO yield a "Pristine" find
+  worth 5× on sale (`items.js` `pristineVariantFor`), sell-only so no craft/refine recipe needs to
+  know it exists; fully derived from the base material, no separate catalog row to keep in sync.
 - [x] Player marketplace — pre-existing, re-checked against the codebase: `listAuction`/
   `auctionTick`/`settleAuctions` in `game.js` (a simulated auction house, honestly labelled —
   NPCs bid over 60s real-time listings, persisted to `localStorage` across reloads). Not a
@@ -363,7 +365,12 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Resource node regeneration** (§6 — gathering was previously
+**Changes made, most recent first:** **Rare resource variants** (§6 — a flat, un-boosted 6% chance
+on every gather to ALSO yield a Pristine find worth 5× on sale, alongside the ordinary yield, never
+instead of it; sell-only by design — not usable in any craft/refine/smelt recipe, so `sellItem` is
+the one place that needs to know pristine ids exist rather than doubling the surface every recipe
+table has to consider; fully derived from the base material via `pristineIdFor`/`pristineVariantFor`,
+no separate catalog row anywhere to drift out of sync) → **Resource node regeneration** (§6 — gathering was previously
 unlimited and instant, gated only by a client-only 1.4s debounce that never survived a reload; now
 a real, persisted, level-scaled cooldown per MATERIAL, not per node instance, since the outdoor
 zones' scattered nodes have no stable per-instance id chunk streaming preserves across a reload;
@@ -459,7 +466,13 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Resource node regeneration is done** (§6). Covered by `tools/test.mjs` (cooldown
+**Next step:** **Rare resource variants is done** (§6). Covered by `tools/test.mjs` (id round-trip,
+sell value, base yield never lost, actually lands in inventory, `sellItem` resolve/refuse) and a
+real `tools/browser-test.mjs` flow via a new `window.__testGatherAt` test hook (gather for real
+until a Pristine find appears, confirm it shows in the Market panel, sell it through the real
+handler). 517 engine / 42 online-rules / 188 real-browser / `check:models`, all green.
+
+Before that: **Resource node regeneration is done** (§6). Covered by `tools/test.mjs` (cooldown
 gating, clears after real time passes, per-material isolation, pure-read guarantee, level-scaling,
 migration) and `tools/browser-test.mjs` against the real Skills screen. 511 engine / 42
 online-rules / 183 real-browser / `check:models`, all green.

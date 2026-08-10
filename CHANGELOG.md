@@ -14,6 +14,31 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Rare resource variants — 2026-08-10
+
+### Rare resource variants — *pending*
+- BACKLOG §6. A flat, un-boosted 6% chance on every successful gather to ALSO yield a "Pristine"
+  find of that same material — a lucky flourish alongside the ordinary yield, never instead of it.
+- Sell-only by design: not usable in any craft/refine/smelt recipe. Adding a second tradeable id to
+  every `req:{...}` table in `items.js` would double the surface every future recipe has to
+  consider for one rare-loot flourish — keeping it sellable-only means `game.js` `sellItem` is the
+  one place that needs to know pristine ids exist.
+- Fully derived, not stored as a flag: `items.js` `pristineIdFor`/`pristineVariantFor` compute a
+  Pristine entry from the base `MATERIALS` row every time (name, `💎` icon, 5× value) — no separate
+  catalog row anywhere to drift out of sync. `baseMatIdFor`/`isPristineId` resolve the round trip,
+  used by `sellItem` and by the Market's "Sell Materials" panel (synthesises owned pristine rows in
+  the same `{id,name,icon,value}` shape a plain material has, zero special-casing). Stacks in
+  `s.inventory` under its own id — no new save shape.
+- `gather()` returns `{..., pristine:true}` alongside the normal result; the Skills-screen and 3D
+  world's toasts share a new `gatherToast()` helper so a Pristine find is folded into the SAME
+  message rather than a second `toast()` call silently overwriting the first (`toast()` replaces,
+  it does not queue).
+- New `window.__testGatherAt(matId, now)` test hook: the pure `gather()` called directly with an
+  explicit clock, bypassing the UI's 1.4s debounce and the real regen cooldown, so a real Playwright
+  test can gather until a Pristine find actually appears without waiting on wall-clock time or
+  needing to know anything about RNG internals.
+- *517 engine / 42 online / 188 browser.*
+
 ## Resource node regeneration — 2026-08-10
 
 ### Resource node regeneration — `da5aa62`

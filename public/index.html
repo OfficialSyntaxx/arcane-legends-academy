@@ -383,7 +383,7 @@ body.has-touch .worldbtn{display:flex;}
 <script type="module">
 import { STR } from "./strings.js";
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
-import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats } from "./items.js";
+import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats, pristineVariantFor } from "./items.js";
 import * as G from "./game.js";
 import { createWorld } from "./world.js";
 import { createAudio, SFX } from "./audio.js";
@@ -1217,11 +1217,26 @@ function renderSkills(el){
   el.innerHTML = h;
 }
 function fname(id){ const m=MATERIALS.find(x=>x.id===id); return m?m.name:id; }
+// Shared by both gather entry points (the Skills-screen button and the 3D world's onGather) so a
+// Pristine find (BACKLOG §6 "Rare resource variants") is celebrated identically no matter which
+// path the player gathered through.
+function gatherToast(m, r){
+  // toast() replaces the single #toast element's text rather than queuing — a second call would
+  // silently swallow the first, so a Pristine find is appended to the SAME toast, not a second one.
+  if (r.pristine){
+    const p = pristineVariantFor(m);
+    toast(`${m.icon} +${m.name} (+${r.xp} xp) · ${p.icon} Pristine find! ${p.name} (worth ${p.value}g)`);
+    AUDIO.play("slab");
+  } else {
+    toast(`${m.icon} +${m.name} (+${r.xp} xp)`);
+    AUDIO.play("gather");
+  }
+}
 window.__EV.gather = (id)=>{
   if (gatherCooldown>0) return;
   const m = MATERIALS.find(x=>x.id===id);
   const r = G.gather(S,m);
-  if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); AUDIO.play("gather"); gatherCooldown = 1.4; }
+  if (r.ok){ gatherToast(m, r); gatherCooldown = 1.4; }
   else if (r.err === "cooldown") err(STR.gather_regenerating.replace("{s}", Math.ceil(r.remaining/1000)));
   else err(LTL);
   save();
@@ -1607,7 +1622,11 @@ function renderMarket(el){
   h += `</div></div>`;
   // bazaar: sell items
   h += `<div class="panel"><h3>📦 Sell Materials</h3><div class="row">`;
-  const mats = [...MATERIALS, ...BARS, ...POTIONS].filter(m => (S.inventory[m.id]||0)>0);
+  // Pristine finds (BACKLOG §6 "Rare resource variants") aren't in MATERIALS themselves — they're
+  // a derived sell-only bonus, synthesised here in the exact {id,name,icon,value} shape a plain
+  // material has so they drop into the same list/row/sell handler with no special-casing.
+  const pristineOwned = MATERIALS.map(pristineVariantFor).filter(p => (S.inventory[p.id]||0)>0);
+  const mats = [...MATERIALS, ...BARS, ...POTIONS, ...pristineOwned].filter(m => (S.inventory[m.id]||0)>0);
   if (mats.length===0) h += `<div class="sub">No materials to sell.</div>`;
   for (const m of mats){
     h += `<div class="panel" style="flex:1;min-width:150px">
@@ -2249,7 +2268,7 @@ function spawnWorld(canvas, zone, spawnAt){
       const m = MATERIALS.find(x=>x.id===matId);
       if (!m) return;
       const r = G.gather(S, m);
-      if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); AUDIO.play("gather"); gatherCooldown = 1.4; }
+      if (r.ok){ gatherToast(m, r); gatherCooldown = 1.4; }
       else if (r.err === "cooldown") err(STR.gather_regenerating.replace("{s}", Math.ceil(r.remaining/1000)));
       else err(LTL);
       save();
@@ -2630,6 +2649,10 @@ window.__testAiTurn = ()=>{ if (battle) G.aiTurn(battle); };
 // to inspect the battle object mid-fight rather than play it out.
 window.__testEndBattle = ()=>{ battle = null; screen = "world"; render(); };
 window.__testGather = ()=>{ const m = MATERIALS.find(x=>x.id==="oak_log"); G.gather(S, m); save(); };
+// Calls the pure gather() directly with an explicit `now`, bypassing both the UI's client-only
+// 1.4s debounce and the real regen cooldown — for tests that need many gathers in quick succession
+// (e.g. confirming a Pristine find, BACKLOG §6, is reachable) without waiting on wall-clock time.
+window.__testGatherAt = (matId, now)=>{ const m = MATERIALS.find(x=>x.id===matId); return m ? G.gather(S, m, now) : null; };
 window.__testDuel = ()=>{ startPracticeDuel(); };
 window.__testRender = ()=>{ render(); };
 window.__testGold = ()=> S.gold;

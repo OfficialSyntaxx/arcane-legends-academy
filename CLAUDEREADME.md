@@ -247,6 +247,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Fast travel** (`index.html`, no new module) — a map button in the 3D world instantly warps to any outdoor zone the player has already walked to, reusing `changeZone`/`entryPointFor` exactly as a real gateway would. See §6.31.
 - **Hidden treasure** (`structures.js`/`zones.json` + `game.js` `claimTreasure`) — authored, off-path caches in every outdoor zone that pay out gold once and never respawn. See §6.32.
 - **Resource node regeneration** (`game.js` `gather`/`gatherCooldownRemaining`) — gathering a material puts THAT material on a real, persisted, level-scaled cooldown, closing the previous unlimited-instant-gather loophole (including the Skills-screen shortcut). See §6.33.
+- **Rare resource variants** (`items.js` `pristineVariantFor`, `game.js` `gather`/`sellItem`) — a flat 6% chance on every gather to ALSO yield a Pristine find worth 5× on sale, sell-only so no crafting recipe needs to know it exists. See §6.34.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -905,7 +906,39 @@ local state, not the save, so it never survived a reload and was never a real li
   between calls — exactly what real cooldowns should refuse. Both now drive an explicit advancing
   clock through `gather`'s `now` parameter, the way a real play session spread over time would.
 
-### 6.34 Retention
+### 6.34 Rare resource variants (`items.js`, `game.js`, `index.html`, BACKLOG §6)
+A flat, un-boosted 6% chance on every successful gather to ALSO yield a "Pristine" find of that
+same material — a lucky flourish alongside the ordinary yield, never instead of it.
+
+- **Sell-only by design, not a parallel resource.** A Pristine find is not usable in any
+  craft/refine/smelt recipe — adding a second tradeable id to every `req:{...}` table in `items.js`
+  (bars, potions, card materials) would double the surface every future recipe has to consider for
+  one rare-loot flourish. Keeping it sellable-only means `game.js`'s `sellItem` is the ONE place
+  that needs to know pristine ids exist, the same shallow footprint `variants.js`'s card printings
+  have relative to the rest of the card system.
+- **Derived, not stored as a flag.** `items.js` `pristineIdFor("copper")` → `"pristine_copper"` and
+  `pristineVariantFor(mat)` → `{id, name:"Pristine "+mat.name, icon:"💎", value: mat.value×5}` are
+  pure functions computed from the base `MATERIALS` entry every time — there is no separate
+  "Pristine Copper Ore" row anywhere in `items.js` to keep in sync with a real one.
+  `baseMatIdFor`/`isPristineId` resolve the round trip back, used by `sellItem` (a pristine id isn't
+  in `MATERIALS`/`BARS`/`POTIONS`, so it's resolved to its base material first) and by the Market's
+  "Sell Materials" panel (synthesises the owned pristine rows in the exact `{id,name,icon,value}`
+  shape a plain material has, so they drop into the same list/row with zero special-casing).
+  Stacked in `s.inventory` under its own id exactly like any other material — no new save shape.
+- **One roll, appended to the gather itself**, not a second interaction: `gather()` returns
+  `{..., pristine: true}` alongside the normal result, and the Skills-screen/3D-world toast (now a
+  shared `gatherToast()` helper, since `toast()` replaces rather than queues, so a second `toast()`
+  call would silently swallow the first) folds a Pristine find into the SAME message instead of a
+  second one that would never be seen.
+- Covered by `tools/test.mjs` (id round-trip, correct sell value, base yield never lost whether or
+  not pristine also hits, actually lands in inventory, `sellItem` resolves and refuses correctly)
+  and a real `tools/browser-test.mjs` flow: gather for real (via a new `window.__testGatherAt(matId,
+  now)` test hook — the pure `gather()` called directly with an explicit clock, bypassing both the
+  UI's 1.4s debounce and the real regen cooldown, so many gathers land in one test tick without the
+  test needing to know anything about RNG internals) until a Pristine find actually appears, confirm
+  it shows in the real Market panel priced correctly, and sell it through the real event handler.
+
+### 6.35 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -944,10 +977,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 511 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 517 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (183 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (188 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -994,7 +1027,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 511 engine / 42 online-rules / 183 real-browser (layout + gestures + world +
+**All tests green:** 517 engine / 42 online-rules / 188 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -1041,7 +1074,21 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Resource node regeneration** (§6.33, BACKLOG §6). Gathering was previously unlimited
+**Last landed: Rare resource variants** (§6.34, BACKLOG §6). A flat 6% chance on every gather to
+ALSO yield a "Pristine" find worth 5× on sale — alongside the ordinary yield, never instead of it.
+Sell-only by design: it is not usable in any craft/refine/smelt recipe, so `game.js` `sellItem` is
+the only place that needs to know pristine ids exist, rather than doubling the surface every
+`req:{...}` table in `items.js` has to consider. Fully derived from the base `MATERIALS` entry
+(`pristineIdFor`/`pristineVariantFor`/`isPristineId`/`baseMatIdFor`), so there is no separate
+"Pristine X" row to keep in sync anywhere, and it stacks in `s.inventory` under its own id with no
+new save shape. Verified with a real Playwright flow via a new `window.__testGatherAt(matId, now)`
+test hook — the pure `gather()` called directly with an explicit clock, bypassing the UI's 1.4s
+debounce and the real regen cooldown so many gathers land in one test tick without the test needing
+to know anything about RNG internals — gathering for real until a Pristine find appears, confirming
+it shows in the real Market panel, and selling it through the real handler. 517 engine / 42
+online-rules / 188 real-browser / `check:models`, all green.
+
+**Before that: Resource node regeneration** (§6.33, BACKLOG §6). Gathering was previously unlimited
 and instant, gated only by a client-only 1.4s debounce that never survived a reload. Now a real,
 persisted, level-scaled cooldown lives PER MATERIAL (`s.gatherCooldowns`) rather than per node
 instance — the outdoor zones scatter many copies of the same node from a deterministic seed with no
@@ -1123,7 +1170,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **511 engine / 42 online-rules / 183 browser / 8 viewports / model-check clean.**
+Tests: **517 engine / 42 online-rules / 188 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —

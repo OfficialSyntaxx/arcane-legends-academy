@@ -30,6 +30,27 @@ export const MATERIALS = [
   { id:"magic_log", name:"Magic Log", icon:"🪵", skill:"woodcutting", lvl:50, xp:70, value:48 },
 ];
 
+// ---------------------------------------------------------------- rare resource variants
+// (BACKLOG §6 "Rare resource variants"). A small, flat chance every gather also yields a Pristine
+// find of that same material — deliberately a SELL-ONLY bonus, not a parallel resource with its
+// own place in every craft/refine recipe. Adding a second tradeable id to every `req:{...}` table
+// in this file (bars, potions, card materials) would double the surface every future recipe has
+// to consider for one rare-loot flourish; keeping it sellable-only means `game.js` only needs to
+// teach ONE more function (`sellItem`) what a pristine id is worth, the same shallow footprint
+// `variants.js`'s card printings have relative to the rest of the card system.
+export const PRISTINE_CHANCE = 6;          // percent, flat — not skill-scaled, a lucky find, not a milestone
+export const PRISTINE_MULTIPLIER = 5;      // sale value only; there is no "craft with a pristine" path
+export const PRISTINE_PREFIX = "pristine_";
+export function pristineIdFor(matId){ return PRISTINE_PREFIX + matId; }
+export function isPristineId(itemId){ return typeof itemId === "string" && itemId.startsWith(PRISTINE_PREFIX); }
+export function baseMatIdFor(pristineId){ return isPristineId(pristineId) ? pristineId.slice(PRISTINE_PREFIX.length) : pristineId; }
+/** A pristine find, described in the same {id,name,icon,value} shape a plain material has, so it
+ * can sit in the exact same sell list/UI row with no special-casing. `null` for an unknown base id. */
+export function pristineVariantFor(mat){
+  if (!mat) return null;
+  return { id: pristineIdFor(mat.id), name: "Pristine " + mat.name, icon: "💎", value: mat.value * PRISTINE_MULTIPLIER };
+}
+
 export const BARS = [
   { id:"bar_bronze", name:"Bronze Bar", icon:"🟤", metal:"bronze", lvl:1, xp:15, value:12, req:{copper:1, tin:1} },
   { id:"bar_iron", name:"Iron Bar", icon:"⚪", metal:"iron", lvl:15, xp:32, value:25, req:{iron:1} },

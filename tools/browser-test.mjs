@@ -1568,6 +1568,47 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   await rctx.close();
 }
 
+// ---------------- rare resource variants (BACKLOG §6) ----------------
+// A Pristine find is rare (6%) but not slow to reach in a real session, so this drives it for real
+// through the pure gather() (via __testGatherAt, which takes an explicit `now` — bypassing the UI's
+// client-only 1.4s debounce and the real regen cooldown so many gathers land in one test tick,
+// without the test needing to know anything about RNG internals) rather than seeding the save
+// directly, then proves the find shows up in the real Market "Sell Materials" panel and actually
+// sells for the right amount through the real event handler.
+{
+  const pctx = await browser.newContext({ viewport:{width:420,height:1400} });
+  const perrs = [];
+  const ppage = await pctx.newPage();
+  ppage.on("pageerror", e => perrs.push(String(e)));
+  await ppage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await ppage.waitForTimeout(900);
+  const pristine = await ppage.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    let clock = Date.now(), found = false, plainOnly = true, tries = 0;
+    for (; tries < 400 && !found; tries++){
+      const r = window.__testGatherAt("copper", clock);
+      clock += 10000;
+      if (!r || !r.ok) continue;
+      if ((window.__testSave().inventory.copper || 0) === 0) plainOnly = false;   // the base item must always land too
+      if (r.pristine) found = true;
+    }
+    document.querySelector('[data-screen="market"]').click();
+    await settle(300);
+    const sellPanel = [...document.querySelectorAll(".panel")].find(p => p.textContent.includes("Sell Materials"));
+    const sellPanelHtml = sellPanel ? sellPanel.innerHTML : "";
+    const goldBefore = window.__testSave().gold;
+    window.__ev("sellItem|pristine_copper");
+    await settle(150);
+    return { found, tries, plainOnly, sellPanelHtml, goldBefore, goldAfter: window.__testSave().gold };
+  });
+  check("no uncaught page errors while gathering for a pristine find", perrs.length === 0, perrs.slice(0,3).join(" | "));
+  check("a pristine find is reachable through the real gather() within a reasonable number of tries", pristine.found === true, `${pristine.tries} tries`);
+  check("a pristine find never replaces the ordinary yield", pristine.plainOnly === true);
+  check("the pristine find shows in the real Market's Sell Materials panel, priced above the base ore", /Pristine Copper Ore/.test(pristine.sellPanelHtml) && /worth 20g each/.test(pristine.sellPanelHtml), pristine.sellPanelHtml.slice(0, 200));
+  check("selling it through the real event handler pays out the pristine price, not the base one", pristine.goldAfter === pristine.goldBefore + 20, `${pristine.goldBefore} -> ${pristine.goldAfter}`);
+  await pctx.close();
+}
+
 // ---------------- auction countdown fix + price history (BACKLOG §6) ----------------
 // A real bug found while adding price history nearby: the countdown compared a Date.now()
 // wall-clock deadline against performance.now() (a different epoch entirely), so a fresh 60s

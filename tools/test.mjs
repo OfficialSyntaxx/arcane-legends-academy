@@ -1,7 +1,7 @@
 // Engine smoke test — runs the card engine, economy, and economy-balance checks headlessly.
 import * as G from "../public/game.js";
 import { CARDS, CARD_MAP, SCHOOLS, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
-import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS, SLOTS as SLOTS_LIST, METALS as METALS_MAP, ENCHANTS, ENCHANT_MAP, enchantStats } from "../public/items.js";
+import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS, SLOTS as SLOTS_LIST, METALS as METALS_MAP, ENCHANTS, ENCHANT_MAP, enchantStats, PRISTINE_CHANCE, PRISTINE_MULTIPLIER, pristineIdFor, pristineVariantFor, isPristineId, baseMatIdFor } from "../public/items.js";
 import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
 import { SKILLS as SKILLS_MAP } from "../public/items.js";
 import * as ST from "../public/structures.js";
@@ -1130,6 +1130,59 @@ check("a save that predates node regeneration migrates with no cooldowns active"
   localStorage_stub(JSON.stringify(old));
   const s = G.load();
   return typeof s.gatherCooldowns === "object" && G.gatherCooldownRemaining(s, "copper") === 0;
+})());
+
+// ---- rare resource variants (BACKLOG §6) ----
+check("pristineIdFor/isPristineId/baseMatIdFor round-trip cleanly", (()=>{
+  const id = pristineIdFor("copper");
+  return isPristineId(id) === true && baseMatIdFor(id) === "copper"
+      && isPristineId("copper") === false && baseMatIdFor("copper") === "copper";
+})());
+check("a pristine variant sells for PRISTINE_MULTIPLIER times the base material's value", (()=>{
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const p = pristineVariantFor(copper);
+  return p.id === "pristine_copper" && p.value === copper.value * PRISTINE_MULTIPLIER;
+})());
+check("a gather never loses the ordinary yield, whether or not it also rolls pristine", (()=>{
+  // Run enough gathers (each material on its own clock, so none is blocked by its own cooldown)
+  // to see both a pristine hit and a miss, and confirm the base item is added identically either
+  // way — a pristine find is a bonus ON TOP, never a replacement.
+  const s = G.newGame();
+  let sawPristine = false, sawPlain = false;
+  const mat = MATERIALS.find(m => m.id === "copper");
+  let clock = Date.now();
+  for (let i = 0; i < 400 && !(sawPristine && sawPlain); i++){
+    const before = s.inventory.copper || 0;
+    const r = G.gather(s, mat, clock);
+    clock += G.regenMsFor(mat) + 1;
+    if (!r.ok) continue;
+    if ((s.inventory.copper || 0) !== before + 1) return false;   // the base item ALWAYS lands
+    if (r.pristine) sawPristine = true; else sawPlain = true;
+  }
+  return sawPristine && sawPlain;
+})());
+check("a pristine find is actually added to inventory under its own id", (()=>{
+  const s = G.newGame();
+  const mat = MATERIALS.find(m => m.id === "copper");
+  let clock = Date.now(), found = false;
+  for (let i = 0; i < 400 && !found; i++){
+    const r = G.gather(s, mat, clock);
+    clock += G.regenMsFor(mat) + 1;
+    if (r.ok && r.pristine) found = true;
+  }
+  return found && s.inventory[pristineIdFor("copper")] === 1;
+})());
+check("sellItem resolves a pristine id back to its base material for the right payout", (()=>{
+  const s = G.newGame();
+  s.inventory[pristineIdFor("copper")] = 1;
+  const goldBefore = s.gold;
+  const r = G.sellItem(s, pristineIdFor("copper"));
+  const copper = MATERIALS.find(m => m.id === "copper");
+  return r.ok === true && r.value === copper.value * PRISTINE_MULTIPLIER && s.gold === goldBefore + r.value;
+})());
+check("sellItem refuses a pristine id for a material the player does not actually have", (()=>{
+  const s = G.newGame();
+  return G.sellItem(s, pristineIdFor("runite")).ok === false;
 })());
 
 // ---- 8. auctions ----
