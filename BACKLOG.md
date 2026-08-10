@@ -277,11 +277,18 @@
       season history instead of a fake leaderboard. Auto-refreshes every 5s so a second tab stays
       live while playing in the first.
 - [x] Save versioning + migration — `migrate()` in `game.js`, covered by tests
-- [ ] Save backup/import/export
+- [x] Save backup/import/export — `game.js` `exportSave`/`importSave`, wired into a new "💾 Save
+  Data" panel on the Dorm/Home screen. The one place a player's progress lives is this browser's
+  `localStorage` — no account, no server copy — so it's also the one thing this game cannot
+  regenerate if lost. Export is literally the bytes `save()` already writes, downloaded as a real
+  file. Import is conservative on purpose (refuses anything that isn't plausibly a save this game
+  produced) and hydrates through the exact same migrate+settle path `load()` uses, so an imported
+  save can never end up in a state `load()` itself would never produce. A destructive action —
+  gated behind a confirmation overlay naming what it will replace with before committing
 - [ ] Cloud save later
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
-- [x] Expanded automated tests — 477 engine / 42 online / 159 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback/enchant/market flows) + model-integrity check, plus CI
+- [x] Expanded automated tests — 485 engine / 42 online / 166 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback/enchant/market/savebackup flows) + model-integrity check, plus CI
 - [ ] Performance profiling
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
@@ -343,7 +350,11 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **an audit, then Auction history / price history** (§6 —
+**Changes made, most recent first:** **Save backup/import/export** (§9 — `game.js`
+`exportSave`/`importSave`, a shared `hydrate()` refactored out of `load()` so an imported save is
+hydrated through the exact same migrate+settle path; a real download, a real file-picker import,
+a confirmation overlay before anything is committed; conservative validation refuses anything that
+isn't plausibly a save this game produced) → **an audit, then Auction history / price history** (§6 —
 `s.marketHistory` recorded at settle time, `priceHistoryFor`/`avgSalePrice`, a new Market-screen
 panel, honestly local; also found and fixed a real pre-existing bug in the auction countdown
 comparing a wall-clock deadline against `performance.now()`; also re-checked "Player marketplace"
@@ -399,7 +410,25 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **A quick audit before continuing, then Auction history / price history is done**
+**Next step:** **Save backup/import/export is done** (§9). The one place a player's progress lives
+is this browser's `localStorage` — no account, no server copy — so it's also the one thing this
+game cannot regenerate if lost. `exportSave(s)` is literally the bytes `save()` already writes,
+downloaded as a real file. `importSave(text)` is deliberately conservative: refuses anything that
+isn't plausibly a save this game produced (not JSON, a JSON array, no `version`, missing
+`cards`/`deck`) before ever touching the real save, and hydrates through the exact same
+migrate+settle path `load()` uses (refactored out into a shared `hydrate()`), so an imported save
+can never end up in a state `load()` itself would never produce. Import is destructive, so it's
+gated behind a confirmation overlay naming what it will replace with. Wired into a new "💾 Save
+Data" panel on the Dorm/Home screen. Two real test-authoring races caught and fixed along the
+way: a nav click via Playwright's actionability-checked `page.click()` timed out because a fresh
+save's character-creation overlay (z-index 100) was still covering the nav bar underneath in a
+context with no charcreate walk-through — fixed by using a synthetic `.click()` via `evaluate()`,
+the same pattern every other click-driven block in this suite already uses; and the file-picker
+tests needed a wider margin before checking the result, since `FileReader` reads the picked file
+asynchronously and 300ms wasn't always enough once this was the last block in an already-long
+suite.
+
+Before that: **a quick audit, then Auction history / price history is done**
 (§6). Working tree was clean, everything already pushed. Checking §6's remaining unstarted items
 turned up that "Player marketplace" was already fully built (`listAuction`/`auctionTick`/
 `settleAuctions`, a simulated NPC-bidding auction house honestly labelled as such, no cross-player

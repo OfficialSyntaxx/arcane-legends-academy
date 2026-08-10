@@ -2907,5 +2907,52 @@ check("equipStats includes an equipped item's enchant bonus on top of its base s
 })());
 check("game.js newGame() starts the enchanting skill at level 1 like every other skill", G.newGame().skills.enchanting === 1);
 
+// ---------------------------------------------------------------- save backup/import/export (BACKLOG §9)
+check("exportSave round-trips through importSave with the save intact", (()=>{
+  const s = G.newGame();
+  s.gold = 9001; s.name = "Roundtrip";
+  const r = G.importSave(G.exportSave(s));
+  return r.ok && r.save.gold === 9001 && r.save.name === "Roundtrip"
+      && r.save.cards.length === s.cards.length && r.save.deck.length === s.deck.length;
+})());
+check("importSave refuses text that isn't JSON at all", G.importSave("not json { at all").ok === false
+  && G.importSave("not json { at all").err === "json");
+check("importSave refuses a JSON array — not the shape a save has ever taken", (()=>{
+  const r = G.importSave(JSON.stringify([1,2,3]));
+  return r.ok === false && r.err === "shape";
+})());
+check("importSave refuses an object with no version — never a save this game wrote", (()=>{
+  const r = G.importSave(JSON.stringify({ cards:[], deck:[] }));
+  return r.ok === false && r.err === "version";
+})());
+check("importSave refuses a versioned object missing cards/deck", (()=>{
+  const r = G.importSave(JSON.stringify({ version:1 }));
+  return r.ok === false && r.err === "shape";
+})());
+check("a successfully imported save is hydrated through the SAME path load() uses", (()=>{
+  // migrate() would add the enchanting skill to an old save missing it; importSave must too,
+  // rather than accepting the raw shape verbatim.
+  const s = G.newGame();
+  delete s.skills.enchanting; delete s.skillXp.enchanting;
+  const r = G.importSave(JSON.stringify(s));
+  return r.ok && r.save.skills.enchanting === 1 && r.save.skillXp.enchanting === 0;
+})());
+check("importing a save with a live auction settles it exactly like load() would", (()=>{
+  const s = G.newGame();
+  G.listAuction(s, s.cards[0].uid, 50);
+  s.auctions[0].ends = Date.now() - 1;   // already expired at export time
+  const r = G.importSave(JSON.stringify(s));
+  return r.ok && r.save.auctions.length === 0;
+})());
+check("importSave never mutates the game's actual save (localStorage) as a side effect", (()=>{
+  // exportSave/importSave are pure text <-> save operations; only an explicit save() call after
+  // import should ever touch localStorage — the caller decides when to commit an import, not
+  // this function.
+  const before = G.load();
+  G.importSave(JSON.stringify({ version:1, cards:[], deck:[], gold:999999 }));
+  const after = G.load();
+  return after.gold === before.gold;
+})());
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

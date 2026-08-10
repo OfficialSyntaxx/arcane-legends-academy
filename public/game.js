@@ -78,16 +78,44 @@ export function newGame(){
     slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false },
   };
 }
+// Shared by load() and importSave() — a raw parsed save object becomes a fully playable one via
+// the exact same migrate + settle-on-load path, whether it came from this browser's own
+// localStorage or a file the player is importing. One path means an imported save can never end
+// up in a state load() itself would never produce.
+function hydrate(raw){
+  const m = migrate(raw);
+  settleAuctions(m);
+  RANK.settleSeason(m.pvp, Date.now());
+  return m;
+}
 export function load(){
   try{
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && s.version){ const m = migrate(s); settleAuctions(m); RANK.settleSeason(m.pvp, Date.now()); return m; }
+    if (s && s.version) return hydrate(s);
   }catch(e){}
   const s = newGame();
   RANK.settleSeason(s.pvp, Date.now());
   return s;
 }
 export function save(s){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(s)); }catch(e){} }
+// Save backup/import/export (BACKLOG §9). `exportSave` is just the shape `save()` already writes
+// to localStorage — a backup is honest specifically because it is NOTHING but that.
+export function exportSave(s){ return JSON.stringify(s, null, 2); }
+/**
+ * Parse and validate an exported save. Returns `{ok:true, save}` with a save hydrated through the
+ * exact same path load() uses, or `{ok:false, err}` for anything that isn't a save this game
+ * could plausibly have produced — deliberately conservative, since accepting garbage here means
+ * silently corrupting the ONE thing (the save) this game cannot regenerate.
+ */
+export function importSave(text){
+  let raw;
+  try { raw = JSON.parse(text); } catch(e){ return { ok:false, err:"json" }; }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ok:false, err:"shape" };
+  if (!raw.version) return { ok:false, err:"version" };
+  if (!Array.isArray(raw.cards) || !Array.isArray(raw.deck)) return { ok:false, err:"shape" };
+  try { return { ok:true, save: hydrate(raw) }; }
+  catch(e){ return { ok:false, err:"corrupt" }; }
+}
 function migrate(s){
   // v1 -> aligned: add scribing skill, slab fields, trim deck to 20-card format
   if (!s.skills.scribing) s.skills.scribing = 1;

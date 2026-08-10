@@ -1467,6 +1467,75 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   await mctx.close();
 }
 
+// ---------------- save backup / import / export (BACKLOG §9) ----------------
+// The real download (via a real browser download event) and the real file-picker import flow
+// (via Playwright's setInputFiles on the actual <input type=file>, not a shortcut around it) —
+// the one place player progress lives is this browser's localStorage, so this is the one feature
+// where "does the real button do the real thing" matters more than almost anywhere else.
+{
+  const sctx = await browser.newContext({ viewport:{width:420,height:900}, acceptDownloads:true });
+  const serrs = [];
+  const spage = await sctx.newPage();
+  spage.on("pageerror", e => serrs.push(String(e)));
+  await spage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await spage.waitForTimeout(900);
+  // A synthetic click via evaluate(), not Playwright's actionability-checked page.click() — a
+  // fresh save's character-creation overlay can still be covering the nav bar at this point
+  // (this context has no charcreate walk-through, on purpose: this feature has nothing to do
+  // with it), the same pattern every other nav-by-click block in this file already uses.
+  await spage.evaluate(() => document.querySelector('[data-screen="home"]').click());
+  await spage.waitForTimeout(300);
+
+  // export: a real download event with real, parseable save JSON in it
+  const [download] = await Promise.all([
+    spage.waitForEvent("download"),
+    spage.evaluate(() => window.__ev("exportSave")),
+  ]);
+  const dlPath = await download.path();
+  const exported = JSON.parse(fs.readFileSync(dlPath, "utf8"));
+
+  // import: write a distinguishable save to a temp file, pick it through the REAL <input type=file>
+  const tmpSave = JSON.parse(JSON.stringify(exported));
+  tmpSave.name = "ImportedWizard"; tmpSave.gold = 55555;
+  const tmpPath = path.join("/tmp", "arcane-import-test-" + Date.now() + ".json");
+  fs.writeFileSync(tmpPath, JSON.stringify(tmpSave));
+  await spage.setInputFiles("#importFile", tmpPath);
+  await spage.waitForTimeout(500);   // FileReader reads the picked file asynchronously
+  const overlayText = await spage.evaluate(() => document.getElementById("ovBody").innerText);
+  const goldBeforeConfirm = await spage.evaluate(() => window.__testSave().gold);
+  // Synthetic click, not Playwright's actionability-checked click — the confirmation overlay
+  // (z-index 97) sits UNDER the still-open character-creation overlay (z-index 100) in this
+  // charcreate-free context, which real pointer hit-testing correctly refuses to click through.
+  await spage.evaluate(() => document.querySelector("#ovBody .btn.danger").click());
+  await spage.waitForTimeout(300);
+  const after = await spage.evaluate(() => ({
+    name: window.__testSave().name, gold: window.__testSave().gold,
+    overlayClosed: document.getElementById("overlay").style.display === "none",
+    savedToStorage: JSON.parse(localStorage.getItem("arcane_legends_save_v1")).gold === 55555,
+  }));
+
+  // a garbage file is refused with an error, never silently swallowed or half-applied
+  const goldBeforeGarbage = await spage.evaluate(() => window.__testSave().gold);
+  const garbagePath = path.join("/tmp", "arcane-import-garbage-" + Date.now() + ".json");
+  fs.writeFileSync(garbagePath, "not valid json at all");
+  await spage.setInputFiles("#importFile", garbagePath);
+  await spage.waitForTimeout(800);   // this is the last block in a long suite; give FileReader margin
+  const afterGarbage = await spage.evaluate(() => ({
+    gold: window.__testSave().gold,
+    errShown: document.getElementById("err").textContent.length > 0,
+  }));
+  fs.unlinkSync(tmpPath); fs.unlinkSync(garbagePath);
+
+  check("no uncaught page errors during export/import", serrs.length === 0, serrs.slice(0,3).join(" | "));
+  check("Download Backup produces real, parseable save JSON", exported.version === 1 && Array.isArray(exported.cards));
+  check("picking a backup file shows a confirmation naming what it will replace with", /ImportedWizard/.test(overlayText) && /REPLACES/.test(overlayText));
+  check("the save is NOT replaced until the confirm button is pressed", goldBeforeConfirm !== 55555);
+  check("confirming an import actually replaces the live save and closes the overlay", after.name === "ImportedWizard" && after.gold === 55555 && after.overlayClosed);
+  check("an imported save is actually persisted to localStorage, not just in-memory", after.savedToStorage === true);
+  check("a garbage file is refused with an error, not silently applied", afterGarbage.gold === goldBeforeGarbage && afterGarbage.errShown);
+  await sctx.close();
+}
+
 // ---------------- debug dashboard (public/debug.html) ----------------
 // A separate page from the game itself — plays a bit of the real game first (via the game's own
 // #app in dctx above would pollute state, so a fresh context) to give the dashboard a real save

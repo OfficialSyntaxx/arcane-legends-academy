@@ -241,6 +241,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Card Backs** (`cardbacks.js`) — 9 procedural CSS backs unlocked by codex achievements, no new grind. See §6.25.
 - **Enchanting** (`items.js` `ENCHANTS`) — a new skill + per-item stat runes, reusing bars already smelted via Smithing. See §6.26.
 - **Auction History / Price History** (`game.js` `marketHistory`) — a per-card sale history + average, plus a real countdown-display bug fixed alongside it. See §6.27.
+- **Save Backup / Import / Export** (`game.js` `exportSave`/`importSave`) — download/restore the whole save as a real file, conservative validation, confirmation before overwrite. See §6.28.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -717,7 +718,36 @@ actually been selling for."
   confirms the countdown reads a sane ≤60s, and confirms the Price History panel surfaces a real
   average computed from seeded history, not a placeholder string.
 
-### 6.28 Retention
+### 6.28 Save Backup / Import / Export (`game.js`, BACKLOG §9)
+The one place a player's progress lives is this browser's `localStorage` — no account, no server
+copy. That is also the one thing this game cannot regenerate if a browser's storage is ever
+cleared, a device is lost, or a player wants to move to a different one.
+
+- **`exportSave(s)` is literally `JSON.stringify(s, null, 2)`** — the exact bytes `save()` already
+  writes to `localStorage`, downloaded as a real file via a `Blob` + a synthetic `<a download>`
+  click. A backup is honest specifically because it is nothing but that.
+- **`importSave(text)` is deliberately conservative.** It parses, then refuses anything that isn't
+  plausibly a save this game produced — not JSON at all, a JSON array, an object with no
+  `version`, a versioned object missing `cards`/`deck` — with a distinct error each time, before
+  ever touching the game's real save. Accepting garbage here would silently corrupt the one thing
+  the game cannot regenerate.
+- **Hydrated through the exact same path `load()` uses** (a shared private `hydrate()` — migrate,
+  settle auctions, settle the PvP season), refactored out of `load()` itself so an imported save
+  can never end up in a state `load()` would never produce — an old save missing a skill added
+  since, or one carrying an already-expired auction, comes out the other side exactly as if it had
+  just been loaded from this browser's own storage.
+- **Import is destructive, so it is gated behind a confirmation** naming what it will replace with
+  (name/school/level/gold/card count) before anything is committed — the Continue button in a
+  generic overlay is one click too easy for something that overwrites a save with no undo.
+- Wired into a new "💾 Save Data" panel on the Dorm/Home screen — the account-level hub, not
+  buried in a settings menu that doesn't otherwise exist.
+- Covered by `tools/browser-test.mjs` end-to-end: a REAL download event with real, re-parseable
+  save JSON in it; a REAL file picked through the actual `<input type=file>` (Playwright's
+  `setInputFiles`, not a shortcut around it); the confirmation overlay names the incoming save;
+  nothing changes until Confirm is pressed; a confirmed import lands in `localStorage`, not just
+  in memory; a garbage file is refused with a visible error and changes nothing.
+
+### 6.29 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -756,10 +786,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 443 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 477 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (159 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (166 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -806,7 +836,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 443 engine / 42 online-rules / 131 real-browser (layout + gestures + world +
+**All tests green:** 485 engine / 42 online-rules / 166 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -866,7 +896,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **477 engine / 42 online-rules / 159 browser / 8 viewports / model-check clean.**
+Tests: **485 engine / 42 online-rules / 166 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —

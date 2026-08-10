@@ -16,6 +16,27 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
+### Save backup / import / export — *pending*
+- The one place a player's progress lives is this browser's `localStorage` — no account, no
+  server copy — so it's also the one thing this game cannot regenerate if lost.
+- `exportSave(s)` is literally the bytes `save()` already writes, downloaded as a real file via a
+  `Blob` + a synthetic `<a download>` click.
+- `importSave(text)` is deliberately conservative: refuses anything that isn't plausibly a save
+  this game produced (not JSON, a JSON array, no `version`, missing `cards`/`deck`) with a
+  distinct error each time, before ever touching the real save. Hydrated through the exact same
+  migrate+settle path `load()` uses — refactored out into a shared `hydrate()` — so an imported
+  save can never end up in a state `load()` itself would never produce.
+- Import is destructive, so it's gated behind a confirmation overlay naming what it will replace
+  with before anything is committed.
+- Wired into a new "💾 Save Data" panel on the Dorm/Home screen.
+- Two real test-authoring races caught and fixed while covering it: a nav click via Playwright's
+  actionability-checked `page.click()` timed out because a fresh save's character-creation overlay
+  (z-index 100) was still covering the nav bar in a context with no charcreate walk-through —
+  fixed with a synthetic `.click()` via `evaluate()`, the pattern every other click-driven block
+  already uses; and the file-picker tests needed a wider margin before checking the result, since
+  `FileReader` reads the picked file asynchronously.
+- *485 engine / 42 online / 166 browser.*
+
 ### Auction history / price history, and a real countdown bug fixed — `6f7f11b`
 - **Audit first**: checking §6's remaining unstarted items found "Player marketplace" already
   fully built (`listAuction`/`auctionTick`/`settleAuctions` — a simulated NPC-bidding auction

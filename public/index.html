@@ -1027,8 +1027,59 @@ function renderHome(el){
   h += `<div class="panel" style="margin-top:14px"><h3>${STR.skills_title}</h3><div class="row">`;
   for (const [skill,info] of Object.entries(SKILLS)) h += `<div class="kpi"><div class="lv" style="font-size:20px">${info.icon} ${S.skills[skill]}</div><div class="nm">${info.name}</div></div>`;
   h += `</div></div>`;
+  // Save backup/import/export (BACKLOG §9). The one place player progress lives is this browser's
+  // localStorage — no account, no server copy — so it is also the one thing this game cannot
+  // regenerate if it is ever lost. A backup is honest specifically because it is nothing but the
+  // exact bytes save() already writes.
+  h += `<div class="panel" style="margin-top:14px"><h3>💾 Save Data</h3>
+    <p class="sub">Your save lives only in this browser. Download a backup, or restore one on another device.</p>
+    <div class="row">
+      <button class="btn" onclick="window.__ev('exportSave')">⬇️ Download Backup</button>
+      <label class="btn" style="cursor:pointer">⬆️ Import Backup<input id="importFile" type="file" accept="application/json" style="display:none" onchange="window.__ev('importPick')"></label>
+    </div></div>`;
   el.innerHTML = h;
 }
+window.__EV.exportSave = ()=>{
+  const blob = new Blob([G.exportSave(S)], { type:"application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `arcane-legends-save-${(S.name||"wizard").replace(/[^a-z0-9]+/gi,"_")}-${stamp}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast("Backup downloaded.");
+};
+window.__EV.importPick = ()=>{
+  const input = $("importFile"); const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const r = G.importSave(reader.result);
+    input.value = "";   // so picking the SAME file again still fires a change event
+    if (!r.ok){
+      err(r.err==="json" ? "That file isn't valid JSON." : r.err==="version" || r.err==="shape" ? "That doesn't look like an Arcane Legends save." : "Couldn't read that save.");
+      return;
+    }
+    pendingImport = r.save;
+    showOverlay("⬆️ Import Backup", `<p class="sub">This REPLACES your current save. It cannot be undone unless you also have a backup of what's here now.</p>
+      <div class="panel"><div style="font-weight:700">${esc(r.save.name || CC.DEFAULT_NAME)}</div>
+        <div class="sub">${SCHOOLS[r.save.school]?.name||r.save.school} · Level ${r.save.level} · ${r.save.gold}g · ${r.save.cards.length} cards</div></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn danger" onclick="window.__ev('importConfirm')">Replace my save</button>
+        <button class="btn" onclick="window.__ev('ovClose')">Cancel</button>
+      </div>`);
+  };
+  reader.readAsText(file);
+};
+let pendingImport = null;
+window.__EV.importConfirm = ()=>{
+  if (!pendingImport) return;
+  S = pendingImport; pendingImport = null;
+  save();
+  document.getElementById("overlay").style.display = "none";
+  toast("Save imported.");
+  refreshGear(); render();
+};
 window.__EV.buyHome = ()=>{ const r=G.buyHome(S); r.ok?toast("🏰 Dorm claimed! Walk to the Student Dorms to go inside."):err(r.err==="gold"?"Not enough gold (200g)":""); render(); };
 window.__EV.upgrade = (id)=>{ const r=G.upgradeHome(S,id); r.ok?toast("Upgraded!"):err(r.err==="gold"?"Not enough gold":r.err==="timber"?"Need timber (chop wood)":"Max"); render(); };
 window.__EV.toPvp = ()=>{ screen="pvp"; render(); };
