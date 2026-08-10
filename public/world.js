@@ -61,6 +61,25 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   scene.fog = ZONE.interior
     ? new THREE.Fog(ZONE.background != null ? ZONE.background : 0x120c22, 18, 80)
     : new THREE.Fog(0x2a1a4a, 95, 250);
+  // A visible sky, not just a solid clear colour. `renderer.setClearColor` below was the only
+  // thing behind the world — an outdoor zone read as an unlit test scene because there was
+  // nothing to look UP at. Deliberately warmer/brighter than `buildEnvironment`'s reflection map
+  // just below (that one stays dim on purpose, so it doesn't wash PBR metal out) — this one exists
+  // to actually be seen, matching the academy's own gold-over-violet palette so the sky and the 2D
+  // UI chrome read as the same game. Interiors keep the flat clear colour: a cave has no sky.
+  if (!ZONE.interior){
+    const c = document.createElement("canvas"); c.width = 8; c.height = 256;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0.00, "#161033");   // zenith — deep indigo
+    grad.addColorStop(0.45, "#4a3168");   // upper sky
+    grad.addColorStop(0.78, "#8a5a7a");   // haze band
+    grad.addColorStop(1.00, "#e8a33d");   // horizon — the academy's own gold, as a sunset glow
+    g.fillStyle = grad; g.fillRect(0, 0, 8, 256);
+    const skyTex = new THREE.CanvasTexture(c);
+    skyTex.encoding = THREE.sRGBEncoding;   // tag it sRGB, same as renderer.outputEncoding below
+    scene.background = skyTex;
+  }
   // Generated models are PBR (metallic/roughness). With no environment to reflect, metal renders
   // near-black and everything looks flat — this is the other half of why they lost their shine.
   // A tiny procedural sky/ground gradient costs no assets and gives them something to catch.

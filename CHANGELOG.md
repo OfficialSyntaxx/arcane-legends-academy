@@ -14,6 +14,41 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## UI theme pass — 2026-08-10
+
+### Panel depth, school accenting, world sky gradient — *pending*
+- Asked point-blank whether the UI/theme "looked developed" — honest answer was no: every panel
+  and button was a flat single colour with a hairline border, the accent colour was a static gold
+  regardless of which school a player actually picked, and every outdoor zone's sky was a flat
+  `renderer.setClearColor()` colour despite `scene.fog` and a PBR reflection environment already
+  existing and going almost entirely unseen.
+- `.panel`/`.btn` moved to a gradient background + real `box-shadow`, with a `:active` press
+  transform on buttons and `:disabled` explicitly zeroing the shadow.
+- New `--accent`/`--accent-glow`/`--accent-dim` CSS custom properties, retinted at runtime by
+  `applyAccent()` from `SCHOOLS[S.school].color` (already the source of truth for card art/borders)
+  — called on boot, on school selection (`chooseSchool`/`ccSchool`), and on a confirmed save
+  import, since an imported save can carry a different school than the one it replaced. The top
+  bar's border/glow and the active nav tab now read these instead of a hardcoded gold.
+- Every outdoor zone gets a real dusk-gradient `scene.background` (an 8×256 `CanvasTexture` linear
+  gradient, tagged `.encoding = THREE.sRGBEncoding` to match the renderer's own `outputEncoding` —
+  `public/vendor/three.min.js` is an older revision without the newer `SRGBColorSpace` API,
+  confirmed by grep first). Interiors are untouched; their walls already fully occlude it. This is
+  the single biggest visible change — the fog now reads as atmosphere instead of a flat colour
+  with nothing to fade into.
+- Verified visually via real Playwright screenshots (home/collection/world, before/after, and
+  again across two different schools) rather than by code review alone.
+- Landed alongside a round of flake-hardening in the pre-existing save/import browser tests
+  (unrelated in cause, surfaced by repeated `npm run test:browser` verification runs): a nav click
+  needed a synthetic `.click()` via `evaluate()` because the character-creation overlay can still
+  cover the nav bar on a fresh save; two fixed `waitForTimeout` sleeps were replaced with
+  `page.waitForFunction` polling the real DOM condition, since a fixed sleep kept flaking
+  specifically when this was the last block in an already-long suite; `setInputFiles` got a
+  resilient wrapper with its own 15s timeout so an environment hiccup fails one check with a
+  diagnostic instead of throwing an uncaught exception that kills the whole test process.
+- No new tests: pure visual/CSS/material change, no new save fields, nothing a `validateX()` would
+  meaningfully assert beyond "the page still boots," already covered by the existing suite.
+- *485 engine / 42 online / 166 browser.*
+
 ## Combat depth & collection — 2026-08-08 → 09
 
 ### Save backup / import / export — `0aae248`

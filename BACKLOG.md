@@ -350,7 +350,15 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Save backup/import/export** (§9 — `game.js`
+**Changes made, most recent first:** **UI depth, school accenting, world sky gradient** (`index.html`,
+`world.js` — asked for an honest critique of whether the UI/theme "looked developed"; answer was
+no, so panels/buttons got real `box-shadow` depth, a new `--accent`/`--accent-glow`/`--accent-dim`
+CSS-variable system retints the top bar and active nav tab from the player's actual
+`SCHOOLS[S.school].color` at runtime instead of a static gold, and every outdoor zone now gets a
+real dusk-gradient `scene.background` canvas texture instead of a flat `setClearColor()`, so the
+fog and PBR reflection environment that already existed finally read as atmosphere; verified via
+real Playwright screenshots before/after and across two schools, not just code review) → **Save
+backup/import/export** (§9 — `game.js`
 `exportSave`/`importSave`, a shared `hydrate()` refactored out of `load()` so an imported save is
 hydrated through the exact same migrate+settle path; a real download, a real file-picker import,
 a confirmation overlay before anything is committed; conservative validation refuses anything that
@@ -410,7 +418,18 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Save backup/import/export is done** (§9). The one place a player's progress lives
+**Next step:** **UI depth/school accenting/world sky gradient is done**, ad hoc (not a pre-listed
+backlog line — a direct response to being asked whether the UI looked developed). No new save
+fields, no new module, nothing a `validateX()` would meaningfully assert beyond "the page still
+boots" — already covered by the existing `npm run test:browser` suite on every screen it touched.
+Also landed alongside a round of flake-hardening in the pre-existing §9 save/import browser tests
+(a synthetic `.click()` for a nav click that a covering character-creation overlay was blocking;
+`page.waitForFunction` polling replacing two fixed `waitForTimeout` sleeps that kept flaking
+specifically as the last block in an already-long suite; a resilient `setInputFiles` wrapper with
+its own timeout so an environment hiccup fails one check instead of killing the whole process) —
+confirmed green afterward at 485 engine / 42 online-rules / 166 real-browser / `check:models`.
+
+Before that: **Save backup/import/export is done** (§9). The one place a player's progress lives
 is this browser's `localStorage` — no account, no server copy — so it's also the one thing this
 game cannot regenerate if lost. `exportSave(s)` is literally the bytes `save()` already writes,
 downloaded as a real file. `importSave(text)` is deliberately conservative: refuses anything that

@@ -1479,6 +1479,15 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   spage.on("pageerror", e => serrs.push(String(e)));
   await spage.goto(BASE + "/index.html", { waitUntil:"load" });
   await spage.waitForTimeout(900);
+  // setInputFiles genuinely hung past 30s once in this environment, late in a long suite, with no
+  // logic error behind it (isolated, repeated single-context runs of this exact interaction never
+  // reproduce it). An uncaught timeout there kills the WHOLE process, silently skipping every check
+  // after it — worse than a normal check() failure. Give it its own generous timeout and a
+  // diagnostic instead of letting the process die.
+  const pickFile = async (selector, filePath) => {
+    try { await spage.setInputFiles(selector, filePath, { timeout: 15000 }); return true; }
+    catch(e){ console.log(`  ⚠ setInputFiles(${selector}) did not complete: ${e.message.split("\n")[0]}`); return false; }
+  };
   // A synthetic click via evaluate(), not Playwright's actionability-checked page.click() — a
   // fresh save's character-creation overlay can still be covering the nav bar at this point
   // (this context has no charcreate walk-through, on purpose: this feature has nothing to do
@@ -1499,8 +1508,15 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   tmpSave.name = "ImportedWizard"; tmpSave.gold = 55555;
   const tmpPath = path.join("/tmp", "arcane-import-test-" + Date.now() + ".json");
   fs.writeFileSync(tmpPath, JSON.stringify(tmpSave));
-  await spage.setInputFiles("#importFile", tmpPath);
-  await spage.waitForTimeout(500);   // FileReader reads the picked file asynchronously
+  await pickFile("#importFile", tmpPath);
+  // FileReader reads the picked file asynchronously. A fixed sleep here flaked under load (this is
+  // the last feature block in a long suite, after ~10 browser contexts) even at 800ms — not
+  // reproducible in isolation, the same category as this project's documented camera-orbit flake.
+  // Poll for the actual condition instead of guessing a bigger number.
+  await spage.waitForFunction(
+    () => (document.getElementById("ovBody") || {}).innerText?.includes("ImportedWizard"),
+    { timeout: 5000 }
+  ).catch(() => {});   // let the check() below fail with a clear diagnostic rather than throwing here
   const overlayText = await spage.evaluate(() => document.getElementById("ovBody").innerText);
   const goldBeforeConfirm = await spage.evaluate(() => window.__testSave().gold);
   // Synthetic click, not Playwright's actionability-checked click — the confirmation overlay
@@ -1518,8 +1534,11 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   const goldBeforeGarbage = await spage.evaluate(() => window.__testSave().gold);
   const garbagePath = path.join("/tmp", "arcane-import-garbage-" + Date.now() + ".json");
   fs.writeFileSync(garbagePath, "not valid json at all");
-  await spage.setInputFiles("#importFile", garbagePath);
-  await spage.waitForTimeout(800);   // this is the last block in a long suite; give FileReader margin
+  await pickFile("#importFile", garbagePath);
+  await spage.waitForFunction(
+    () => (document.getElementById("err") || {}).textContent?.length > 0,
+    { timeout: 5000 }
+  ).catch(() => {});
   const afterGarbage = await spage.evaluate(() => ({
     gold: window.__testSave().gold,
     errShown: document.getElementById("err").textContent.length > 0,

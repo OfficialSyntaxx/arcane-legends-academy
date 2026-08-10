@@ -242,6 +242,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Enchanting** (`items.js` `ENCHANTS`) — a new skill + per-item stat runes, reusing bars already smelted via Smithing. See §6.26.
 - **Auction History / Price History** (`game.js` `marketHistory`) — a per-card sale history + average, plus a real countdown-display bug fixed alongside it. See §6.27.
 - **Save Backup / Import / Export** (`game.js` `exportSave`/`importSave`) — download/restore the whole save as a real file, conservative validation, confirmation before overwrite. See §6.28.
+- **UI depth & school accenting, world sky gradient** (`index.html`, `world.js`) — panel/button box-shadows, a runtime `--accent` retint driven by the player's actual school, and a real gradient sky replacing the flat clear colour outdoors. See §6.29.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -747,7 +748,39 @@ cleared, a device is lost, or a player wants to move to a different one.
   nothing changes until Confirm is pressed; a confirmed import lands in `localStorage`, not just
   in memory; a garbage file is refused with a visible error and changes nothing.
 
-### 6.29 Retention
+### 6.29 UI depth & school accenting, world sky gradient (`index.html`, `world.js`, no new module)
+Asked point-blank whether the UI/theme "looked developed" — the honest answer was no: every panel
+and button was a flat single colour with a hairline border (no depth), the accent colour was a
+static gold regardless of which of the eight schools a player actually picked, and every outdoor
+zone's sky was `renderer.setClearColor()` — a flat solid colour — despite `scene.fog` and a PBR
+reflection environment already existing and going almost entirely unseen. Fixed all three, free of
+new assets:
+- **Panel/button depth**: `.panel` moved from a flat background to a gradient + a real `box-shadow`;
+  `.btn` got a matching shadow, an `:active` press transform, and a transition, with `:disabled`
+  explicitly zeroing the shadow so disabled buttons don't look pressable.
+- **School-colour accenting** (`applyAccent()`): `--accent` / `--accent-glow` / `--accent-dim` are
+  CSS custom properties on `:root`, overwritten at runtime from `SCHOOLS[S.school].color` (already
+  the source of truth for card art/borders — `cards.js`) converted to an rgba glow. Called once on
+  boot and again from both places a school can change (`chooseSchool`, `ccSchool` in character
+  creation) — an imported save (§6.28) can also carry a different school, so `importConfirm` calls
+  it too. `#topbar`'s border/glow and the active `.navbtn.on` tab now read these variables instead
+  of a hardcoded gold, so the whole chrome retints to whichever school the player actually is.
+- **World sky gradient**: every outdoor zone (`!ZONE.interior`) now gets a `scene.background`
+  built from an 8×256 `CanvasTexture` linear gradient (`#161033` → `#4a3168` → `#8a5a7a` → `#e8a33d`,
+  a dusk palette), tagged `.encoding = THREE.sRGBEncoding` to match the renderer's own
+  `outputEncoding` — `public/vendor/three.min.js` is an older revision that only has
+  `sRGBEncoding`, not the newer `SRGBColorSpace` API, confirmed by grep before writing this.
+  Interiors are left alone; their walls already fully occlude the background either way. This is
+  the single biggest visible change of the three — the existing fog now actually reads as
+  atmosphere instead of a flat colour with no gradient to fade into.
+- Verified visually with real Playwright screenshots (home/collection/world, before and after, and
+  again after switching to a second school) rather than by code review alone — this is a rendering
+  change and the project's own convention is to look at the pixels.
+- No new tests: this is a pure visual/CSS/material change with no new derivable state, no new
+  save fields, and nothing a `validateX()` would meaningfully assert beyond "the page still boots
+  with no errors," which the existing `npm run test:browser` suite already covers on every screen.
+
+### 6.30 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -786,7 +819,7 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 477 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 485 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
 npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (166 checks)
@@ -883,7 +916,21 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: an end-to-end audit, then Deck Archetypes** (§6.22). Asked to check the previous
+**Last landed: an honest UI/theme critique, then three fixes** (§6.29) — asked point-blank whether
+the UI "looked developed," the answer was no (flat panels, a static gold accent regardless of
+school, a flat-colour sky despite fog/reflections already existing), and all three were fixed:
+panel/button depth via `box-shadow`, a `--accent` CSS variable retinted at runtime from the
+player's actual school colour, and a real gradient sky in `world.js` for every outdoor zone.
+Verified visually via real Playwright screenshots before/after and across two different schools,
+not just by reading the diff. Landed alongside a round of flake-hardening in the pre-existing
+§6.28 save/import browser tests (a nav click needed a synthetic `.click()` instead of Playwright's
+actionability-checked one because the character-creation overlay can still be covering the nav on
+a fresh save; two fixed `waitForTimeout` sleeps were replaced with `page.waitForFunction` polling
+the real DOM condition; `setInputFiles` got a resilient wrapper with its own timeout so an
+environment hiccup fails one check with a diagnostic instead of killing the whole suite) — all
+tests confirmed green afterward: 485 engine / 42 online-rules / 166 real-browser / `check:models`.
+
+**Before that: an end-to-end audit, then Deck Archetypes** (§6.22). Asked to check the previous
 stretch of work for anything left unfinished before continuing: the working tree was already clean
 and every commit pushed, but `CLAUDEREADME.md` itself had drifted — a "how to run tests" section
 and an "All tests green" line both still quoting 343/34/109, long overtaken by real growth. Fixed,
