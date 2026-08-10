@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Hidden treasure — 2026-08-10
 
-### Hidden treasure — *pending*
+### Hidden treasure — `15cf746`
 - BACKLOG §3. A handful of authored, off-path caches per outdoor zone — placed away from the
   tower/arena/NPCs and the routes onboarding/quests already walk a player down, so finding one
   rewards actually exploring the corners of the map.
