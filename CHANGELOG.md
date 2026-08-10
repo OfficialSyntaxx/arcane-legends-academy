@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Achievements & player titles — 2026-08-10
 
-### Achievements & player titles — *pending*
+### Achievements & player titles — `e82ffe1`
 - The last unchecked line in BACKLOG §1/§2's original scope: `codex.js` already had achievements
   (scoped to the card collection, by its own header) and `pvprank.js` already had `titleFor`
   (scoped to PvP rank, always-current rather than equippable) — neither was "player achievements,"
