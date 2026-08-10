@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## UI theme pass — 2026-08-10
 
-### Panel depth, school accenting, world sky gradient — *pending*
+### Panel depth, school accenting, world sky gradient — `1ed45f3`
 - Asked point-blank whether the UI/theme "looked developed" — honest answer was no: every panel
   and button was a flat single colour with a hairline border, the accent colour was a static gold
   regardless of which school a player actually picked, and every outdoor zone's sky was a flat
