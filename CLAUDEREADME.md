@@ -245,6 +245,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **UI depth & school accenting, world sky gradient** (`index.html`, `world.js`) — panel/button box-shadows, a runtime `--accent` retint driven by the player's actual school, and a real gradient sky replacing the flat clear colour outdoors. See §6.29.
 - **Achievements & player titles** (`achievements.js`) — 10 account-wide achievements spanning quests, dungeon bosses, PvP rank, wealth, crafting and reputation, each unlocking a title the player can equip next to their name. See §6.30.
 - **Fast travel** (`index.html`, no new module) — a map button in the 3D world instantly warps to any outdoor zone the player has already walked to, reusing `changeZone`/`entryPointFor` exactly as a real gateway would. See §6.31.
+- **Hidden treasure** (`structures.js`/`zones.json` + `game.js` `claimTreasure`) — authored, off-path caches in every outdoor zone that pay out gold once and never respawn. See §6.32.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -831,7 +832,41 @@ system — it is `changeZone` called the same way a gateway calls it, just with 
   Drowned Vault and back for real in the same test run — the panel lists all three outdoor zones
   it saw with its own eyes, and choosing one actually moves the live world, not a mocked one.
 
-### 6.32 Retention
+### 6.32 Hidden treasure (`structures.js`, `zones.json`, `worldconfig.js`, `world.js`, `game.js`, BACKLOG §3)
+A find, not a grind: a handful of authored, off-path caches per outdoor zone — placed away from the
+tower/arena/NPCs and the routes the onboarding chain and quests already walk a player down, so
+finding one rewards actually exploring the corners of the map.
+
+- **Authoring split follows the existing WORLDSPEC §10 rule**: the academy's treasures live in
+  `structures.js` (`TREASURES`, generated into `zones.json` by `tools/sync-zones.mjs` — hand-editing
+  the academy zone's JSON directly is already a mistake this project guards against for every
+  other authored table, and treasures are no exception); the forest's and lake's are authored
+  directly in `zones.json`, same as their NPCs and dungeon entrances.
+- **Ids are globally unique across every zone** (`worldconfig.js` `validateTreasureIds`), not just
+  within one — a found treasure is recorded as ONE flat id in the save
+  (`s.worldState.treasuresFound`), unlike a dungeon boss kill which nests under that dungeon's own
+  key, so a collision would let opening one cache silently mark an unrelated one in another zone
+  found too.
+- **`game.js` `claimTreasure(s, id)`** is the source of truth, not the 3D mesh: it refuses a repeat
+  claim by checking the save, not by trusting that the mesh is already gone. `TREASURE_REWARDS`
+  (flat gold, scaled to the zone — the lake pays more than the academy, the same "later zones pay
+  more" shape quests already follow) and `validateTreasureRewards` catch a placed treasure with no
+  reward or a reward with nowhere placed, either direction, before it ships.
+- **`world.js`** renders a small procedural chest (box + lid + a slow-spinning, bobbing glint, the
+  same "reads as special from a distance" trick the magic trees' emissive crown already uses) for
+  every treasure NOT in `opts.foundTreasures` — mirroring `opts.defeated` for dungeon enemies
+  exactly, so a claimed cache simply never spawns on a later visit. `removeTreasure(id)` disposes
+  it in place the instant it's opened, the same shape `removeEnemy` already has.
+- No new interaction system: `register('treasure', ...)` and a `callbacks.onTreasure` dispatch slot
+  into the SAME `nearby`/`trigger()` machinery gather nodes, stations, dungeon entrances and enemies
+  already use — the prompt UI only needed one more icon branch (✨).
+- Covered by `tools/test.mjs` (id uniqueness, reward-table symmetry, claim/refuse-repeat/reject-
+  unknown, migration) and `tools/browser-test.mjs` against the real 3D world: walk up to an actually
+  authored cache, trigger it through the real prompt path, confirm the gold lands in the live save,
+  the id is recorded and the mesh is gone, and a second trigger (nothing left to hit) never pays out
+  twice.
+
+### 6.33 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -870,10 +905,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 497 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 505 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (173 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (177 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -920,7 +955,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 497 engine / 42 online-rules / 173 real-browser (layout + gestures + world +
+**All tests green:** 505 engine / 42 online-rules / 177 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -967,7 +1002,21 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Fast travel** (§6.31, BACKLOG §3). The world already had everything this needed —
+**Last landed: Hidden treasure** (§6.32, BACKLOG §3 "Hidden areas / treasure"). A handful of
+authored, off-path caches per outdoor zone, following the existing WORLDSPEC §10 authoring split —
+the academy's live in `structures.js` (generated into `zones.json`, never hand-edited), the
+forest's and lake's directly in `zones.json`. Ids are globally unique across every zone (a found
+treasure is one flat id in the save, not nested per-zone like a dungeon kill), enforced by a new
+`worldconfig.js` `validateTreasureIds`. `game.js` `claimTreasure` is the source of truth on whether
+a cache has been claimed, not the 3D mesh — the world side (`world.js` `removeTreasure`) just keeps
+it from ever being re-approached in the ordinary case. No new interaction system: it slots into the
+same `register`/`trigger()` machinery gather nodes and dungeon entrances already use. Covered by
+`tools/test.mjs` (id uniqueness, reward-table symmetry, claim/refuse-repeat/reject-unknown) and a
+real `tools/browser-test.mjs` flow (walk to an authored cache, open it through the real prompt,
+confirm the gold lands and it cannot be re-farmed). 505 engine / 42 online-rules / 177 real-browser
+/ `check:models`, all green.
+
+**Before that: Fast travel** (§6.31, BACKLOG §3). The world already had everything this needed —
 `changeZone`/`entryPointFor` already fell back to a zone's default spawn with no `fromZoneId`, and
 `S.worldState.visited` already tracked every zone reached — so this is a UI-only feature: a 🗺️ map
 button in the 3D world (always visible, not gated to touch) opens an overlay of every OUTDOOR zone
@@ -1022,7 +1071,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **497 engine / 42 online-rules / 173 browser / 8 viewports / model-check clean.**
+Tests: **505 engine / 42 online-rules / 177 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —

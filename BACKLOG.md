@@ -102,7 +102,10 @@
   outdoor zone `S.worldState.visited` already records the player having walked to; picking one
   calls the existing `changeZone`/`entryPointFor` exactly as a real gateway would (no new teleport
   path, no new save field).
-- [ ] Hidden areas / treasure
+- [x] Hidden areas / treasure — a handful of authored, off-path caches per outdoor zone
+  (`structures.js`/`zones.json`, `game.js` `claimTreasure`); pays out gold once and never
+  respawns, ids globally unique across every zone, slots into the existing gather/dungeon-entrance
+  interaction machinery with no new system.
 - [ ] Day/night cycle
 - [ ] Weather
 - [ ] Dynamic world events
@@ -357,7 +360,13 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Fast travel** (§3 — a 🗺️ map button in the 3D world opens a
+**Changes made, most recent first:** **Hidden areas / treasure** (§3 — authored off-path caches per
+outdoor zone, academy's in `structures.js`/generated into `zones.json` via `tools/sync-zones.mjs`
+following the existing WORLDSPEC §10 authoring split, forest's/lake's hand-authored directly in
+`zones.json`; `game.js` `claimTreasure` is the source of truth on whether a cache is claimed, not
+the mesh; ids globally unique across every zone since a claim is one flat id in the save, not
+nested per-zone like a dungeon kill; slots into the existing `register`/`trigger()` interaction
+machinery with no new system) → **Fast travel** (§3 — a 🗺️ map button in the 3D world opens a
 panel of every outdoor zone `S.worldState.visited` already records; picking one reuses
 `changeZone`/`entryPointFor` exactly as a real gateway would, since `entryPointFor` already falls
 back to a zone's default spawn with no `fromZoneId` — no new save field, no new pure module,
@@ -440,7 +449,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Fast travel is done** (§3). A UI-only feature: `changeZone`/`entryPointFor`
+**Next step:** **Hidden areas / treasure is done** (§3). Covered by `tools/test.mjs` (id
+uniqueness, reward-table symmetry, claim/refuse-repeat/reject-unknown) and `tools/browser-test.mjs`
+against the real 3D world. 505 engine / 42 online-rules / 177 real-browser / `check:models`, all
+green.
+
+Before that: **Fast travel is done** (§3). A UI-only feature: `changeZone`/`entryPointFor`
 already had everything it needed, so this just calls them one more way. 497 engine / 42
 online-rules / 173 real-browser / `check:models`, all green.
 

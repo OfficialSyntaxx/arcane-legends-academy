@@ -14,6 +14,31 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Hidden treasure — 2026-08-10
+
+### Hidden treasure — *pending*
+- BACKLOG §3. A handful of authored, off-path caches per outdoor zone — placed away from the
+  tower/arena/NPCs and the routes onboarding/quests already walk a player down, so finding one
+  rewards actually exploring the corners of the map.
+- Authoring follows the existing WORLDSPEC §10 split: the academy's caches live in `structures.js`
+  (`TREASURES`, generated into `zones.json` by `tools/sync-zones.mjs` — the academy zone is a
+  build artifact, never hand-edited, same as every other authored table there); the forest's and
+  lake's are hand-authored directly in `zones.json`, same as their NPCs and dungeon entrances.
+- Ids are globally unique across every zone (`worldconfig.js` `validateTreasureIds`) — a found
+  treasure is ONE flat id in the save (`s.worldState.treasuresFound`), not nested per-zone like a
+  dungeon's `defeated` list, so a repeated id across two zones would let opening one silently mark
+  an unrelated one found too.
+- `game.js` `claimTreasure(s, id)` is the source of truth, not the mesh: refuses a repeat claim by
+  checking the save. `TREASURE_REWARDS` (flat gold, scaled to the zone) and
+  `validateTreasureRewards` catch a placed treasure with no reward or an orphaned reward entry,
+  either direction, before it ships.
+- `world.js` renders a small procedural chest (glinting, slow-spinning) for every treasure not in
+  `opts.foundTreasures`, mirroring `opts.defeated` for dungeon enemies exactly; `removeTreasure(id)`
+  disposes it the instant it's opened, the same shape `removeEnemy` already has. No new interaction
+  system — `register('treasure', ...)` and `callbacks.onTreasure` slot into the same
+  `nearby`/`trigger()` machinery gather nodes and dungeon entrances already use.
+- *505 engine / 42 online / 177 browser.*
+
 ## Fast travel — 2026-08-10
 
 ### Fast travel — `a36d307`

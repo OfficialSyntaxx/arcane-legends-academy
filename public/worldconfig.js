@@ -25,7 +25,7 @@ function withDefaults(zone){
   z.terrain = { ...ZONE_DEFAULTS.terrain, ...(zone.terrain || {}) };
   z.bounds  = { ...ZONE_DEFAULTS.bounds,  ...(zone.bounds  || {}) };
   for (const k of ["buildings","landmarks","props","npcs","wanderers","resourceNodes",
-                   "enemies","exits","dungeonEntrances","treeRing"]) z[k] = z[k] || [];
+                   "enemies","exits","dungeonEntrances","treeRing","treasures"]) z[k] = z[k] || [];
   z.nodeModels = z.nodeModels || {};
   return z;
 }
@@ -57,6 +57,7 @@ export function validateZone(z, opts = {}){
     ...z.landmarks.map(l => ["landmark:" + l.key, l.x, l.z]),
     ...z.npcs.map(n => ["npc:" + n.key, n.x, n.z]),
     ...z.dungeonEntrances.map(d => ["dungeon:" + d.id, d.x, d.z]),
+    ...z.treasures.map(t => ["treasure:" + t.id, t.x, t.z]),
     ...z.props.filter(p => p.x != null).map(p => ["prop:" + p.url, p.x, p.z]),
     ...z.resourceNodes.filter(n => n.x != null).map(n => ["node:" + n.id, n.x, n.z]),
   ];
@@ -154,6 +155,24 @@ export function validateExits(world){
     for (let i = 0; i < z.exits.length; i++) for (let j = i + 1; j < z.exits.length; j++){
       if (Math.hypot(z.exits[i].x - z.exits[j].x, z.exits[i].z - z.exits[j].z) < EXIT_RADIUS * 2)
         problems.push(`${id}: exits to ${z.exits[i].toZone} and ${z.exits[j].toZone} overlap`);
+    }
+  }
+  return problems;
+}
+
+/**
+ * Whole-world treasure check (BACKLOG §3 "Hidden areas / treasure"). A found treasure is recorded
+ * in the save as a flat id (`s.worldState.treasuresFound`, no per-zone nesting like a dungeon's
+ * `defeated` list has) — so an id that repeats across two zones would let opening one silently
+ * mark the other found too. Same contract as validateExits: a list of problems, not a throw.
+ */
+export function validateTreasureIds(world){
+  const problems = [];
+  const seenAt = {};
+  for (const id of world.zoneIds){
+    for (const t of world.get(id).treasures){
+      if (seenAt[t.id]) problems.push(`treasure id "${t.id}" is used in both ${seenAt[t.id]} and ${id} — ids must be globally unique`);
+      else seenAt[t.id] = id;
     }
   }
   return problems;

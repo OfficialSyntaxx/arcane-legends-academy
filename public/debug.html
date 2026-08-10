@@ -211,6 +211,9 @@ function integritySection(){
     const zoneProblems = world.zoneIds.flatMap(id => WC.validateZone(world.get(id), { zoneIds: world.zoneIds }));
     checks.push(["worldconfig.js — every zone (models unchecked — that's npm run check:models's job)", zoneProblems]);
     checks.push(["worldconfig.js — exits mutually reachable", WC.validateExits(world)]);
+    checks.push(["worldconfig.js — treasure ids globally unique", WC.validateTreasureIds(world)]);
+    const placedTreasureIds = world.zoneIds.flatMap(id => world.get(id).treasures.map(t => t.id));
+    checks.push(["game.js — every placed treasure has a reward, and vice versa", G.validateTreasureRewards(placedTreasureIds)]);
   }
   if (dungeons){
     const dProblems = dungeons.flatMap(d => DG.validateDungeon(d, { zoneIds: world ? world.zoneIds : [] }));

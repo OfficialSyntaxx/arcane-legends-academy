@@ -111,6 +111,18 @@ export const NPCS = [
   { key:"trainer",   role:"trainer",   station:"trainer",   label:"Trainer — Practice",   x:17,    z:24,    main:0x3a6bd8, hat:0x8a3a2a, orb:0xffd766, model:"trainer.glb" },
   { key:"librarian", role:"librarian", station:"librarian", label:"Librarian — Lore",     x:-31,   z:22,    main:0x6a5b9e, hat:0x2a1f4d, orb:0x7be0ff, model:"librarian.glb" },
 ];
+
+// ---------------------------------------------------------------- hidden treasure (BACKLOG §3)
+// Off the beaten path — away from the tower/arena/NPCs, not on the paths a new player is guided
+// down — so finding one rewards actually exploring the corners of the hub rather than the route
+// the onboarding chain already walks a player through. Ids are globally unique across every zone
+// (worldconfig.js's `validateTreasureIds` enforces it) because a found treasure is recorded as one
+// flat id in the save (`s.worldState.treasuresFound`), not nested per-zone like a dungeon kill is.
+export const TREASURES = [
+  { id:"academy_grove_cache", x:-50, z:40 },
+  { id:"academy_cliff_cache", x:55, z:-50 },
+  { id:"academy_courtyard_cache", x:-45, z:-45 },
+];
 export const WANDERERS = [
   { key:"wander0", main:0x3ddc84, hat:0xff6b6b, model:"student_emerald.glb" },
   { key:"wander1", main:0xa06bff, hat:0x2a1f4d, model:"student_violet.glb" },

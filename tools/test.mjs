@@ -1752,6 +1752,44 @@ check("structures.js exposes the interior seam generically, not as a dorm specia
 const LAKE = WORLD.get("lake_arcanum");
 check("the third zone ships and validates", !!LAKE && WC.validateZone(LAKE, { zoneIds: WORLD.zoneIds }).length === 0);
 check("every zone is mutually reachable (no one-way exits anywhere)", WC.validateExits(WORLD).length === 0);
+
+// ---- hidden treasure (BACKLOG §3 "Hidden areas / treasure") ----
+const PLACED_TREASURE_IDS = WORLD.zoneIds.flatMap(id => WORLD.get(id).treasures.map(t => t.id));
+check("the shipped world places at least one treasure per outdoor zone", (()=>{
+  return WORLD.zoneIds.filter(id => !WORLD.get(id).interior).every(id => WORLD.get(id).treasures.length > 0);
+})());
+check("treasure ids are globally unique across every zone", WC.validateTreasureIds(WORLD).length === 0);
+check("a repeated treasure id across two zones is caught", (()=>{
+  const w = WC.buildWorld({ zones:[
+    { id:"a", name:"A", spawn:{x:0,z:0}, treasures:[{id:"dupe", x:0, z:0}] },
+    { id:"b", name:"B", spawn:{x:0,z:0}, treasures:[{id:"dupe", x:0, z:0}] },
+  ]});
+  return WC.validateTreasureIds(w).some(p => /dupe/.test(p) && /globally unique/.test(p));
+})());
+check("every placed treasure has a reward, and every reward is placed somewhere", G.validateTreasureRewards(PLACED_TREASURE_IDS).length === 0);
+check("claimTreasure grants the reward and records the id", (()=>{
+  const s = G.newGame();
+  const goldBefore = s.gold;
+  const r = G.claimTreasure(s, "academy_grove_cache");
+  return r.ok === true && s.gold === goldBefore + G.TREASURE_REWARDS.academy_grove_cache.gold
+      && s.worldState.treasuresFound.includes("academy_grove_cache");
+})());
+check("claimTreasure refuses a repeat claim and never grants the reward twice", (()=>{
+  const s = G.newGame();
+  G.claimTreasure(s, "academy_grove_cache");
+  const goldAfterFirst = s.gold;
+  const r2 = G.claimTreasure(s, "academy_grove_cache");
+  return r2.ok === false && r2.err === "claimed" && s.gold === goldAfterFirst;
+})());
+check("claimTreasure refuses an id with no reward table entry", (()=>{
+  const s = G.newGame();
+  const r = G.claimTreasure(s, "not-a-real-treasure");
+  return r.ok === false && r.err === "unknown" && s.worldState.treasuresFound.length === 0;
+})());
+check("game.js load() never leaves treasuresFound unset", (()=>{
+  const s = G.load();
+  return Array.isArray(s.worldState.treasuresFound);
+})());
 check("the lake is reachable from the forest and back", (()=>{
   const forest = WORLD.get("whispering_forest");
   return forest.exits.some(e => e.toZone === "lake_arcanum") && LAKE.exits.some(e => e.toZone === "whispering_forest");

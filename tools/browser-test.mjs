@@ -1214,6 +1214,40 @@ if (hasWorld){
         travel.panelHtml.slice(0, 300));
   check("fast travel actually moves the player to the chosen zone", travel.zoneAfter === "academy", String(travel.zoneAfter));
 
+  // --- Hidden treasure (BACKLOG §3) ---
+  // Fast travel just landed the player back in the academy, which places its own authored caches
+  // — walk up to one for real, open it through the real prompt/trigger path, and confirm it both
+  // pays out once and never respawns.
+  const treasure = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    const t = (dbg().treasures || [])[0];
+    if (!t) return { error: "no treasures in this zone" };
+    window.__world.teleport(t.x, t.z);
+    await settle(400);
+    const nearbyKind = dbg().nearbyKind;
+    const goldBefore = window.__testSave().gold;
+    window.__world.trigger();
+    await settle(300);
+    const goldAfterFirst = window.__testSave().gold;
+    const foundAfterFirst = [...window.__testSave().worldState.treasuresFound];
+    const remainingAfterFirst = dbg().treasuresRemaining;
+    // trying again — the mesh is gone, so there is nothing left to be nearby, and the save-side
+    // guard (game.js claimTreasure) refuses a repeat even if something still called it
+    window.__world.trigger();
+    await settle(200);
+    const goldAfterSecond = window.__testSave().gold;
+    return { id: t.id, nearbyKind, goldBefore, goldAfterFirst, goldAfterSecond, foundAfterFirst, remainingAfterFirst };
+  });
+  check("the hidden treasure prompts as a treasure, not a station or gather node", treasure.nearbyKind === "treasure", String(treasure.nearbyKind));
+  check("opening it pays out real gold into the live save", treasure.goldAfterFirst > treasure.goldBefore,
+        `${treasure.goldBefore} -> ${treasure.goldAfterFirst}`);
+  check("it is recorded as found and removed from the world so it cannot be re-farmed",
+        treasure.foundAfterFirst.includes(treasure.id) && !treasure.remainingAfterFirst.includes(treasure.id),
+        JSON.stringify(treasure));
+  check("triggering it again (mesh already gone) never grants the reward twice",
+        treasure.goldAfterSecond === treasure.goldAfterFirst, `${treasure.goldAfterFirst} -> ${treasure.goldAfterSecond}`);
+
 }
 
 

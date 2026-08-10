@@ -810,7 +810,24 @@
           "z": -70
         }
       ],
-      "dungeonEntrances": []
+      "dungeonEntrances": [],
+      "treasures": [
+        {
+          "id": "academy_grove_cache",
+          "x": -50,
+          "z": 40
+        },
+        {
+          "id": "academy_cliff_cache",
+          "x": 55,
+          "z": -50
+        },
+        {
+          "id": "academy_courtyard_cache",
+          "x": -45,
+          "z": -45
+        }
+      ]
     },
     {
       "id": "whispering_forest",
@@ -941,6 +958,23 @@
           "toZone": "lake_arcanum",
           "x": -158,
           "z": 0
+        }
+      ],
+      "treasures": [
+        {
+          "id": "forest_hollow_cache",
+          "x": -70,
+          "z": -10
+        },
+        {
+          "id": "forest_ridge_cache",
+          "x": 90,
+          "z": 70
+        },
+        {
+          "id": "forest_thicket_cache",
+          "x": -100,
+          "z": 90
         }
       ]
     },
@@ -1092,6 +1126,23 @@
           "toZone": "whispering_forest",
           "x": 158,
           "z": 0
+        }
+      ],
+      "treasures": [
+        {
+          "id": "lake_hermit_cache",
+          "x": 110,
+          "z": 55
+        },
+        {
+          "id": "lake_diver_cache",
+          "x": 60,
+          "z": -95
+        },
+        {
+          "id": "lake_trader_cache",
+          "x": 130,
+          "z": -55
         }
       ]
     }

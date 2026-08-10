@@ -52,7 +52,11 @@ export function newGame(){
     stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 },
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
-    worldState:{ zone:"academy", visited:["academy"], dungeons:{} },
+    // `treasuresFound` (BACKLOG §3 "Hidden areas / treasure") is a flat list of globally-unique
+    // treasure ids (worldconfig.js's validateTreasureIds enforces uniqueness across every zone),
+    // not nested per-zone the way a dungeon's `defeated` list is — a claimed cache is a one-time
+    // world event, same shape as a dungeon boss kill, just not scoped to one dungeon's own key.
+    worldState:{ zone:"academy", visited:["academy"], dungeons:{}, treasuresFound:[] },
     // Quests given by NPCs out in the world (zonequests.js). Only the player's CHOICES live
     // here — progress is derived from inventory/dungeon state every time it is read.
     zoneQuests:{ accepted:[], done:[] },
@@ -145,6 +149,7 @@ function migrate(s){
   if (!Array.isArray(s.worldState.visited)) s.worldState.visited = ["academy"];
   // WORLDSPEC §6: per-dungeon progress (cleared rooms, boss kills) lives in the save.
   if (!s.worldState.dungeons || typeof s.worldState.dungeons !== "object") s.worldState.dungeons = {};
+  if (!Array.isArray(s.worldState.treasuresFound)) s.worldState.treasuresFound = [];
   if (!s.zoneQuests) s.zoneQuests = { accepted: [], done: [] };
   if (!Array.isArray(s.zoneQuests.accepted)) s.zoneQuests.accepted = [];
   if (!Array.isArray(s.zoneQuests.done)) s.zoneQuests.done = [];
@@ -257,6 +262,48 @@ export function addItem(s, id, n=1){ s.inventory[id] = (s.inventory[id]||0) + n;
 export function hasItems(s, req){ return Object.entries(req).every(([id,n]) => (s.inventory[id]||0) >= n); }
 export function removeItems(s, req){ for (const [id,n] of Object.entries(req)) s.inventory[id] -= n; }
 export function gainGold(s, amt){ s.gold += Math.round(amt); }
+
+// ---------------------------------------------------------------- hidden treasure (BACKLOG §3)
+// Reward table keyed by the same globally-unique ids worldconfig.js's validateTreasureIds checks
+// zones.json/structures.js against — a treasure with no entry here would silently open to
+// nothing, and `validateTreasureRewards` below catches that mismatch either direction before it
+// ships. Flat gold, scaled to the zone it sits in (the academy is where a new player starts; the
+// lake is gated behind a boss) — the same "later zones pay more" shape quests already follow.
+export const TREASURE_REWARDS = {
+  academy_grove_cache:     { gold: 120 },
+  academy_cliff_cache:     { gold: 120 },
+  academy_courtyard_cache: { gold: 120 },
+  forest_hollow_cache:     { gold: 220 },
+  forest_ridge_cache:      { gold: 220 },
+  forest_thicket_cache:    { gold: 220 },
+  lake_hermit_cache:       { gold: 340 },
+  lake_diver_cache:        { gold: 340 },
+  lake_trader_cache:       { gold: 340 },
+};
+
+/**
+ * Claim a hidden treasure once. The world side (world.js `removeTreasure`) already stops a normal
+ * approach from re-triggering it, but the SAVE is the source of truth — refusing a repeat claim
+ * here as well means a stale world build or a replayed event can never grant the reward twice.
+ */
+export function claimTreasure(s, id){
+  if (s.worldState.treasuresFound.includes(id)) return { ok:false, err:"claimed" };
+  const reward = TREASURE_REWARDS[id];
+  if (!reward) return { ok:false, err:"unknown" };
+  if (reward.gold) gainGold(s, reward.gold);
+  s.worldState.treasuresFound.push(id);
+  return { ok:true, reward };
+}
+
+/** Every treasure a zone places must have a reward, and every reward must actually be placed
+ * somewhere — an orphaned entry on either side is a content bug, not a design choice. */
+export function validateTreasureRewards(placedTreasureIds){
+  const problems = [];
+  const placed = new Set(placedTreasureIds || []);
+  for (const id of placed) if (!TREASURE_REWARDS[id]) problems.push(`treasure "${id}" is placed in the world but has no TREASURE_REWARDS entry`);
+  for (const id of Object.keys(TREASURE_REWARDS)) if (!placed.has(id)) problems.push(`TREASURE_REWARDS has "${id}" but no zone places it`);
+  return problems;
+}
 
 // ---------- Skills: gather / craft ----------
 export function canGather(s, mat){ return skillLevel(s, mat.skill) >= mat.lvl; }

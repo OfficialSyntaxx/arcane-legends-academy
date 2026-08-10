@@ -983,6 +983,33 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     register('dungeon', de.x, de.z, de.id, (opts.zoneNames && opts.zoneNames[de.id]) || de.id, arch, 6.0);
   }
 
+  // ---------- hidden treasure (BACKLOG §3 "Hidden areas / treasure") ----------
+  // A find, not a grind: a handful of authored, off-path caches per outdoor zone (structures.js
+  // TREASURES for the academy; hand-authored in zones.json for the others). `opts.foundTreasures`
+  // mirrors `opts.defeated` above — ids this save has already claimed simply never spawn, the same
+  // "no re-farming a one-time thing" rule a dungeon boss kill already follows.
+  const FOUND_TREASURE = new Set(opts.foundTreasures || []);
+  const treasureGroups = {};
+  for (const t of ZONE.treasures || []){
+    if (FOUND_TREASURE.has(t.id)) continue;
+    const gy = groundY(t.x, t.z);
+    const g = new THREE.Group(); g.position.set(t.x, gy, t.z); scene.add(g);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 0.75), mat(0x6b4a2b));
+    body.position.y = 0.35; body.castShadow = true; body.receiveShadow = true; g.add(body);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.3, 0.8), mat(0x8a6a3a));
+    lid.position.y = 0.78; lid.castShadow = true; g.add(lid);
+    const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), mat(0xffc94d));
+    clasp.position.set(0, 0.55, 0.42); g.add(clasp);
+    // A slow-spinning, bobbing glint so a cache reads as special from a distance — the same trick
+    // the magic trees' emissive crown already uses to stand out from an ordinary one.
+    const glint = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), mat(0xfff2c0));
+    glint.material.emissive = srgb(0xffe08a); glint.material.emissiveIntensity = 0.85;
+    glint.position.y = 1.35; g.add(glint);
+    g.userData.glint = glint;
+    treasureGroups[t.id] = g;
+    register('treasure', t.x, t.z, t.id, "Hidden Cache", body, 4.6);
+  }
+
   // ---------- enemies (dungeon rooms; outdoor zones stream theirs per chunk) ----------
   // `opts.defeated` is the set of enemy ids the save says are already dead. Without it every
   // dungeon enemy respawns the moment you walk back in, and the same slime can be fought
@@ -1075,6 +1102,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     else if (nearby.kind === 'station') callbacks.onStation && callbacks.onStation(nearby.data);
     else if (nearby.kind === 'dungeon') callbacks.onDungeon && callbacks.onDungeon(nearby.data);
     else if (nearby.kind === 'enemy') callbacks.onEnemy && callbacks.onEnemy(nearby.data);
+    else if (nearby.kind === 'treasure') callbacks.onTreasure && callbacks.onTreasure(nearby.data);
   }
 
   // ---------- step each frame ----------
@@ -1290,6 +1318,10 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     updateChars(dt);
     updateNearby();
     updateExits();
+    for (const g of Object.values(treasureGroups)){
+      g.userData.glint.rotation.y += dt * 1.4;
+      g.userData.glint.position.y = 1.35 + Math.sin(now / 500) * 0.08;
+    }
     stepAura(now / 1000);
     updateCamera();
     renderer.render(scene, camera);
@@ -1323,6 +1355,8 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       zone: ZONE.id, exits: (ZONE.exits||[]).map(e=>({to:e.toZone,x:e.x,z:e.z})), exitArmed,
       interior: !!ZONE.interior,
       dungeonEntrances: (ZONE.dungeonEntrances||[]).map(d=>({id:d.id,x:d.x,z:d.z})),
+      treasures: (ZONE.treasures||[]).map(t=>({id:t.id,x:t.x,z:t.z})),
+      treasuresRemaining: Object.keys(treasureGroups),
       dorm: ZONE.dormLayout ? { pieces: ZONE.dormLayout.pieces.length,
                                 cases: (ZONE.dormLayout.cases||[]).filter(c=>c.card).length,
                                 trophies: (ZONE.dormLayout.trophies||[]).length,
@@ -1426,6 +1460,27 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       const oi = ZONE_OBSTACLES.findIndex(o => o.id === 'boss:' + String(id).split(':')[0]);
       if (oi >= 0) ZONE_OBSTACLES.splice(oi, 1);
       if (nearby && nearby.kind === 'enemy' && nearby.data === id){
+        nearby = null;
+        callbacks.onNearby && callbacks.onNearby(null);
+      }
+      return true;
+    },
+    // Remove a claimed treasure in place, the same shape removeEnemy already uses — a cache is
+    // a one-time find, so it must vanish the instant it's opened, not linger until the next zone
+    // rebuild pretending it can still be found.
+    removeTreasure(id){
+      const g = treasureGroups[id];
+      if (!g) return false;
+      g.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+        for (const m of mats) if (m && m.dispose) m.dispose();
+      });
+      scene.remove(g);
+      delete treasureGroups[id];
+      for (let i = interactives.length - 1; i >= 0; i--)
+        if (interactives[i].kind === 'treasure' && interactives[i].data === id) interactives.splice(i, 1);
+      if (nearby && nearby.kind === 'treasure' && nearby.data === id){
         nearby = null;
         callbacks.onNearby && callbacks.onNearby(null);
       }

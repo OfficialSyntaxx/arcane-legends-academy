@@ -2234,7 +2234,8 @@ function spawnWorld(canvas, zone, spawnAt){
       const p = $("prompt");
       if (target){
         const isNPC = target.kind==="station" && NPC_DIALOGUE[target.data];
-        p.innerHTML = `<button class="btn gold" onclick="window.__ev('worldGo')">${target.kind==="gather"?"⛏️":(isNPC?"💬":"🚪")} ${target.label}</button>`;
+        const icon = target.kind==="gather" ? "⛏️" : target.kind==="treasure" ? "✨" : isNPC ? "💬" : "🚪";
+        p.innerHTML = `<button class="btn gold" onclick="window.__ev('worldGo')">${icon} ${target.label}</button>`;
         p.style.display = "block";
       } else p.style.display = "none";
     },
@@ -2291,10 +2292,24 @@ function spawnWorld(canvas, zone, spawnAt){
     },
     onDungeon(id){ enterDungeon(id); },
     onEnemy(name){ startDungeonFight(name); },
+    onTreasure(id){
+      const r = G.claimTreasure(S, id);
+      if (!r.ok) return;                      // already claimed or unknown — silently no-op, never re-grant
+      if (world && world.removeTreasure) world.removeTreasure(id);
+      const bits = [];
+      if (r.reward.gold) bits.push(`+${r.reward.gold}g`);
+      toast(`✨ Hidden cache found! ${bits.join(" ")}`);
+      AUDIO.play("coin");
+      save(); render();
+    },
   }, zone, {
     spawnAt,
     // enemies this save has already killed — they must not respawn on re-entry
     defeated: (S.worldState.dungeons[zone.id] || {}).defeated || [],
+    // hidden treasures this save has already claimed (BACKLOG §3) — a flat, globally-unique list,
+    // not nested per-zone the way dungeon `defeated` is, so it's passed through unfiltered; a
+    // treasure whose id belongs to a DIFFERENT zone simply never matches anything this zone places.
+    foundTreasures: S.worldState.treasuresFound || [],
     zoneNames: worldCfg ? Object.fromEntries(worldCfg.zoneIds.map(id => [id, worldCfg.get(id).name])) : {},
   });
 }
