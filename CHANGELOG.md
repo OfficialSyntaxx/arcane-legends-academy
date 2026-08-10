@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Collection value analytics — 2026-08-10
 
-### Collection value analytics — *pending*
+### Collection value analytics — `6dd287c`
 - BACKLOG §5. `totalCollectionValue(s)` already existed and was already shown on the Collection
   screen header, but only ever answered "how much is everything worth" — not where that value sits
   or which cards actually carry it.
