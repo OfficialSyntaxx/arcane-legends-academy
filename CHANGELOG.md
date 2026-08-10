@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Resource node regeneration — 2026-08-10
 
-### Resource node regeneration — *pending*
+### Resource node regeneration — `da5aa62`
 - BACKLOG §6. Gathering was previously unlimited and instant, gated only by a client-only 1.4s UI
   debounce that lived in `index.html`'s own state, not the save — it never survived a reload and
   was never a real limit, just a click-spam guard.
