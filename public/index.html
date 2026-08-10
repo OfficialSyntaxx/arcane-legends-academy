@@ -1397,6 +1397,28 @@ function buildCodex(){
     h += `<button class="btn ${t.id===equippedTitle?"primary":""}" style="${unlocked?"":"opacity:.4;cursor:not-allowed"}" ${unlocked?`onclick="window.__ev('titleEquip|${t.id}')"`:""} title="${unlocked?t.name:t.name+" (locked)"}">${unlocked?"":"🔒 "}${t.name}</button>`;
   }
   h += `</div></div>`;
+
+  // collection value analytics (BACKLOG §5) — where the total sits, not just what it is
+  const bySchoolValue = G.valueBySchool(S);
+  const byRarityValue = G.valueByRarity(S);
+  const topCards = G.topValuableCards(S, 5);
+  h += `<div class="panel" style="margin-top:14px"><h3>📊 Collection Value</h3>
+    <p class="sub">Total: <b style="color:var(--gold)">${G.totalCollectionValue(S)}g</b> across ${S.cards.length} cards</p>
+    <div class="row" style="flex-wrap:wrap;gap:14px;align-items:flex-start">
+      <div style="flex:1;min-width:180px"><div class="sub" style="margin-bottom:4px">By school</div>` +
+      Object.entries(bySchoolValue).sort((a,b)=>b[1]-a[1]).map(([id,v])=>
+        `<div class="row" style="justify-content:space-between;font-size:13px"><span>${SCHOOL_ICON[id]||"◇"} ${SCHOOLS[id]?.name||id}</span><span>${v}g</span></div>`).join("") +
+      `</div>
+      <div style="flex:1;min-width:180px"><div class="sub" style="margin-bottom:4px">By rarity</div>` +
+      Object.entries(byRarityValue).sort((a,b)=>b[1]-a[1]).map(([id,v])=>
+        `<div class="row" style="justify-content:space-between;font-size:13px"><span style="color:${RARITY[id]?.color||"var(--ink)"}">${RARITY[id]?.name||id}</span><span>${v}g</span></div>`).join("") +
+      `</div>
+      <div style="flex:1;min-width:180px"><div class="sub" style="margin-bottom:4px">Most valuable</div>` +
+      topCards.map(t => { const c = CARD_MAP[t.id]; return c ?
+        `<div class="row" style="justify-content:space-between;font-size:13px"><span>${c.name}</span><span>${t.value}g</span></div>` : ""; }).join("") +
+      (topCards.length===0 ? `<div class="sub">Nothing owned yet.</div>` : "") +
+      `</div>
+    </div></div>`;
   return h;
 }
 function refreshCodex(){

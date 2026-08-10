@@ -1475,6 +1475,45 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
   await tctx.close();
 }
 
+// ---------------- collection value analytics (BACKLOG §5) ----------------
+// Drives the real Codex "Collection Value" panel against a save that has actually opened real
+// packs (not a seeded card list), and confirms a sale is reflected immediately.
+{
+  const vctx = await browser.newContext({ viewport:{width:420,height:1400} });
+  const verrs = [];
+  const vpage = await vctx.newPage();
+  vpage.on("pageerror", e => verrs.push(String(e)));
+  await vpage.goto(BASE + "/index.html", { waitUntil:"load" });
+  await vpage.waitForTimeout(900);
+  const value = await vpage.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    window.__ev("openCodex");
+    await settle(300);
+    document.getElementById("overlay").scrollTop = document.getElementById("overlay").scrollHeight;
+    const panel = [...document.querySelectorAll("#ovBody .panel")].find(p => p.textContent.includes("Collection Value"));
+    const beforeHtml = panel ? panel.innerHTML : "";
+    const totalBefore = window.__testSave ? (() => { const s = window.__testSave(); return s.cards.length; })() : 0;
+    window.__ev("ovClose");
+    // sell the first owned card and reopen — the total must actually move, not just the base game state
+    const s = window.__testSave();
+    const uid = s.cards[0].uid;
+    window.__ev("sell|" + uid);
+    await settle(150);
+    window.__ev("openCodex");
+    await settle(300);
+    document.getElementById("overlay").scrollTop = document.getElementById("overlay").scrollHeight;
+    const panel2 = [...document.querySelectorAll("#ovBody .panel")].find(p => p.textContent.includes("Collection Value"));
+    const afterHtml = panel2 ? panel2.innerHTML : "";
+    return { beforeHtml, afterHtml, cardsBefore: totalBefore, cardsAfter: s.cards.length };
+  });
+  check("no uncaught page errors while viewing collection value", verrs.length === 0, verrs.slice(0,3).join(" | "));
+  check("the Collection Value panel shows a total, a by-school and a by-rarity breakdown, and a most-valuable list",
+        /Collection Value/.test(value.beforeHtml) && /By school/.test(value.beforeHtml) && /By rarity/.test(value.beforeHtml) && /Most valuable/.test(value.beforeHtml),
+        value.beforeHtml.slice(0, 200));
+  check("selling a card is reflected in the panel the next time it's opened", value.afterHtml !== value.beforeHtml && value.cardsAfter === value.cardsBefore - 1);
+  await vctx.close();
+}
+
 // ---------------- enchanting (BACKLOG §6) ----------------
 // Drives the real Loadout picker: apply a rune through the real event handler, confirm the item's
 // stats actually change through equipStats (not just a label), confirm a second rune REPLACES

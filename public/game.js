@@ -1067,5 +1067,36 @@ export function runSelfTest(){
 export function totalCollectionValue(s){
   return s.cards.reduce((m,c)=>m+instanceValue(c),0);
 }
+
+// ---------------------------------------------------------------- collection value analytics
+// (BACKLOG §5 "Collection value analytics"). `totalCollectionValue` already existed but only ever
+// answered "how much is everything worth" — not WHERE that value sits or WHICH cards actually
+// carry it, the two questions an actual player asking "what's my collection worth" has next. All
+// DERIVED from `s.cards` on every read, same rule as everything else here: sell a card and its
+// slice of every one of these totals shrinks immediately, with nothing left over to drift.
+export function valueBySchool(s){
+  const out = {};
+  for (const c of s.cards){
+    const card = CARD_MAP[c.id]; if (!card) continue;
+    out[card.school] = (out[card.school] || 0) + instanceValue(c);
+  }
+  return out;
+}
+export function valueByRarity(s){
+  const out = {};
+  for (const c of s.cards){
+    const card = CARD_MAP[c.id]; if (!card) continue;
+    out[card.rarity] = (out[card.rarity] || 0) + instanceValue(c);
+  }
+  return out;
+}
+/** The `n` single most valuable cards owned, each instance counted on its own (two copies of the
+ * same card can carry very different value — a slabbed prismatic vs. a plain ungraded one). */
+export function topValuableCards(s, n = 5){
+  return s.cards
+    .map(c => ({ uid: c.uid, id: c.id, value: instanceValue(c) }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, n);
+}
 export function ownedCount(s, id){ return s.cards.filter(c=>c.id===id).length; }
 export function cardInstance(s, uidC){ return s.cards.find(c=>c.uid===uidC); }

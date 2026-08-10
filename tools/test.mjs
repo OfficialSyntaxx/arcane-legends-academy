@@ -2445,6 +2445,55 @@ check("a foil raises the collection's total value", (()=>{
   s.cards[0].variant = "prism";
   return G.totalCollectionValue(s) > plain;
 })());
+
+// ---- collection value analytics (BACKLOG §5) ----
+check("valueBySchool sums to the same total as totalCollectionValue", (()=>{
+  const s = G.newGame();
+  const bySchool = G.valueBySchool(s);
+  const sum = Object.values(bySchool).reduce((a,b)=>a+b, 0);
+  return sum === G.totalCollectionValue(s);
+})());
+check("valueByRarity sums to the same total as totalCollectionValue", (()=>{
+  const s = G.newGame();
+  const byRarity = G.valueByRarity(s);
+  const sum = Object.values(byRarity).reduce((a,b)=>a+b, 0);
+  return sum === G.totalCollectionValue(s);
+})());
+check("valueBySchool only ever lists schools the player actually owns cards from", (()=>{
+  const s = G.newGame();
+  const owned = new Set(s.cards.map(c => CARD_MAP[c.id].school));
+  return Object.keys(G.valueBySchool(s)).every(id => owned.has(id));
+})());
+check("selling a card shrinks its slice of valueBySchool immediately, with nothing left over", (()=>{
+  const s = G.newGame();
+  const c = s.cards[0]; const school = CARD_MAP[c.id].school;
+  const before = G.valueBySchool(s)[school];
+  const worth = G.instanceValue(c);
+  G.sellCard(s, c.uid);
+  const after = G.valueBySchool(s)[school] || 0;
+  return after === before - worth;
+})());
+check("topValuableCards returns the n highest-value instances, sorted descending", (()=>{
+  // A deliberately unambiguous set — three copies of the same card, only their PRINTING differs —
+  // so the value ordering follows variants.js's own rarity ladder (prismatic > foil > normal)
+  // rather than depending on the starter deck's own random rolls.
+  const s = G.newGame(); s.cards = [];
+  const id = CARDS[0].id;
+  s.cards.push({ uid:"low",  id, roll:50, graded:false, variant:"normal" });
+  s.cards.push({ uid:"mid",  id, roll:50, graded:false, variant:"foil" });
+  s.cards.push({ uid:"high", id, roll:50, graded:false, variant:"prism" });
+  const top = G.topValuableCards(s, 3);
+  return top.length === 3 && top[0].uid === "high" && top[1].uid === "mid" && top[2].uid === "low"
+      && top[0].value >= top[1].value && top[1].value >= top[2].value;
+})());
+check("topValuableCards never returns more than n entries, even with a huge collection", (()=>{
+  const s = G.newGame();
+  return G.topValuableCards(s, 5).length <= 5;
+})());
+check("topValuableCards on an empty collection returns an empty list, not an error", (()=>{
+  const s = G.newGame(); s.cards = [];
+  return Array.isArray(G.topValuableCards(s)) && G.topValuableCards(s).length === 0;
+})());
 check("an old save is grandfathered one first edition per card type, once", (()=>{
   const old = G.newGame();
   for (const c of old.cards){ delete c.variant; delete c.fe; }

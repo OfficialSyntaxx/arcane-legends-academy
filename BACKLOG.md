@@ -238,7 +238,9 @@
   A real bug found while adding it: the auction countdown compared a `Date.now()` wall-clock
   deadline against `performance.now()` (a different epoch entirely), so a fresh 60s listing
   displayed as millions of seconds left — fixed alongside
-- [ ] Collection value analytics
+- [x] Collection value analytics — `game.js` `valueBySchool`/`valueByRarity`/`topValuableCards`,
+  all derived from `s.cards` on every read and provably consistent with the existing
+  `totalCollectionValue`; a new "📊 Collection Value" panel in the Codex overlay.
 
 ## 7. Pets, Housing & Cosmetics
 
@@ -365,7 +367,12 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Rare resource variants** (§6 — a flat, un-boosted 6% chance
+**Changes made, most recent first:** **Collection value analytics** (§5 — `valueBySchool`/
+`valueByRarity` (each provably sums back to the existing `totalCollectionValue`) and
+`topValuableCards` (ranks individual card INSTANCES, since two copies of the same card can carry
+very different value), landed as a new "📊 Collection Value" panel in the Codex overlay; all three
+pure reads over `s.cards`, so selling a card shrinks the right slice immediately with nothing left
+to drift) → **Rare resource variants** (§6 — a flat, un-boosted 6% chance
 on every gather to ALSO yield a Pristine find worth 5× on sale, alongside the ordinary yield, never
 instead of it; sell-only by design — not usable in any craft/refine/smelt recipe, so `sellItem` is
 the one place that needs to know pristine ids exist rather than doubling the surface every recipe
@@ -466,7 +473,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Rare resource variants is done** (§6). Covered by `tools/test.mjs` (id round-trip,
+**Next step:** **Collection value analytics is done** (§5). Covered by `tools/test.mjs` (both
+breakdowns sum to the known total, selling shrinks the right slice by the right amount, top-N
+ordering/edge cases) and `tools/browser-test.mjs` against a save that opened real packs. 524
+engine / 42 online-rules / 191 real-browser / `check:models`, all green.
+
+Before that: **Rare resource variants is done** (§6). Covered by `tools/test.mjs` (id round-trip,
 sell value, base yield never lost, actually lands in inventory, `sellItem` resolve/refuse) and a
 real `tools/browser-test.mjs` flow via a new `window.__testGatherAt` test hook (gather for real
 until a Pristine find appears, confirm it shows in the Market panel, sell it through the real

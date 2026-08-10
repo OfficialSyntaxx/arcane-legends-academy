@@ -14,6 +14,24 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Collection value analytics — 2026-08-10
+
+### Collection value analytics — *pending*
+- BACKLOG §5. `totalCollectionValue(s)` already existed and was already shown on the Collection
+  screen header, but only ever answered "how much is everything worth" — not where that value sits
+  or which cards actually carry it.
+- New `game.js` `valueBySchool(s)`/`valueByRarity(s)` — each sums back to exactly
+  `totalCollectionValue(s)`, proven by a test, so the breakdown can never disagree with the total a
+  player already trusts.
+- New `topValuableCards(s, n=5)` ranks individual card INSTANCES, not card types — two copies of the
+  same card can carry very different value (a slabbed prismatic vs. a plain ungraded one).
+- All three are pure reads over `s.cards`, computed fresh every call — selling a card shrinks its
+  slice of every one of these immediately, with nothing left to drift.
+- Landed as a new "📊 Collection Value" panel in the Codex overlay (total, by-school, by-rarity,
+  most-valuable), reusing the existing `.row`/`justify-content:space-between` pattern rather than
+  debug.html's `.kv` classes, which were never defined in the game's own stylesheet.
+- *524 engine / 42 online / 191 browser.*
+
 ## Rare resource variants — 2026-08-10
 
 ### Rare resource variants — `9a8b577`

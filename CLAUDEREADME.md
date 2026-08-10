@@ -248,6 +248,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Hidden treasure** (`structures.js`/`zones.json` + `game.js` `claimTreasure`) — authored, off-path caches in every outdoor zone that pay out gold once and never respawn. See §6.32.
 - **Resource node regeneration** (`game.js` `gather`/`gatherCooldownRemaining`) — gathering a material puts THAT material on a real, persisted, level-scaled cooldown, closing the previous unlimited-instant-gather loophole (including the Skills-screen shortcut). See §6.33.
 - **Rare resource variants** (`items.js` `pristineVariantFor`, `game.js` `gather`/`sellItem`) — a flat 6% chance on every gather to ALSO yield a Pristine find worth 5× on sale, sell-only so no crafting recipe needs to know it exists. See §6.34.
+- **Collection value analytics** (`game.js` `valueBySchool`/`valueByRarity`/`topValuableCards`) — a Codex panel breaking the existing total value down by school, by rarity, and by the 5 most valuable cards owned, all derived from `s.cards` on every read. See §6.35.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -938,7 +939,32 @@ same material — a lucky flourish alongside the ordinary yield, never instead o
   test needing to know anything about RNG internals) until a Pristine find actually appears, confirm
   it shows in the real Market panel priced correctly, and sell it through the real event handler.
 
-### 6.35 Retention
+### 6.35 Collection value analytics (`game.js`, `index.html`, BACKLOG §5)
+`totalCollectionValue(s)` already existed and was already shown on the Collection screen header —
+but it only ever answered "how much is everything worth," not WHERE that value sits or WHICH cards
+actually carry it, the two questions a player asking "what's my collection worth" has next.
+
+- **`valueBySchool(s)`/`valueByRarity(s)`** sum `instanceValue(c)` (the same per-instance valuation
+  `totalCollectionValue` and `sellCard` already use) grouped by the owned card's school/rarity —
+  each sums back to exactly `totalCollectionValue(s)`, proven by a test, so there is no discrepancy
+  for a player to notice between the total and its own breakdown.
+- **`topValuableCards(s, n=5)`** ranks individual card INSTANCES, not card types — two copies of the
+  same card can carry very different value (a slabbed prismatic vs. a plain ungraded one), so the
+  ranking has to be per-instance to mean anything.
+- All three are pure reads over `s.cards` computed fresh every call, same rule as every other
+  derived total in `game.js` — sell a card and its slice of every one of these shrinks immediately,
+  proven by a test that sells a card and checks the exact delta, not just "it changed."
+- Landed as a new "📊 Collection Value" panel in the Codex overlay, right after Achievements/Titles:
+  a total, three side-by-side breakdowns (by school, by rarity, most valuable), reusing the existing
+  `.row`/`justify-content:space-between` layout pattern already used elsewhere in `index.html` rather
+  than debug.html's `.kv`/`.k`/`.v` classes, which were never defined in the game's own stylesheet.
+- Covered by `tools/test.mjs` (both breakdowns sum to the known total, a school only ever appears if
+  actually owned, selling shrinks the right slice by the right amount, top-N ordering and edge cases)
+  and `tools/browser-test.mjs` against a save that opened real packs: the panel shows all three
+  sections, and selling a card through the real handler changes what the panel shows the next time
+  it's opened.
+
+### 6.36 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -977,10 +1003,10 @@ npm test                     # runs all three suites; fails the run on any failu
 ```
 Individually:
 ```bash
-node tools/test.mjs          # 517 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
+node tools/test.mjs          # 524 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (188 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (191 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -1027,7 +1053,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 517 engine / 42 online-rules / 188 real-browser (layout + gestures + world +
+**All tests green:** 524 engine / 42 online-rules / 191 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -1074,7 +1100,17 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Rare resource variants** (§6.34, BACKLOG §6). A flat 6% chance on every gather to
+**Last landed: Collection value analytics** (§6.35, BACKLOG §5). `totalCollectionValue` already
+existed and was already shown on the Collection screen header, but only ever answered "how much,"
+not "where" or "which cards." New `valueBySchool`/`valueByRarity` (each provably sums back to
+`totalCollectionValue`) and `topValuableCards` (ranks individual INSTANCES, not card types, since
+two copies of the same card can carry very different value) landed as a new "📊 Collection Value"
+panel in the Codex overlay. All three are pure reads over `s.cards`, same rule as every other
+derived total here — selling a card shrinks the right slice by the right amount immediately, proven
+by a test checking the exact delta. 524 engine / 42 online-rules / 191 real-browser /
+`check:models`, all green.
+
+**Before that: Rare resource variants** (§6.34, BACKLOG §6). A flat 6% chance on every gather to
 ALSO yield a "Pristine" find worth 5× on sale — alongside the ordinary yield, never instead of it.
 Sell-only by design: it is not usable in any craft/refine/smelt recipe, so `game.js` `sellItem` is
 the only place that needs to know pristine ids exist, rather than doubling the surface every
@@ -1170,7 +1206,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **517 engine / 42 online-rules / 188 browser / 8 viewports / model-check clean.**
+Tests: **524 engine / 42 online-rules / 191 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —
