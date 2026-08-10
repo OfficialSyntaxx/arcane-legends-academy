@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Ashen Mountains, step 1: zone shell — 2026-08-10
 
-### Ashen Mountains, step 1 of 5: zone shell — *pending*
+### Ashen Mountains, step 1 of 5: zone shell — `fd4c119`
 - BACKLOG §3, the last open outdoor zone. Taken as a five-step content pass (the shape Lake Arcanum
   + the Drowned Vault shipped as) but split into separately committable steps this time. This step
   is deliberately the smallest slice: prove the zone exists, loads, connects, and is walkable.
