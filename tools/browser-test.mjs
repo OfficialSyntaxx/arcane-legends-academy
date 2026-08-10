@@ -1248,6 +1248,34 @@ if (hasWorld){
   check("triggering it again (mesh already gone) never grants the reward twice",
         treasure.goldAfterSecond === treasure.goldAfterFirst, `${treasure.goldAfterFirst} -> ${treasure.goldAfterSecond}`);
 
+  // --- Ashen Mountains (BACKLOG §3) — zone shell, step 1 of the content pass ---
+  // The player is currently back in the academy (fast travel above). Walk the real gateway chain
+  // academy -> forest -> ashen_mountains and confirm the fourth zone actually BUILDS: terrain,
+  // a clear spawn, and a reciprocal exit back to the forest — the same shape every other zone's
+  // shell was proven with before any content (NPCs/quests/dungeon) was authored on top of it.
+  const ashen = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    for (let hop = 0; hop < 2 && dbg().zone !== "ashen_mountains"; hop++){
+      const here = dbg();
+      const want = here.zone === "academy" ? "whispering_forest" : "ashen_mountains";
+      const e = (here.exits || []).find(x => x.to === want) || (here.exits || [])[0];
+      if (!e) break;
+      window.__world.teleport(e.x, e.z);
+      await settle(1600);
+    }
+    const d = dbg();
+    const out = { zone: d.zone, spawnClear: d.spawnClear, exits: d.exits };
+    // walk back out through the reciprocal exit
+    const back = (d.exits || [])[0];
+    if (back){ window.__world.teleport(back.x, back.z); await settle(1600); }
+    out.zoneAfter = dbg().zone;
+    return out;
+  });
+  check("the fourth zone (Ashen Mountains) builds and can be walked into", ashen.zone === "ashen_mountains", String(ashen.zone));
+  check("the player does not spawn inside a wall arriving in Ashen Mountains", ashen.spawnClear === true);
+  check("Ashen Mountains has a working exit back to the forest", ashen.zoneAfter === "whispering_forest", String(ashen.zoneAfter));
+
 }
 
 

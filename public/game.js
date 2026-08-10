@@ -283,6 +283,8 @@ export const TREASURE_REWARDS = {
   lake_hermit_cache:       { gold: 340 },
   lake_diver_cache:        { gold: 340 },
   lake_trader_cache:       { gold: 340 },
+  ashen_summit_cache:      { gold: 480 },
+  ashen_ridge_cache:       { gold: 480 },
 };
 
 /**

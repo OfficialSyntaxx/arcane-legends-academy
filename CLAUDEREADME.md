@@ -249,6 +249,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Resource node regeneration** (`game.js` `gather`/`gatherCooldownRemaining`) — gathering a material puts THAT material on a real, persisted, level-scaled cooldown, closing the previous unlimited-instant-gather loophole (including the Skills-screen shortcut). See §6.33.
 - **Rare resource variants** (`items.js` `pristineVariantFor`, `game.js` `gather`/`sellItem`) — a flat 6% chance on every gather to ALSO yield a Pristine find worth 5× on sale, sell-only so no crafting recipe needs to know it exists. See §6.34.
 - **Collection value analytics** (`game.js` `valueBySchool`/`valueByRarity`/`topValuableCards`) — a Codex panel breaking the existing total value down by school, by rarity, and by the 5 most valuable cards owned, all derived from `s.cards` on every read. See §6.35.
+- **Ashen Mountains, step 1: zone shell** (`zones.json`, `structures.js`) — a fourth outdoor zone off Whispering Forest's unused north edge, using the `mountains` terrain biome that had shipped unused since WORLDSPEC step 2. Walkable, reciprocally connected, two treasures placed; NPCs/quests/resources/dungeon are later steps. See §6.36.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -964,7 +965,40 @@ actually carry it, the two questions a player asking "what's my collection worth
   sections, and selling a card through the real handler changes what the panel shows the next time
   it's opened.
 
-### 6.36 Retention
+### 6.36 Ashen Mountains, step 1: zone shell (`zones.json`, `game.js`, BACKLOG §3, WORLDSPEC step 6)
+BACKLOG's last open outdoor zone, taken as a five-step content pass instead of one large one (the
+shape Lake Arcanum + the Drowned Vault shipped as) — split for incremental review this time. This
+step is deliberately the smallest possible slice: prove the zone exists, loads, connects, and is
+walkable, with nothing authored on top of it yet.
+
+- **`ashen_mountains`** hangs off Whispering Forest's unused north edge (`z:-158` — the forest
+  already had exits south to the academy and west to the lake, leaving north and east genuinely
+  open) with a reciprocal exit back, validated by the existing whole-world `validateExits`/
+  `validateZone` machinery with zero new code.
+- **Uses the `mountains` biome** (`terrain.js` `BIOMES.mountains` — `rough:2.60`, grey/slate
+  palette) that had shipped unused since the terrain system itself was built (WORLDSPEC step 2):
+  this zone is the reason it exists. Amplitude 18 (vs. the forest's 7 and the lake's 9) for real
+  peaks, confirmed visually via a real render — dramatically steeper than either existing zone.
+  No water (`waterLevel: null`); a dry, rocky range rather than the lake's flooded one.
+  Same 320×320m span and default chunk/load radii as its siblings, for consistency.
+  Same authoring split precedent as the academy/forest/lake: an outdoor zone's shape lives directly
+  in `zones.json`, hand-authored — `structures.js` is reserved for the academy hub specifically,
+  the one zone `tools/sync-zones.mjs` generates.
+- **Two treasures placed immediately**, not deferred to the polish pass — `tools/test.mjs` already
+  asserts every outdoor zone places at least one (BACKLOG §3), and a shippable zone shouldn't leave
+  a real invariant broken even temporarily. `TREASURE_REWARDS` gained two matching entries
+  (480g each — scaled above the lake's 340g, since this zone sits even later in progression).
+- Empty `npcs`/`resourceNodes`/`enemies`/`dungeonEntrances` for now — steps 2–4 below.
+- Covered by `tools/test.mjs` (world-config validation already covers the new zone for free — no
+  new checks needed there beyond the treasure-reward-table entries) and a new
+  `tools/browser-test.mjs` block walking the real gateway chain academy → forest → ashen_mountains
+  and back, confirming the zone builds, the spawn is clear, and the return exit works.
+
+**Steps 2–5, not yet done:** NPCs + field quests (§3), mining-flavoured resource nodes (reusing the
+gather/regen/pristine systems already built), a third dungeon + boss gated behind the quest chain,
+then an atmosphere/landmark polish pass.
+
+### 6.37 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -1006,7 +1040,7 @@ Individually:
 node tools/test.mjs          # 524 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (191 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (194 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -1053,7 +1087,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 524 engine / 42 online-rules / 191 real-browser (layout + gestures + world +
+**All tests green:** 524 engine / 42 online-rules / 194 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -1100,7 +1134,20 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Collection value analytics** (§6.35, BACKLOG §5). `totalCollectionValue` already
+**Last landed: Ashen Mountains, step 1 of 5 — zone shell** (§6.36, BACKLOG §3). The last open
+outdoor zone, taken as a content pass split into separately committable steps this time rather than
+one large one. This step proves the smallest possible slice: a fourth zone off Whispering Forest's
+unused north edge, using the `mountains` terrain biome that had shipped unused since the terrain
+system itself was built — amplitude 18 for real peaks, confirmed via a real render to be
+dramatically steeper than either existing outdoor zone. Two treasures placed immediately (not
+deferred) so the existing "every outdoor zone places at least one" invariant `tools/test.mjs`
+already asserts is never broken, even temporarily. Empty NPCs/resources/dungeon — those are steps
+2–4, with an atmosphere/landmark polish pass as step 5. Covered by a new `tools/browser-test.mjs`
+block walking the real gateway chain and confirming the zone builds, the spawn is clear, and the
+return exit works — world-config validation already covered the rest for free. 524 engine / 42
+online-rules / 194 real-browser / `check:models`, all green.
+
+**Before that: Collection value analytics** (§6.35, BACKLOG §5). `totalCollectionValue` already
 existed and was already shown on the Collection screen header, but only ever answered "how much,"
 not "where" or "which cards." New `valueBySchool`/`valueByRarity` (each provably sums back to
 `totalCollectionValue`) and `topValuableCards` (ranks individual INSTANCES, not card types, since
@@ -1206,7 +1253,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **524 engine / 42 online-rules / 191 browser / 8 viewports / model-check clean.**
+Tests: **524 engine / 42 online-rules / 194 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —

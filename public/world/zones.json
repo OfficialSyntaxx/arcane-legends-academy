@@ -958,6 +958,11 @@
           "toZone": "lake_arcanum",
           "x": -158,
           "z": 0
+        },
+        {
+          "toZone": "ashen_mountains",
+          "x": 0,
+          "z": -158
         }
       ],
       "treasures": [
@@ -1143,6 +1148,55 @@
           "id": "lake_trader_cache",
           "x": 130,
           "z": -55
+        }
+      ]
+    },
+    {
+      "id": "ashen_mountains",
+      "name": "Ashen Mountains",
+      "spawn": {
+        "x": 0,
+        "z": 100
+      },
+      "bounds": {
+        "minX": -160,
+        "maxX": 160,
+        "minZ": -160,
+        "maxZ": 160
+      },
+      "terrain": {
+        "seed": 913377,
+        "scale": 70,
+        "amplitude": 18,
+        "baseHeight": 0,
+        "waterLevel": null,
+        "biome": "mountains"
+      },
+      "chunkSize": 32,
+      "loadRadius": 70,
+      "unloadRadius": 100,
+      "npcs": [],
+      "resourceNodes": [],
+      "props": [],
+      "enemies": [],
+      "dungeonEntrances": [],
+      "treasures": [
+        {
+          "id": "ashen_summit_cache",
+          "x": 60,
+          "z": -60
+        },
+        {
+          "id": "ashen_ridge_cache",
+          "x": -70,
+          "z": -40
+        }
+      ],
+      "exits": [
+        {
+          "toZone": "whispering_forest",
+          "x": 0,
+          "z": 158
         }
       ]
     }

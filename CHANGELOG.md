@@ -14,6 +14,26 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Ashen Mountains, step 1: zone shell — 2026-08-10
+
+### Ashen Mountains, step 1 of 5: zone shell — *pending*
+- BACKLOG §3, the last open outdoor zone. Taken as a five-step content pass (the shape Lake Arcanum
+  + the Drowned Vault shipped as) but split into separately committable steps this time. This step
+  is deliberately the smallest slice: prove the zone exists, loads, connects, and is walkable.
+- `ashen_mountains` hangs off Whispering Forest's unused north edge (the forest already had exits
+  south to the academy and west to the lake), with a reciprocal exit back — validated by the
+  existing whole-world `validateExits`/`validateZone` machinery with zero new code.
+- Uses the `mountains` terrain biome that had shipped unused since the terrain system itself was
+  built (WORLDSPEC step 2) — this zone is the reason it exists. Amplitude 18 (vs. the forest's 7
+  and the lake's 9) for real peaks, confirmed via a real render. No water — a dry range.
+- Two treasures placed immediately, not deferred to the polish pass — `tools/test.mjs` already
+  asserts every outdoor zone places at least one, and a shippable zone shouldn't leave that broken
+  even temporarily. `TREASURE_REWARDS` gained two matching 480g entries.
+- Empty NPCs/resource nodes/enemies/dungeon entrances for now — steps 2–5.
+- Covered by a new `tools/browser-test.mjs` block walking the real gateway chain academy → forest →
+  ashen_mountains and back.
+- *524 engine / 42 online / 194 browser.*
+
 ## Collection value analytics — 2026-08-10
 
 ### Collection value analytics — `6dd287c`

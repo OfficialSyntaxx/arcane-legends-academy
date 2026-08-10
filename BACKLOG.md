@@ -93,7 +93,9 @@
 - [x] Lake Arcanum — a real lake (29% water) reached through the forest's west gateway; shoreline
   fishing (salmon/lobster/shark), silver + mithril + magic trees, 3 NPCs, 5 quests gated behind
   the Cinder Wyrm, and the Drowned Vault entrance
-- [ ] Ashen Mountains
+- [~] Ashen Mountains — step 1 of 5 done (zone shell: `mountains`-biome terrain, gateway off the
+  forest's unused north edge, two treasures). Steps 2–5 (NPCs/quests, resource nodes, a third
+  dungeon + boss, an atmosphere/landmark polish pass) are not yet done.
 - [x] Cinderhollow Caverns — 4-room dungeon reachable from the Whispering Forest, boss + persistent kill/room/boss progress
 - [x] The Drowned Vault — 5-room dungeon under Lake Arcanum, cold flooded palette, the Drowned Archon (Lv14) at the bottom
 - [x] Zone transitions — walkable gateways, reciprocal arrival, world state persisted in the save
@@ -367,7 +369,12 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Collection value analytics** (§5 — `valueBySchool`/
+**Changes made, most recent first:** **Ashen Mountains, step 1 of 5: zone shell** (§3 — a fourth
+outdoor zone off Whispering Forest's unused north edge, using the `mountains` terrain biome that
+had shipped unused since the terrain system itself was built; amplitude 18 for real peaks; two
+treasures placed immediately so the "every outdoor zone places at least one" invariant is never
+broken even temporarily; empty NPCs/resources/dungeon — those are steps 2–4, with a polish pass as
+step 5) → **Collection value analytics** (§5 — `valueBySchool`/
 `valueByRarity` (each provably sums back to the existing `totalCollectionValue`) and
 `topValuableCards` (ranks individual card INSTANCES, since two copies of the same card can carry
 very different value), landed as a new "📊 Collection Value" panel in the Codex overlay; all three
@@ -473,7 +480,14 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Collection value analytics is done** (§5). Covered by `tools/test.mjs` (both
+**Next step:** **Ashen Mountains step 1 of 5 (zone shell) is done** (§3). Steps 2–5: NPCs + field
+quests, mining-flavoured resource nodes, a third dungeon + boss gated behind the quest chain, then
+an atmosphere/landmark polish pass. Covered by `tools/browser-test.mjs` (walks the real gateway
+chain, confirms the zone builds and the return exit works) — world-config validation already
+covers the rest for free. 524 engine / 42 online-rules / 194 real-browser / `check:models`, all
+green.
+
+Before that: **Collection value analytics is done** (§5). Covered by `tools/test.mjs` (both
 breakdowns sum to the known total, selling shrinks the right slice by the right amount, top-N
 ordering/edge cases) and `tools/browser-test.mjs` against a save that opened real packs. 524
 engine / 42 online-rules / 191 real-browser / `check:models`, all green.
