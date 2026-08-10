@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Combat depth & collection — 2026-08-08 → 09
 
-### Save backup / import / export — *pending*
+### Save backup / import / export — `0aae248`
 - The one place a player's progress lives is this browser's `localStorage` — no account, no
   server copy — so it's also the one thing this game cannot regenerate if lost.
 - `exportSave(s)` is literally the bytes `save()` already writes, downloaded as a real file via a
