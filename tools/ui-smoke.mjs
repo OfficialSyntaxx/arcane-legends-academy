@@ -9,7 +9,10 @@ const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 // ---- minimal DOM stub ----
 function makeEl(id){
   return {
-    id, _html:"", innerHTML:"", textContent:"", value:"", style:{}, dataset:{},
+    id, _html:"", innerHTML:"", textContent:"", value:"",
+    // .setProperty (CSS custom properties, e.g. applyAccent() retinting --accent) is real
+    // CSSStyleDeclaration API a plain {} does not have.
+    style:{ setProperty(){}, removeProperty(){} }, dataset:{},
     readyState:0, onclick:null,
     addEventListener(){}, setAttribute(){}, querySelectorAll(){return [];},
     querySelector(){return null;}, appendChild(){}, remove(){}, focus(){},
@@ -17,11 +20,18 @@ function makeEl(id){
   };
 }
 const els = {};
+// A real DOM always has document.documentElement (the <html> element) — applyAccent() (index.html)
+// calls documentElement.style.setProperty(...) to retint the UI to the player's school, and every
+// other module that queries the DOM by selector rather than id needs a real querySelector, not just
+// querySelectorAll. Omitting either here is a gap in the STUB, not a defensive check the app code
+// should need to add for a scenario no real browser can produce.
 global.document = {
   getElementById(id){ return els[id] || (els[id]=makeEl(id)); },
   querySelectorAll(){ return []; },
+  querySelector(){ return null; },
   createElement(){ return makeEl("x"); },
   addEventListener(){}, body: makeEl("body"),
+  documentElement: makeEl("html"),
 };
 global.window = global;
 Object.defineProperty(global, "navigator", { value: { getGamepads:()=>[] }, configurable:true });

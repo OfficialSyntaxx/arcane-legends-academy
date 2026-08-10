@@ -2,7 +2,8 @@
 export const meta = { game: "Arcane Legends — Online Duel", minPlayers: 2, maxPlayers: 2 };
 
 // <<< GENERATED CARD CATALOG — do not edit by hand; run: node tools/sync-cards.mjs
-// Mirrors public/cards.js. Source of truth is cards.js — edit there, then re-run the script. >>>
+// Mirrors public/cards.js and public/schoolmagic.js. Source of truth is those files — edit
+// there, then re-run the script. >>>
 const C = [
   {id:"fire_cat",name:"Fire Cat",school:"fire",type:"creature",cost:1,atk:2,hp:2,fx:["haste"]},
   {id:"fire_elf",name:"Fire Elf",school:"fire",type:"creature",cost:2,atk:3,hp:3,fx:[]},
@@ -53,6 +54,9 @@ const C = [
   {id:"mana_ward",name:"Mana Ward",school:"ice",type:"trap",cost:2,fx:[{"k":"trapShield","n":4}]},
 ];
 const SCHOOL_BONUS = [["fire","ice"],["ice","storm"],["storm","myth"],["myth","life"],["life","death"],["death","fire"]];
+const SCHOOL_AFFINITY_FX = {"fire":{"k":"dmg","n":1},"ice":{"k":"shield","n":1},"storm":{"k":"draw","n":1},"myth":{"k":"buffAll","n":1},"life":{"k":"heal","n":2},"death":{"k":"dmgWiz","n":1},"balance":{"k":"heal","n":1}};
+const SCHOOL_ULT_FX = {"fire":[{"k":"dmgAll","n":5},{"k":"dmgWiz","n":3}],"ice":[{"k":"freezeAll","n":1},{"k":"shield","n":8}],"storm":[{"k":"dmgWiz","n":6},{"k":"draw","n":2}],"myth":[{"k":"buffAll","n":3},{"k":"draw","n":1}],"life":[{"k":"heal","n":15},{"k":"buffAll","n":2}],"death":[{"k":"dmgAll","n":3},{"k":"heal","n":6}],"balance":[{"k":"heal","n":6},{"k":"shield","n":6},{"k":"draw","n":1}]};
+const ULT_CHARGE_MAX = 5;
 // <<< END GENERATED >>>
 const CM = Object.fromEntries(C.map(c=>[c.id,c]));
 
@@ -64,7 +68,7 @@ export const MAX_TURNS = 100;
 
 export function setup(players){
   return {
-    players, phase:"deck", decks:{}, turn:null, battle:null,
+    players, phase:"deck", decks:{}, schools:{}, turn:null, battle:null,
     hands:{ [players[0]]:null, [players[1]]:null },
     // Seeded once per match so the shuffle is reproducible from the state alone — a match can
     // be replayed or a bug report re-run. Module-level RNG would be shared across every room.
@@ -115,6 +119,13 @@ export function validateAction(state, playerId, action){
     return { ok:true };
   }
   if (action.type === "endTurn") return { ok:true };
+  if (action.type === "ultimate"){
+    const p = b.you.id === playerId ? b.you : b.enemy;
+    if (!SCHOOL_ULT_FX[p.school]) return { ok:false, error:"no ultimate for this school" };
+    if (p.ultUsed) return { ok:false, error:"already used this duel" };
+    if ((p.ultCharge||0) < ULT_CHARGE_MAX) return { ok:false, error:"not charged yet" };
+    return { ok:true };
+  }
   return { ok:false, error:"unknown action" };
 }
 
@@ -123,7 +134,11 @@ function mulberry32(seed){ let a=seed>>>0; return function(){ a|=0; a=a+0x6D2B79
 function draw(p){ if (p.hand.length>=10) return; if (p.deck.length) p.hand.push(p.deck.pop()); }
 function makeCreature(id, p){
   const c = CM[id]; const fx = c.fx||[];
-  return { id, school:c.school, atk:c.atk + fieldAtkBonus(p), hp:c.hp, maxHp:c.hp, exhausted:false, summoning:true,
+  // School affinity: a creature hits harder for a wizard of its own school, mirrored from
+  // game.js's makeCreature — this was missing here entirely, so every online duel undersold same-
+  // school creatures relative to a local one.
+  const affinity = p.school && c.school === p.school ? 1 : 0;
+  return { id, school:c.school, atk:c.atk + fieldAtkBonus(p) + affinity, hp:c.hp, maxHp:c.hp, exhausted:false, summoning:true,
     taunt:fx.includes("taunt"), haste:fx.includes("haste"), drain:fx.includes("drain"),
     multi:fx.includes("multiAttack")?2:1, attacks:0, freeze:0, owner:p.id };
 }
@@ -133,8 +148,8 @@ function damageWizard(p, dmg){ const absorb=Math.min(p.shield,dmg); p.shield-=ab
 function startBattle(state){
   const [p0,p1] = state.players;
   const rand = mulberry32(state.seed >>> 0);
-  const you = { id:p0, hp:100, maxHp:100, shield:0, maxPips:1, pips:1, hand:[], deck:buildDeck(state.decks[p0], rand), board:[], field:[], traps:[], fatigue:0 };
-  const enemy = { id:p1, hp:100, maxHp:100, shield:0, maxPips:1, pips:1, hand:[], deck:buildDeck(state.decks[p1], rand), board:[], field:[], traps:[], fatigue:0 };
+  const you = { id:p0, school:(state.schools && state.schools[p0]) || "balance", hp:100, maxHp:100, shield:0, maxPips:1, pips:1, hand:[], deck:buildDeck(state.decks[p0], rand), board:[], field:[], traps:[], fatigue:0, ultCharge:0, ultUsed:false };
+  const enemy = { id:p1, school:(state.schools && state.schools[p1]) || "balance", hp:100, maxHp:100, shield:0, maxPips:1, pips:1, hand:[], deck:buildDeck(state.decks[p1], rand), board:[], field:[], traps:[], fatigue:0, ultCharge:0, ultUsed:false };
   const b = { you, enemy, turn:p0, log:[] };
   for (let i=0;i<5;i++){ draw(you); draw(enemy); }  // 5-card opening hand
   state.battle = b; state.phase="play"; state.turn=p0;
@@ -179,15 +194,27 @@ function applyFx(b, owner, fx, target){
 export function applyAction(state, playerId, action){
   if (action.type === "setDeck"){
     const decks = { ...state.decks, [playerId]: action.deck.slice() };
-    const next = { ...state, decks };
+    const schools = { ...state.schools, [playerId]: SCHOOL_AFFINITY_FX[action.school] ? action.school : "balance" };
+    const next = { ...state, decks, schools };
     if (state.players.every(p=>decks[p])) startBattle(next);
     return next;
   }
   const b = state.battle;
   const p = b.you.id === playerId ? b.you : b.enemy;
+  if (action.type === "ultimate"){
+    const fx = SCHOOL_ULT_FX[p.school];
+    p.ultCharge = 0;
+    p.ultUsed = true;
+    b.log.push(playerId + " unleashes a school ultimate");
+    applyFx(b, p, fx, null);
+    return state;
+  }
   if (action.type === "play"){
     const id = p.hand[action.handIndex]; const c = CM[id];
     p.pips -= c.cost; p.hand.splice(action.handIndex,1);
+    // Ultimate charge: playing a card of your OWN school banks charge, mirrored from game.js's
+    // playCard — capped so it can't be hoarded past the threshold it unlocks.
+    if (p.school && c.school === p.school) p.ultCharge = Math.min(ULT_CHARGE_MAX, (p.ultCharge||0) + 1);
     const enemy = b.you.id===playerId ? b.enemy : b.you;
     if (c.type === "creature"){
       const cr = makeCreature(id, p);
@@ -211,6 +238,12 @@ export function applyAction(state, playerId, action){
       const foe = b.you.id === playerId ? b.enemy : b.you;
       const t = action.target ? (action.target.kind==="wiz" ? foe : foe.board[action.target.idx]) : null;
       applyFx(b, p, c.fx, t);
+      // School affinity bonus: a spell cast by a wizard of its own school does a little more —
+      // the spell-side echo of the creature affinity bonus above, mirrored from game.js.
+      if (p.school && c.school === p.school){
+        const bonus = SCHOOL_AFFINITY_FX[p.school];
+        if (bonus) applyFx(b, p, [bonus], t);
+      }
     }
   } else if (action.type === "attack"){
     const atk = p.board[action.attacker];
@@ -274,7 +307,7 @@ export function viewFor(state, playerId){
     phase: state.phase,
     turn: state.turn,
     turns: state.turns || 0, maxTurns: MAX_TURNS,
-    you: { hp:me.hp, maxHp:me.maxHp, shield:me.shield, pips:me.pips, hand:me.hand, deck:me.deck.length, board:me.board, field:me.field, traps:me.traps.length },
+    you: { hp:me.hp, maxHp:me.maxHp, shield:me.shield, pips:me.pips, hand:me.hand, deck:me.deck.length, board:me.board, field:me.field, traps:me.traps.length, school:me.school, ultCharge:me.ultCharge||0, ultUsed:!!me.ultUsed },
     opp: { hp:opp.hp, maxHp:opp.maxHp, shield:opp.shield, pips:opp.pips, hand:opp.hand.length, deck:opp.deck.length, board:opp.board, field:opp.field, traps:opp.traps.length },
     log: b.log.slice(-6),
   };

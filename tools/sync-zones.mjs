@@ -49,6 +49,7 @@ export function buildAcademyZone(){
     obstacles: ST.OBSTACLES,
     exits: [{ toZone: "whispering_forest", x: 0, z: -70 }],
     dungeonEntrances: [],
+    treasures: ST.TREASURES,
   };
 }
 

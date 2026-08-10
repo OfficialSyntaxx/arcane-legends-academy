@@ -6,6 +6,7 @@ export const SKILLS = {
   smithing: { name:"Smithing", icon:"⚒️" },
   alchemy: { name:"Alchemy", icon:"⚗️" },
   scribing: { name:"Scribing", icon:"🪶" },
+  enchanting: { name:"Enchanting", icon:"🔮" },
 };
 
 // Gatherable materials: [id, name, icon, skill, level, xp, value]
@@ -28,6 +29,27 @@ export const MATERIALS = [
   { id:"willow_log", name:"Willow Log", icon:"🪵", skill:"woodcutting", lvl:20, xp:32, value:16 },
   { id:"magic_log", name:"Magic Log", icon:"🪵", skill:"woodcutting", lvl:50, xp:70, value:48 },
 ];
+
+// ---------------------------------------------------------------- rare resource variants
+// (BACKLOG §6 "Rare resource variants"). A small, flat chance every gather also yields a Pristine
+// find of that same material — deliberately a SELL-ONLY bonus, not a parallel resource with its
+// own place in every craft/refine recipe. Adding a second tradeable id to every `req:{...}` table
+// in this file (bars, potions, card materials) would double the surface every future recipe has
+// to consider for one rare-loot flourish; keeping it sellable-only means `game.js` only needs to
+// teach ONE more function (`sellItem`) what a pristine id is worth, the same shallow footprint
+// `variants.js`'s card printings have relative to the rest of the card system.
+export const PRISTINE_CHANCE = 6;          // percent, flat — not skill-scaled, a lucky find, not a milestone
+export const PRISTINE_MULTIPLIER = 5;      // sale value only; there is no "craft with a pristine" path
+export const PRISTINE_PREFIX = "pristine_";
+export function pristineIdFor(matId){ return PRISTINE_PREFIX + matId; }
+export function isPristineId(itemId){ return typeof itemId === "string" && itemId.startsWith(PRISTINE_PREFIX); }
+export function baseMatIdFor(pristineId){ return isPristineId(pristineId) ? pristineId.slice(PRISTINE_PREFIX.length) : pristineId; }
+/** A pristine find, described in the same {id,name,icon,value} shape a plain material has, so it
+ * can sit in the exact same sell list/UI row with no special-casing. `null` for an unknown base id. */
+export function pristineVariantFor(mat){
+  if (!mat) return null;
+  return { id: pristineIdFor(mat.id), name: "Pristine " + mat.name, icon: "💎", value: mat.value * PRISTINE_MULTIPLIER };
+}
 
 export const BARS = [
   { id:"bar_bronze", name:"Bronze Bar", icon:"🟤", metal:"bronze", lvl:1, xp:15, value:12, req:{copper:1, tin:1} },
@@ -114,3 +136,28 @@ export const CARD_MATERIALS = [
 ];
 // Which raw material feeds which card material (for "refine" UI).
 export function refineSource(cardMat){ return CARD_MATERIALS.find(m=>m.id===cardMat).from; }
+
+// Enchanting (BACKLOG §6): a per-item, player-CHOSEN upgrade layered on top of an equipped item's
+// base stats. Deliberately reuses BARS already smelted via Smithing rather than inventing a new
+// resource chain — an enchant is a metal thing done to a metal item. One enchant per item;
+// re-enchanting overwrites (and pays again), the same "spend to change your mind" shape regrading
+// an already-graded card already has (`regradeCard`).
+export const ENCHANTS = [
+  { id:"whet_1",  name:"Whetting Rune I",   stat:"atk", n:1, lvl:1,  xp:20,  cost:60,  req:{bar_bronze:1} },
+  { id:"whet_2",  name:"Whetting Rune II",  stat:"atk", n:2, lvl:20, xp:55,  cost:160, req:{bar_silver:1} },
+  { id:"whet_3",  name:"Whetting Rune III", stat:"atk", n:3, lvl:45, xp:120, cost:340, req:{bar_mithril:1} },
+  { id:"ward_1",  name:"Warding Rune I",    stat:"def", n:1, lvl:1,  xp:20,  cost:60,  req:{bar_bronze:1} },
+  { id:"ward_2",  name:"Warding Rune II",   stat:"def", n:2, lvl:20, xp:55,  cost:160, req:{bar_silver:1} },
+  { id:"ward_3",  name:"Warding Rune III",  stat:"def", n:3, lvl:45, xp:120, cost:340, req:{bar_mithril:1} },
+  { id:"vital_1", name:"Vital Rune I",      stat:"hp",  n:3, lvl:1,  xp:20,  cost:60,  req:{bar_bronze:1} },
+  { id:"vital_2", name:"Vital Rune II",     stat:"hp",  n:6, lvl:20, xp:55,  cost:160, req:{bar_silver:1} },
+  { id:"vital_3", name:"Vital Rune III",    stat:"hp",  n:9, lvl:45, xp:120, cost:340, req:{bar_mithril:1} },
+];
+export const ENCHANT_MAP = Object.fromEntries(ENCHANTS.map(e => [e.id, e]));
+/** The stat delta a given enchant id contributes, in the same shape equipmentFor()'s stats are. */
+export function enchantStats(enchantId){
+  const stats = { atk:0, def:0, hp:0, pip:0, gold:0 };
+  const e = ENCHANT_MAP[enchantId];
+  if (e) stats[e.stat] = e.n;
+  return stats;
+}

@@ -291,6 +291,11 @@ export function dungeonZone(d){
     id: d.id,
     name: d.name,
     interior: true,
+    // Optional per-dungeon look. Without these every dungeon is the same grey room with different
+    // furniture in it, which is what "a content pass" is supposed to stop being. All optional:
+    // world.js falls back to the original palette when a dungeon does not say.
+    floorColor: d.floorColor, wallColor: d.wallColor, bossFloorColor: d.bossFloorColor,
+    lightScale: d.lightScale, lightTint: d.lightTint,
     spawn: d.spawn,
     bounds: d.bounds,
     // Flat, seeded but featureless: a dungeon floor is a floor. Amplitude 0 means heightAt()

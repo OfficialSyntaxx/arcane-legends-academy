@@ -169,5 +169,70 @@ check("setup assigns a seed", Number.isInteger(L.setup(players).seed));
 const badLen = L.validateAction(L.setup(players), "p1", {type:"setDeck", deck:twenty("fire_cat").slice(0,19)});
 check("deck error text says 20 cards", badLen.ok===false && badLen.error.includes("20 cards"));
 
+// ---- school affinity + ultimates (parity with game.js's schoolmagic.js wiring) ----
+function startedWithSchools(d1, s1, d2, s2){
+  let st = L.setup(players);
+  st = L.applyAction(st, "p1", {type:"setDeck", deck:d1, school:s1});
+  st = L.applyAction(st, "p2", {type:"setDeck", deck:d2, school:s2});
+  return st;
+}
+check("setDeck without a school defaults to balance", (()=>{
+  let st = L.setup(players);
+  st = L.applyAction(st, "p1", {type:"setDeck", deck:twenty("fire_cat")});
+  return st.schools.p1 === "balance";
+})());
+check("setDeck rejects an unknown school by falling back to balance", (()=>{
+  let st = L.setup(players);
+  st = L.applyAction(st, "p1", {type:"setDeck", deck:twenty("fire_cat"), school:"nonsense"});
+  return st.schools.p1 === "balance";
+})());
+check("a same-school creature gets the +1 affinity bonus online, an off-school one doesn't", (()=>{
+  const s1 = startedWithSchools(twenty("fire_cat"), "fire", twenty("elixir"), "balance");
+  const p1a = sideFor(s1, "p1"); p1a.hand = ["fire_cat"]; p1a.pips = 10;
+  const st1 = L.applyAction(s1, "p1", {type:"play", handIndex:0});
+  const withAffinity = sideFor(st1, "p1").board[0].atk;   // fire_cat printed atk 2, +1 affinity = 3
+  const s2 = startedWithSchools(twenty("fire_cat"), "ice", twenty("elixir"), "balance");
+  const p2a = sideFor(s2, "p1"); p2a.hand = ["fire_cat"]; p2a.pips = 10;
+  const st2 = L.applyAction(s2, "p1", {type:"play", handIndex:0});
+  const withoutAffinity = sideFor(st2, "p1").board[0].atk;
+  return withAffinity === 3 && withoutAffinity === 2;
+})());
+check("a same-school spell deals the affinity bonus on top of its printed value online", (()=>{
+  const s = startedWithSchools(twenty("firebolt"), "fire", twenty("frost_giant"), "ice");
+  const p1 = sideFor(s, "p1"), p2 = sideFor(s, "p2");
+  p1.hand = ["firebolt"]; p1.pips = 10;
+  const before = p2.hp;
+  const st = L.applyAction(s, "p1", {type:"play", handIndex:0, target:{kind:"wiz"}});
+  return before - sideFor(st,"p2").hp === 5;   // 4 printed + 1 fire affinity
+})());
+check("playing an own-school card banks ultimate charge online; an off-school one does not", (()=>{
+  const s = startedWithSchools(twenty("fire_cat"), "fire", twenty("elixir"), "balance");
+  const p1 = sideFor(s, "p1"); p1.hand = ["fire_cat"]; p1.pips = 10;
+  const st = L.applyAction(s, "p1", {type:"play", handIndex:0});
+  return sideFor(st, "p1").ultCharge === 1;
+})());
+check("ultimate is rejected below the charge threshold", (()=>{
+  const s = startedWithSchools(twenty("fire_cat"), "fire", twenty("elixir"), "balance");
+  return L.validateAction(s, "p1", {type:"ultimate"}).ok === false;
+})());
+check("a charged ultimate applies its school's fx, drains charge, and can't be reused this duel", (()=>{
+  const s = startedWithSchools(twenty("fire_cat"), "fire", twenty("elixir"), "balance");
+  const p1 = sideFor(s, "p1"), p2 = sideFor(s, "p2");
+  p1.ultCharge = 5;   // ULT_CHARGE_MAX
+  const enemyHpBefore = p2.hp;
+  const ok1 = L.validateAction(s, "p1", {type:"ultimate"}).ok;
+  const st = L.applyAction(s, "p1", {type:"ultimate"});
+  const after = sideFor(st, "p1");
+  const spentAndUsed = after.ultCharge === 0 && after.ultUsed;
+  const dealtDamage = enemyHpBefore - sideFor(st,"p2").hp === 3;   // Inferno's dmgWiz
+  const ok2 = L.validateAction(st, "p1", {type:"ultimate"}).ok;
+  return ok1 && spentAndUsed && dealtDamage && ok2 === false;
+})());
+check("viewFor exposes the player's own school/ultCharge/ultUsed, for the UI ultimate button", (()=>{
+  const s = startedWithSchools(twenty("fire_cat"), "fire", twenty("elixir"), "balance");
+  const v = L.viewFor(s, "p1");
+  return v.you.school === "fire" && v.you.ultCharge === 0 && v.you.ultUsed === false;
+})());
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail?1:0);

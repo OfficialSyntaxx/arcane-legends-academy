@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arcane Legends — Debug Dashboard</title>
+<style>
+:root{
+  --gold:#ffc94d; --gold2:#e8a33d; --panel:#1a1430; --panel2:#241c44;
+  --ink:#f2ecff; --muted:#a99fc9; --line:rgba(255,201,77,.25);
+  --danger:#ff6b6b; --ok:#6ee7a0; --info:#7aa8ff;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:#0d0a1f;color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,sans-serif;}
+body{padding:16px;max-width:1100px;margin:0 auto 60px;}
+h1{font-family:Georgia,serif;color:var(--gold);font-size:22px;margin:4px 0 2px;}
+h2{font-family:Georgia,serif;color:var(--ink);font-size:16px;margin:0 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px;}
+.sub{color:var(--muted);font-size:12px;}
+#topline{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+#topline .sp{flex:1;}
+button{background:linear-gradient(180deg,#3a2d6e,#241c44);color:var(--ink);border:1px solid var(--line);border-radius:8px;
+  padding:8px 14px;font-size:13px;cursor:pointer;font-weight:600;}
+button.on{background:linear-gradient(180deg,#2f9e63,#1f6b42);border-color:var(--ok);}
+label.tog{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;user-select:none;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:18px;}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:13px;border-bottom:1px dashed rgba(255,255,255,.06);}
+.kv:last-child{border-bottom:none;}
+.kv .k{color:var(--muted);}
+.kv .v{font-weight:700;text-align:right;}
+.badge{display:inline-block;font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px;margin-left:6px;}
+.badge.ok{background:rgba(110,231,160,.15);color:var(--ok);border:1px solid var(--ok);}
+.badge.bad{background:rgba(255,107,107,.15);color:var(--danger);border:1px solid var(--danger);}
+.badge.info{background:rgba(122,168,255,.15);color:var(--info);border:1px solid var(--info);}
+.bar{height:8px;border-radius:4px;background:#00000066;overflow:hidden;margin-top:4px;}
+.bar div{height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold));}
+.probs{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--danger);}
+.probs li{margin-bottom:2px;}
+pre{background:#08061a;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11px;
+  overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-word;}
+details summary{cursor:pointer;font-weight:700;color:var(--gold);padding:4px 0;}
+#empty{color:var(--muted);padding:40px 0;text-align:center;}
+.foot{color:var(--muted);font-size:11px;text-align:center;margin-top:30px;}
+a{color:var(--info);}
+</style>
+</head>
+<body>
+<div id="topline">
+  <div>
+    <h1>🛠 Debug Dashboard</h1>
+    <div class="sub">Reads this browser's save + runs every data-integrity validator live. A separate page/tab — it never touches gameplay.</div>
+  </div>
+  <div class="sp"></div>
+  <label class="tog"><input type="checkbox" id="autoToggle" checked> Auto-refresh (5s)</label>
+  <button id="refreshBtn">↻ Refresh now</button>
+</div>
+<div id="root"><div id="empty">Loading…</div></div>
+<div class="foot" id="foot"></div>
+
+<script type="module">
+import * as G from "./game.js";
+import { CARDS, SCHOOLS } from "./cards.js";
+import { SKILLS } from "./items.js";
+import { GATHERABLE } from "./nodes.js";
+import * as CX from "./codex.js";
+import * as ACADEMY from "./academy.js";
+import * as REP from "./reputation.js";
+import * as DORM from "./dorm.js";
+import * as RANK from "./pvprank.js";
+import * as ARCH from "./archetypes.js";
+import * as MAGIC from "./schoolmagic.js";
+import * as VAR from "./variants.js";
+import * as LSN from "./lessons.js";
+import * as WC from "./worldconfig.js";
+import * as DG from "./dungeons.js";
+import * as ZQ from "./zonequests.js";
+import * as ACHV from "./achievements.js";
+
+const root = document.getElementById("root");
+const foot = document.getElementById("foot");
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const pct = (n, d) => d ? Math.round((n / d) * 100) : 0;
+const kv = (k, v) => `<div class="kv"><span class="k">${esc(k)}</span><span class="v">${v}</span></div>`;
+// A distinct class from the generic `.badge` used elsewhere (e.g. the deck valid/invalid pill) —
+// tools/browser-test.mjs queries `.vbadge` specifically to check every VALIDATOR reads clean,
+// and a blanket `.badge` selector would also catch that unrelated pill and read it as a failure.
+const badge = (n, label) => n === 0
+  ? `<span class="badge vbadge ok">✓ ${label}</span>`
+  : `<span class="badge vbadge bad">✗ ${n} problem${n===1?"":"s"}</span>`;
+const probList = probs => probs.length
+  ? `<ul class="probs">${probs.slice(0,10).map(p=>`<li>${esc(p)}</li>`).join("")}${probs.length>10?`<li>…and ${probs.length-10} more</li>`:""}</ul>` : "";
+
+// World/dungeon config is fetched once — it does not change while the tab is open, and refetching
+// it every 5s on an auto-refresh would be pure waste. Manual refresh re-checks it too, in case the
+// author edited world/*.json and wants to see the result without reloading the page.
+//
+// `world` stays OUTDOOR-ONLY, deliberately — mirrors exactly what tools/test.mjs checks, not a
+// bigger invariant invented for this page. A dungeon zone's own `exits` points one-way back to its
+// entrance zone (world.js computes the actual return trigger dynamically at runtime, from
+// `dungeonEntrances` in reverse — it is never a second static `exits` entry on the outdoor zone),
+// so merging dungeon zones into `world` and running `validateExits` over the result flags every
+// dungeon as "one-way" — a false positive against a page that was never designed to be mutually
+// reachable via the static exits graph. Each dungeon zone is validated SOLO instead, the same way
+// `tools/test.mjs`'s "each dungeon compiles to a valid zone" check does.
+let world = null, dungeons = null, worldErr = null;
+async function loadWorld(){
+  try {
+    world = await WC.loadWorldConfig();
+    dungeons = await DG.loadDungeons();
+    worldErr = null;
+  } catch(e){ worldErr = e && e.message || String(e); }
+}
+
+function saveSection(s){
+  if (!s) return `<div class="panel"><h2>Save</h2><p class="sub">No save found in this browser yet — open the game once first.</p></div>`;
+  const gear = G.equipStats(s);
+  const dTier = DORM.tierFor(s), dProg = DORM.progressToNextTier(s);
+  const aScore = G.academyScore(s), aYear = ACADEMY.yearFor(aScore), aProg = ACADEMY.progressToNext(aScore);
+  const rTier = RANK.tierFor(s.pvp.rankPoints), rProg = RANK.progressToNextTier(s.pvp.rankPoints);
+  const value = G.totalCollectionValue(s);
+  const dungeonState = s.worldState && s.worldState.dungeons || {};
+  const bossesDown = Object.values(dungeonState).filter(d => d.bossDead).length;
+  const repRows = Object.entries(s.reputation || {}).filter(([,v])=>v>0)
+    .map(([k,v]) => kv(k, `${v} (${REP.levelFor(v).name})`)).join("") || `<div class="sub">No standing with any NPC yet.</div>`;
+  return `<div class="grid">
+    <div class="panel"><h2>Player</h2>
+      ${kv("Name", esc(s.name||"(unnamed)"))}
+      ${kv("School", `${SCHOOLS[s.school]?.name||s.school}`)}
+      ${kv("Level / XP", `${s.level} / ${s.xp}`)}
+      ${kv("Gold", s.gold)}
+      ${kv("Academy rank", `${aYear.name} <span class="sub">(score ${aScore})</span>`)}
+      <div class="bar"><div style="width:${aProg.maxed?100:aProg.pct}%"></div></div>
+      ${kv("Save version", s.version)}
+    </div>
+    <div class="panel"><h2>Deck &amp; Gear</h2>
+      ${kv("Deck", `${s.deck.length}/${G.MAX_DECK} ${G.deckValid(s)?'<span class="badge ok">valid</span>':'<span class="badge bad">invalid</span>'}`)}
+      ${kv("Equip bonus", `+${gear.hp}hp +${gear.atk}atk +${gear.def}def +${gear.pip}pip +${gear.gold}%g`)}
+      ${kv("Cards owned", s.cards.length)}
+      ${kv("Unique types owned", new Set(s.cards.map(c=>c.id)).size)}
+      ${kv("Collection value", `${value}g`)}
+    </div>
+    <div class="panel"><h2>PvP (pvprank.js)</h2>
+      ${kv("Tier", `${rTier.icon} ${rTier.name} — ${s.pvp.rankPoints}pts`)}
+      <div class="bar"><div style="width:${rProg.maxed?100:rProg.pct}%"></div></div>
+      ${kv("W/L", `${s.pvp.wins}/${s.pvp.losses}`)}
+      ${kv("Streak", s.pvp.streak||0)}
+      ${kv("Season", s.pvp.season||"(none yet)")}
+      ${kv("Season history", (s.pvp.history||[]).length + " past seasons")}
+    </div>
+    <div class="panel"><h2>Dorm &amp; World</h2>
+      ${kv("Dorm tier", `${dTier.name} <span class="sub">${dTier.w}×${dTier.d}m, ${dTier.slots} slots</span>`)}
+      <div class="bar"><div style="width:${dProg.maxed?100:dProg.pct}%"></div></div>
+      ${kv("Dungeons with boss defeated", bossesDown)}
+      ${kv("Daily quest", `${s.daily.type} ${s.daily.progress}/${s.daily.target}${s.daily.claimed?" (claimed)":""}`)}
+    </div>
+    <div class="panel" style="grid-column:1/-1"><h2>NPC Reputation</h2>${repRows}</div>
+    <div class="panel" style="grid-column:1/-1"><h2>Achievements &amp; Titles (achievements.js)</h2>
+      ${kv("Equipped title", esc(ACHV.equippedTitle(s).name))}
+      ${ACHV.achievementsFor(s).map(a=>`<div class="kv"><span class="k">${a.icon} ${esc(a.name)}</span><span class="v">${a.done?"✓":`${a.have}/${a.need}`}</span></div>`).join("")}
+    </div>
+  </div>`;
+}
+
+function collectionSection(s){
+  if (!s) return "";
+  const overall = CX.overallCompletion(CARDS, s.cards);
+  const bySchool = CX.completionBy(CARDS, s.cards, d => d.school);
+  const ach = CX.achievementsFor(CARDS, s.cards);
+  const variantCounts = {};
+  let feCount = 0, gradedCount = 0, slabCount = 0;
+  for (const c of s.cards){
+    variantCounts[c.variant||"normal"] = (variantCounts[c.variant||"normal"]||0) + 1;
+    if (c.fe) feCount++;
+    if (c.graded) gradedCount++;
+    if (c.serial) slabCount++;
+  }
+  const schoolRows = Object.entries(bySchool).map(([school, g]) =>
+    `<div class="kv"><span class="k">${SCHOOLS[school]?.name||school}</span><span class="v">${g.owned}/${g.total} (${g.pct}%)</span></div>`).join("");
+  const printRows = Object.entries(variantCounts).map(([v,n]) => kv(v, n)).join("");
+  return `<div class="grid">
+    <div class="panel"><h2>Codex Completion</h2>
+      ${kv("Overall", `${overall.owned}/${overall.total} (${overall.pct}%)`)}
+      <div class="bar"><div style="width:${overall.pct}%"></div></div>
+      ${schoolRows}
+    </div>
+    <div class="panel"><h2>Achievements</h2>
+      ${kv("Earned", `${ach.length}/${CX.ACHIEVEMENTS.length}`)}
+      ${ach.map(a=>`<div class="kv"><span class="k">${esc(a.name)}</span><span class="v">✓</span></div>`).join("") || `<div class="sub">None yet.</div>`}
+    </div>
+    <div class="panel"><h2>Printings</h2>
+      ${printRows}
+      ${kv("First editions", feCount)}
+      ${kv("Graded", gradedCount)}
+      ${kv("Slabs (serialized)", slabCount)}
+    </div>
+  </div>`;
+}
+
+function integritySection(){
+  const checks = [
+    ["archetypes.js — AI personalities, boss phases, thematic decks", ARCH.validateArchetypes()],
+    ["codex.js — achievements reachable against the catalog", CX.validateCodex(CARDS)],
+    ["dorm.js — tiers, furniture slots, trophies", DORM.validateDorm()],
+    ["pvprank.js — tiers, streak/season maths", RANK.validateRanks()],
+    ["schoolmagic.js — affinity bonuses, ultimates", MAGIC.validateSchoolMagic()],
+    ["variants.js — printing weights, first editions", VAR.validateVariants()],
+    ["lessons.js — 21 classes vs. curriculum years + skills", LSN.validateLessons({ years: ACADEMY.YEARS.length, skillIds: Object.keys(SKILLS) })],
+    ["achievements.js — achievable targets, titles, no duplicate ids", ACHV.validateAchievements()],
+  ];
+  if (world){
+    const zoneProblems = world.zoneIds.flatMap(id => WC.validateZone(world.get(id), { zoneIds: world.zoneIds }));
+    checks.push(["worldconfig.js — every zone (models unchecked — that's npm run check:models's job)", zoneProblems]);
+    checks.push(["worldconfig.js — exits mutually reachable", WC.validateExits(world)]);
+    checks.push(["worldconfig.js — treasure ids globally unique", WC.validateTreasureIds(world)]);
+    const placedTreasureIds = world.zoneIds.flatMap(id => world.get(id).treasures.map(t => t.id));
+    checks.push(["game.js — every placed treasure has a reward, and vice versa", G.validateTreasureRewards(placedTreasureIds)]);
+  }
+  if (dungeons){
+    const dProblems = dungeons.flatMap(d => DG.validateDungeon(d, { zoneIds: world ? world.zoneIds : [] }));
+    checks.push(["dungeons.js — rooms, corridors, boss present", dProblems]);
+    // Each dungeon compiles to a zone and must satisfy the same rules an outdoor zone does —
+    // validated SOLO (its own exit points at its entrance zone, which must be in scope, but the
+    // dungeon zone itself is not part of the outdoor exits graph — see the note on `world` above).
+    const zoneIds = world ? [...world.zoneIds, ...dungeons.map(d => d.id)] : dungeons.map(d => d.id);
+    const compileProblems = dungeons.flatMap(d => WC.validateZone(WC.buildWorld({ zones: [DG.dungeonZone(d)] }).get(d.id), { zoneIds }));
+    checks.push(["worldconfig.js — each dungeon compiles to a valid zone", compileProblems]);
+  }
+  if (world && dungeons){
+    const rooms = Object.fromEntries(dungeons.map(d => [d.id, d.rooms.map(r => r.id)]));
+    checks.push(["zonequests.js — quest chain reachability + references", ZQ.validateQuests({
+      zoneIds: world.zoneIds, dungeonIds: dungeons.map(d => d.id), dungeonRooms: rooms, gatherable: GATHERABLE,
+    })]);
+  }
+  const totalProblems = checks.reduce((n, [,p]) => n + p.length, 0);
+  const rows = checks.map(([name, probs]) => `<div class="kv" style="flex-direction:column;align-items:stretch">
+    <div style="display:flex;justify-content:space-between"><span class="k">${esc(name)}</span>${badge(probs.length, "clean")}</div>
+    ${probList(probs)}
+  </div>`).join("");
+  const worldNote = worldErr ? `<div class="sub" style="color:var(--danger)">world/dungeon config failed to load: ${esc(worldErr)}</div>` : "";
+  return `<div class="panel">
+    <h2>Data Integrity — every validateX() in the codebase, run live ${badge(totalProblems, "all clean")}</h2>
+    <p class="sub">The same validators <code>npm test</code> asserts against in CI, run right here against the code as shipped. Model-existence checks are skipped (no filesystem access in a browser) — that's what <code>npm run check:models</code> covers.</p>
+    ${worldNote}
+    ${rows}
+  </div>`;
+}
+
+function envSection(s){
+  const raw = (() => { try { return localStorage.getItem("arcane_legends_save_v1") || ""; } catch(e){ return ""; } })();
+  return `<div class="grid">
+    <div class="panel"><h2>Environment</h2>
+      ${kv("User agent", `<span style="font-weight:400;font-size:11px">${esc(navigator.userAgent)}</span>`)}
+      ${kv("Viewport", `${innerWidth}×${innerHeight} @${devicePixelRatio}x`)}
+      ${kv("Online", navigator.onLine ? "yes" : "no")}
+      ${kv("Save size", `${raw.length.toLocaleString()} bytes`)}
+      ${kv("Checked at", new Date().toLocaleTimeString())}
+    </div>
+  </div>
+  <div class="panel"><details><summary>Raw save JSON</summary><pre>${s ? esc(JSON.stringify(s, null, 2)) : "(no save)"}</pre></details></div>`;
+}
+
+async function renderAll(){
+  let s = null;
+  try { s = G.load(); } catch(e){ console.error("failed to load save:", e); }
+  root.innerHTML = saveSection(s) + collectionSection(s) + integritySection() + envSection(s);
+  foot.textContent = `Arcane Legends Academy — Debug Dashboard · last checked ${new Date().toLocaleString()}`;
+}
+
+document.getElementById("refreshBtn").onclick = () => renderAll();
+const autoToggle = document.getElementById("autoToggle");
+let timer = null;
+function armAuto(){
+  clearInterval(timer);
+  if (autoToggle.checked) timer = setInterval(renderAll, 5000);
+}
+autoToggle.onchange = armAuto;
+
+loadWorld().then(renderAll).catch(renderAll);
+armAuto();
+</script>
+</body>
+</html>

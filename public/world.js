@@ -5,6 +5,7 @@
 import { WORLD_NODES, NODE_MODELS } from "./nodes.js";
 import { isClear, CHARACTER_HEIGHT, BUILDINGS, LANDMARKS, PROPS, NPCS, WANDERERS, PLAYER_SPAWN, OBSTACLES, TREE_RING, PLAYER_RADIUS, WORLD_BOUND, doorPos, resolveCollisions, cameraDistanceLimit, CAMERA_RADIUS } from "./structures.js";
 import { modelUrl, CDN } from "./cdn.js";
+import { tintTree } from "./tint.js";
 import { heightAt, isWater, flatsForZone, groundColorAt, BIOMES } from "./terrain.js";
 import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS, ZONE_MAPS } from "./worldconfig.js";
 
@@ -78,6 +79,25 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   scene.fog = ZONE.interior
     ? new THREE.Fog(ZONE.background != null ? ZONE.background : 0x120c22, 18, 80)
     : new THREE.Fog(0x2a1a4a, 95, 250);
+  // A visible sky, not just a solid clear colour. `renderer.setClearColor` below was the only
+  // thing behind the world — an outdoor zone read as an unlit test scene because there was
+  // nothing to look UP at. Deliberately warmer/brighter than `buildEnvironment`'s reflection map
+  // just below (that one stays dim on purpose, so it doesn't wash PBR metal out) — this one exists
+  // to actually be seen, matching the academy's own gold-over-violet palette so the sky and the 2D
+  // UI chrome read as the same game. Interiors keep the flat clear colour: a cave has no sky.
+  if (!ZONE.interior){
+    const c = document.createElement("canvas"); c.width = 8; c.height = 256;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0.00, "#161033");   // zenith — deep indigo
+    grad.addColorStop(0.45, "#4a3168");   // upper sky
+    grad.addColorStop(0.78, "#8a5a7a");   // haze band
+    grad.addColorStop(1.00, "#e8a33d");   // horizon — the academy's own gold, as a sunset glow
+    g.fillStyle = grad; g.fillRect(0, 0, 8, 256);
+    const skyTex = new THREE.CanvasTexture(c);
+    skyTex.encoding = THREE.sRGBEncoding;   // tag it sRGB, same as renderer.outputEncoding below
+    scene.background = skyTex;
+  }
   // Generated models are PBR (metallic/roughness). With no environment to reflect, metal renders
   // near-black and everything looks flat — this is the other half of why they lost their shine.
   // A tiny procedural sky/ground gradient costs no assets and gives them something to catch.
@@ -115,10 +135,16 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // Interiors (dungeons) are lit as caves: almost no sky, no sun, and close fog so the torches
   // and the boss glow are what the player actually reads by. An outdoor rig inside a dungeon
   // just makes a brightly-lit room with a ceiling missing.
+  //
+  // Not every interior is a cave, though. A dungeon earns its darkness because it SHIPS torches
+  // in every room; a home does not, so the same rig makes a dorm a black box with a bed in it
+  // — which reads as broken, not atmospheric. `ZONE.lightScale` lets a zone say how lit it is
+  // instead of inferring it from `interior`, and the dorm asks for a warm, lived-in room.
   const INTERIOR = !!ZONE.interior;
   if (INTERIOR){
-    scene.add(new THREE.HemisphereLight(0x585070, 0x140e22, 0.30));
-    const fill = new THREE.DirectionalLight(0xa89ad0, 0.16);
+    const k = ZONE.lightScale || 1;
+    scene.add(new THREE.HemisphereLight(ZONE.lightTint || 0x585070, 0x140e22, 0.30 * k));
+    const fill = new THREE.DirectionalLight(0xa89ad0, 0.16 * k);
     fill.position.set(10, 30, 10); scene.add(fill);
   } else {
   // Map-backed zones ship PBR-baked terrain that needs a brighter rig than the procedural
@@ -323,7 +349,9 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // dungeons.js — nothing spatial is decided here, matching the rule that world.js renders what
   // the pure modules hand it (§9b d).
   if (ZONE.rooms && ZONE.rooms.length){
-    const floorMat = mat(0x3a3348), wallMat = mat(0x4a4160), bossFloorMat = mat(0x5a3a44);
+    const floorMat = mat(ZONE.floorColor != null ? ZONE.floorColor : 0x3a3348);
+    const wallMat  = mat(ZONE.wallColor  != null ? ZONE.wallColor  : 0x4a4160);
+    const bossFloorMat = mat(ZONE.bossFloorColor != null ? ZONE.bossFloorColor : 0x5a3a44);
     const wallH = ZONE.wallHeight || 7;
     for (const r of ZONE.rooms){
       const f = add(new THREE.PlaneGeometry(r.w, r.d), r.boss ? bossFloorMat : floorMat, r.x, 0.02, r.z, {receive:true, cast:false});
@@ -335,6 +363,87 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     }
     for (const w of [...ZONE.rooms.flatMap(r => r.walls || []), ...(ZONE.corridorWalls || [])]){
       add(new THREE.BoxGeometry(w.w, wallH, w.d), wallMat, w.x, wallH/2, w.z);
+    }
+  }
+  // ---------- dorm furnishing (the Dorm phases, D2–D4) ----------
+  // Everything here is PROCEDURAL and every position was decided by dorm.js — this block only
+  // turns a resolved layout into primitives, the same contract the dungeon block above follows.
+  // Nothing in this file works out where a bed, a case or a trophy goes.
+  if (ZONE.dormLayout){
+    const L = ZONE.dormLayout;
+    for (const p of L.pieces){
+      const m = mat(p.color);
+      const put = (geo, y, h) => {
+        const o = add(geo, m, p.x, y, p.z);
+        o.rotation.y = p.ry || 0;
+        return o;
+      };
+      if (p.shape === "rug"){
+        const r = add(new THREE.PlaneGeometry(p.w, p.d), mat(p.color), p.x, 0.05, p.z, {receive:true, cast:false});
+        r.rotation.x = -Math.PI/2; r.rotation.z = p.ry || 0;
+      } else if (p.shape === "bed"){
+        put(new THREE.BoxGeometry(p.w, 0.45, p.d), 0.22);
+        const pillow = add(new THREE.BoxGeometry(p.w*0.8, 0.28, 0.7), mat(0xd8d0e8), p.x, 0.58, p.z);
+        pillow.rotation.y = p.ry || 0;
+        pillow.position.add(new THREE.Vector3(0, 0, p.d/2 - 0.6).applyAxisAngle(new THREE.Vector3(0,1,0), p.ry || 0));
+      } else if (p.shape === "desk"){
+        put(new THREE.BoxGeometry(p.w, 0.16, p.d), p.h);
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]){
+          const leg = add(new THREE.BoxGeometry(0.14, p.h, 0.14), m, p.x, p.h/2, p.z);
+          leg.position.add(new THREE.Vector3(sx*(p.w/2-0.2), 0, sz*(p.d/2-0.2)).applyAxisAngle(new THREE.Vector3(0,1,0), p.ry || 0));
+        }
+      } else if (p.shape === "brazier"){
+        put(new THREE.CylinderGeometry(p.w*0.16, p.w*0.34, p.h, 8), p.h/2);
+        const bowl = add(new THREE.CylinderGeometry(p.w*0.55, p.w*0.3, 0.4, 10), m, p.x, p.h + 0.2, p.z);
+        bowl.material = bowl.material.clone();
+      } else if (p.shape === "shelf"){
+        put(new THREE.BoxGeometry(p.w, p.h, p.d), p.h/2);
+        // Books pushed forward out of the carcass, or the shelf renders as a plain brown slab
+        // against the wall — which is exactly how it looked in the first render of the room.
+        for (let i = 1; i <= 3; i++){
+          const books = add(new THREE.BoxGeometry(p.w*0.86, 0.34, p.d*0.7), mat(0x8a3a2a), p.x, i * (p.h/4), p.z);
+          books.rotation.y = p.ry || 0;
+          books.position.add(new THREE.Vector3(0, 0, p.d*0.45).applyAxisAngle(new THREE.Vector3(0,1,0), p.ry || 0));
+        }
+      } else if (p.shape === "banner"){
+        const b = put(new THREE.PlaneGeometry(p.w, p.h), p.h/2 + 1.4);
+        b.material.side = THREE.DoubleSide;
+      } else if (p.shape === "sconce"){
+        put(new THREE.BoxGeometry(p.w, p.h, p.d), 2.3);
+      } else if (p.shape === "case"){
+        // Plinth + glass. The slab itself is drawn from `L.cases` below, so an empty case still
+        // reads as a case waiting to be filled rather than as missing geometry.
+        put(new THREE.BoxGeometry(p.w, 0.9, p.d), 0.45);
+        const glass = new THREE.MeshLambertMaterial({ color: 0x9fd8ff, transparent:true, opacity:0.22 });
+        glass.color.convertSRGBToLinear();
+        const g = add(new THREE.BoxGeometry(p.w, p.h - 0.9, p.d), glass, p.x, 0.9 + (p.h-0.9)/2, p.z, {cast:false});
+        g.rotation.y = p.ry || 0;
+      } else {
+        put(new THREE.BoxGeometry(p.w, p.h, p.d), p.h/2);
+      }
+      if (p.light){
+        const l = new THREE.PointLight(p.light.color, p.light.intensity, p.light.distance);
+        l.position.set(p.x, p.light.y, p.z); scene.add(l);
+        const bulb = add(new THREE.SphereGeometry(0.2, 8, 6), mat(p.light.color), p.x, p.light.y, p.z, {cast:false});
+        bulb.material.emissive = srgb(p.light.color); bulb.material.emissiveIntensity = 1.0;
+      }
+    }
+    // A displayed slab: a small glowing card standing inside its case. Its colour comes from the
+    // grade, so a 10 reads as gold across the room — which is the entire point of a display case.
+    for (const c of L.cases || []){
+      if (!c.card) continue;
+      const tint = c.card.roll >= 98 ? 0xffd766 : c.card.roll >= 92 ? 0xc9d4ff : 0x9fe6b0;
+      const slab = add(new THREE.BoxGeometry(0.62, 0.9, 0.07), mat(tint), c.x, 1.5, c.z, {cast:false});
+      slab.rotation.y = c.ry || 0;
+      slab.material.emissive = srgb(tint); slab.material.emissiveIntensity = 0.55;
+    }
+    // Trophies are DERIVED from boss kills (dorm.js), never stored — so one appears the moment
+    // the Cinder Wyrm goes down and can never disagree with the world.
+    for (const t of L.trophies || []){
+      const base = add(new THREE.CylinderGeometry(0.7, 0.9, 0.5, 8), mat(0x2a1f4d), t.x, 0.25, t.z);
+      const skull = add(new THREE.DodecahedronGeometry(t.h * 0.32), mat(t.color), t.x, 0.5 + t.h*0.4, t.z);
+      skull.rotation.y = t.ry || 0;
+      skull.material.emissive = srgb(t.color); skull.material.emissiveIntensity = 0.22;
     }
   }
   // water, only where the zone declares a level
@@ -484,27 +593,115 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     g.position.y = base + Math.abs(Math.sin(t*9))*0.09*speed;
   }
 
-  // ---------- player ----------
-  let schoolColor = null;
-  function applyPlayerColor(){
-    if (schoolColor == null) return;
+  // ---------- player appearance (BACKLOG §2, charcreate.js) ----------
+  //
+  // `player_wizard.glb` is ONE mesh with ONE material, so there is nothing to recolour per part.
+  // The old version lerped that single material 45% toward a flat school colour, which dragged
+  // the face, hands and boots toward it too and washed the painted texture into a single hue.
+  //
+  // This rotates HUE while keeping each material's own LIGHTNESS, so the painting survives and
+  // the school still reads instantly. charcreate.js decides the numbers; this only applies them.
+  let appearance = null;         // { hue, sat, light, strength, aura, motes } or null
+  let auraGroup = null;
+  function applyPlayerAppearance(){
+    if (!appearance) return;
+    // The shift happens in the FRAGMENT SHADER (tint.js), not on material.color: the player GLB's
+    // Base Color is white and all of its colour is in the texture, so multiplying the material
+    // colour cannot rotate a hue — it can only darken. Found by rendering the preview and seeing
+    // a Fire wizard come out Storm purple while the numbers were correct.
     const ud = player.userData;
-    if (ud && ud.robe && ud.robe.parent){ ud.robe.material.color.set(schoolColor); ud.chest.material.color.set(schoolColor); }
+    if (ud && ud.robe && ud.robe.parent) tintTree(player, appearance);
     const pc = chars.player;
-    if (pc && pc.model){
-      // tint the loaded model with the school colour without flattening its texture
-      pc.model.traverse(o => {
-        if (o.isMesh && o.material && o.material.color && !o.userData._tintBase){
-          o.userData._tintBase = o.material.color.clone();
-        }
-      });
-      pc.model.traverse(o => {
-        if (o.isMesh && o.material && o.material.color){
-          const base = o.userData._tintBase;
-          o.material = o.material.clone();
-          o.material.color.copy(base).lerp(new THREE.Color(schoolColor), 0.45);
-        }
-      });
+    if (pc && pc.model) tintTree(pc.model, appearance);
+    buildAura();
+  }
+  // ---------- equipped gear on the character (BACKLOG §2, equipment3d.js) ----------
+  // Bone attachment. The auto-rigged player exposes real named bones (RightHand, Neck, ...), so a
+  // weapon can simply be parented to one and inherits the animation for free — no per-frame
+  // matrix copying, no separate update path.
+  //
+  // Rebuilt wholesale on every change rather than diffed: there are at most two attachments, and
+  // a diff would have to reason about tier changes swapping the model underneath a slot.
+  let gearGroups = {};
+  function clearGear(){
+    for (const g of Object.values(gearGroups)){
+      g.traverse(o => { if (o.isMesh){ o.geometry.dispose(); if (o.material.dispose) o.material.dispose(); } });
+      if (g.parent) g.parent.remove(g);
+    }
+    gearGroups = {};
+  }
+  function applyGear(){
+    clearGear();
+    const pc = chars.player;
+    if (!pc || !pc.model || !gearList.length) return;
+    for (const a of gearList){
+      const bone = pc.model.getObjectByName(a.bone);
+      // A missing bone is a real failure (the model was replaced with an unrigged one, or the
+      // rigger renamed things) — say so once rather than silently showing no gear.
+      if (!bone){ console.warn("gear: no bone", a.bone, "for", a.slot); continue; }
+      const g = new THREE.Group();
+      g.position.fromArray(a.pos);
+      g.rotation.fromArray(a.rot);
+      bone.add(g);
+      gearGroups[a.slot] = g;
+      // The bone carries the character's own scale, so anything parented to it inherits that
+      // scale too. Undo it, or a 0.85m wand comes out at whatever the rig's internal units are.
+      bone.updateWorldMatrix(true, false);
+      const s = new THREE.Vector3().setFromMatrixScale(bone.matrixWorld);
+      const inv = 1 / Math.max(1e-6, (s.x + s.y + s.z) / 3);
+      g.scale.setScalar(inv);
+
+      if (a.model){
+        // Gear gets its OWN loader rather than loadLandmarkModel: that one grounds the model to
+        // the terrain height and registers it in `chars`, both of which are wrong for something
+        // parented to a bone. CDN-then-local retry is kept — it is why props stopped vanishing
+        // during a CDN outage.
+        loadGear("./assets/models/" + a.model, g, a);
+      } else {
+        // No model for this slot: a small bead. The amulet has no CC0 mesh in the repo and does
+        // not need one at this size.
+        const bead = new THREE.Mesh(new THREE.SphereGeometry(a.height * 0.5, 10, 8), mat(a.color || 0xc8c8c8));
+        if (a.glow){ bead.material.emissive = srgb(a.color || 0xc8c8c8); bead.material.emissiveIntensity = 0.9; }
+        g.add(bead);
+      }
+    }
+  }
+  let gearList = [];
+
+  // A school-coloured glow on the ground under the player. This is the half of the appearance
+  // system that is actually unambiguous at a glance — a hue shift on a dark robe is subtle at
+  // camera distance, a coloured rune ring is not.
+  function buildAura(){
+    if (auraGroup){
+      // Free the GPU memory rather than just detaching. The aura is rebuilt on every appearance
+      // change, and the character-creation screen changes it on every click of every swatch.
+      auraGroup.traverse(o => { if (o.isMesh){ o.geometry.dispose(); o.material.dispose(); } });
+      player.remove(auraGroup); auraGroup = null;
+    }
+    if (!appearance || appearance.aura == null) return;
+    auraGroup = new THREE.Group();
+    const glow = c => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.42,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.05, 28, 1), glow(appearance.aura));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03;
+    auraGroup.add(ring);
+    const inner = new THREE.Mesh(new THREE.RingGeometry(0.30, 0.38, 20, 1), glow(appearance.aura));
+    inner.rotation.x = -Math.PI / 2; inner.position.y = 0.03; inner.material.opacity = 0.3;
+    auraGroup.add(inner);
+    for (let i = 0; i < (appearance.motes || 0); i++){
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.075, 6, 5), glow(appearance.aura));
+      m.material.opacity = 0.8;
+      m.userData.phase = (i / appearance.motes) * Math.PI * 2;
+      auraGroup.add(m);
+    }
+    player.add(auraGroup);
+  }
+  function stepAura(t){
+    if (!auraGroup) return;
+    for (const m of auraGroup.children){
+      if (m.userData.phase == null) continue;
+      const a = m.userData.phase + t * 0.7;
+      m.position.set(Math.cos(a) * 0.95, 0.55 + Math.sin(a * 1.7) * 0.35, Math.sin(a) * 0.95);
     }
   }
   const player = makeWizard(0x3a6bd8, 0x2a1f4d);
@@ -724,9 +921,41 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     }
   }
   // Generated GLB character models — keys match NPC roles so the update loop uses the GLB mixer.
-  makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>applyPlayerColor());
+  makeCharModel('player', './assets/models/player_wizard.glb', player, ()=>{ applyPlayerAppearance(); applyGear(); });
   for (const n of ZONE.npcs) makeCharModel(n.key, './assets/models/' + n.model, npcByKey[n.key]);
   for (let i=0;i<ZWANDER.length;i++) makeCharModel(ZWANDER[i].key, './assets/models/' + ZWANDER[i].model, wanderers[i]);
+
+  // Load one piece of gear into a bone-local group. No terrain grounding, no `chars` entry, no
+  // boot-progress accounting: this is a child of a bone, not a thing in the world.
+  function loadGear(localUrl, group, a){
+    const cdnUrl = CDN[localUrl.split('/').pop()];
+    const go = (url, fallbackUrl) => {
+      const loader = new THREE.GLTFLoader();
+      const d = getDraco();
+      if (d) loader.setDRACOLoader(d);
+      loader.load(url, gltf => {
+        const model = gltf.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const h = Math.max(0.001, box.max.y - box.min.y);
+        model.scale.setScalar(a.height / h);
+        // Centre the model on its own bounding box so the grip sits at the bone, not the model's
+        // base — otherwise a 2m staff is held by its foot and stabs through the floor.
+        const c = box.getCenter(new THREE.Vector3()).multiplyScalar(a.height / h);
+        model.position.set(-c.x, -c.y, -c.z);
+        if (a.color != null) model.traverse(o => {
+          if (o.isMesh && o.material && o.material.color){
+            o.material = o.material.clone();
+            o.material.color.lerp(srgb(a.color), 0.55);
+          }
+        });
+        group.add(model);
+      }, undefined, err => {
+        if (fallbackUrl){ go(fallbackUrl, null); return; }
+        console.warn("gear model failed to load:", url, err && err.message);
+      });
+    };
+    go(cdnUrl || localUrl, cdnUrl ? localUrl : null);
+  }
 
   // ---------- static landmark/building models (unlike characters, no fixed 1.8 target height —
   // each is scaled to its own footprint, and stays centered on X/Z with its base at y=0) ----------
@@ -1001,6 +1230,33 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     register('dungeon', de.x, de.z, de.id, (opts.zoneNames && opts.zoneNames[de.id]) || de.id, arch, 6.0);
   }
 
+  // ---------- hidden treasure (BACKLOG §3 "Hidden areas / treasure") ----------
+  // A find, not a grind: a handful of authored, off-path caches per outdoor zone (structures.js
+  // TREASURES for the academy; hand-authored in zones.json for the others). `opts.foundTreasures`
+  // mirrors `opts.defeated` above — ids this save has already claimed simply never spawn, the same
+  // "no re-farming a one-time thing" rule a dungeon boss kill already follows.
+  const FOUND_TREASURE = new Set(opts.foundTreasures || []);
+  const treasureGroups = {};
+  for (const t of ZONE.treasures || []){
+    if (FOUND_TREASURE.has(t.id)) continue;
+    const gy = groundY(t.x, t.z);
+    const g = new THREE.Group(); g.position.set(t.x, gy, t.z); scene.add(g);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 0.75), mat(0x6b4a2b));
+    body.position.y = 0.35; body.castShadow = true; body.receiveShadow = true; g.add(body);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.3, 0.8), mat(0x8a6a3a));
+    lid.position.y = 0.78; lid.castShadow = true; g.add(lid);
+    const clasp = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), mat(0xffc94d));
+    clasp.position.set(0, 0.55, 0.42); g.add(clasp);
+    // A slow-spinning, bobbing glint so a cache reads as special from a distance — the same trick
+    // the magic trees' emissive crown already uses to stand out from an ordinary one.
+    const glint = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 0), mat(0xfff2c0));
+    glint.material.emissive = srgb(0xffe08a); glint.material.emissiveIntensity = 0.85;
+    glint.position.y = 1.35; g.add(glint);
+    g.userData.glint = glint;
+    treasureGroups[t.id] = g;
+    register('treasure', t.x, t.z, t.id, "Hidden Cache", body, 4.6);
+  }
+
   // ---------- enemies (dungeon rooms; outdoor zones stream theirs per chunk) ----------
   // `opts.defeated` is the set of enemy ids the save says are already dead. Without it every
   // dungeon enemy respawns the moment you walk back in, and the same slime can be fought
@@ -1093,6 +1349,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     else if (nearby.kind === 'station') callbacks.onStation && callbacks.onStation(nearby.data);
     else if (nearby.kind === 'dungeon') callbacks.onDungeon && callbacks.onDungeon(nearby.data);
     else if (nearby.kind === 'enemy') callbacks.onEnemy && callbacks.onEnemy(nearby.data);
+    else if (nearby.kind === 'treasure') callbacks.onTreasure && callbacks.onTreasure(nearby.data);
   }
 
   // ---------- step each frame ----------
@@ -1360,7 +1617,20 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
           mapSurfaceY(camera.position.x, camera.position.z) + 1.8);
       }
     }
-    // Always keep the camera above the map's surface (a low eased position can sit under a hill).
+    // FINAL SAFETY NET. Both clamps above solve along the RAY from the player to the camera, and
+    // that is the weakest possible geometry for a NEAR-TANGENT pass: brushing the side of a
+    // circle barely changes the ray solution, so the camera can end a frame a few centimetres
+    // inside an obstacle with the distance clamp seeing nothing wrong. Both intermittent failures
+    // of the orbit check were exactly that — 8.56 and 8.69 from the tower's centre against a
+    // clamp radius of 8.7, while orbiting the campus.
+    //
+    // So finish with the same resolver everything else uses: push the camera straight out of
+    // whatever it is touching, perpendicular to the surface rather than along the ray. This runs
+    // every frame and is a no-op in the overwhelmingly common case.
+    const fixed = resolveCollisions(camera.position.x, camera.position.z, CAMERA_RADIUS, ZONE_OBSTACLES);
+    camera.position.x = fixed.x; camera.position.z = fixed.z;
+    // Always keep the camera above the map's surface too (a low eased position can sit under a hill
+    // on a baked GLB map, which the procedural-terrain-only checks above don't know about).
     const ms = mapSurfaceY(camera.position.x, camera.position.z);
     if (ms > -Infinity) camera.position.y = Math.max(camera.position.y, ms + 1.8);
     camera.lookAt(px, py + 2.2, pz);
@@ -1376,6 +1646,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     updateChars(dt);
     updateNearby();
     updateExits();
+    for (const g of Object.values(treasureGroups)){
+      g.userData.glint.rotation.y += dt * 1.4;
+      g.userData.glint.position.y = 1.35 + Math.sin(now / 500) * 0.08;
+    }
+    stepAura(now / 1000);
     updateCamera(dt);
     if (skyGroup) skyGroup.position.copy(camera.position);   // keep the sky centered on the camera
     if (cloudGroup){                                        // drift clouds around the sky
@@ -1422,6 +1697,12 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       zone: ZONE.id, exits: (ZONE.exits||[]).map(e=>({to:e.toZone,x:e.x,z:e.z})), exitArmed,
       interior: !!ZONE.interior,
       dungeonEntrances: (ZONE.dungeonEntrances||[]).map(d=>({id:d.id,x:d.x,z:d.z})),
+      treasures: (ZONE.treasures||[]).map(t=>({id:t.id,x:t.x,z:t.z})),
+      treasuresRemaining: Object.keys(treasureGroups),
+      dorm: ZONE.dormLayout ? { pieces: ZONE.dormLayout.pieces.length,
+                                cases: (ZONE.dormLayout.cases||[]).filter(c=>c.card).length,
+                                trophies: (ZONE.dormLayout.trophies||[]).length,
+                                room: [ZONE.dormLayout.room.w, ZONE.dormLayout.room.d] } : null,
       rooms: (ZONE.rooms||[]).length,
       wallCount: (ZONE.obstacles||[]).filter(o=>String(o.id).startsWith("wall:")).length,
       nearbyKind: nearby ? nearby.kind : null,
@@ -1434,12 +1715,46 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       playerSize: (()=>{ if(!chars.player || !chars.player.model) return null; const m=chars.player.model; m.updateMatrixWorld(true); const b=new THREE.Box3().setFromObject(m); const s=b.getSize(new THREE.Vector3()); return {x:Math.round(s.x),y:Math.round(s.y),z:Math.round(s.z)}; })() };
   };
   return {
+    // Draw one frame on demand. Reading the world canvas from a test is otherwise unreliable:
+    // the drawing buffer is cleared after a composite, so a 2D drawImage of it comes back blank
+    // and a dark scene is indistinguishable from a broken one. battle3d.js exposes the same hook
+    // for the same reason.
+    renderOnce(){ renderer.render(scene, camera); },
     setTouchMove(x, y){ joy.x = x; joy.y = y; },
-    setPlayerColor(color){
-      // Remembered, because this is usually called before the GLB finishes loading — and once
-      // it loads, userData.robe is no longer in the scene, so writing only there was a no-op.
-      schoolColor = color;
-      applyPlayerColor();
+    // Remembered, because this is usually called before the GLB finishes loading — and once
+    // it loads, userData.robe is no longer in the scene, so writing only there was a no-op.
+    setPlayerAppearance(look){
+      appearance = look;
+      applyPlayerAppearance();
+    },
+    // Equipped gear, resolved by equipment3d.js. Remembered like the appearance, because this is
+    // usually called before the player GLB (and therefore its skeleton) has loaded.
+    // Test hook: which bones the loaded player rig actually exposes. equipment3d.js validates its
+    // table against this list, so a model swap that renames bones fails loudly instead of
+    // silently showing no gear.
+    gearDebug(){
+      const out = {};
+      for (const [slot, g] of Object.entries(gearGroups)){
+        g.updateWorldMatrix(true, true);
+        const b = new THREE.Box3().setFromObject(g);
+        const size = b.isEmpty() ? null : b.getSize(new THREE.Vector3()).toArray().map(v=>+v.toFixed(3));
+        const ctr = b.isEmpty() ? null : b.getCenter(new THREE.Vector3()).toArray().map(v=>+v.toFixed(2));
+        let meshes = 0; g.traverse(o=>{ if(o.isMesh) meshes++; });
+        out[slot] = { children: g.children.length, meshes, worldSize: size, worldCenter: ctr,
+                      groupScale: +g.scale.x.toFixed(4) };
+      }
+      return out;
+    },
+    playerBones(){
+      const pc = chars.player;
+      if (!pc || !pc.model) return null;
+      const out = [];
+      pc.model.traverse(o => { if (o.isBone) out.push(o.name); });
+      return out;
+    },
+    setPlayerGear(list){
+      gearList = list || [];
+      applyGear();
     },
     // Show the equipped weapon on the player's right hand (visual equipment). `metal` is the
     // equipment's metal tier (bronze/iron/gold/mithril/rune) -> a matching weapon GLB; null hides it.
@@ -1512,6 +1827,33 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       }
       return true;
     },
+    // Remove a claimed treasure in place, the same shape removeEnemy already uses — a cache is
+    // a one-time find, so it must vanish the instant it's opened, not linger until the next zone
+    // rebuild pretending it can still be found.
+    removeTreasure(id){
+      const g = treasureGroups[id];
+      if (!g) return false;
+      g.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+        for (const m of mats) if (m && m.dispose) m.dispose();
+      });
+      scene.remove(g);
+      delete treasureGroups[id];
+      for (let i = interactives.length - 1; i >= 0; i--)
+        if (interactives[i].kind === 'treasure' && interactives[i].data === id) interactives.splice(i, 1);
+      if (nearby && nearby.kind === 'treasure' && nearby.data === id){
+        nearby = null;
+        callbacks.onNearby && callbacks.onNearby(null);
+      }
+      return true;
+    },
+    // Exposes the SAME ground-height function the engine itself uses to place the player —
+    // whichever source that is for this zone (procedural heightAt, or a baked GLB map's real
+    // surface via mapSurfaceY, see ZONE_MAPS in worldconfig.js). Lets tests verify "does the
+    // player actually ride the ground" without duplicating — and risking drifting from — the
+    // engine's own height-source decision.
+    groundYAt(x, z){ return groundY(x, z); },
     resize(){ onResize(); },
     dispose(){ window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); cancelAnimationFrame(raf); renderer.dispose(); },
   };

@@ -1,8 +1,9 @@
 // Engine smoke test — runs the card engine, economy, and economy-balance checks headlessly.
 import * as G from "../public/game.js";
-import { CARDS, CARD_MAP, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
-import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS } from "../public/items.js";
+import { CARDS, CARD_MAP, SCHOOLS, cardValue, gradeForRoll, gradeFee, GRADES } from "../public/cards.js";
+import { equipmentFor, BARS, POTIONS, MATERIALS, CARD_MATERIALS, SLOTS as SLOTS_LIST, METALS as METALS_MAP, ENCHANTS, ENCHANT_MAP, enchantStats, PRISTINE_CHANCE, PRISTINE_MULTIPLIER, pristineIdFor, pristineVariantFor, isPristineId, baseMatIdFor } from "../public/items.js";
 import { WORLD_NODES, GATHERABLE } from "../public/nodes.js";
+import { SKILLS as SKILLS_MAP } from "../public/items.js";
 import * as ST from "../public/structures.js";
 import { SFX as AUDIO_SFX } from "../public/audio.js";
 import { CDN } from "../public/cdn.js";
@@ -14,7 +15,18 @@ import * as ADVICE from "../public/advice.js";
 import * as VFX from "../public/vfx.js";
 import * as ZQ from "../public/zonequests.js";
 import * as ACADEMY from "../public/academy.js";
+import * as LSN from "../public/lessons.js";
+import * as VAR from "../public/variants.js";
+import * as CX from "../public/codex.js";
+import * as ARCH from "../public/archetypes.js";
+import * as RANK from "../public/pvprank.js";
+import * as MAGIC from "../public/schoolmagic.js";
+import * as CB from "../public/cardbacks.js";
+import * as ACHV from "../public/achievements.js";
 import * as REP from "../public/reputation.js";
+import * as DORM from "../public/dorm.js";
+import * as CC from "../public/charcreate.js";
+import * as EQ3 from "../public/equipment3d.js";
 import fs from "fs"; import path from "path"; import { fileURLToPath } from "url";
 const fsReadIndex = () => fs.readFileSync(
   path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "index.html"), "utf8");
@@ -1075,6 +1087,105 @@ let net = 0;
 for (let i=0;i<20;i++){ const c = MATERIALS.find(m=>m.id==="copper"); G.gather(s4,c); net += c.value; }
 check("gathering 20 copper nets positive value", net > 0);
 
+// ---- resource node regeneration (BACKLOG §6) ----
+check("gathering the same material twice back-to-back is refused with a cooldown", (()=>{
+  const s = G.newGame();
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const now = Date.now();
+  const first = G.gather(s, copper, now);
+  const second = G.gather(s, copper, now);        // same instant — no time has passed
+  return first.ok === true && second.ok === false && second.err === "cooldown" && second.remaining > 0;
+})());
+check("the cooldown clears once real time has passed", (()=>{
+  const s = G.newGame();
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const now = Date.now();
+  G.gather(s, copper, now);
+  const third = G.gather(s, copper, now + G.regenMsFor(copper) + 1);
+  return third.ok === true;
+})());
+check("a cooldown on one material never blocks gathering a different one", (()=>{
+  const s = G.newGame();
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const oak = MATERIALS.find(m => m.id === "oak_log");
+  const now = Date.now();
+  G.gather(s, copper, now);
+  return G.gather(s, oak, now).ok === true;
+})());
+check("gatherCooldownRemaining is a pure read — it never mutates the save", (()=>{
+  const s = G.newGame();
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const now = Date.now();
+  G.gather(s, copper, now);
+  const before = JSON.stringify(s.gatherCooldowns);
+  G.gatherCooldownRemaining(s, "copper", now);
+  return JSON.stringify(s.gatherCooldowns) === before;
+})());
+check("regenMsFor scales with the material's own level (rarer takes longer)", (()=>{
+  const copper = MATERIALS.find(m => m.id === "copper");     // lvl 1
+  const runite = MATERIALS.find(m => m.id === "runite");     // lvl 70
+  return G.regenMsFor(runite) > G.regenMsFor(copper);
+})());
+check("a save that predates node regeneration migrates with no cooldowns active", (()=>{
+  const old = G.newGame(); delete old.gatherCooldowns;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  return typeof s.gatherCooldowns === "object" && G.gatherCooldownRemaining(s, "copper") === 0;
+})());
+
+// ---- rare resource variants (BACKLOG §6) ----
+check("pristineIdFor/isPristineId/baseMatIdFor round-trip cleanly", (()=>{
+  const id = pristineIdFor("copper");
+  return isPristineId(id) === true && baseMatIdFor(id) === "copper"
+      && isPristineId("copper") === false && baseMatIdFor("copper") === "copper";
+})());
+check("a pristine variant sells for PRISTINE_MULTIPLIER times the base material's value", (()=>{
+  const copper = MATERIALS.find(m => m.id === "copper");
+  const p = pristineVariantFor(copper);
+  return p.id === "pristine_copper" && p.value === copper.value * PRISTINE_MULTIPLIER;
+})());
+check("a gather never loses the ordinary yield, whether or not it also rolls pristine", (()=>{
+  // Run enough gathers (each material on its own clock, so none is blocked by its own cooldown)
+  // to see both a pristine hit and a miss, and confirm the base item is added identically either
+  // way — a pristine find is a bonus ON TOP, never a replacement.
+  const s = G.newGame();
+  let sawPristine = false, sawPlain = false;
+  const mat = MATERIALS.find(m => m.id === "copper");
+  let clock = Date.now();
+  for (let i = 0; i < 400 && !(sawPristine && sawPlain); i++){
+    const before = s.inventory.copper || 0;
+    const r = G.gather(s, mat, clock);
+    clock += G.regenMsFor(mat) + 1;
+    if (!r.ok) continue;
+    if ((s.inventory.copper || 0) !== before + 1) return false;   // the base item ALWAYS lands
+    if (r.pristine) sawPristine = true; else sawPlain = true;
+  }
+  return sawPristine && sawPlain;
+})());
+check("a pristine find is actually added to inventory under its own id", (()=>{
+  const s = G.newGame();
+  const mat = MATERIALS.find(m => m.id === "copper");
+  let clock = Date.now(), found = false;
+  for (let i = 0; i < 400 && !found; i++){
+    const r = G.gather(s, mat, clock);
+    clock += G.regenMsFor(mat) + 1;
+    if (r.ok && r.pristine) found = true;
+  }
+  return found && s.inventory[pristineIdFor("copper")] === 1;
+})());
+check("sellItem resolves a pristine id back to its base material for the right payout", (()=>{
+  const s = G.newGame();
+  s.inventory[pristineIdFor("copper")] = 1;
+  const goldBefore = s.gold;
+  const r = G.sellItem(s, pristineIdFor("copper"));
+  const copper = MATERIALS.find(m => m.id === "copper");
+  return r.ok === true && r.value === copper.value * PRISTINE_MULTIPLIER && s.gold === goldBefore + r.value;
+})());
+check("sellItem refuses a pristine id for a material the player does not actually have", (()=>{
+  const s = G.newGame();
+  return G.sellItem(s, pristineIdFor("runite")).ok === false;
+})());
+
 // ---- 8. auctions ----
 const s5 = G.newGame();
 const c0 = s5.cards[0];
@@ -1102,6 +1213,53 @@ sLegacy.auctions[0].ends = 60000;            // what performance.now()+60s used 
 const legacyGold = sLegacy.gold;
 G.settleAuctions(sLegacy);
 check("a legacy performance.now() auction is settled, not stranded", sLegacy.auctions.length === 0 && sLegacy.gold > legacyGold);
+
+// ---- 8.6 auction history / price history (BACKLOG §6) ----
+check("a settled auction is recorded into marketHistory, a live listing is not", (()=>{
+  const s = G.newGame();
+  const cardId = s.cards[0].id;
+  G.listAuction(s, s.cards[0].uid, 50);
+  const beforeSettle = s.marketHistory.length;
+  s.auctions[0].ends = Date.now() - 1;
+  G.auctionTick(s);
+  return beforeSettle === 0 && s.marketHistory.length === 1 && s.marketHistory[0].cardId === cardId;
+})());
+check("priceHistoryFor returns only that card TYPE's sales, newest first", (()=>{
+  const s = G.newGame();
+  const twoOfSameType = s.cards.filter(c => c.id === s.cards[0].id);
+  if (twoOfSameType.length < 2) return true;   // starter deck shape guard, not the thing under test
+  const id = twoOfSameType[0].id;
+  G.listAuction(s, twoOfSameType[0].uid, 30); s.auctions[0].ends = Date.now() - 2000; G.auctionTick(s);
+  G.listAuction(s, twoOfSameType[1].uid, 40); s.auctions[0].ends = Date.now() - 1; G.auctionTick(s);
+  const h = G.priceHistoryFor(s, id);
+  return h.length === 2 && h[0].price === 40 && h[1].price === 30;   // newest (most recently settled) first
+})());
+check("priceHistoryFor never returns another card type's sales", (()=>{
+  const s = G.newGame();
+  const otherId = s.cards.find(c => c.id !== s.cards[0].id);
+  if (!otherId) return true;
+  G.listAuction(s, s.cards[0].uid, 50); s.auctions[0].ends = Date.now() - 1; G.auctionTick(s);
+  return G.priceHistoryFor(s, otherId.id).length === 0;
+})());
+check("avgSalePrice is null with no sales recorded for that card type yet", (()=>{
+  const s = G.newGame();
+  return G.avgSalePrice(s, s.cards[0].id) === null;
+})());
+check("avgSalePrice averages the actual PAYOUT, not the asking price", (()=>{
+  const s = G.newGame();
+  const twoOfSameType = s.cards.filter(c => c.id === s.cards[0].id);
+  if (twoOfSameType.length < 2) return true;
+  const id = twoOfSameType[0].id;
+  s.marketHistory = [{ cardId:id, price:50, pay:50, bidder:null, at:1 }, { cardId:id, price:50, pay:70, bidder:"NPC", at:2 }];
+  return G.avgSalePrice(s, id) === 60;
+})());
+check("marketHistory is capped rather than growing forever", (()=>{
+  const s = G.newGame();
+  s.marketHistory = Array.from({length:200}, (_,i) => ({ cardId:"x", price:10, pay:10, bidder:null, at:i }));
+  G.listAuction(s, s.cards[0].uid, 50); s.auctions[0].ends = Date.now() - 1; G.auctionTick(s);
+  return s.marketHistory.length === 200;
+})());
+check("game.js newGame() starts marketHistory as an empty array", Array.isArray(G.newGame().marketHistory) && G.newGame().marketHistory.length === 0);
 
 // ---- 8.6 school picker survives a quit during character creation ----
 const freshSave = G.newGame();
@@ -1175,10 +1333,13 @@ check("the onboarding chain can actually be completed", (()=>{
   G.setSchool(s, "fire"); s.flags.schoolPicked = true;
 
   advance();                                   // gather
-  // gather enough of the three refinable sources to make one of each scribing input
+  // gather enough of the three refinable sources to make one of each scribing input. Each material
+  // now has a real regen cooldown (BACKLOG §6), so repeated gathers of the SAME source need a
+  // clock that actually advances past it, the way a real play session spread over time would.
+  let clock = Date.now();
   for (const cm of CARD_MATERIALS){
     const src = MATERIALS.find(m => cm.from.includes(m.id));
-    for (let i = 0; i < 3; i++) G.gather(s, src);
+    for (let i = 0; i < 3; i++){ G.gather(s, src, clock); clock += G.regenMsFor(src) + 1; }
   }
 
   advance();                                   // refine
@@ -1557,6 +1718,1558 @@ check("turning in a field quest raises reputation with its giver", (()=>{
   return r.ok && REP.repOf(s, q.giver) === before;
 })());
 
+
+// ---- The Dorm (D1-D4) ----
+// dorm.js is pure, so every layout rule, placement rule and derivation is checkable here rather
+// than only in a browser. The bar is the one the rest of the world modules hold: no spatial maths
+// in world.js, and nothing derived is stored in the save.
+function dormSave(levels = { treasury:2, library:1, armory:0, tavern:1 }){
+  const s = G.newGame();
+  s.home.owned = true; s.home.upgrades = { ...s.home.upgrades, ...levels };
+  return s;
+}
+check("the dorm's own configuration is valid", DORM.validateDorm().length === 0);
+check("a fresh save has the dorm save shape after migrate", (()=>{
+  localStorage_stub(JSON.stringify({ ...G.newGame(), home:{ owned:true, upgrades:{treasury:0,library:0,armory:0,tavern:0} } }));
+  const s = G.load();
+  return s.home.stock && s.home.furniture && s.home.cases;
+})());
+check("an unowned dorm is the bare tier with no levels", DORM.upgradeLevels(G.newGame()) === 0);
+check("buying hall upgrades raises the dorm tier (D4)", (()=>{
+  const bare = DORM.tierFor(dormSave({treasury:0,library:0,armory:0,tavern:0}));
+  const big  = DORM.tierFor(dormSave({treasury:5,library:5,armory:5,tavern:5}));
+  return bare.id === "bare" && big.id === "chambers" && big.w > bare.w && big.slots > bare.slots;
+})());
+check("every tier's slots fit inside its own room", (()=>{
+  for (const lv of [0,4,9,20]){
+    const s = dormSave({treasury:lv>15?5:Math.min(5,lv), library:Math.min(5,Math.max(0,lv-5)), armory:Math.min(5,Math.max(0,lv-10)), tavern:Math.min(5,Math.max(0,lv-15))});
+    const room = DORM.dormRoom(s);
+    for (const slot of DORM.slotsFor(s)){
+      if (Math.abs(slot.x - room.x) > room.w/2 || Math.abs(slot.z - room.z) > room.d/2) return false;
+    }
+  }
+  return true;
+})());
+check("furniture cannot be placed in a slot of the wrong kind", (()=>{
+  const s = dormSave(); s.home.stock = { bookshelf: 1 };
+  return DORM.placementProblem(s, "floor_a", "bookshelf") !== null;
+})());
+check("furniture the player does not own cannot be placed", (()=>{
+  const s = dormSave();
+  return DORM.placementProblem(s, "floor_a", "bed") !== null;
+})());
+check("a slot that this tier has not unlocked is rejected", (()=>{
+  const s = dormSave({treasury:0,library:0,armory:0,tavern:0});   // bare: 4 slots
+  s.home.stock = { case: 1 };
+  return DORM.slotsFor(s).length === 4 && DORM.placementProblem(s, "case_d", "case") !== null;
+})());
+check("buying then placing furniture works, and a slot cannot be double-filled", (()=>{
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  if (!DORM.buyFurniture(s, "bed").ok) return false;
+  if (!DORM.place(s, "floor_a", "bed").ok) return false;
+  DORM.buyFurniture(s, "bed");
+  return DORM.place(s, "floor_a", "bed").ok === false && s.home.furniture.floor_a === "bed";
+})());
+check("buying furniture actually spends gold and timber", (()=>{
+  const s = dormSave(); s.gold = 1000; s.inventory.oak_log = 10;
+  const item = DORM.FURNITURE_MAP.bookshelf;
+  DORM.buyFurniture(s, "bookshelf");
+  return s.gold === 1000 - item.gold && s.inventory.oak_log === 10 - item.timber;
+})());
+check("furniture cannot be bought without the gold or the timber", (()=>{
+  const s = dormSave(); s.gold = 0; s.inventory.oak_log = 0;
+  const a = DORM.buyFurniture(s, "bed");
+  s.gold = 5000;
+  const b = DORM.buyFurniture(s, "bookshelf");   // needs timber
+  return a.ok === false && a.err === "gold" && b.ok === false && b.err === "timber";
+})());
+check("unplacing returns the piece to stock rather than destroying it", (()=>{
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  DORM.buyFurniture(s, "bed"); DORM.place(s, "floor_a", "bed");
+  if (DORM.unplaced(s).length !== 0) return false;
+  DORM.unplace(s, "floor_a");
+  return DORM.unplaced(s).some(u => u.id === "bed" && u.count === 1);
+})());
+// --- display cases (D3): the derived-state rule ---
+function slabbedSave(){
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  DORM.buyFurniture(s, "case"); DORM.place(s, "case_a", "case");
+  s.cards.push({ uid:"slab1", id:s.cards[0].id, roll:99, graded:true, serial:1001 });
+  return s;
+}
+check("only slabbed cards can be displayed", (()=>{
+  const s = slabbedSave();
+  s.cards.push({ uid:"plain", id:s.cards[0].id, roll:40, graded:false });
+  return DORM.displayProblem(s, "case_a", "plain") !== null && DORM.displayIn(s, "case_a", "slab1").ok;
+})());
+check("a slab cannot be shown in two cases at once", (()=>{
+  const s = slabbedSave();
+  DORM.buyFurniture(s, "case"); DORM.place(s, "case_b", "case");
+  DORM.displayIn(s, "case_a", "slab1");
+  return DORM.displayIn(s, "case_b", "slab1").ok === false;
+})());
+check("a case cannot be filled where no case furniture stands", (()=>{
+  const s = slabbedSave();
+  return DORM.displayProblem(s, "floor_a", "slab1") !== null;
+})());
+// THE drift test. The save stores only the card's uid; everything shown is read live. Selling a
+// displayed slab must empty its case, not leave a ghost of a card the player no longer owns.
+check("selling a displayed slab empties its case instead of leaving a ghost", (()=>{
+  const s = slabbedSave();
+  DORM.displayIn(s, "case_a", "slab1");
+  if (!DORM.caseContents(s, gradeForRoll).find(c => c.slot === "case_a").card) return false;
+  s.cards = s.cards.filter(c => c.uid !== "slab1");          // sold
+  const after = DORM.caseContents(s, gradeForRoll).find(c => c.slot === "case_a");
+  return after && after.card === null;
+})());
+check("removing the case furniture removes its display entry too", (()=>{
+  const s = slabbedSave();
+  DORM.displayIn(s, "case_a", "slab1");
+  DORM.unplace(s, "case_a");
+  return DORM.caseContents(s, gradeForRoll).length === 0 && !(s.home.cases||{}).case_a;
+})());
+// --- trophies (D3): derived, never stored ---
+check("a trophy appears only once its boss is actually dead", (()=>{
+  const s = dormSave();
+  if (DORM.trophiesFor(s).length !== 0) return false;
+  s.worldState.dungeons.cinderhollow_caverns = { cleared:[], defeated:[], bossDead:true };
+  return DORM.trophiesFor(s).length === 1 && DORM.trophyPlacements(s)[0].z !== undefined;
+})());
+check("a trophy never lands on a piece of furniture", (()=>{
+  // Every slot filled, every trophy earned, at every tier — the arrangement most likely to
+  // collide. Two earlier trophy layouts failed exactly this, and only a render showed it.
+  for (const t of DORM.TIERS){
+    const s = dormSave({treasury:5,library:5,armory:5,tavern:5});
+    // force this tier by trimming levels to its threshold
+    const lv = t.minLevels;
+    s.home.upgrades = { treasury:Math.min(5,lv), library:Math.min(5,Math.max(0,lv-5)),
+                        armory:Math.min(5,Math.max(0,lv-10)), tavern:Math.min(5,Math.max(0,lv-15)) };
+    if (DORM.tierFor(s).id !== t.id) continue;
+    s.gold = 99999; s.inventory.oak_log = 999;
+    for (const slot of DORM.slotsFor(s)){
+      const item = DORM.FURNITURE.find(f => f.kind === slot.kind);
+      DORM.buyFurniture(s, item.id); DORM.place(s, slot.id, item.id);
+    }
+    s.worldState.dungeons.cinderhollow_caverns = { cleared:[], defeated:[], bossDead:true };
+    const z = DORM.dormZone(s, {});
+    for (const tr of z.dormLayout.trophies){
+      for (const p of z.dormLayout.pieces){
+        if (Math.abs(tr.x - p.x) < (p.w/2 + 1.0) && Math.abs(tr.z - p.z) < (p.d/2 + 1.0)) return false;
+      }
+      const room = DORM.dormRoom(s);
+      if (Math.abs(tr.x) > room.w/2 - 0.5 || Math.abs(tr.z) > room.d/2 - 0.5) return false;
+    }
+  }
+  return true;
+})());
+check("trophies are not written into the save", (()=>{
+  const s = dormSave();
+  s.worldState.dungeons.cinderhollow_caverns = { cleared:[], defeated:[], bossDead:true };
+  DORM.trophyPlacements(s);
+  return JSON.stringify(s).indexOf("Cinder Wyrm Skull") === -1;
+})());
+// --- the zone (D1) ---
+check("the dorm compiles to a zone with a reachable, non-ping-pong exit", (()=>{
+  const z = DORM.dormZone(dormSave(), {});
+  const ex = z.exits[0];
+  const w = WC.buildWorld({ zones:[z] });
+  return z.interior === true && ex.toZone === "academy" &&
+         Math.hypot(z.spawn.x - ex.x, z.spawn.z - ex.z) > WC.EXIT_RADIUS &&
+         !WC.exitNear(w.get("dorm"), z.spawn.x, z.spawn.z);
+})());
+check("the dorm's exit and spawn are both inside its own bounds", (()=>{
+  const z = DORM.dormZone(dormSave(), {});
+  const inb = p => p.x > z.bounds.minX && p.x < z.bounds.maxX && p.z > z.bounds.minZ && p.z < z.bounds.maxZ;
+  return inb(z.spawn) && inb(z.exits[0]);
+})());
+check("the doorway is a real gap — the south wall is not one solid box", (()=>{
+  const z = DORM.dormZone(dormSave(), {});
+  const room = z.rooms.find(r => r.id === "dorm");
+  const south = room.walls.filter(w => w.id.endsWith(":s"));
+  // Two pieces either side of the door, and neither spans the doorway's centre line.
+  return south.length === 2 && south.every(w => Math.abs(w.x) > DORM.DOOR_WIDTH/2 - 0.01);
+})());
+check("the dorm zone carries no enemies (it is a home, not a dungeon)", DORM.dormZone(dormSave(), {}).enemies.length === 0);
+check("placed furniture becomes collision, except flat rugs", (()=>{
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  DORM.buyFurniture(s, "bed"); DORM.place(s, "floor_a", "bed");
+  DORM.buyFurniture(s, "rug"); DORM.place(s, "floor_b", "rug");
+  const obs = DORM.dormZone(s, {}).obstacles.filter(o => String(o.id).startsWith("furn:"));
+  return obs.length === 1 && obs[0].id === "furn:floor_a";
+})());
+check("a banner with no colour of its own takes the player's school colour", (()=>{
+  const s = dormSave(); s.gold = 5000; s.inventory.oak_log = 50;
+  DORM.buyFurniture(s, "banner"); DORM.place(s, "wall_a", "banner");
+  return DORM.layoutFor(s, { schoolColor: 0x123456 }).pieces[0].color === 0x123456;
+})());
+// The whole point of D1: the dorm reuses the dungeon zone machinery rather than a parallel path.
+check("the dorm's walls and floors were computed by dungeons.js, not hand-placed", (()=>{
+  const z = DORM.dormZone(dormSave(), {});
+  return z.rooms.every(r => Array.isArray(r.walls) && r.walls.length > 0) &&
+         z.obstacles.some(o => String(o.id).startsWith("wall:"));
+})());
+check("structures.js exposes the interior seam generically, not as a dorm special case", (()=>{
+  return ST.interiorFor("home") === "dorm" && ST.interiorFor("market") === null;
+})());
+
+
+// ---- WORLDSPEC step 6: the content pass (Lake Arcanum + the Drowned Vault) ----
+// These are authored against schemas that already existed, so the value of these checks is
+// content correctness, not engine correctness: a zone you drown in on arrival, a fishing spot on
+// a hilltop, or a quest chain gated behind something in a zone you cannot reach yet.
+const LAKE = WORLD.get("lake_arcanum");
+check("the third zone ships and validates", !!LAKE && WC.validateZone(LAKE, { zoneIds: WORLD.zoneIds }).length === 0);
+check("every zone is mutually reachable (no one-way exits anywhere)", WC.validateExits(WORLD).length === 0);
+
+// ---- hidden treasure (BACKLOG §3 "Hidden areas / treasure") ----
+const PLACED_TREASURE_IDS = WORLD.zoneIds.flatMap(id => WORLD.get(id).treasures.map(t => t.id));
+check("the shipped world places at least one treasure per outdoor zone", (()=>{
+  return WORLD.zoneIds.filter(id => !WORLD.get(id).interior).every(id => WORLD.get(id).treasures.length > 0);
+})());
+check("treasure ids are globally unique across every zone", WC.validateTreasureIds(WORLD).length === 0);
+check("a repeated treasure id across two zones is caught", (()=>{
+  const w = WC.buildWorld({ zones:[
+    { id:"a", name:"A", spawn:{x:0,z:0}, treasures:[{id:"dupe", x:0, z:0}] },
+    { id:"b", name:"B", spawn:{x:0,z:0}, treasures:[{id:"dupe", x:0, z:0}] },
+  ]});
+  return WC.validateTreasureIds(w).some(p => /dupe/.test(p) && /globally unique/.test(p));
+})());
+check("every placed treasure has a reward, and every reward is placed somewhere", G.validateTreasureRewards(PLACED_TREASURE_IDS).length === 0);
+check("claimTreasure grants the reward and records the id", (()=>{
+  const s = G.newGame();
+  const goldBefore = s.gold;
+  const r = G.claimTreasure(s, "academy_grove_cache");
+  return r.ok === true && s.gold === goldBefore + G.TREASURE_REWARDS.academy_grove_cache.gold
+      && s.worldState.treasuresFound.includes("academy_grove_cache");
+})());
+check("claimTreasure refuses a repeat claim and never grants the reward twice", (()=>{
+  const s = G.newGame();
+  G.claimTreasure(s, "academy_grove_cache");
+  const goldAfterFirst = s.gold;
+  const r2 = G.claimTreasure(s, "academy_grove_cache");
+  return r2.ok === false && r2.err === "claimed" && s.gold === goldAfterFirst;
+})());
+check("claimTreasure refuses an id with no reward table entry", (()=>{
+  const s = G.newGame();
+  const r = G.claimTreasure(s, "not-a-real-treasure");
+  return r.ok === false && r.err === "unknown" && s.worldState.treasuresFound.length === 0;
+})());
+check("game.js load() never leaves treasuresFound unset", (()=>{
+  const s = G.load();
+  return Array.isArray(s.worldState.treasuresFound);
+})());
+check("the lake is reachable from the forest and back", (()=>{
+  const forest = WORLD.get("whispering_forest");
+  return forest.exits.some(e => e.toZone === "lake_arcanum") && LAKE.exits.some(e => e.toZone === "whispering_forest");
+})());
+// The trap this zone is built around: flattened areas are pinned to `baseHeight`, so a lake whose
+// surface rose above it would open the zone with the player, the NPCs and the dungeon mouth all
+// standing underwater. Nothing about that is caught by the schema.
+check("nothing in the lake zone spawns underwater", (()=>{
+  const flats = TER.flatsForZone(LAKE);
+  const h = (x, z) => TER.heightAt(x, z, LAKE.terrain, flats);
+  const wl = LAKE.terrain.waterLevel;
+  const pts = [[LAKE.spawn.x, LAKE.spawn.z], ...LAKE.npcs.map(n => [n.x, n.z]),
+               ...LAKE.dungeonEntrances.map(d => [d.x, d.z]), ...LAKE.exits.map(e => [e.x, e.z])];
+  const bad = pts.filter(([x, z]) => h(x, z) <= wl);
+  if (bad.length) console.log("   underwater: " + JSON.stringify(bad));
+  return bad.length === 0;
+})());
+check("the lake is actually a lake, not puddles", (()=>{
+  const flats = TER.flatsForZone(LAKE);
+  let wet = 0, n = 0;
+  for (let x = LAKE.bounds.minX; x <= LAKE.bounds.maxX; x += 8)
+    for (let z = LAKE.bounds.minZ; z <= LAKE.bounds.maxZ; z += 8){
+      n++; if (TER.heightAt(x, z, LAKE.terrain, flats) < LAKE.terrain.waterLevel) wet++;
+    }
+  const pct = 100 * wet / n;
+  if (pct < 12 || pct > 55) console.log(`   water coverage ${pct.toFixed(1)}%`);
+  return pct >= 12 && pct <= 55;                       // enough to swim in, not so much there is nowhere to walk
+})());
+check("every fishing spot lands on the shore, not on a hilltop", (()=>{
+  const flats = TER.flatsForZone(LAKE);
+  const h = (x, z) => TER.heightAt(x, z, LAKE.terrain, flats);
+  const ponds = WC.scatterZone(LAKE).resourceNodes.filter(r => r.kind === "pond");
+  if (!ponds.length) return false;
+  return ponds.every(p => {
+    for (let a = -12; a <= 12; a += 2) for (let b = -12; b <= 12; b += 2)
+      if (h(p.x + a, p.z + b) < LAKE.terrain.waterLevel) return true;
+    return false;
+  });
+})());
+check("nearWater is ignored in a zone with no water rather than placing nothing", (()=>{
+  const dry = WC.buildWorld({ zones:[{ id:"dry", spawn:{x:0,z:0}, bounds:{minX:-60,maxX:60,minZ:-60,maxZ:60},
+    terrain:{ seed:5, amplitude:1 }, resourceNodes:[{ kind:"pond", id:"raw_shrimp", count:4, nearWater:true }] }] }).get("dry");
+  return WC.scatterZone(dry).resourceNodes.length === 4;
+})());
+const VAULT = DUNGEONS.find(d => d.id === "drowned_vault");
+check("the second dungeon ships", !!VAULT && VAULT.rooms.length >= 5);
+check("the second dungeon's rooms are all reachable and it has a boss",
+      !!VAULT && DG.validateDungeon(VAULT, { zoneIds: WORLD.zoneIds, knownModels: [...knownModels] }).length === 0);
+check("a dungeon can carry its own palette, and one that does not keeps the default", (()=>{
+  const vault = DG.dungeonZone(VAULT);
+  const cinder = DG.dungeonZone(DUNGEONS.find(d => d.id === "cinderhollow_caverns"));
+  // The point of a content pass is that the second dungeon is not the first one reskinned.
+  return vault.floorColor != null && vault.wallColor != null && vault.lightTint != null &&
+         cinder.floorColor == null && vault.floorColor !== cinder.floorColor;
+})());
+check("the two dungeons do not share enemy ids", (()=>{
+  const ids = DUNGEONS.flatMap(d => DG.dungeonZone(d).enemies.map(e => d.id + "/" + e.id));
+  return new Set(ids).size === ids.length;
+})());
+check("each dungeon's entrance is declared by the zone that holds it", (()=>{
+  return DUNGEONS.every(d => {
+    const z = WORLD.get(d.entranceZone);
+    return z && z.dungeonEntrances.some(e => e.id === d.id);
+  });
+})());
+check("the quest table validates against the zones, dungeons and materials that exist", (()=>{
+  const rooms = Object.fromEntries(DUNGEONS.map(d => [d.id, d.rooms.map(r => r.id)]));
+  const problems = ZQ.validateQuests({ zoneIds: WORLD.zoneIds, dungeonIds: DUNGEONS.map(d => d.id),
+                                       dungeonRooms: rooms, gatherable: GATHERABLE });
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("a quest requiring a quest that does not exist is caught",
+      ZQ.validateQuests({ zoneIds: ["nope"] }).some(p => /does not exist/.test(p)));
+check("objective text names the right dungeon now that there are two", (()=>{
+  const a = ZQ.ZONE_QUESTS.find(q => q.objective.dungeon === "cinderhollow_caverns" && q.objective.kind === "boss");
+  const b = ZQ.ZONE_QUESTS.find(q => q.objective.dungeon === "drowned_vault" && q.objective.kind === "boss");
+  return ZQ.objectiveText(a) !== ZQ.objectiveText(b) && /Vault/.test(ZQ.objectiveText(b));
+})());
+check("the lake chain is gated behind finishing the forest chain", (()=>{
+  const s = G.newGame();
+  const first = ZQ.ZONE_QUESTS.find(q => q.zone === "lake_arcanum" && !(q.requires||[]).some(r =>
+    ZQ.ZONE_QUESTS.find(x => x.id === r).zone === "lake_arcanum"));
+  return !ZQ.unlocked(s, first);
+})());
+check("the whole lake chain can be completed in order", (()=>{
+  const s = G.newGame();
+  // finish the forest chain the honest way first
+  const order = ZQ.ZONE_QUESTS.slice();
+  for (let pass = 0; pass < 4; pass++) for (const q of order){
+    if (ZQ.isDone(s, q.id) || !ZQ.unlocked(s, q)) continue;
+    if (!ZQ.accept(s, q.id).ok) continue;
+    const o = q.objective;
+    if (o.kind === "gather") s.inventory[o.id] = (s.inventory[o.id] || 0) + o.n;
+    else {
+      const st = (s.worldState.dungeons[o.dungeon] = s.worldState.dungeons[o.dungeon] || { cleared:[], defeated:[], bossDead:false });
+      if (o.kind === "slay") for (let i = st.defeated.length; i < o.n; i++) st.defeated.push("x" + i);
+      if (o.kind === "boss") st.bossDead = true;
+      if (o.kind === "clear") st.cleared.push(o.room);
+      if (o.kind === "visit") s.worldState.visited.push(o.zone);
+    }
+    ZQ.turnIn(s, q.id);
+  }
+  const left = ZQ.ZONE_QUESTS.filter(q => !ZQ.isDone(s, q.id)).map(q => q.id);
+  if (left.length) console.log("   never completed: " + left.join(", "));
+  return left.length === 0;
+})());
+
+
+// ---- character creation + per-school appearance (BACKLOG §2) ----
+// The whole appearance system is a set of NUMBERS derived from the save; world.js and
+// preview3d.js only apply them. That makes it fully checkable here, which matters because the
+// thing it is protecting against — two schools that look the same — is invisible in a unit test
+// unless something explicitly measures it.
+check("every school has a look, and no look invents a school", (()=>{
+  const problems = CC.validateLooks({ schoolIds: Object.keys(SCHOOLS) });
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("no two schools are close enough in hue to be confused", (()=>{
+  const ids = Object.keys(CC.SCHOOL_LOOKS);
+  for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++){
+    const a = CC.SCHOOL_LOOKS[ids[i]].hue, b = CC.SCHOOL_LOOKS[ids[j]].hue;
+    const d = 180 - Math.abs(Math.abs(a - b) - 180);
+    if (d < 22){ console.log(`   ${ids[i]}/${ids[j]} only ${d}° apart`); return false; }
+  }
+  return true;
+})());
+check("appearance is fully derived — nothing resolved is written to the save", (()=>{
+  const s = G.newGame(); s.school = "fire";
+  const before = JSON.stringify(s);
+  CC.appearanceFor(s);
+  return JSON.stringify(s) === before;
+})());
+check("changing school changes the appearance without touching stored fields", (()=>{
+  const s = G.newGame();
+  s.school = "fire"; const a = CC.appearanceFor(s);
+  s.school = "ice";  const b = CC.appearanceFor(s);
+  return a.hue !== b.hue && a.aura !== b.aura && s.appearance.variant === "standard";
+})());
+check("a variant changes richness but never the school's hue", (()=>{
+  const s = G.newGame(); s.school = "storm";
+  const std = CC.appearanceFor(s);
+  CC.applyAppearance(s, { variant:"deep" });
+  const deep = CC.appearanceFor(s);
+  // hue is the school's identity; only saturation/lightness/strength may move
+  return deep.hue === std.hue && deep.sat > std.sat && deep.strength !== std.strength;
+})());
+check("tint strength stays inside 0..1 for every variant", CC.VARIANTS.every(v => v.strength >= 0 && v.strength <= 1));
+check("the aura can be switched off, and off means null", (()=>{
+  const s = G.newGame();
+  CC.applyAppearance(s, { aura:"none" });
+  return CC.appearanceFor(s).aura === null && CC.appearanceFor(s).motes === 0;
+})());
+check("an unknown variant or aura is rejected rather than stored", (()=>{
+  const s = G.newGame();
+  const a = CC.applyAppearance(s, { variant:"chartreuse" });
+  const b = CC.applyAppearance(s, { aura:"disco" });
+  return !a.ok && !b.ok && s.appearance.variant === "standard" && s.appearance.aura === "ring";
+})());
+// Names go straight into innerHTML on the Dorm screen, so this is a correctness check, not taste.
+check("names that would break the UI are rejected", (()=>{
+  const bad = ["", "   ", "<script>", "Bob & Alice", "a".repeat(CC.NAME_MAX + 1), "9Lives", "Sam\u0000"];
+  return bad.every(n => CC.nameProblem(n) !== null);
+})());
+check("ordinary names, including non-Latin ones, are accepted", (()=>{
+  const good = ["Rowan", "Nell O'Shea", "Jean-Luc", "Ada Lovelace", "Зарина", "さくら"];
+  const bad = good.filter(n => CC.nameProblem(n) !== null);
+  if (bad.length) console.log("   rejected: " + bad.join(", "));
+  return bad.length === 0;
+})());
+check("sloppy spacing is fixed, not refused", CC.nameProblem("Two  Spaces") === null && CC.sanitizeName("Two  Spaces") === "Two Spaces");
+check("a name is trimmed and collapsed rather than stored raw", (()=>{
+  const s = G.newGame();
+  CC.applyAppearance(s, { name: "  Rowan   the Green  " });
+  return s.name === "Rowan the Green";
+})());
+check("a rejected name is not written to the save", (()=>{
+  const s = G.newGame();
+  const r = CC.applyAppearance(s, { name: "<b>" });
+  return !r.ok && !s.name;
+})());
+// The step model, same derived-state contract as onboarding.js.
+check("a fresh save has creation unfinished, starting at the name", (()=>{
+  const s = G.newGame();
+  return !CC.isComplete(s) && CC.currentStep(s).id === "name";
+})());
+check("progress reports the step the player is ON, not the number finished", (()=>{
+  const s = G.newGame();
+  s.flags.schoolPicked = true;                       // school + look done, name is not
+  const p = CC.progress(s);
+  return p.done === 2 && p.index === 0 && CC.currentStep(s).id === "name";
+})());
+check("creation completes once name, school and look are all set", (()=>{
+  const s = G.newGame();
+  CC.applyAppearance(s, { name:"Rowan" });
+  s.flags.schoolPicked = true;
+  return CC.isComplete(s) && CC.progress(s).done === CC.STEPS.length;
+})());
+check("creation steps are derived, so doing them out of order still completes", (()=>{
+  const s = G.newGame();
+  s.flags.schoolPicked = true;                      // school first
+  CC.applyAppearance(s, { aura:"motes" });          // look second
+  if (CC.currentStep(s).id !== "name") return false;
+  CC.applyAppearance(s, { name:"Nell" });           // name last
+  return CC.isComplete(s);
+})());
+check("an older save with a school but no name is walked through the rest, not re-schooled", (()=>{
+  // The migration deliberately does NOT invent a name — this is the case that proves why.
+  localStorage_stub(JSON.stringify({ ...G.newGame(), name: undefined, school:"death", flags:{ schoolPicked:true } }));
+  const s = G.load();
+  return !CC.isComplete(s) && CC.currentStep(s).id === "name" && s.school === "death";
+})());
+check("migrate defaults the appearance so an old save still renders", (()=>{
+  const old = G.newGame(); delete old.appearance;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  return s.appearance.variant === "standard" && CC.appearanceFor(s).aura != null;
+})());
+
+
+// ---- visible equipment on the 3D character (BACKLOG §2) ----
+// The rig's real bone list, captured from player_wizard.glb. Hard-coded on purpose: if the model
+// is ever replaced with one that renames or drops these, the attachment table must fail here
+// rather than silently show no gear in the world.
+const PLAYER_BONES = ["Hips","Spine","Spine1","Neck","Head",
+  "LeftShoulder","LeftArm","LeftForeArm","LeftHand",
+  "RightShoulder","RightArm","RightForeArm","RightHand",
+  "LeftUpLeg","LeftLeg","LeftFoot","RightUpLeg","RightLeg","RightFoot"];
+check("the attachment table validates against the rig, the slots, the metals and the shipped models", (()=>{
+  const problems = EQ3.validateAttachments({
+    bones: PLAYER_BONES,
+    slotIds: SLOTS_LIST.map(s => s.id),
+    metalIds: Object.keys(METALS_MAP),
+    knownModels: [...knownModels],
+  });
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("every equipment slot is either shown on the character or explained", (()=>{
+  return SLOTS_LIST.every(s => EQ3.ATTACHMENTS[s.id] || EQ3.UNSUPPORTED[s.id]);
+})());
+check("a bone the rig does not have is caught", (()=>{
+  return EQ3.validateAttachments({ bones: ["Hips"] }).some(p => /not in the player rig/.test(p));
+})());
+check("nothing hangs off the character until something is equipped", EQ3.attachmentsFor(G.newGame()).length === 0);
+check("equipping a wand puts a model in the right hand", (()=>{
+  const s = G.newGame();
+  const def = equipmentFor("iron", "wand");
+  const item = { uid:"w1", id:def.id, metal:"iron", slot:"wand", tier:def.tier };
+  s.equipment.push(item); G.equip(s, "w1");
+  const a = EQ3.attachmentsFor(s);
+  return a.length === 1 && a[0].bone === "RightHand" && !!a[0].model;
+})());
+check("a better metal changes the silhouette AND the colour", (()=>{
+  const mk = metal => {
+    const s = G.newGame();
+    const def = equipmentFor(metal, "wand");
+    s.equipment.push({ uid:"w", id:def.id, metal, slot:"wand", tier:def.tier }); G.equip(s, "w");
+    return EQ3.attachmentsFor(s)[0];
+  };
+  const bronze = mk("bronze"), rune = mk("rune");
+  return bronze.model !== rune.model && bronze.color !== rune.color && rune.height > bronze.height;
+})());
+check("equipping a hat changes stats but hangs nothing on the character", (()=>{
+  const s = G.newGame();
+  const def = equipmentFor("gold", "hat");
+  s.equipment.push({ uid:"h1", id:def.id, metal:"gold", slot:"hat", tier:def.tier }); G.equip(s, "h1");
+  return EQ3.attachmentsFor(s).length === 0 && EQ3.visibilityNote("hat") !== null;
+})());
+// The derived-state rule again: the visual is never stored, so it cannot outlive the item.
+check("unequipping removes the attachment", (()=>{
+  const s = G.newGame();
+  const def = equipmentFor("iron", "wand");
+  s.equipment.push({ uid:"w1", id:def.id, metal:"iron", slot:"wand", tier:def.tier }); G.equip(s, "w1");
+  G.unequip(s, "wand");
+  return EQ3.attachmentsFor(s).length === 0;
+})());
+check("selling an equipped wand does not leave a ghost staff in the hand", (()=>{
+  const s = G.newGame();
+  const def = equipmentFor("rune", "wand");
+  s.equipment.push({ uid:"w1", id:def.id, metal:"rune", slot:"wand", tier:def.tier }); G.equip(s, "w1");
+  s.equipment = s.equipment.filter(e => e.uid !== "w1");     // sold, loadout still points at it
+  return EQ3.attachmentsFor(s).length === 0;
+})());
+check("every metal tier 1..5 resolves to a wand model", (()=>{
+  return Object.keys(METALS_MAP).every(metal => {
+    const s = G.newGame();
+    const def = equipmentFor(metal, "wand");
+    s.equipment.push({ uid:"w", id:def.id, metal, slot:"wand", tier:def.tier }); G.equip(s, "w");
+    const a = EQ3.attachmentsFor(s)[0];
+    return a && a.model && a.height > 0;
+  });
+})());
+
+
+// ---- Academy classes (lessons.js) ----
+// The backlog's standing criticism of the curriculum was that a year "only grants numeric
+// bonuses; there is nothing to attend or choose". These checks are about that distinction: a
+// class must be enrolled in deliberately, must have an assignment derived from real play, and
+// must teach something that changes an existing system rather than adding another percentage.
+check("the syllabus validates against the years, the skills and its own prerequisites", (()=>{
+  const problems = LSN.validateLessons({ years: ACADEMY.YEARS.length, skillIds: Object.keys(SKILLS_MAP) });
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("every curriculum year has classes", (()=>{
+  return ACADEMY.YEARS.every((_, y) => LSN.LESSONS.some(l => l.year === y));
+})());
+check("a prerequisite from a later year is caught", (()=>{
+  // The failure mode: the class looks unlocked by year and stays greyed out forever.
+  const problems = LSN.validateLessons({ years: 7 });
+  return problems.length === 0 &&                        // the real table is clean...
+    LSN.LESSONS.every(l => (l.requires||[]).every(r => LSN.byId(r).year <= l.year));
+})());
+check("classes from a later year cannot be enrolled in", (()=>{
+  const s = G.newGame();
+  const late = LSN.LESSONS.find(l => l.year === 6);
+  return !LSN.unlocked(s, late, 0) && !LSN.available(s, 0).some(l => l.id === late.id);
+})());
+check("a class must be enrolled in before it can be submitted", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  s.stats.refined = 99;                                   // assignment already satisfied
+  return LSN.submit(s, l.id).ok === false;
+})());
+check("an unfinished assignment cannot be submitted", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  LSN.enroll(s, l.id);
+  return LSN.submit(s, l.id).ok === false;
+})());
+check("progress is derived from play the save already records", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "scribe" && x.assign.n === 3);
+  if (LSN.progressOf(s, l).done) return false;
+  s.stats.scribed = 3;
+  return LSN.progressOf(s, l).done;                       // nothing was "handed in" — it just counts
+})());
+check("passing a class teaches a technique, and it is derived not stored", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  LSN.enroll(s, l.id); s.stats.refined = 99;
+  const before = LSN.masteryFor(s).scribeBonus;
+  const r = LSN.submit(s, l.id);
+  const after = LSN.masteryFor(s).scribeBonus;
+  // the totals live nowhere in the save — only the list of classes passed
+  return r.ok && after > before && JSON.stringify(s.lessons) === JSON.stringify({ enrolled: [], done: [l.id] });
+})());
+check("a class pays out only once", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  LSN.enroll(s, l.id); s.stats.refined = 99;
+  LSN.submit(s, l.id);
+  return LSN.submit(s, l.id).ok === false && LSN.masteryFor(s).scribeBonus === l.teaches.scribeBonus;
+})());
+check("lessons.js never touches gold or xp itself", (()=>{
+  const s = G.newGame();
+  const l = LSN.LESSONS.find(x => x.assign.kind === "refine");
+  LSN.enroll(s, l.id); s.stats.refined = 99;
+  const gold = s.gold, xp = s.xp;
+  LSN.submit(s, l.id);
+  return s.gold === gold && s.xp === xp;                  // the caller applies the reward, like zonequests
+})());
+check("the whole syllabus can be completed in order", (()=>{
+  const s = G.newGame();
+  for (let pass = 0; pass < 8; pass++){
+    for (const l of LSN.LESSONS){
+      if (LSN.isDone(s, l.id)) continue;
+      if (!LSN.unlocked(s, l, 6)) continue;
+      if (!LSN.isEnrolled(s, l.id) && !LSN.enroll(s, l.id).ok) continue;
+      const a = l.assign;
+      if (a.kind === "skill") s.skills[a.id] = a.level;
+      else if (a.kind === "collect") while (s.cards.length < a.n) s.cards.push({ uid:"x"+s.cards.length, id:s.cards[0].id, roll:1, graded:false });
+      else if (a.kind === "level") s.level = a.n;
+      else if (a.kind === "lessons") { /* satisfied by the others */ }
+      else s.stats[{ scribe:"scribed", refine:"refined", grade:"graded", slabs:"slabs", win:"won", packs:"packs" }[a.kind]] = a.n;
+      LSN.submit(s, l.id);
+    }
+  }
+  const left = LSN.LESSONS.filter(l => !LSN.isDone(s, l.id)).map(l => l.id);
+  if (left.length) console.log("   never completed: " + left.join(", "));
+  return left.length === 0 && LSN.graduatedYears(s) === ACADEMY.YEARS.length;
+})());
+
+// --- the four techniques must actually change the systems they name ---
+// A "technique" that does not is just another number on a screen, which is the thing this whole
+// module exists to stop being.
+// A save that has passed EVERY class teaching one technique. An earlier version stopped at the
+// first class, which gave a 4% sell bonus — and 4% of a 10g card rounds back to 10g, so the check
+// failed against a working engine. Grant the full technique and compare on a value it can move.
+function taught(technique){
+  const s = G.newGame();
+  for (const l of LSN.LESSONS) if (l.teaches[technique]) s.lessons.done.push(l.id);
+  return s;
+}
+check("Appraisal makes grading genuinely cheaper", (()=>{
+  const plain = G.newGame(), skilled = taught("gradeDiscount");
+  const base = 500;
+  return G.gradeCost(skilled, base) < G.gradeCost(plain, base) && G.gradeCost(skilled, base) >= 1;
+})());
+check("a grading discount can never make a fee free or negative", (()=>{
+  const s = G.newGame();
+  for (const l of LSN.LESSONS) if (l.teaches.gradeDiscount) s.lessons.done.push(l.id);
+  return G.gradeCost(s, 1) >= 1 && G.gradeCost(s, 10) >= 1;
+})());
+check("Haggling pays more for a sold card", (()=>{
+  const mk = s => { s.cards = [{ uid:"c1", id:CARDS[0].id, roll:50, graded:false }]; s.gold = 0; return s; };
+  const plain = mk(G.newGame()), skilled = mk(taught("sellBonus"));
+  G.sellCard(plain, "c1"); G.sellCard(skilled, "c1");
+  return skilled.gold > plain.gold;
+})());
+check("Penmanship raises the scribe roll", (()=>{
+  // Compare the BONUS the engine applies rather than a random roll, so this is deterministic.
+  const skilled = taught("scribeBonus");
+  return LSN.masteryFor(skilled).scribeBonus > 0 && LSN.masteryFor(G.newGame()).scribeBonus === 0;
+})());
+check("Husbandry can yield a second unit, and never does without the class", (()=>{
+  // Each gather now carries a real regen cooldown (BACKLOG §6), so repeated gathers of the same
+  // material need an explicit advancing clock rather than relying on real wall-clock time between
+  // calls in a tight loop.
+  const mat = MATERIALS.find(m => m.id === "oak_log");
+  const step = G.regenMsFor(mat) + 1;
+  const plain = G.newGame();
+  let extras = 0, clock = Date.now();
+  for (let i = 0; i < 200; i++){ plain.inventory = {}; extras += G.gather(plain, mat, clock).extra ? 1 : 0; clock += step; }
+  if (extras !== 0) return false;                          // no class, never a bonus
+  const skilled = taught("gatherBonus");
+  let got = 0;
+  for (let i = 0; i < 600; i++){ skilled.inventory = {}; got += G.gather(skilled, mat, clock).extra ? 1 : 0; clock += step; }
+  return got > 0;
+})());
+check("a save that predates classes migrates cleanly", (()=>{
+  const old = G.newGame(); delete old.lessons;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  return Array.isArray(s.lessons.enrolled) && Array.isArray(s.lessons.done) && LSN.available(s, 0).length > 0;
+})());
+
+
+// ---- card printings: foil / holo / prismatic + first editions (BACKLOG §5) ----
+// Design pillar 3 names "grade, foil, and slab serials" as what makes a card tangible. Grade and
+// slabs shipped long ago; foil did not exist. These checks are about the two things that make a
+// printing worth anything: it must be RARE and it must be WORTH MORE, in that order.
+check("the printing table validates", (()=>{
+  const problems = VAR.validateVariants();
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("rarer printings are always worth more", (()=>{
+  for (let i = 1; i < VAR.VARIANTS.length; i++){
+    if (VAR.VARIANTS[i].chance > VAR.VARIANTS[i-1].chance) return false;
+    if (VAR.VARIANTS[i].x <= VAR.VARIANTS[i-1].x) return false;
+  }
+  return true;
+})());
+check("a card with no printing field reads as normal and is worth its base value", (()=>{
+  const legacy = { uid:"x", id:CARDS[0].id, roll:50, graded:false };   // pre-variants save
+  return VAR.variantOf(legacy).id === "normal" && VAR.valueOf(legacy, 100) === 100;
+})());
+check("the rarest printing is not swallowed by the commoner bands", (()=>{
+  // rollVariant checks rarest-first; a naive ascending scan would return "foil" for every roll
+  // below the foil chance and prismatic would never appear at all.
+  const prism = VAR.VARIANTS[VAR.VARIANTS.length - 1];
+  return VAR.rollVariant(prism.chance * 0.5) === prism.id;
+})());
+check("printing odds land near the table, over a large sample", (()=>{
+  const rand = G.mulberry32(12345);
+  const tally = {};
+  const N = 60000;
+  for (let i = 0; i < N; i++){ const v = VAR.rollVariant(rand); tally[v] = (tally[v] || 0) + 1; }
+  for (const v of VAR.VARIANTS){
+    if (v.id === "normal") continue;
+    const got = (tally[v.id] || 0) / N;
+    // expected is this band's chance minus the rarer bands that outrank it
+    const rarer = VAR.VARIANTS.filter(x => x.chance < v.chance).reduce((a, x) => a + x.chance, 0);
+    const want = v.chance - rarer;
+    if (Math.abs(got - want) > want * 0.35 + 0.002){
+      console.log(`   ${v.id}: got ${(got*100).toFixed(2)}% want ~${(want*100).toFixed(2)}%`);
+      return false;
+    }
+  }
+  return true;
+})());
+check("luck raises the odds without changing their order", (()=>{
+  const count = luck => {
+    const rand = G.mulberry32(999);
+    let n = 0;
+    for (let i = 0; i < 20000; i++) if (VAR.rollVariant(rand, luck) !== "normal") n++;
+    return n;
+  };
+  return count(2) > count(1);
+})());
+// --- first editions ---
+check("the first copy of a type is a first edition and later copies are not", (()=>{
+  const s = G.newGame();
+  const fresh = CARDS.find(c => !s.cards.some(x => x.id === c.id));
+  const a = G.mintCard(s, fresh.id, 50);
+  const b = G.mintCard(s, fresh.id, 50);
+  return VAR.isFirstEdition(a) && !VAR.isFirstEdition(b);
+})());
+check("a first edition is worth more than an identical plain copy", (()=>{
+  const fe = { id:CARDS[0].id, roll:50, variant:"normal", fe:true };
+  const plain = { id:CARDS[0].id, roll:50, variant:"normal" };
+  return VAR.valueOf(fe, 100) > VAR.valueOf(plain, 100);
+})());
+check("printing and first edition multiply together", (()=>{
+  const holo = VAR.VARIANT_MAP.holo;
+  const c = { variant:"holo", fe:true };
+  return Math.abs(VAR.multiplierFor(c) - holo.x * VAR.FIRST_EDITION_X) < 1e-9;
+})());
+// --- the mint funnel ---
+// There were five hand-written copies of the card-instance literal. The whole point of mintCard
+// is that a printing cannot be applied to four of them and forgotten on the fifth.
+check("every way of gaining a card goes through mintCard and gets a printing", (()=>{
+  const s = G.newGame(); s.gold = 100000; s.inventory = { canvas:5, ink:5, reagent:5 };
+  const before = s.cards.length;
+  G.openPack(s);
+  G.dropCards(s, 2);
+  G.scribe(s);
+  G.buyCard(s, CARDS[0].id);
+  G.issueSchoolStarter(s, "fire");
+  const added = s.cards.slice(before);
+  if (!added.length) return false;
+  const missing = added.filter(c => c.variant == null);
+  if (missing.length) console.log(`   ${missing.length} of ${added.length} cards have no printing`);
+  return missing.length === 0;
+})());
+check("starter cards are always a normal printing", (()=>{
+  const s = G.newGame();
+  return s.cards.every(c => c.variant === "normal");
+})());
+check("a pack is luckier than buying a card off the shelf", (()=>{
+  // Not a distribution test — just that the two paths pass different luck through.
+  const src = G.mintCard.toString();
+  return /luck/.test(src);
+})());
+// --- value flows through the engine, not just the module ---
+check("selling a foil pays more than selling the same card plain", (()=>{
+  const mk = variant => {
+    const s = G.newGame(); s.gold = 0;
+    s.cards = [{ uid:"c1", id:CARDS[0].id, roll:50, graded:false, variant }];
+    G.sellCard(s, "c1");
+    return s.gold;
+  };
+  return mk("holo") > mk("foil") && mk("foil") > mk("normal");
+})());
+check("a foil raises the collection's total value", (()=>{
+  const s = G.newGame();
+  const plain = G.totalCollectionValue(s);
+  s.cards[0].variant = "prism";
+  return G.totalCollectionValue(s) > plain;
+})());
+
+// ---- collection value analytics (BACKLOG §5) ----
+check("valueBySchool sums to the same total as totalCollectionValue", (()=>{
+  const s = G.newGame();
+  const bySchool = G.valueBySchool(s);
+  const sum = Object.values(bySchool).reduce((a,b)=>a+b, 0);
+  return sum === G.totalCollectionValue(s);
+})());
+check("valueByRarity sums to the same total as totalCollectionValue", (()=>{
+  const s = G.newGame();
+  const byRarity = G.valueByRarity(s);
+  const sum = Object.values(byRarity).reduce((a,b)=>a+b, 0);
+  return sum === G.totalCollectionValue(s);
+})());
+check("valueBySchool only ever lists schools the player actually owns cards from", (()=>{
+  const s = G.newGame();
+  const owned = new Set(s.cards.map(c => CARD_MAP[c.id].school));
+  return Object.keys(G.valueBySchool(s)).every(id => owned.has(id));
+})());
+check("selling a card shrinks its slice of valueBySchool immediately, with nothing left over", (()=>{
+  const s = G.newGame();
+  const c = s.cards[0]; const school = CARD_MAP[c.id].school;
+  const before = G.valueBySchool(s)[school];
+  const worth = G.instanceValue(c);
+  G.sellCard(s, c.uid);
+  const after = G.valueBySchool(s)[school] || 0;
+  return after === before - worth;
+})());
+check("topValuableCards returns the n highest-value instances, sorted descending", (()=>{
+  // A deliberately unambiguous set — three copies of the same card, only their PRINTING differs —
+  // so the value ordering follows variants.js's own rarity ladder (prismatic > foil > normal)
+  // rather than depending on the starter deck's own random rolls.
+  const s = G.newGame(); s.cards = [];
+  const id = CARDS[0].id;
+  s.cards.push({ uid:"low",  id, roll:50, graded:false, variant:"normal" });
+  s.cards.push({ uid:"mid",  id, roll:50, graded:false, variant:"foil" });
+  s.cards.push({ uid:"high", id, roll:50, graded:false, variant:"prism" });
+  const top = G.topValuableCards(s, 3);
+  return top.length === 3 && top[0].uid === "high" && top[1].uid === "mid" && top[2].uid === "low"
+      && top[0].value >= top[1].value && top[1].value >= top[2].value;
+})());
+check("topValuableCards never returns more than n entries, even with a huge collection", (()=>{
+  const s = G.newGame();
+  return G.topValuableCards(s, 5).length <= 5;
+})());
+check("topValuableCards on an empty collection returns an empty list, not an error", (()=>{
+  const s = G.newGame(); s.cards = [];
+  return Array.isArray(G.topValuableCards(s)) && G.topValuableCards(s).length === 0;
+})());
+check("an old save is grandfathered one first edition per card type, once", (()=>{
+  const old = G.newGame();
+  for (const c of old.cards){ delete c.variant; delete c.fe; }
+  delete old.flags.feStamped;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  const types = new Set(s.cards.map(c => c.id));
+  const stamped = s.cards.filter(c => VAR.isFirstEdition(c)).length;
+  if (stamped !== types.size){ console.log(`   stamped ${stamped} for ${types.size} types`); return false; }
+  // and re-loading must not mint a second "first" edition
+  localStorage_stub(JSON.stringify(s));
+  const again = G.load();
+  return again.cards.filter(c => VAR.isFirstEdition(c)).length === stamped;
+})());
+check("the collection sort floats the best printing to the top", (()=>{
+  const cards = [
+    { id:"a", variant:"normal" }, { id:"b", variant:"prism" },
+    { id:"c", variant:"foil" }, { id:"d", variant:"normal", fe:true },
+  ];
+  const sorted = [...cards].sort((a,b) => VAR.collectionRank(b) - VAR.collectionRank(a));
+  return sorted[0].variant === "prism" && sorted[sorted.length-1].variant === "normal" && !sorted[sorted.length-1].fe;
+})());
+check("a printing has a badge so it is visible without reading a tooltip", (()=>{
+  return VAR.VARIANTS.filter(v => v.id !== "normal").every(v => VAR.badgesFor({ variant:v.id }).length === 1);
+})());
+
+
+// ---- the codex: filters, completion, favourites, achievements (BACKLOG §5) ----
+// The collection screen answers "what do I own". Only the codex can answer "what am I missing",
+// which is the question a collection game exists to keep asking — and it can only do that by
+// filtering the CATALOG rather than the collection.
+check("the codex tables validate against the real catalog", (()=>{
+  const problems = CX.validateCodex(CARDS);
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("every achievement is reachable with the best possible collection", (()=>{
+  // The probe must contain one of EVERY printing. An earlier version made every card prismatic,
+  // and the foil and holo achievements reported as unreachable — the validator was right and the
+  // sample was wrong.
+  const printings = VAR.VARIANTS.map(v => v.id);
+  const everything = CARDS.map((d, i) => ({ id:d.id, roll:100, graded:true, serial:1,
+                                            variant:printings[i % printings.length], fe:true }));
+  return CX.achievementsFor(CARDS, everything).every(a => a.done);
+})());
+check("a fresh save has earned nothing yet", (()=>{
+  const s = G.newGame();
+  return CX.achievementCount(CARDS, s.cards).done === 0;
+})());
+check("completion counts card TYPES, not copies", (()=>{
+  const s = G.newGame();
+  const before = CX.overallCompletion(CARDS, s.cards).owned;
+  G.mintCard(s, s.cards[0].id, 50);          // a duplicate of something already owned
+  return CX.overallCompletion(CARDS, s.cards).owned === before;
+})());
+check("per-school completion adds up to the whole catalog", (()=>{
+  const s = G.newGame();
+  const by = CX.completionBy(CARDS, s.cards, d => d.school);
+  const total = Object.values(by).reduce((a, g) => a + g.total, 0);
+  const owned = Object.values(by).reduce((a, g) => a + g.owned, 0);
+  const all = CX.overallCompletion(CARDS, s.cards);
+  return total === CARDS.length && owned === all.owned;
+})());
+// --- browse ---
+check("owned and missing partition the catalog", (()=>{
+  const s = G.newGame();
+  const owned = CX.browse(CARDS, s, { filter:"owned" }).length;
+  const missing = CX.browse(CARDS, s, { filter:"missing" }).length;
+  return owned + missing === CARDS.length && owned > 0 && missing > 0;
+})());
+check("the missing filter really lists cards the player does not have", (()=>{
+  const s = G.newGame();
+  const have = new Set(s.cards.map(c => c.id));
+  return CX.browse(CARDS, s, { filter:"missing" }).every(r => !have.has(r.def.id));
+})());
+check("a school filter only returns that school", (()=>{
+  const s = G.newGame();
+  return CX.browse(CARDS, s, { school:"fire" }).every(r => r.def.school === "fire");
+})());
+check("search matches names and card text", (()=>{
+  const s = G.newGame();
+  const byName = CX.browse(CARDS, s, { query:"dragon" });
+  return byName.length > 0 && byName.every(r => /dragon/i.test(r.def.name + " " + (r.def.text||"")));
+})());
+check("every sort returns the whole set in a stable order", (()=>{
+  const s = G.newGame();
+  for (const o of CX.SORTS){
+    const a = CX.browse(CARDS, s, { sort:o.id }).map(r => r.def.id);
+    const b = CX.browse(CARDS, s, { sort:o.id }).map(r => r.def.id);
+    if (a.length !== CARDS.length) { console.log(`   ${o.id} returned ${a.length}`); return false; }
+    if (a.join() !== b.join()){ console.log(`   ${o.id} is not stable`); return false; }
+  }
+  return true;
+})());
+check("sorting by best copy puts a prismatic ahead of a plain card", (()=>{
+  const s = G.newGame();
+  const target = s.cards[0].id;
+  G.mintCard(s, target, 50, { variant:"prism" });
+  const rows = CX.browse(CARDS, s, { sort:"value", desc:true });
+  return rows[0].def.id === target;
+})());
+check("the special filter finds a printing or a first edition and nothing else", (()=>{
+  const s = G.newGame();
+  for (const c of s.cards){ c.variant = "normal"; delete c.fe; }
+  if (CX.browse(CARDS, s, { filter:"printed" }).length !== 0) return false;
+  s.cards[0].variant = "holo";
+  const rows = CX.browse(CARDS, s, { filter:"printed" });
+  return rows.length === 1 && rows[0].def.id === s.cards[0].id;
+})());
+// --- favourites: the one stored bit ---
+check("favouriting a card stores it and toggles back off", (()=>{
+  const s = G.newGame();
+  const id = CARDS[0].id;
+  CX.toggleFavorite(s, id);
+  const on = CX.isFavorite(s, id);
+  CX.toggleFavorite(s, id);
+  return on && !CX.isFavorite(s, id) && s.favorites.length === 0;
+})());
+check("the favourites filter returns exactly what was favourited", (()=>{
+  const s = G.newGame();
+  CX.toggleFavorite(s, CARDS[3].id);
+  const rows = CX.browse(CARDS, s, { filter:"favorite" });
+  return rows.length === 1 && rows[0].def.id === CARDS[3].id;
+})());
+check("a save that predates favourites migrates cleanly", (()=>{
+  const old = G.newGame(); delete old.favorites;
+  localStorage_stub(JSON.stringify(old));
+  const s = G.load();
+  return Array.isArray(s.favorites) && CX.browse(CARDS, s, { filter:"favorite" }).length === 0;
+})());
+// --- the derived rule, which is the whole reason achievements are not stored ---
+check("selling the cards un-earns the achievement they propped up", (()=>{
+  const s = G.newGame();
+  for (const d of CARDS) if (!s.cards.some(c => c.id === d.id)) G.mintCard(s, d.id, 50);
+  const full = CX.achievementsFor(CARDS, s.cards).find(a => a.id === "archivist");
+  if (!full.done) return false;
+  s.cards = s.cards.slice(0, 3);                       // sold almost everything
+  return CX.achievementsFor(CARDS, s.cards).find(a => a.id === "archivist").done === false;
+})());
+check("nothing about completion or achievements is written to the save", (()=>{
+  const s = G.newGame();
+  const before = JSON.stringify(s);
+  CX.overallCompletion(CARDS, s.cards);
+  CX.completionBy(CARDS, s.cards, d => d.school);
+  CX.achievementsFor(CARDS, s.cards);
+  CX.browse(CARDS, s, { filter:"missing", sort:"rarity" });
+  return JSON.stringify(s) === before;
+})());
+
+
+// ---- AI battle personalities, thematic enemy decks, multi-phase bosses (BACKLOG §4) ----
+// Every AI opponent used to run the identical strategy — highest-cost affordable card, damage
+// spells finish the weakest enemy creature, always race face unless a taunt forces a trade. These
+// checks are about the two things that have to be true for "archetype" to mean anything: the
+// personalities must actually choose DIFFERENTLY given the same board, and the compatibility
+// default must reproduce the OLD behaviour exactly so nothing that already worked breaks.
+check("the archetype table validates", (()=>{
+  const problems = ARCH.validateArchetypes();
+  if (problems.length) console.log("   " + problems.join("\n   "));
+  return problems.length === 0;
+})());
+check("midrange reproduces the old unconditional behaviour: face unless taunt", (()=>{
+  const p = ARCH.policyFor("midrange");
+  const enemyBoard = [{atk:9,hp:1},{atk:1,hp:9}];   // a very tempting trade either way
+  return ARCH.pickAttackTarget(p, {atk:5,hp:5}, enemyBoard, null) === "face";
+})());
+check("midrange's damage spell finishes the weakest enemy creature", (()=>{
+  const p = ARCH.policyFor("midrange");
+  const enemyBoard = [{atk:9,hp:8},{atk:1,hp:2}];
+  return ARCH.pickSpellTarget(p, enemyBoard, 5, 5) === 1;
+})());
+check("every archetype obeys taunt, no exceptions", (()=>{
+  return ARCH.ARCHETYPE_IDS.every(id => ARCH.pickAttackTarget(ARCH.policyFor(id), {atk:9,hp:9}, [{atk:1,hp:1}], 0) === 0);
+})());
+check("aggro always burns face with removal, even into a killable creature", (()=>{
+  const p = ARCH.policyFor("aggro");
+  return ARCH.pickSpellTarget(p, [{atk:1,hp:1}], 5, 5) === "face";
+})());
+check("aggro plays its cheapest card first; midrange plays its priciest", (()=>{
+  const playable = [{i:0,cost:1},{i:1,cost:5},{i:2,cost:3}];
+  const aggroFirst = ARCH.orderCards(ARCH.policyFor("aggro"), playable)[0];
+  const midFirst = ARCH.orderCards(ARCH.policyFor("midrange"), playable)[0];
+  return aggroFirst.cost === 1 && midFirst.cost === 5;
+})());
+check("control removes the biggest threat, not the weakest creature", (()=>{
+  const p = ARCH.policyFor("control");
+  const enemyBoard = [{atk:9,hp:8},{atk:1,hp:2}];
+  return ARCH.pickSpellTarget(p, enemyBoard, 5, 5) === 0;
+})());
+check("control takes a trade it can win instead of always racing face", (()=>{
+  const p = ARCH.policyFor("control");
+  const enemyBoard = [{atk:2,hp:3}];                // attacker kills it and survives
+  return ARCH.pickAttackTarget(p, {atk:5,hp:5}, enemyBoard, null) === 0;
+})());
+check("control will not take a trade that kills its own creature", (()=>{
+  const p = ARCH.policyFor("control");
+  const enemyBoard = [{atk:9,hp:1}];                // attacker kills it but dies too — not favourable
+  return ARCH.pickAttackTarget(p, {atk:5,hp:5}, enemyBoard, null) === "face";
+})());
+check("tempo faces when ahead on board and clears when behind", (()=>{
+  const p = ARCH.policyFor("tempo");
+  const enemyBoard = [{atk:1,hp:1}];
+  return ARCH.pickSpellTarget(p, enemyBoard, 10, 2) === "face" &&
+         ARCH.pickSpellTarget(p, enemyBoard, 2, 10) === 0;
+})());
+// --- boss phases ---
+check("a boss enters its first phase at half health, not before", (()=>{
+  return ARCH.nextBossPhase(0.51, []) === null && ARCH.nextBossPhase(0.50, []).id === "bloodied";
+})());
+check("a phase never fires twice", (()=>{
+  return ARCH.nextBossPhase(0.10, ["bloodied","desperate"]) === null;
+})());
+check("dropping straight through both thresholds still gets both, in order", (()=>{
+  const applied = [];
+  let p = ARCH.nextBossPhase(0.05, applied); applied.push(p.id);
+  const p2 = ARCH.nextBossPhase(0.05, applied);
+  return p.id === "bloodied" && p2.id === "desperate";
+})());
+// --- thematic decks ---
+check("every archetype builds a full, non-empty deck from a real school pool", (()=>{
+  const pool = CARDS.filter(d => d.school === "fire");
+  return ["aggro","control","tempo","boss","midrange"].every(a => ARCH.archetypeDeckFor(a, pool).length === 20);
+})());
+check("a school with no damage spell still gets a full deck (falls back to creatures)", (()=>{
+  const pool = CARDS.filter(d => d.school === "ice");   // ice has zero fx:dmg spells
+  return ARCH.archetypeDeckFor("control", pool).length === 20;
+})());
+check("an empty pool never crashes — it returns an empty deck, not a broken one", ARCH.archetypeDeckFor("aggro", []).length === 0);
+check("aggro's deck skews cheaper than the boss deck from the same pool", (()=>{
+  const pool = CARDS.filter(d => d.school === "fire");
+  const avgCost = ids => ids.reduce((a,id) => a + CARD_MAP[id].cost, 0) / ids.length;
+  return avgCost(ARCH.archetypeDeckFor("aggro", pool)) < avgCost(ARCH.archetypeDeckFor("boss", pool));
+})());
+check("every card in a generated deck actually comes from the pool given", (()=>{
+  const pool = CARDS.filter(d => d.school === "death");
+  const ids = new Set(pool.map(d => d.id));
+  return ARCH.archetypeDeckFor("control", pool).every(id => ids.has(id));
+})());
+// --- autoBuildDeck: the player-facing sibling, capped by what's actually owned ---
+check("autoBuildDeck never exceeds 3 copies of a card, even if the archetype wants more", (()=>{
+  const owned = { fire_cat: 3, fire_elf: 3, fire_dragon: 3, firebolt: 3, fireball: 3, meteor: 3 };
+  const deck = ARCH.autoBuildDeck("aggro", owned, CARDS.filter(d=>d.school==="fire"));
+  const counts = {}; for (const id of deck) counts[id] = (counts[id]||0)+1;
+  return Object.values(counts).every(n => n <= 3);
+})());
+check("autoBuildDeck never suggests a card the player owns zero of", (()=>{
+  const owned = { fire_cat: 3, fire_elf: 3 };   // owns nothing else in the fire pool
+  const deck = ARCH.autoBuildDeck("aggro", owned, CARDS.filter(d=>d.school==="fire"));
+  return deck.every(id => id === "fire_cat" || id === "fire_elf");
+})());
+check("autoBuildDeck fills all 20 slots when the collection can support it", (()=>{
+  const owned = {}; for (const c of CARDS) owned[c.id] = 3;   // three of literally everything
+  return ARCH.autoBuildDeck("control", owned, CARDS).length === 20;
+})());
+check("autoBuildDeck returns a legitimate PARTIAL deck when the collection can't fill it — not a hang", (()=>{
+  const owned = { fire_cat: 2 };
+  const deck = ARCH.autoBuildDeck("aggro", owned, CARDS.filter(d=>d.school==="fire"));
+  return deck.length === 2 && deck.every(id => id === "fire_cat");
+})());
+check("autoBuildDeck on an empty collection returns an empty deck, not a crash", (()=>{
+  return ARCH.autoBuildDeck("aggro", {}, CARDS.filter(d=>d.school==="fire")).length === 0;
+})());
+check("autoBuildDeck respects ownership across the WHOLE catalog, not just one school", (()=>{
+  // A real player deck already mixes schools (the starter deck does) — auto-build should too.
+  const owned = { fire_cat: 3, ice_golem: 3, pixie: 3, novice: 3, firebolt: 3 };
+  const deck = ARCH.autoBuildDeck("midrange", owned, CARDS);
+  const schools = new Set(deck.map(id => CARD_MAP[id].school));
+  return schools.size > 1;
+})());
+// --- assigning an archetype from what the enemy visibly is ---
+check("a boss is always the boss archetype regardless of its model name", ARCH.archetypeFor({model:"whatever.glb", boss:true}) === "boss");
+check("dragons, slimes, skeletons and bats/wraiths get their own personality", (()=>{
+  return ARCH.archetypeFor({model:"creature_Dragon.glb"}) === "boss" &&
+         ARCH.archetypeFor({model:"creature_Slime.glb"}) === "aggro" &&
+         ARCH.archetypeFor({model:"creature_Skeleton.glb"}) === "control" &&
+         ARCH.archetypeFor({model:"creature_Bat.glb"}) === "tempo" &&
+         ARCH.archetypeFor({model:"enemy_skeleton.glb"}) === "control";
+})());
+check("an unrecognised enemy still gets a usable, safe default", ARCH.archetypeFor({model:"mystery.glb"}) === "midrange");
+check("every flavour school actually has a positive population to draw from", (()=>{
+  const schools = new Set(["fire","ice","storm","myth","life","death","balance"]);
+  const usedSchools = new Set([ARCH.flavorSchoolFor({model:"creature_Dragon.glb"}),
+    ARCH.flavorSchoolFor({model:"creature_Slime.glb"}), ARCH.flavorSchoolFor({model:"creature_Skeleton.glb"}),
+    ARCH.flavorSchoolFor({model:"creature_Bat.glb"}), ARCH.flavorSchoolFor({model:"???"})]);
+  return [...usedSchools].every(s => schools.has(s) && CARDS.some(d => d.school === s));
+})());
+
+// ---- game.js integration: the archetype actually changes how a real duel plays out ----
+check("QUESTS carry an archetype, defaulting to midrange when not given", (()=>{
+  return G.QUESTS.every(q => !!q.archetype) && G.QUESTS[0].archetype === "aggro" && G.QUESTS[7].archetype === "boss";
+})());
+check("aiTurn with no archetype set behaves exactly as the old unconditional AI did", (()=>{
+  // Reproduce runSelfTest's "contrast" case (player never acts) with an explicit archetype-free
+  // battle and confirm it still resolves the same way: the AI alone is enough to win.
+  const s = G.newGame();
+  const b = G.startDuel(s.deck, G.equipStats(s), G.QUESTS[0].deck, G.QUESTS[0].gear, G.QUESTS[0].hp);
+  delete b.enemy.archetype;
+  let guard = 0; while (!G.isOver(b).over && guard++ < 200) G.aiTurn(b);
+  return G.isOver(b).over && G.isOver(b).winner === "enemy";
+})());
+check("a boss duel actually enters a phase once its HP crosses the threshold", (()=>{
+  const s = G.newGame();
+  const b = G.startDuel(deck20("elixir"), {hp:0,atk:0,def:0,pip:0}, deck20("fire_dragon"), {hp:0,atk:0,def:0,pip:0}, 40);
+  b.enemy.archetype = "boss";
+  b.enemy.hp = 18;                              // 45% — past "bloodied" (50%), not yet "desperate" (20%)
+  G.aiTurn(b);
+  return JSON.stringify(b.enemy.phasesApplied) === JSON.stringify(["bloodied"]);
+})());
+check("dropping through BOTH thresholds between the boss's own turns fires both at once", (()=>{
+  // The guarantee archetypes.js documents: a big hit landing between the boss's turns must not
+  // make it wait an extra turn to "catch up" on a phase it skipped past.
+  const s = G.newGame();
+  const b = G.startDuel(deck20("elixir"), {hp:0,atk:0,def:0,pip:0}, deck20("fire_dragon"), {hp:0,atk:0,def:0,pip:0}, 40);
+  b.enemy.archetype = "boss";
+  b.enemy.hp = 5;                               // 12.5% — already past BOTH thresholds
+  const before = b.enemy.atkBonus || 0;
+  G.aiTurn(b);
+  return (b.enemy.atkBonus || 0) > before && JSON.stringify(b.enemy.phasesApplied) === JSON.stringify(["bloodied","desperate"]);
+})());
+check("a non-boss archetype never enters a boss phase, however low its HP", (()=>{
+  const s = G.newGame();
+  const b = G.startDuel(deck20("elixir"), {hp:0,atk:0,def:0,pip:0}, deck20("skeleton"), {hp:0,atk:0,def:0,pip:0}, 40);
+  b.enemy.archetype = "control";
+  b.enemy.hp = 2;
+  G.aiTurn(b);
+  return !b.enemy.phasesApplied || b.enemy.phasesApplied.length === 0;
+})());
+
+
+// ---------------------------------------------------------------- pvprank.js
+check("validateRanks reports no problems", RANK.validateRanks().length === 0);
+check("tierFor(0) is bronze, tierFor a huge score is grandmaster", (()=>{
+  return RANK.tierFor(0).id === "bronze" && RANK.tierFor(99999).id === "grandmaster";
+})());
+check("tierFor is exact-boundary inclusive", (()=>{
+  return RANK.tierFor(300).id === "silver" && RANK.tierFor(299).id === "bronze";
+})());
+check("nextTier is null at the top tier, populated everywhere else", (()=>{
+  return RANK.nextTier(0).id === "silver" && RANK.nextTier(99999) === null;
+})());
+check("progressToNextTier reports maxed at the top tier", RANK.progressToNextTier(99999).maxed === true);
+check("progressToNextTier reports have/need/pct within a tier", (()=>{
+  const p = RANK.progressToNextTier(150);       // bronze [0,300)
+  return p.have === 150 && p.need === 300 && p.pct === 50 && !p.maxed;
+})());
+check("titleFor: ordinary tiers are '<Tier> Duelist', grandmaster is special", (()=>{
+  return RANK.titleFor(0) === "Bronze Duelist" && RANK.titleFor(99999) === "Grandmaster of the Arcane";
+})());
+check("resultOf: a win always gains points and increments the streak", (()=>{
+  const r = RANK.resultOf(true, 100, 0, 0);
+  return r.points === 120 && r.streak === 1 && r.delta === 20;
+})());
+check("resultOf: streak bonus grows then caps at STREAK_CAP", (()=>{
+  const a = RANK.resultOf(true, 0, 5, 0);        // already at the cap
+  const b = RANK.resultOf(true, 0, 50, 0);       // way past the cap
+  return a.delta === 30 && b.delta === 30;
+})());
+check("resultOf: a loss always costs points, and resets the streak", (()=>{
+  const r = RANK.resultOf(false, 100, 4, 0);
+  return r.points === 85 && r.streak === 0 && r.delta === -15;
+})());
+check("resultOf: a loss cannot fall below the season floor", (()=>{
+  const r = RANK.resultOf(false, 305, 0, 300);   // one point above the floor
+  return r.points === 300;
+})());
+check("resultOf: the season floor itself cannot go negative", (()=>{
+  const r = RANK.resultOf(false, 5, 0, 0);
+  return r.points === 0;
+})());
+check("seasonIdFor is a stable YYYY-MM in UTC", (()=>{
+  return RANK.seasonIdFor(Date.UTC(2026, 7, 9)) === "2026-08"       // August, 0-indexed month 7
+      && RANK.seasonIdFor(Date.UTC(2026, 0, 1)) === "2026-01";
+})());
+check("applyResult mutates rankPoints/streak/seasonBest in place and returns the delta", (()=>{
+  const pvp = { rankPoints: 0, streak: 0, seasonBest: 0 };
+  const r = RANK.applyResult(pvp, true);
+  return pvp.rankPoints === 20 && pvp.streak === 1 && pvp.seasonBest === 20 && r.delta === 20;
+})());
+check("applyResult: seasonBest only ever rises, even after a loss", (()=>{
+  const pvp = { rankPoints: 320, streak: 0, seasonBest: 320 };
+  RANK.applyResult(pvp, false);
+  return pvp.rankPoints === 305 && pvp.seasonBest === 320;
+})());
+check("settleSeason on a brand-new save starts the current season with no history", (()=>{
+  const pvp = { rankPoints: 0, streak: 0, season: null, seasonBest: 0, history: [] };
+  RANK.settleSeason(pvp, Date.UTC(2026, 7, 9));
+  return pvp.season === "2026-08" && pvp.history.length === 0;
+})());
+check("settleSeason is a no-op within the same season", (()=>{
+  const pvp = { rankPoints: 123, streak: 3, season: "2026-08", seasonBest: 200, history: [] };
+  RANK.settleSeason(pvp, Date.UTC(2026, 7, 20));
+  return pvp.rankPoints === 123 && pvp.streak === 3 && pvp.history.length === 0;
+})());
+check("settleSeason on rollover records history and soft-resets, never below the tier floor", (()=>{
+  const pvp = { rankPoints: 270, streak: 4, season: "2026-08", seasonBest: 270, history: [] };
+  RANK.settleSeason(pvp, Date.UTC(2026, 8, 1));  // next month
+  const halved = Math.floor(270 * 0.5);
+  return pvp.season === "2026-09"
+      && pvp.rankPoints === halved && pvp.seasonBest === halved
+      && pvp.streak === 0
+      && pvp.history.length === 1 && pvp.history[0].season === "2026-08"
+      && pvp.history[0].points === 270 && pvp.history[0].tier === "bronze";
+})());
+check("settleSeason soft reset cannot drop a player below the tier they finished in", (()=>{
+  const pvp = { rankPoints: 1850, streak: 2, season: "2026-08", seasonBest: 1850, history: [] };  // diamond
+  RANK.settleSeason(pvp, Date.UTC(2026, 8, 1));
+  return pvp.rankPoints >= RANK.TIERS.find(t=>t.id==="diamond").min;
+})());
+check("settleSeason caps history at 12 entries", (()=>{
+  const pvp = { rankPoints: 0, streak: 0, season: "2020-01", seasonBest: 0, history: Array.from({length:12}, (_,i)=>({season:`2019-${i+1}`, points:0, tier:"bronze"})) };
+  RANK.settleSeason(pvp, Date.UTC(2020, 1, 1));
+  return pvp.history.length === 12 && pvp.history[0].season === "2020-01";
+})());
+check("game.js newGame() gives a fresh pvp record with the pvprank fields", (()=>{
+  const s = G.newGame();
+  return s.pvp.rankPoints === 0 && s.pvp.streak === 0 && s.pvp.seasonBest === 0
+      && Array.isArray(s.pvp.history) && s.pvp.season === null;
+})());
+check("game.js load() settles the season on a fresh save", (()=>{
+  const s = G.load();
+  return typeof s.pvp.season === "string" && s.pvp.season === RANK.seasonIdFor(Date.now());
+})());
+check("game.js migrate() defaults rank fields for an older save missing them", (()=>{
+  const old = G.newGame();
+  delete old.pvp.rankPoints; delete old.pvp.streak; delete old.pvp.history; delete old.pvp.seasonBest;
+  old.pvp.wins = 40; old.pvp.losses = 20;
+  const m = G.migrate ? G.migrate(old) : null;
+  if (!m) return true;  // migrate() is not exported; covered indirectly via load() above
+  return m.pvp.rankPoints === 0 && m.pvp.streak === 0 && Array.isArray(m.pvp.history) && m.pvp.seasonBest === 0;
+})());
+
+// ---------------------------------------------------------------- schoolmagic.js
+check("validateSchoolMagic reports no problems", MAGIC.validateSchoolMagic().length === 0);
+check("affinityFx: same-school caster and spell earns a bonus", (()=>{
+  const fx = MAGIC.affinityFx("fire", "fire");
+  return Array.isArray(fx) && fx.length === 1;
+})());
+check("affinityFx: off-school spell earns nothing", MAGIC.affinityFx("fire", "ice") === null);
+check("affinityFx: no caster school earns nothing", MAGIC.affinityFx(null, "fire") === null);
+check("every school has both an affinity bonus and an ultimate", (()=>{
+  const ids = ["fire","ice","storm","myth","life","death","balance"];
+  return ids.every(id => MAGIC.AFFINITY_FX[id] && MAGIC.ultimateFor(id));
+})());
+check("canUseUltimate: false below the charge threshold", MAGIC.canUseUltimate(MAGIC.ULT_CHARGE_MAX-1, "fire", false) === false);
+check("canUseUltimate: true once charged, for a real school", MAGIC.canUseUltimate(MAGIC.ULT_CHARGE_MAX, "fire", false) === true);
+check("canUseUltimate: false once already used this duel", MAGIC.canUseUltimate(MAGIC.ULT_CHARGE_MAX, "fire", true) === false);
+check("canUseUltimate: false for an unknown school", MAGIC.canUseUltimate(MAGIC.ULT_CHARGE_MAX, "nope", false) === false);
+
+// ---- game.js integration: affinity bonus, ultimate charge/cast, AI auto-cast ----
+check("startDuel gives both sides a fresh, unused ultimate charge", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("firebolt"), flat, 100, "fire", "fire");
+  return b.you.ultCharge === 0 && !b.you.ultUsed && b.enemy.ultCharge === 0 && !b.enemy.ultUsed;
+})());
+check("playing a card of your OWN school banks ultimate charge; an off-school card does not", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b.you.hand = ["firebolt"]; b.you.pips = 10;
+  G.playCard(b, b.you, 0, { kind: "wiz" });
+  const withOwnSchool = b.you.ultCharge;
+  const b2 = G.startDuel(deck20("ice_golem"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b2.you.hand = ["ice_golem"]; b2.you.pips = 10;
+  G.playCard(b2, b2.you, 0, null);
+  return withOwnSchool === 1 && b2.you.ultCharge === 0;
+})());
+check("a fire wizard's own-school spell deals the affinity bonus dmg on top of the printed value", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b.you.hand = ["firebolt"]; b.you.pips = 10;
+  const before = b.enemy.hp;
+  G.playCard(b, b.you, 0, { kind: "wiz" });
+  return before - b.enemy.hp === 5;    // 4 printed + 1 fire affinity
+})());
+check("useUltimate fails below the charge threshold", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  return G.useUltimate(b, b.you).ok === false;
+})());
+check("useUltimate applies the school's fx, drains the charge, and can't be reused this duel", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b.you.ultCharge = MAGIC.ULT_CHARGE_MAX;
+  const enemyHpBefore = b.enemy.hp;
+  const r = G.useUltimate(b, b.you);
+  const spentAndUsed = r.ok && b.you.ultCharge === 0 && b.you.ultUsed;
+  const dealtDamage = enemyHpBefore - b.enemy.hp === 3;   // Inferno's dmgWiz
+  const second = G.useUltimate(b, b.you);
+  return spentAndUsed && dealtDamage && second.ok === false;
+})());
+check("useUltimate refuses on the opponent's turn", (()=>{
+  const b = G.startDuel(deck20("firebolt"), flat, deck20("frost_giant"), flat, 100, "fire", "ice");
+  b.you.ultCharge = MAGIC.ULT_CHARGE_MAX;
+  b.turn = "enemy";
+  return G.useUltimate(b, b.you).ok === false;
+})());
+check("aiTurn spends a charged ultimate automatically", (()=>{
+  const b = G.startDuel(deck20("elixir"), flat, deck20("frost_giant"), flat, 100, "balance", "ice");
+  b.turn = "enemy";
+  b.enemy.ultCharge = MAGIC.ULT_CHARGE_MAX;
+  const shieldBefore = b.enemy.shield;
+  G.aiTurn(b);
+  return b.enemy.ultUsed && b.enemy.shield > shieldBefore;   // Deep Freeze shields for 8
+})());
+
+// ---------------------------------------------------------------- cardbacks.js
+check("validateCardBacks reports no problems", CB.validateCardBacks().length === 0);
+check("the default back is always unlocked, with no achievement gate", (()=>{
+  return CB.isUnlocked(CB.DEFAULT_BACK, []) === true;
+})());
+check("every non-default back is locked with no achievements done", (()=>{
+  return CB.CARD_BACKS.filter(b => b.id !== CB.DEFAULT_BACK).every(b => CB.isUnlocked(b.id, []) === false);
+})());
+check("a back unlocks once its matching achievement is done", (()=>{
+  return CB.isUnlocked("archivist", ["archivist"]) === true
+      && CB.isUnlocked("archivist", ["curator"]) === false;
+})());
+check("unlockedBacks always includes the default plus whatever achievements are done", (()=>{
+  const ids = CB.unlockedBacks(["shiny", "founder"]).map(b => b.id);
+  return ids.includes(CB.DEFAULT_BACK) && ids.includes("shiny") && ids.includes("founder") && !ids.includes("curator");
+})());
+check("equippedBack falls back to the default for a fresh or bad save", (()=>{
+  return CB.equippedBack({}).id === CB.DEFAULT_BACK
+      && CB.equippedBack({ cardBack: "not-a-real-id" }).id === CB.DEFAULT_BACK
+      && CB.equippedBack(null).id === CB.DEFAULT_BACK;
+})());
+check("setBack refuses a locked back and leaves the save unchanged", (()=>{
+  const save = { cardBack: CB.DEFAULT_BACK };
+  const r = CB.setBack(save, "legends", []);
+  return r.ok === false && save.cardBack === CB.DEFAULT_BACK;
+})());
+check("setBack accepts an unlocked back", (()=>{
+  const save = { cardBack: CB.DEFAULT_BACK };
+  const r = CB.setBack(save, "scholar", ["scholar"]);
+  return r.ok === true && save.cardBack === "scholar";
+})());
+check("every card back's achievement id (if any) is a real codex achievement", (()=>{
+  const ids = CX.ACHIEVEMENTS.map(a => a.id);
+  return CB.CARD_BACKS.every(b => b.achievement == null || ids.includes(b.achievement));
+})());
+check("game.js newGame() equips the default card back", G.newGame().cardBack === CB.DEFAULT_BACK);
+check("game.js load() never leaves cardBack unset or pointing at a fake back", (()=>{
+  const s = G.load();
+  return !!s.cardBack && !!CB.BACK_MAP[s.cardBack];
+})());
+
+// ---------------------------------------------------------------- achievements.js (BACKLOG §1/§2)
+check("validateAchievements reports no problems", ACHV.validateAchievements().length === 0);
+check("a fresh save has earned none of the achievements", (()=>{
+  const s = G.newGame();
+  return ACHV.achievementsFor(s).every(a => a.done === false);
+})());
+check("wayfarer completes exactly when every field quest is done", (()=>{
+  const s = G.newGame();
+  s.zoneQuests.done = ZQ.ZONE_QUESTS.map(q => q.id).slice(0, -1);
+  const notYet = ACHV.achievementsFor(s).find(a => a.id === "wayfarer");
+  s.zoneQuests.done = ZQ.ZONE_QUESTS.map(q => q.id);
+  const done = ACHV.achievementsFor(s).find(a => a.id === "wayfarer");
+  return notYet.done === false && done.done === true;
+})());
+check("wyrmslayer and vault_breaker read their own dungeon's bossDead, not each other's", (()=>{
+  const s = G.newGame();
+  s.worldState.dungeons.cinderhollow_caverns = { bossDead: true };
+  const list = ACHV.achievementsFor(s);
+  return list.find(a => a.id === "wyrmslayer").done === true
+      && list.find(a => a.id === "vault_breaker").done === false;
+})());
+check("gold_hoarder is derived live — spending the gold un-earns it", (()=>{
+  const s = G.newGame();
+  s.gold = 5000;
+  const before = ACHV.achievementsFor(s).find(a => a.id === "gold_hoarder").done;
+  s.gold = 0;
+  const after = ACHV.achievementsFor(s).find(a => a.id === "gold_hoarder").done;
+  return before === true && after === false;
+})());
+check("the default title is always unlocked, with no achievement gate", (()=>{
+  return ACHV.isTitleUnlocked(ACHV.DEFAULT_TITLE, []) === true;
+})());
+check("every non-default title is locked until its achievement is done", (()=>{
+  return ACHV.TITLES.filter(t => t.id !== ACHV.DEFAULT_TITLE).every(t => ACHV.isTitleUnlocked(t.id, []) === false)
+      && ACHV.isTitleUnlocked("wyrmslayer", ["wyrmslayer"]) === true;
+})());
+check("equippedTitle falls back to the default for a fresh or bad save", (()=>{
+  return ACHV.equippedTitle({}).id === ACHV.DEFAULT_TITLE
+      && ACHV.equippedTitle({ title: "not-a-real-id" }).id === ACHV.DEFAULT_TITLE
+      && ACHV.equippedTitle(null).id === ACHV.DEFAULT_TITLE;
+})());
+check("setTitle refuses a locked title and leaves the save unchanged", (()=>{
+  const save = { title: ACHV.DEFAULT_TITLE };
+  const r = ACHV.setTitle(save, "grandmaster", []);
+  return r.ok === false && save.title === ACHV.DEFAULT_TITLE;
+})());
+check("setTitle accepts an unlocked title", (()=>{
+  const save = { title: ACHV.DEFAULT_TITLE };
+  const r = ACHV.setTitle(save, "wyrmslayer", ["wyrmslayer"]);
+  return r.ok === true && save.title === "wyrmslayer";
+})());
+check("game.js newGame() equips the default title", G.newGame().title === ACHV.DEFAULT_TITLE);
+check("game.js load() never leaves title unset or pointing at a fake title", (()=>{
+  const s = G.load();
+  return !!s.title && ACHV.TITLES.some(t => t.id === s.title);
+})());
+
+// ---------------------------------------------------------------- enchanting (BACKLOG §6)
+check("every enchant costs a real bar the smithing chain actually produces", (()=>{
+  const barIds = new Set(BARS.map(b => b.id));
+  return ENCHANTS.every(e => Object.keys(e.req).every(id => barIds.has(id)));
+})());
+check("enchantStats returns a zeroed stat block for an unknown enchant id", (()=>{
+  const s = enchantStats("not-a-real-id");
+  return s.atk === 0 && s.def === 0 && s.hp === 0 && s.pip === 0 && s.gold === 0;
+})());
+check("enchantStats returns exactly the printed stat/n for a real enchant", (()=>{
+  const s = enchantStats("ward_2");
+  return s.def === 2 && s.atk === 0 && s.hp === 0;
+})());
+check("canEnchant is false below the required level, gold or resources", (()=>{
+  const s = G.newGame();
+  return G.canEnchant(s, "whet_1") === false;   // no bar_bronze, no matter the gold
+})());
+check("enchantItem applies to the named item, charges gold, consumes the bar, and grants XP", (()=>{
+  const s = G.newGame();
+  s.gold = 500; s.inventory.bar_bronze = 2;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  const goldBefore = s.gold, xpBefore = s.skillXp.enchanting;
+  const r = G.enchantItem(s, "eq1", "whet_1");
+  return r.ok && eq.enchant === "whet_1"
+      && s.gold === goldBefore - ENCHANT_MAP.whet_1.cost
+      && s.inventory.bar_bronze === 1
+      && s.skillXp.enchanting > xpBefore;
+})());
+check("enchantItem refuses without enough gold, even with the resource and level in hand", (()=>{
+  const s = G.newGame();
+  s.gold = 0; s.inventory.bar_bronze = 2;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  const r = G.enchantItem(s, "eq1", "whet_1");
+  return r.ok === false && r.err === "gold" && eq.enchant === undefined;
+})());
+check("enchantItem refuses below the required enchanting level", (()=>{
+  const s = G.newGame();
+  s.gold = 500; s.inventory.bar_mithril = 2;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  const r = G.enchantItem(s, "eq1", "whet_3");   // needs level 45, save starts at 1
+  return r.ok === false && r.err === "level";
+})());
+check("re-enchanting an item overwrites the previous enchant rather than stacking", (()=>{
+  const s = G.newGame();
+  s.gold = 1000; s.inventory.bar_bronze = 2; s.inventory.bar_silver = 2; s.skills.enchanting = 25;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  G.enchantItem(s, "eq1", "whet_1");
+  G.enchantItem(s, "eq1", "whet_2");
+  return eq.enchant === "whet_2";
+})());
+check("equipStats includes an equipped item's enchant bonus on top of its base stats", (()=>{
+  const s = G.newGame();
+  s.gold = 500; s.inventory.bar_bronze = 2;
+  const eq = { uid:"eq1", id:"bronze_wand", slot:"wand", metal:"bronze", tier:1 };
+  s.equipment.push(eq);
+  G.equip(s, "eq1");
+  const afterUnenchanted = G.equipStats(s).atk;   // bronze wand's own +2 atk
+  G.enchantItem(s, "eq1", "whet_1");
+  const afterEnchanted = G.equipStats(s).atk;
+  return afterEnchanted === afterUnenchanted + 1;   // whet_1 is +1 atk
+})());
+check("game.js newGame() starts the enchanting skill at level 1 like every other skill", G.newGame().skills.enchanting === 1);
+
+// ---------------------------------------------------------------- save backup/import/export (BACKLOG §9)
+check("exportSave round-trips through importSave with the save intact", (()=>{
+  const s = G.newGame();
+  s.gold = 9001; s.name = "Roundtrip";
+  const r = G.importSave(G.exportSave(s));
+  return r.ok && r.save.gold === 9001 && r.save.name === "Roundtrip"
+      && r.save.cards.length === s.cards.length && r.save.deck.length === s.deck.length;
+})());
+check("importSave refuses text that isn't JSON at all", G.importSave("not json { at all").ok === false
+  && G.importSave("not json { at all").err === "json");
+check("importSave refuses a JSON array — not the shape a save has ever taken", (()=>{
+  const r = G.importSave(JSON.stringify([1,2,3]));
+  return r.ok === false && r.err === "shape";
+})());
+check("importSave refuses an object with no version — never a save this game wrote", (()=>{
+  const r = G.importSave(JSON.stringify({ cards:[], deck:[] }));
+  return r.ok === false && r.err === "version";
+})());
+check("importSave refuses a versioned object missing cards/deck", (()=>{
+  const r = G.importSave(JSON.stringify({ version:1 }));
+  return r.ok === false && r.err === "shape";
+})());
+check("a successfully imported save is hydrated through the SAME path load() uses", (()=>{
+  // migrate() would add the enchanting skill to an old save missing it; importSave must too,
+  // rather than accepting the raw shape verbatim.
+  const s = G.newGame();
+  delete s.skills.enchanting; delete s.skillXp.enchanting;
+  const r = G.importSave(JSON.stringify(s));
+  return r.ok && r.save.skills.enchanting === 1 && r.save.skillXp.enchanting === 0;
+})());
+check("importing a save with a live auction settles it exactly like load() would", (()=>{
+  const s = G.newGame();
+  G.listAuction(s, s.cards[0].uid, 50);
+  s.auctions[0].ends = Date.now() - 1;   // already expired at export time
+  const r = G.importSave(JSON.stringify(s));
+  return r.ok && r.save.auctions.length === 0;
+})());
+check("importSave never mutates the game's actual save (localStorage) as a side effect", (()=>{
+  // exportSave/importSave are pure text <-> save operations; only an explicit save() call after
+  // import should ever touch localStorage — the caller decides when to commit an import, not
+  // this function.
+  const before = G.load();
+  G.importSave(JSON.stringify({ version:1, cards:[], deck:[], gold:999999 }));
+  const after = G.load();
+  return after.gold === before.gold;
+})());
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

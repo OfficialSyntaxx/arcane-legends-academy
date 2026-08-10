@@ -15,8 +15,13 @@
 | School art, card art, backgrounds, pack art | Higgsfield image | ✅ in-game |
 | PWA icons | generated locally (headless Chromium) | ✅ free |
 
-Still procedural primitives: **Library, Smithy, Merchant Stall, Student Dorms**, fountain, trees,
-ore nodes, stumps, lamps, torches.
+*(Corrected Aug 2026: the Library, Smithy, Merchant Stall and Student Dorms are **no longer
+procedural** — they use CC0 KayKit hex models, see `ASSETS.md`.)*
+
+Still procedural primitives: the **fountain**, street lamps, crystal spires, the fishing-spot node
+(the only node kind with no model at all), every piece of **dorm furniture**, boss trophies, the
+**dungeon wall/floor kit**, the in-duel arena, and zone gateways. Each of these has a full
+modelling brief in **`BLENDERTODO.md`**.
 
 ---
 

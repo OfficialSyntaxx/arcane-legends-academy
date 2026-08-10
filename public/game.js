@@ -1,7 +1,14 @@
 // Wizard TCG — engine (saved state, skills, economy, market, auctions, housing, duels, AI)
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, SCHOOL_BONUS, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
-import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS } from "./items.js";
+import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats, PRISTINE_CHANCE, pristineIdFor, pristineVariantFor, isPristineId, baseMatIdFor } from "./items.js";
 import * as ACADEMY from "./academy.js";
+import * as LESSONS from "./lessons.js";
+import * as VAR from "./variants.js";
+import * as ARCH from "./archetypes.js";
+import * as RANK from "./pvprank.js";
+import * as MAGIC from "./schoolmagic.js";
+import * as CB from "./cardbacks.js";
+import * as ACHV from "./achievements.js";
 import { traitForCard } from "./creatures.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
@@ -16,43 +23,118 @@ export function newGame(){
   const starterTypes = ["fire_dragon","storm_titan","ice_golem","firebolt","lightning","pixie","elixir","fire_elf","novice","myth_walker"];
   const deck = [];
   for (const id of starterTypes) for (let i=0;i<2;i++) deck.push(id); // 20-card deck format
+  // Starters can't go through mintCard (there is no save yet), so they mirror its shape by hand:
+  // always a normal printing — a free deck should not also hand out the rarest thing in the game
+  // — and the FIRST copy of each type carries the first-edition stamp, which is true.
   const cards = [];
-  for (const id of starterTypes) for (let i=0;i<3;i++) cards.push({ uid: uid(), id, roll: Math.floor(rng()*101), graded:false });
+  for (const id of starterTypes) for (let i=0;i<3;i++){
+    const inst = { uid: uid(), id, roll: Math.floor(rng()*101), graded:false, variant:"normal" };
+    if (i === 0) inst.fe = true;
+    cards.push(inst);
+  }
   return {
-    version:1, name:"Aspiring Wizard", school:"balance", gold:START_GOLD, xp:0, level:1,
-    skills:{ mining:1, fishing:1, woodcutting:1, smithing:1, alchemy:1, scribing:1 },
-    skillXp:{ mining:0, fishing:0, woodcutting:0, smithing:0, alchemy:0, scribing:0 },
+    version:1, school:"balance", gold:START_GOLD, xp:0, level:1,
+    skills:{ mining:1, fishing:1, woodcutting:1, smithing:1, alchemy:1, scribing:1, enchanting:1 },
+    skillXp:{ mining:0, fishing:0, woodcutting:0, smithing:0, alchemy:0, scribing:0, enchanting:0 },
     inventory:{}, cards, equipment:[],
+    // Resource node regeneration (BACKLOG §6). matId -> the timestamp (ms) it's gatherable again.
+    // Only materials actually gathered ever get an entry — an empty object is "everything ready."
+    gatherCooldowns:{},
     loadout:{ wand:null, hat:null, robe:null, boots:null, amulet:null },
     deck,
-    home:{ owned:false, upgrades:{ treasury:0, library:0, armory:0, tavern:0 } },
+    // `name` starts EMPTY on purpose: charcreate.js derives "creation unfinished" from a missing
+    // name, so a default here would skip the creation screen entirely on a fresh save.
+    name:"", appearance:{ variant:"standard", aura:"ring" },
+    home:{ owned:false, upgrades:{ treasury:0, library:0, armory:0, tavern:0 }, stock:{}, furniture:{}, cases:{} },
     quests:{ current:0, done:[] },
-    pvp:{ wins:0, losses:0 },
+    // PvP rank (pvprank.js). `rankPoints`/`streak`/`seasonBest` are STORED — the outcome of a
+    // sequence of match results that cannot be recomputed from win/loss totals alone (two 40-20
+    // records can sit at very different points depending on the order the results came in),
+    // exactly like a card's `roll` in variants.js. `season` is set on first load, not here — a
+    // fresh save has never "started" a season until load() calls settleSeason.
+    pvp:{ wins:0, losses:0, rankPoints:0, streak:0, season:null, seasonBest:0, history:[] },
     stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 }, academyBonus:0,
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
-    worldState:{ zone:"academy", visited:["academy"], dungeons:{} },
+    // `treasuresFound` (BACKLOG §3 "Hidden areas / treasure") is a flat list of globally-unique
+    // treasure ids (worldconfig.js's validateTreasureIds enforces uniqueness across every zone),
+    // not nested per-zone the way a dungeon's `defeated` list is — a claimed cache is a one-time
+    // world event, same shape as a dungeon boss kill, just not scoped to one dungeon's own key.
+    worldState:{ zone:"academy", visited:["academy"], dungeons:{}, treasuresFound:[] },
     // Quests given by NPCs out in the world (zonequests.js). Only the player's CHOICES live
     // here — progress is derived from inventory/dungeon state every time it is read.
     zoneQuests:{ accepted:[], done:[] },
+    // Academy classes (lessons.js). Only the CHOICES: enrolled and passed. What each class taught
+    // is recomputed from `done` on every read.
+    lessons:{ enrolled:[], done:[] },
+    // Favourited card TYPES (codex.js). The one stored bit of the codex — everything else about a
+    // collection (completion, achievements, filters) is derived from `cards` on every read.
+    favorites:[],
+    // Equipped card back (cardbacks.js). The one stored bit there too — WHICH backs are unlocked
+    // is derived from achievements every time; this is only the choice among the unlocked ones.
+    cardBack: CB.DEFAULT_BACK,
+    // Equipped player title (achievements.js). Same shape as cardBack: which titles are UNLOCKED
+    // is derived from achievements every time; this is only the choice among the unlocked ones.
+    title: ACHV.DEFAULT_TITLE,
     // NPC reputation (reputation.js). Only quest givers earn any right now — see that module
     // for why this is a flat {npcKey: number} map rather than a richer per-NPC shape.
     reputation:{},
-    auctions:[], slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false }, flags:{ starters:true, schoolPicked:false, lastClassDay:null, adviceHidden:false },
+    auctions:[],
+    // Auction history (BACKLOG §6 "Auction history / price history"). Recorded once a listing
+    // SETTLES — the outcome of NPC bidding, not something that can be recomputed from `auctions`
+    // (which only ever holds LIVE listings and drops a sale the instant it pays out). Newest
+    // first, capped so it stays a history rather than an ever-growing log — the same shape
+    // pvprank.js's season history already uses. Honestly local: this project has no persistent
+    // server, so it can only ever be the player's OWN past sales, never a cross-player price feed.
+    marketHistory:[],
+    slabCounter:0, daily:{ date:"", type:"win", progress:0, target:3, claimed:false },
+    flags:{ starters:true, schoolPicked:false, lastClassDay:null, adviceHidden:false },
   };
+}
+// Shared by load() and importSave() — a raw parsed save object becomes a fully playable one via
+// the exact same migrate + settle-on-load path, whether it came from this browser's own
+// localStorage or a file the player is importing. One path means an imported save can never end
+// up in a state load() itself would never produce.
+function hydrate(raw){
+  const m = migrate(raw);
+  settleAuctions(m);
+  RANK.settleSeason(m.pvp, Date.now());
+  return m;
 }
 export function load(){
   try{
     const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s && s.version){ const m = migrate(s); settleAuctions(m); return m; }
+    if (s && s.version) return hydrate(s);
   }catch(e){}
-  return newGame();
+  const s = newGame();
+  RANK.settleSeason(s.pvp, Date.now());
+  return s;
 }
 export function save(s){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(s)); }catch(e){} }
+// Save backup/import/export (BACKLOG §9). `exportSave` is just the shape `save()` already writes
+// to localStorage — a backup is honest specifically because it is NOTHING but that.
+export function exportSave(s){ return JSON.stringify(s, null, 2); }
+/**
+ * Parse and validate an exported save. Returns `{ok:true, save}` with a save hydrated through the
+ * exact same path load() uses, or `{ok:false, err}` for anything that isn't a save this game
+ * could plausibly have produced — deliberately conservative, since accepting garbage here means
+ * silently corrupting the ONE thing (the save) this game cannot regenerate.
+ */
+export function importSave(text){
+  let raw;
+  try { raw = JSON.parse(text); } catch(e){ return { ok:false, err:"json" }; }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { ok:false, err:"shape" };
+  if (!raw.version) return { ok:false, err:"version" };
+  if (!Array.isArray(raw.cards) || !Array.isArray(raw.deck)) return { ok:false, err:"shape" };
+  try { return { ok:true, save: hydrate(raw) }; }
+  catch(e){ return { ok:false, err:"corrupt" }; }
+}
 function migrate(s){
   // v1 -> aligned: add scribing skill, slab fields, trim deck to 20-card format
   if (!s.skills.scribing) s.skills.scribing = 1;
   if (!s.skillXp.scribing) s.skillXp.scribing = 0;
+  if (!s.skills.enchanting) s.skills.enchanting = 1;
+  if (!s.skillXp.enchanting) s.skillXp.enchanting = 0;
   if (!s.stats.slabs) s.stats.slabs = 0;
   // Counters the onboarding chain asks about. They record an ACTION the save had no other record
   // of — a scribed card is indistinguishable from a starter one once it is in `cards`.
@@ -68,22 +150,91 @@ function migrate(s){
   if (s.flags.schoolPicked === undefined) s.flags.schoolPicked = true;
   if (s.flags.adviceHidden === undefined) s.flags.adviceHidden = false;
   if (!s.auctions) s.auctions = [];
+  if (!Array.isArray(s.marketHistory)) s.marketHistory = [];
   if (!s.worldState) s.worldState = { zone:"academy", visited:["academy"], dungeons:{} };
   if (!Array.isArray(s.worldState.visited)) s.worldState.visited = ["academy"];
   // WORLDSPEC §6: per-dungeon progress (cleared rooms, boss kills) lives in the save.
   if (!s.worldState.dungeons || typeof s.worldState.dungeons !== "object") s.worldState.dungeons = {};
+  if (!Array.isArray(s.worldState.treasuresFound)) s.worldState.treasuresFound = [];
   if (!s.zoneQuests) s.zoneQuests = { accepted: [], done: [] };
   if (!Array.isArray(s.zoneQuests.accepted)) s.zoneQuests.accepted = [];
   if (!Array.isArray(s.zoneQuests.done)) s.zoneQuests.done = [];
   if (!s.reputation || typeof s.reputation !== "object") s.reputation = {};
+  if (!Array.isArray(s.favorites)) s.favorites = [];
+  if (!s.cardBack || !CB.BACK_MAP[s.cardBack]) s.cardBack = CB.DEFAULT_BACK;
+  if (!s.title || !ACHV.TITLES.some(t => t.id === s.title)) s.title = ACHV.DEFAULT_TITLE;
+  if (!s.gatherCooldowns || typeof s.gatherCooldowns !== "object") s.gatherCooldowns = {};
+  // PvP rank. An older save has real wins/losses but never had a rank — it starts at Bronze
+  // rather than being credited retroactively, because there is no recorded ORDER for those old
+  // results to replay through the streak/season maths.
+  if (s.pvp.rankPoints == null) s.pvp.rankPoints = 0;
+  if (s.pvp.streak == null) s.pvp.streak = 0;
+  if (!Array.isArray(s.pvp.history)) s.pvp.history = [];
+  if (s.pvp.seasonBest == null) s.pvp.seasonBest = s.pvp.rankPoints;
+  if (!s.lessons) s.lessons = { enrolled: [], done: [] };
+  if (!Array.isArray(s.lessons.enrolled)) s.lessons.enrolled = [];
+  if (!Array.isArray(s.lessons.done)) s.lessons.done = [];
+  // The Dorm phases. `stock` is what the player has BOUGHT, `furniture` is slot -> item id, and
+  // `cases` is slot -> card uid. Nothing derived is stored: the room's size and slot count come
+  // from the upgrade levels, a displayed slab's grade is read off the live card, and trophies are
+  // recomputed from boss kills — so none of that can drift out of sync with the save.
+  // Character creation (BACKLOG §2). `name` and `appearance` are CHOICES, so they are stored;
+  // the resolved hue/saturation/aura are derived by charcreate.js on every read and never saved,
+  // which is what lets the palette be retuned later without a migration.
+  //
+  // NOTE the asymmetry: `appearance` is defaulted here so every save renders, but `name` is left
+  // UNSET on purpose. charcreate.js derives "creation is unfinished" from a missing name, so
+  // filling one in here would silently skip the creation screen for every existing save.
+  if (!s.appearance || typeof s.appearance !== "object") s.appearance = { variant:"standard", aura:"ring" };
+  if (!s.appearance.variant) s.appearance.variant = "standard";
+  if (!s.appearance.aura) s.appearance.aura = "ring";
+  if (!s.home.stock || typeof s.home.stock !== "object") s.home.stock = {};
+  if (!s.home.furniture || typeof s.home.furniture !== "object") s.home.furniture = {};
+  if (!s.home.cases || typeof s.home.cases !== "object") s.home.cases = {};
   // `defeated` arrived after `cleared`/`bossDead`, so older saves have the object but not the list.
   for (const d of Object.values(s.worldState.dungeons)){
     if (!Array.isArray(d.defeated)) d.defeated = [];
     if (!Array.isArray(d.cleared)) d.cleared = [];
   }
+  // Printings (variants.js). An absent `variant` already reads as "normal", so no backfill is
+  // needed there. First edition is different: without a stamp, a long-standing player could never
+  // earn one for anything already in their collection and the feature would be dead for them. So
+  // grandfather the first copy of each type they own, once. `feStamped` makes it once-only —
+  // re-running it after they sold and re-bought a card would mint a second "first" edition.
+  if (!s.flags.feStamped){
+    const seen = new Set();
+    for (const c of s.cards || []){
+      if (c.variant == null) c.variant = "normal";
+      if (!seen.has(c.id)){ seen.add(c.id); if (c.fe == null) c.fe = true; }
+    }
+    s.flags.feStamped = true;
+  }
   if (s.deck && s.deck.length > MAX_DECK) s.deck = s.deck.slice(0, MAX_DECK);
   return s;
 }
+/**
+ * Mint one card instance. THE only place a card enters the collection.
+ *
+ * There were four near-identical copies of this line (scribe, buyPack, dropCards, buyCard) plus a
+ * fifth in newGame, and adding printings to a card meant getting the same three fields right in
+ * five places — exactly the drift that put the logic.js catalog out of sync with cards.js. One
+ * function, and a printing can no longer be applied inconsistently.
+ *
+ * `luck` scales the odds of a rare printing: packs are luckier than a card bought off the shelf.
+ * First edition is decided BEFORE the push, so a card is never its own predecessor.
+ */
+export function mintCard(s, cardId, roll, opts = {}){
+  const inst = {
+    uid: uid(), id: cardId, roll, graded: false,
+    variant: opts.variant || VAR.rollVariant(rng, opts.luck || 1),
+  };
+  if (VAR.firstEditionFor(s.cards, cardId)) inst.fe = true;
+  s.cards.push(inst);
+  return inst;
+}
+/** A card instance's value, including its printing and first-edition stamp. */
+export function instanceValue(c){ return VAR.valueOf(c, cardValue(c.id, c.roll)); }
+
 let _uid = 0; export function uid(){ return "c" + (Date.now().toString(36)) + (++_uid).toString(36) + Math.floor(rng()*1000); }
 
 // ---------- Leveling ----------
@@ -101,7 +252,7 @@ export const SCHOOL_STARTER = {
 export function issueSchoolStarter(s, school){
   const ids = SCHOOL_STARTER[school] || [];
   for (const id of ids){
-    for (let i=0;i<3;i++) s.cards.push({ uid: uid(), id, roll: Math.floor(rng()*101), graded:false });
+    for (let i=0;i<3;i++) mintCard(s, id, Math.floor(rng()*101), { variant:"normal" });
   }
 }
 export function xpForLevel(l){ return Math.floor(50*l + l*l*2.5); }
@@ -119,13 +270,100 @@ export function hasItems(s, req){ return Object.entries(req).every(([id,n]) => (
 export function removeItems(s, req){ for (const [id,n] of Object.entries(req)) s.inventory[id] -= n; }
 export function gainGold(s, amt){ s.gold += Math.round(amt); }
 
+// ---------------------------------------------------------------- hidden treasure (BACKLOG §3)
+// Reward table keyed by the same globally-unique ids worldconfig.js's validateTreasureIds checks
+// zones.json/structures.js against — a treasure with no entry here would silently open to
+// nothing, and `validateTreasureRewards` below catches that mismatch either direction before it
+// ships. Flat gold, scaled to the zone it sits in (the academy is where a new player starts; the
+// lake is gated behind a boss) — the same "later zones pay more" shape quests already follow.
+export const TREASURE_REWARDS = {
+  academy_grove_cache:     { gold: 120 },
+  academy_cliff_cache:     { gold: 120 },
+  academy_courtyard_cache: { gold: 120 },
+  forest_hollow_cache:     { gold: 220 },
+  forest_ridge_cache:      { gold: 220 },
+  forest_thicket_cache:    { gold: 220 },
+  lake_hermit_cache:       { gold: 340 },
+  lake_diver_cache:        { gold: 340 },
+  lake_trader_cache:       { gold: 340 },
+  ashen_summit_cache:      { gold: 480 },
+  ashen_ridge_cache:       { gold: 480 },
+  snow_hollow_cache:       { gold: 560 },
+};
+
+/**
+ * Claim a hidden treasure once. The world side (world.js `removeTreasure`) already stops a normal
+ * approach from re-triggering it, but the SAVE is the source of truth — refusing a repeat claim
+ * here as well means a stale world build or a replayed event can never grant the reward twice.
+ */
+export function claimTreasure(s, id){
+  if (s.worldState.treasuresFound.includes(id)) return { ok:false, err:"claimed" };
+  const reward = TREASURE_REWARDS[id];
+  if (!reward) return { ok:false, err:"unknown" };
+  if (reward.gold) gainGold(s, reward.gold);
+  s.worldState.treasuresFound.push(id);
+  return { ok:true, reward };
+}
+
+/** Every treasure a zone places must have a reward, and every reward must actually be placed
+ * somewhere — an orphaned entry on either side is a content bug, not a design choice. */
+export function validateTreasureRewards(placedTreasureIds){
+  const problems = [];
+  const placed = new Set(placedTreasureIds || []);
+  for (const id of placed) if (!TREASURE_REWARDS[id]) problems.push(`treasure "${id}" is placed in the world but has no TREASURE_REWARDS entry`);
+  for (const id of Object.keys(TREASURE_REWARDS)) if (!placed.has(id)) problems.push(`TREASURE_REWARDS has "${id}" but no zone places it`);
+  return problems;
+}
+
 // ---------- Skills: gather / craft ----------
 export function canGather(s, mat){ return skillLevel(s, mat.skill) >= mat.lvl; }
-export function gather(s, mat){
+
+// ---------------------------------------------------------------- resource node regeneration
+// (BACKLOG §6 "Resource node regeneration"). Gathering was previously unlimited and instant —
+// spam a node (or, since the Skills screen's own Gather buttons hit the exact same function, the
+// UI shortcut that bypasses the 3D world entirely) as fast as the client-only 1.4s UI debounce in
+// index.html allowed. That debounce is not in the save, so it does not survive a reload and was
+// never a real limit, just a click-spam guard.
+//
+// WHY PER-MATERIAL, NOT PER-INSTANCE: the outdoor zones scatter many copies of the same node
+// (`count` in zones.json) via a deterministic seed, with no stable per-instance id to hang save
+// state off — WORLDSPEC's chunk streaming tears the meshes down and rebuilds them from that same
+// seed on every load, so "instance #14 of copper in the forest" is not an identity that survives a
+// reload either. A cooldown on the MATERIAL itself is the one thing both the hub's one-node-per-ore
+// layout and the outdoor zones' scattered many-per-ore layout can share honestly, and it closes the
+// same exploit either way: gather one, and every node (and the Skills-screen shortcut) of that
+// material goes quiet for a while, not just the one you happened to click.
+//
+// Cooldown scales with the material's own level requirement — the same "later/rarer costs more"
+// shape quest rewards and treasure gold already follow — so a level-1 copper vein clears fast and a
+// level-70 runite vein takes meaningfully longer, without ever reaching OSRS-punishing durations
+// (a casual, mobile-first game should not make a player wait minutes to gather again).
+export function regenMsFor(mat){ return Math.round(8000 + mat.lvl * 500); }
+
+/** Milliseconds until `mat` can be gathered again (0 = ready now). Pure read, no mutation. */
+export function gatherCooldownRemaining(s, matId, now = Date.now()){
+  const readyAt = (s.gatherCooldowns || {})[matId] || 0;
+  return Math.max(0, readyAt - now);
+}
+
+export function gather(s, mat, now = Date.now()){
   if (!canGather(s, mat)) return { ok:false, err:"level" };
-  addItem(s, mat.id, 1); addSkillXp(s, mat.skill, mat.xp);
+  const remaining = gatherCooldownRemaining(s, mat.id, now);
+  if (remaining > 0) return { ok:false, err:"cooldown", remaining };
+  // "Husbandry", taught in the field-studies classes: a chance at a second unit. One of the four
+  // places a lesson changes an existing system rather than adding a number to a screen.
+  const bonus = masteries(s).gatherBonus;
+  const extra = bonus > 0 && rng() * 100 < bonus ? 1 : 0;
+  addItem(s, mat.id, 1 + extra); addSkillXp(s, mat.skill, mat.xp);
   dailyProgress(s, "gather");
-  return { ok:true, item:mat, xp:mat.xp };
+  if (!s.gatherCooldowns) s.gatherCooldowns = {};
+  s.gatherCooldowns[mat.id] = now + regenMsFor(mat);
+  // Rare resource variants (BACKLOG §6): a flat, un-boosted chance at a Pristine find alongside the
+  // ordinary yield — a lucky flourish on top of the gather, not instead of it, so a Pristine hit
+  // never costs the player the material they came for.
+  const pristine = rng() * 100 < PRISTINE_CHANCE;
+  if (pristine) addItem(s, pristineIdFor(mat.id), 1);
+  return { ok:true, item:mat, xp:mat.xp, extra, pristine };
 }
 export function canCraft(s, spec){ return skillLevel(s,"smithing") >= spec.lvl && hasItems(s, spec.req); }
 export function smelt(s, bar){
@@ -164,11 +402,12 @@ export function scribe(s){
   if ((s.inventory.canvas||0) < 1 || (s.inventory.ink||0) < 1 || (s.inventory.reagent||0) < 1) return { ok:false, err:"materials" };
   s.inventory.canvas--; s.inventory.ink--; s.inventory.reagent--;
   const lvl = skillLevel(s,"scribing");
-  const bonus = Math.min(30, Math.floor(lvl * 0.3));   // skilled player -> higher average roll
+  // Skill sets the floor; "Penmanship" from the scribing classes adds on top of it.
+  const bonus = Math.min(30, Math.floor(lvl * 0.3)) + masteries(s).scribeBonus;
   const roll = Math.min(100, Math.max(0, Math.floor(rng()*100) + bonus));
   const c = randomCardOfRarity(rollRarity());
-  const inst = { uid:uid(), id:c.id, roll, graded:false };
-  s.cards.push(inst);
+  // Scribed cards are slightly luckier than shop stock — the player made this one.
+  const inst = mintCard(s, c.id, roll, { luck: 1.25 });
   s.stats.scribed = (s.stats.scribed || 0) + 1;
   addSkillXp(s, "scribing", 30);
   dailyProgress(s, "scribe");
@@ -211,8 +450,15 @@ export function dailyLabel(s){
 export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won + (s.academyBonus||0); }
 export function academyRank(s){ return ACADEMY.yearFor(academyScore(s)).name; }
 export function academyPerks(s){ return ACADEMY.perksFor(academyScore(s)); }
-// ---- Academy classes (real curriculum content) ----
-// Attending a class costs gold and grants academy-rank progress (stored bonus). One class per day.
+// Techniques learned in class (lessons.js). Derived from the classes PASSED, never stored, so
+// re-tuning what a class teaches applies to every existing save with no migration.
+export function masteries(s){ return LESSONS.masteryFor(s); }
+// ---- Academy classes (a second, gold-cost curriculum track, from the parallel main branch) ----
+// Attending a class costs gold and grants academy-rank progress (stored bonus, s.academyBonus).
+// One class per day. Distinct from lessons.js's own 21-class curriculum (which teaches named
+// TECHNIQUES via LESSONS.masteryFor and costs materials/assignments, not gold) — the two systems
+// award different things (a raw score bonus vs. a mechanical technique) so they coexist rather
+// than compete.
 const today = () => new Date().toISOString().slice(0,10);
 export function classesState(s){
   const sc = academyScore(s);
@@ -241,6 +487,13 @@ export function equipStats(s){
     const eq = s.equipment.find(e=>e.uid===uid); if (!eq) continue;
     const def = equipmentFor(eq.metal, eq.slot).stats;
     for (const k of Object.keys(def)) stats[k] += def[k];
+    // Enchanting (items.js ENCHANTS): a per-item bonus layered BEFORE the Armory multiplier below,
+    // so a home upgrade that boosts "gear stats" honestly boosts everything gear contributes,
+    // enchant included, rather than treating an enchant as something else.
+    if (eq.enchant){
+      const bonus = enchantStats(eq.enchant);
+      for (const k of Object.keys(bonus)) stats[k] += bonus[k];
+    }
   }
   const armory = s.home.owned ? s.home.upgrades.armory : 0;
   if (armory) for (const k of ["atk","def","hp"]) stats[k] = Math.round(stats[k] * (1 + armory*0.05));
@@ -251,6 +504,25 @@ export function equip(s, uidE){
   s.loadout[eq.slot] = uidE; return {ok:true};
 }
 export function unequip(s, slot){ s.loadout[slot] = null; return {ok:true}; }
+// Enchanting: apply one of items.js's ENCHANTS to a specific owned equipment instance. One
+// enchant per item — re-enchanting overwrites and pays again, so a player who outgrows an early
+// Whetting Rune I can commit to Whetting Rune III without needing to sell the item and re-forge.
+export function canEnchant(s, enchantId){
+  const e = ENCHANT_MAP[enchantId];
+  if (!e) return false;
+  return skillLevel(s, "enchanting") >= e.lvl && s.gold >= e.cost && hasItems(s, e.req);
+}
+export function enchantItem(s, uidE, enchantId){
+  const eq = s.equipment.find(e=>e.uid===uidE); if (!eq) return { ok:false, err:"item" };
+  const e = ENCHANT_MAP[enchantId]; if (!e) return { ok:false, err:"enchant" };
+  if (skillLevel(s, "enchanting") < e.lvl) return { ok:false, err:"level" };
+  if (s.gold < e.cost) return { ok:false, err:"gold" };
+  if (!hasItems(s, e.req)) return { ok:false, err:"resources" };
+  s.gold -= e.cost; removeItems(s, e.req);
+  eq.enchant = enchantId;
+  addSkillXp(s, "enchanting", e.xp);
+  return { ok:true, enchant:e };
+}
 
 // ---------- Cards: packs, drops, grade, sell ----------
 const RARITY_POOL = [ ["common",60],["uncommon",25],["rare",11],["epic",3],["legendary",1] ];
@@ -265,8 +537,8 @@ export function openPack(s){
   const drops = [];
   for (let i=0;i<5;i++){
     const c = randomCardOfRarity(rollRarity());
-    const inst = { uid:uid(), id:c.id, roll:Math.floor(rng()*101), graded:false };
-    s.cards.push(inst); drops.push(inst);
+    // A pack is where a foil is SUPPOSED to come from, so it carries the best odds in the game.
+    drops.push(mintCard(s, c.id, Math.floor(rng()*101), { luck: 2 }));
   }
   return { ok:true, drops };
 }
@@ -274,14 +546,21 @@ export function dropCards(s, n=3){
   const drops = [];
   for (let i=0;i<n;i++){
     const c = randomCardOfRarity(rollRarity());
-    const inst = { uid:uid(), id:c.id, roll:Math.floor(rng()*101), graded:false };
-    s.cards.push(inst); drops.push(inst);
+    drops.push(mintCard(s, c.id, Math.floor(rng()*101), { luck: 1.4 }));
   }
   return drops;
 }
+/** A grading fee after the Appraisal discount. Floored at 1 so a fee never becomes free or negative. */
+export function gradeCost(s, base){
+  const pct = Math.min(90, masteries(s).gradeDiscount);
+  return Math.max(1, Math.round(base * (1 - pct / 100)));
+}
 export function gradeCard(s, uidC){
   const c = s.cards.find(x=>x.uid===uidC); if (!c || c.graded) return {ok:false};
-  const fee = gradeFee(c.id);
+  // "Appraisal", from the grading classes: a discount, so it SUBTRACTS. applyBonus() is built for
+  // rewards (which go up) and using it here would make a better-taught wizard pay more — the same
+  // trap buyCard's market discount already documents.
+  const fee = gradeCost(s, gradeFee(c.id));
   if (s.gold < fee) return { ok:false, err:"gold" };
   s.gold -= fee; c.graded = true; s.stats.graded++;
   const g = gradeForRoll(c.roll);
@@ -291,7 +570,7 @@ export function gradeCard(s, uidC){
 // Regrade: risk/reward — re-roll an already-graded card's grade for a higher fee (could go up or down).
 export function regradeCard(s, uidC){
   const c = s.cards.find(x=>x.uid===uidC); if (!c || !c.graded) return {ok:false};
-  const fee = Math.round(gradeFee(c.id) * 1.5);
+  const fee = gradeCost(s, Math.round(gradeFee(c.id) * 1.5));
   if (s.gold < fee) return { ok:false, err:"gold" };
   s.gold -= fee;
   const old = gradeForRoll(c.roll);
@@ -303,8 +582,11 @@ export function regradeCard(s, uidC){
 }
 export function sellCard(s, uidC){
   const i = s.cards.findIndex(x=>x.uid===uidC); if (i<0) return {ok:false};
-  const c = s.cards[i]; s.gold += cardValue(c.id, c.roll); s.cards.splice(i,1);
-  return { ok:true, value: cardValue(c.id, c.roll) };
+  const c = s.cards[i];
+  // "Haggling", from the market and duelling classes.
+  const value = ACADEMY.applyBonus(instanceValue(c), masteries(s).sellBonus);
+  s.gold += value; s.cards.splice(i,1);
+  return { ok:true, value };
 }
 export function buyCard(s, id){
   const c = CARD_MAP[id]; const base = RARITY[c.rarity].base * 2;
@@ -313,11 +595,17 @@ export function buyCard(s, id){
   const price = Math.max(1, ACADEMY.applyBonus(base, -academyPerks(s).market));
   if (s.gold < price) return { ok:false, err:"gold" };
   s.gold -= price;
-  s.cards.push({ uid:uid(), id, roll:Math.floor(rng()*101), graded:false });
+  // Bought off the shelf: no luck bonus. A guaranteed card should not also be a lottery ticket.
+  mintCard(s, id, Math.floor(rng()*101));
   return { ok:true, price };
 }
 export function sellItem(s, itemId, qty=1){
-  const mat = MATERIALS.find(m=>m.id===itemId) || BARS.find(b=>b.id===itemId) || POTIONS.find(p=>p.id===itemId);
+  // A pristine id (BACKLOG §6 "Rare resource variants") isn't in MATERIALS/BARS/POTIONS itself —
+  // it's a derived sell-only bonus on top of a real material, resolved back to it here so this is
+  // the ONE place that needs to know pristine ids exist, not every table in items.js.
+  const mat = isPristineId(itemId)
+    ? pristineVariantFor(MATERIALS.find(m => m.id === baseMatIdFor(itemId)))
+    : MATERIALS.find(m=>m.id===itemId) || BARS.find(b=>b.id===itemId) || POTIONS.find(p=>p.id===itemId);
   if (!mat || (s.inventory[itemId]||0) < qty) return {ok:false};
   s.inventory[itemId] -= qty; s.gold += mat.value * qty;
   return { ok:true, value: mat.value*qty };
@@ -373,9 +661,24 @@ export function auctionTick(s){
     const pay = a.bid || a.price;
     s.gold += pay;
     settled.push({ id:a.id, card:a.card, pay, bidder:a.bidder });
+    // Auction history: recorded HERE, at the moment a listing actually settles — this is the one
+    // place the outcome (did it sell over reserve, who bought it) exists at all.
+    s.marketHistory = s.marketHistory || [];
+    s.marketHistory.unshift({ cardId:a.card.id, price:a.price, pay, bidder:a.bidder, at:now });
+    s.marketHistory = s.marketHistory.slice(0, 200);
     return false;
   });
   return settled;
+}
+/** A card TYPE's own past sales, newest first — the player's own history, not a price feed. */
+export function priceHistoryFor(s, cardId, limit=10){
+  return (s.marketHistory || []).filter(h => h.cardId === cardId).slice(0, limit);
+}
+/** The average of what a card TYPE has actually sold for, or null with no sales recorded yet. */
+export function avgSalePrice(s, cardId){
+  const h = (s.marketHistory || []).filter(x => x.cardId === cardId);
+  if (!h.length) return null;
+  return Math.round(h.reduce((a, x) => a + x.pay, 0) / h.length);
 }
 // Settle any auctions that ran out while the game was closed. Called once on load: without it,
 // a listing left running across a session would sit in the list forever until the market screen
@@ -404,16 +707,19 @@ export function upgradeHome(s, id){
 }
 
 // ---------- Quests (bosses) ----------
-const q = (id,name,title,school,deck,hp,reward,dropN,gear)=>({id,name,title,school,deck,hp,reward,dropN,gear});
+// `archetype` (archetypes.js) gives each rival its own BATTLE PERSONALITY on top of its
+// hand-authored deck — the deck stays exactly as designed, only how it is PLAYED changes.
+// Defaults to "midrange" (the old, only, unconditional behaviour) when not given.
+const q = (id,name,title,school,deck,hp,reward,dropN,gear,archetype)=>({id,name,title,school,deck,hp,reward,dropN,gear,archetype:archetype||"midrange"});
 export const QUESTS = [
-  q(0,"Battle Mage","The Academy Rookie","fire",["fire_cat","fire_cat","fire_elf","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf"], 40, 120, 2, {hp:0,atk:0,def:0,pip:0}),
-  q(1,"The Sprite","A Garden Guardian","life",["pixie","pixie","healing_wave","unicorn","healing_wave","pixie","unicorn","pixie","healing_wave","satyr","pixie","unicorn","healing_wave","pixie","unicorn","elixir","pixie","healing_wave","pixie","unicorn"], 60, 180, 3, {hp:5,atk:0,def:1,pip:0}),
-  q(2,"Stone Golem","The Balance of Power","balance",["novice","balance_blade","sunbird","golden_golem","balance_blade","novice","sunbird","golden_golem","balance_blade","novice","balance_blade","sunbird","golden_golem","master_wand","novice","sunbird","balance_blade","golden_golem","balance_dragon","master_wand"], 75, 260, 3, {hp:8,atk:1,def:1,pip:0}),
-  q(3,"Death Knight","Champion of the Underworld","death",["skeleton","dark_pact","ghoul","vampire","dark_pact","skeleton","ghoul","vampire","dark_pact","skeleton","ghoul","dark_pact","vampire","skeleton","ghoul","dark_pact","vampire","skeleton","ghoul","reaper"], 90, 360, 4, {hp:10,atk:1,def:2,pip:0}),
-  q(4,"Storm Caller","Lord of the Tempest","storm",["storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift"], 60, 500, 4, {hp:6,atk:2,def:1,pip:0}),
-  q(5,"Ice Queen","Guardian of the Frost","ice",["ice_golem","ice_armor","frost_shield","frost_giant","ice_armor","ice_golem","frost_shield","frost_giant","ice_armor","ice_golem","frost_giant","ice_armor","frost_shield","frost_giant","ice_golem","frost_giant","ice_armor","blizzard","ice_wyrm","frost_shield"], 110, 700, 5, {hp:15,atk:2,def:2,pip:0}),
-  q(6,"Myth Master","Keeper of the Beasts","myth",["myth_walker","myth_blast","minotaur","basilisk","myth_blast","myth_walker","minotaur","basilisk","myth_blast","myth_walker","minotaur","basilisk","myth_blast","hydra","myth_walker","minotaur","basilisk","hydra","myth_blast","minotaur"], 120, 900, 5, {hp:15,atk:3,def:2,pip:1}),
-  q(7,"The Archon","Final Trial of the Arcane","balance",["balance_streak","sunbird","master_wand","golden_golem","arcane_guardian","balance_dragon","hydra","reaper","ice_wyrm","basilisk","balance_streak","sunbird","arcane_guardian","balance_dragon","hydra","reaper","ice_wyrm","blizzard","master_wand","golden_golem"], 95, 1500, 6, {hp:15,atk:3,def:2,pip:1}),
+  q(0,"Battle Mage","The Academy Rookie","fire",["fire_cat","fire_cat","fire_elf","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf","fire_cat","fire_elf"], 40, 120, 2, {hp:0,atk:0,def:0,pip:0}, "aggro"),
+  q(1,"The Sprite","A Garden Guardian","life",["pixie","pixie","healing_wave","unicorn","healing_wave","pixie","unicorn","pixie","healing_wave","satyr","pixie","unicorn","healing_wave","pixie","unicorn","elixir","pixie","healing_wave","pixie","unicorn"], 60, 180, 3, {hp:5,atk:0,def:1,pip:0}, "control"),
+  q(2,"Stone Golem","The Balance of Power","balance",["novice","balance_blade","sunbird","golden_golem","balance_blade","novice","sunbird","golden_golem","balance_blade","novice","balance_blade","sunbird","golden_golem","master_wand","novice","sunbird","balance_blade","golden_golem","balance_dragon","master_wand"], 75, 260, 3, {hp:8,atk:1,def:1,pip:0}, "control"),
+  q(3,"Death Knight","Champion of the Underworld","death",["skeleton","dark_pact","ghoul","vampire","dark_pact","skeleton","ghoul","vampire","dark_pact","skeleton","ghoul","dark_pact","vampire","skeleton","ghoul","dark_pact","vampire","skeleton","ghoul","reaper"], 90, 360, 4, {hp:10,atk:1,def:2,pip:0}, "control"),
+  q(4,"Storm Caller","Lord of the Tempest","storm",["storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift","storm_bat","storm_shift","storm_shift","storm_bat","storm_shift"], 60, 500, 4, {hp:6,atk:2,def:1,pip:0}, "tempo"),
+  q(5,"Ice Queen","Guardian of the Frost","ice",["ice_golem","ice_armor","frost_shield","frost_giant","ice_armor","ice_golem","frost_shield","frost_giant","ice_armor","ice_golem","frost_giant","ice_armor","frost_shield","frost_giant","ice_golem","frost_giant","ice_armor","blizzard","ice_wyrm","frost_shield"], 110, 700, 5, {hp:15,atk:2,def:2,pip:0}, "control"),
+  q(6,"Myth Master","Keeper of the Beasts","myth",["myth_walker","myth_blast","minotaur","basilisk","myth_blast","myth_walker","minotaur","basilisk","myth_blast","myth_walker","minotaur","basilisk","myth_blast","hydra","myth_walker","minotaur","basilisk","hydra","myth_blast","minotaur"], 120, 900, 5, {hp:15,atk:3,def:2,pip:1}, "tempo"),
+  q(7,"The Archon","Final Trial of the Arcane","balance",["balance_streak","sunbird","master_wand","golden_golem","arcane_guardian","balance_dragon","hydra","reaper","ice_wyrm","basilisk","balance_streak","sunbird","arcane_guardian","balance_dragon","hydra","reaper","ice_wyrm","blizzard","master_wand","golden_golem"], 95, 1500, 6, {hp:15,atk:3,def:2,pip:1}, "boss"),
 ];
 export function currentQuest(s){ return QUESTS[s.quests.current]; }
 export function questDone(s, id){ return s.quests.done.includes(id); }
@@ -473,8 +779,8 @@ export const MAX_TURNS = 100;
 export function startDuel(playerCardIds, playerGear, enemyDefs, enemyGear, enemyHp=100, playerSchool="balance", enemySchool="balance", seed=null){
   const s = seed == null ? (rng()*4294967296)>>>0 : seed>>>0;
   const rand = mulberry32(s);
-  const you = { id:"you", school:playerSchool, hp:100+playerGear.hp, maxHp:100+playerGear.hp, shield:0, maxPips:1+playerGear.pip, pips:1+playerGear.pip, hand:[], deck:buildDeck(playerCardIds, rand), board:[], field:[], traps:[], atkBonus:playerGear.atk, defBonus:playerGear.def, fatigue:0 };
-  const enemy = { id:"enemy", school:enemySchool, hp:enemyHp, maxHp:enemyHp, shield:0, maxPips:1+enemyGear.pip, pips:1+enemyGear.pip, hand:[], deck:buildDeck(enemyDefs, rand), board:[], field:[], traps:[], atkBonus:enemyGear.atk, defBonus:enemyGear.def, fatigue:0 };
+  const you = { id:"you", school:playerSchool, hp:100+playerGear.hp, maxHp:100+playerGear.hp, shield:0, maxPips:1+playerGear.pip, pips:1+playerGear.pip, hand:[], deck:buildDeck(playerCardIds, rand), board:[], field:[], traps:[], atkBonus:playerGear.atk, defBonus:playerGear.def, fatigue:0, ultCharge:0, ultUsed:false };
+  const enemy = { id:"enemy", school:enemySchool, hp:enemyHp, maxHp:enemyHp, shield:0, maxPips:1+enemyGear.pip, pips:1+enemyGear.pip, hand:[], deck:buildDeck(enemyDefs, rand), board:[], field:[], traps:[], atkBonus:enemyGear.atk, defBonus:enemyGear.def, fatigue:0, ultCharge:0, ultUsed:false };
   const b = { you, enemy, turn:"you", phase:"play", winner:null, log:[], seed:s, rand, turns:0 };
   for (let i=0;i<5;i++){ draw(you); draw(enemy); }  // 5-card opening hand
   return b;
@@ -518,23 +824,36 @@ function resolveTarget(b, foe, target){
   if (target.kind === "creature") return foe.board[target.idx] || null;
   return foe;  // "wiz" (or an unrecognised descriptor) hits the opposing wizard
 }
+// The reusable combat effect system (BACKLOG §4): every card fx, school affinity bonus
+// (schoolmagic.js AFFINITY_FX) and school ultimate (schoolmagic.js ULTIMATES) all resolve through
+// this ONE dispatch table instead of each being its own bolted-on special case. Adding a new kind
+// of effect anywhere in the game — a new card, a new school mechanic — means adding one entry here,
+// not threading a new `if` through every place effects can originate.
+const FX_HANDLERS = {
+  // `spellImmune` (creatures.js, via makeCreature's trait lookup) makes a creature a dead end for
+  // targeted AND board-wide spell damage — checked here, not in resolveTarget, since resolveTarget
+  // is also used to find a legal ATTACK target (creatures fight back regardless of spell immunity).
+  dmg: (ctx, f) => {
+    const t = resolveTarget(ctx.b, ctx.foe, ctx.zone && ctx.zone.target);
+    if (!t || t.spellImmune) return;
+    if (t === ctx.foe) damageWizard(ctx.foe, f.n, ctx.foe.defBonus);
+    else t.hp -= f.n;                         // creatures have no shield/defBonus
+  },
+  dmgAll: (ctx, f) => { for (const c of [...ctx.foe.board]) if (!c.spellImmune) c.hp -= f.n; },
+  dmgWiz: (ctx, f) => damageWizard(ctx.foe, f.n, ctx.foe.defBonus),
+  heal:   (ctx, f) => { ctx.owner.hp = Math.min(ctx.owner.maxHp, ctx.owner.hp + f.n); },
+  shield: (ctx, f) => { ctx.owner.shield += f.n; },
+  buffAll:(ctx, f) => { for (const c of ctx.owner.board) c.atk += f.n; },
+  draw:   (ctx, f) => { for (let i=0;i<f.n;i++) draw(ctx.owner); },
+  freezeAll: (ctx) => { for (const c of ctx.foe.board) c.freeze = 1; },
+};
 const applyFx = (b, owner, fx, zone) => {
   const foe = foeOf(b, owner);
+  const ctx = { b, owner, foe, zone };
   for (const f of fx){
     if (typeof f === "string") continue;
-    if (f.k === "dmg"){
-      const t = resolveTarget(b, foe, zone && zone.target);
-      if (!t || t.spellImmune) continue;
-      if (t === foe) damageWizard(foe, f.n, foe.defBonus);
-      else t.hp -= f.n;                       // creatures have no shield/defBonus
-    }
-    else if (f.k === "dmgAll"){ for (const c of [...foe.board]) if (!c.spellImmune) c.hp -= f.n; }
-    else if (f.k === "dmgWiz"){ damageWizard(foe, f.n, foe.defBonus); }
-    else if (f.k === "heal"){ owner.hp = Math.min(owner.maxHp, owner.hp + f.n); }
-    else if (f.k === "shield"){ owner.shield += f.n; }
-    else if (f.k === "buffAll"){ for (const c of owner.board) c.atk += f.n; }
-    else if (f.k === "draw"){ for (let i=0;i<f.n;i++) draw(owner); }
-    else if (f.k === "freezeAll"){ for (const c of foe.board) c.freeze = 1; }
+    const handler = FX_HANDLERS[f.k];
+    if (handler) handler(ctx, f);
   }
   // cleanup deaths
   for (const side of [b.you, b.enemy]) side.board = side.board.filter(c => c.hp > 0);
@@ -544,6 +863,11 @@ export function playCard(b, p, handIndex, target){
   p.pips -= c.cost; p.hand.splice(handIndex,1);
   b.log.push(p.id+" plays "+c.name);
   const enemy = p.id==="you" ? b.enemy : b.you;
+  // Ultimate charge (schoolmagic.js): playing a card of your OWN school banks charge toward your
+  // school's ultimate, capped so it can't be hoarded past the threshold it unlocks.
+  if (p.school && c.school === p.school){
+    p.ultCharge = Math.min(MAGIC.ULT_CHARGE_MAX, (p.ultCharge||0) + 1);
+  }
   if (c.type === "creature"){
     const cr = makeCreature(id, p);
     for (const f of c.fx){
@@ -597,8 +921,27 @@ export function playCard(b, p, handIndex, target){
     p.traps.push({ fx: c.fx });
   } else {
     applyFx(b, p, c.fx, { target });
+    // School affinity bonus (schoolmagic.js): a spell cast by a wizard of its own school does a
+    // little more, the spell-side echo of the creature affinity bonus makeCreature already grants.
+    const bonus = MAGIC.affinityFx(p.school, c.school);
+    if (bonus) applyFx(b, p, bonus, { target });
   }
   return {ok:true};
+}
+// The school ultimate (schoolmagic.js): a once-per-duel finisher, spent when its charge meter
+// (filled by playing your own school's cards, see playCard) reaches ULT_CHARGE_MAX. Does not cost
+// pips or a card — it is banked from play, not bought with it.
+export function useUltimate(b, p){
+  if (isOver(b).over) return { ok:false, err:"over" };
+  if (b.turn !== p.id) return { ok:false, err:"turn" };
+  const ult = MAGIC.ultimateFor(p.school);
+  if (!ult) return { ok:false, err:"school" };
+  if (!MAGIC.canUseUltimate(p.ultCharge, p.school, p.ultUsed)) return { ok:false, err:"charge" };
+  p.ultCharge = 0;
+  p.ultUsed = true;
+  b.log.push(p.id + " unleashes " + ult.name);
+  applyFx(b, p, ult.fx, {});
+  return { ok:true, ultimate: ult };
 }
 // Deal damage to a creature honouring its defensive creature rules (shield0, survive, evade).
 function creatureHit(cr, dmg, b){
@@ -704,32 +1047,68 @@ export function isOver(b){
 }
 export function cleanDeaths(b){ b.you.board = b.you.board.filter(c=>c.hp>0); b.enemy.board = b.enemy.board.filter(c=>c.hp>0); }
 
-// ---------- AI ----------
+// ---------- AI (archetypes.js decides WHAT the personality prefers; this carries it out) ----------
+//
+// `b.enemy.archetype` picks the personality. Absent, it resolves to "midrange" — which is defined
+// in archetypes.js to reproduce the OLD unconditional behaviour exactly (descending cost, damage
+// spells finish the weakest enemy creature, always race face unless a taunt forces a trade), so
+// every existing call site and every existing test keeps its old behaviour with zero changes here.
 export function aiTurn(b){
   const ai = b.enemy;
-  // play ONE highest-cost affordable creature (or a removal spell), then pass
-  const sorted = ai.hand.map((id,i)=>({id,i})).filter(x=>CARD_MAP[x.id].cost<=ai.pips).sort((a,b)=>CARD_MAP[b.id].cost-CARD_MAP[a.id].cost);
-  for (const pick of sorted){
+  const policy = ARCH.policyFor(ai.archetype);
+  applyBossPhase(b, ai);
+
+  // Spend a charged ultimate the moment it's available — every archetype wants a free finisher
+  // that cost neither pips nor a card, so this isn't a personality choice the way targeting is.
+  if (MAGIC.canUseUltimate(ai.ultCharge, ai.school, ai.ultUsed)) useUltimate(b, ai);
+
+  // play ONE affordable card, ordered by the archetype's preference (cheap-first for Aggro,
+  // priciest-first for everyone else — see archetypes.js `orderCards`)
+  const playable = ai.hand.map((id,i)=>({id,i,cost:CARD_MAP[id].cost})).filter(x=>x.cost<=ai.pips);
+  const ordered = ARCH.orderCards(policy, playable);
+  for (const pick of ordered){
     const c = CARD_MAP[pick.id];
-    if (c.type === "creature"){ playCard(b, ai, pick.i, null); break; }
-    if (c.type === "field"){ playCard(b, ai, pick.i, null); break; }
-    if (c.type === "trap"){ playCard(b, ai, pick.i, null); break; }
-    if (c.type === "spell" && c.fx.some(f=>f.k==="dmg") && b.you.board.length){
-      const t = b.you.board.reduce((m,x)=>x.hp<m.hp?x:m, b.you.board[0]);
-      playCard(b, ai, pick.i, {kind:"creature", idx:b.you.board.indexOf(t)});
+    if (c.type === "creature" || c.type === "field" || c.type === "trap"){ playCard(b, ai, pick.i, null); break; }
+    if (c.type === "spell" && c.fx.some(f=>f.k==="dmg")){
+      const enemyBoard = b.you.board.map(x=>({atk:x.atk, hp:x.hp}));
+      const ownPower = ai.board.reduce((a,x)=>a+x.atk,0), enemyPower = b.you.board.reduce((a,x)=>a+x.atk,0);
+      const t = ARCH.pickSpellTarget(policy, enemyBoard, ownPower, enemyPower);
+      playCard(b, ai, pick.i, t === "face" ? {kind:"wiz"} : {kind:"creature", idx:t});
       b.you.board = b.you.board.filter(x=>x.hp>0);
       break;
     }
   }
-  // attack: clear taunts, else race face
+  // attack: taunt is a RULE (every archetype obeys it); beyond that, the archetype decides
+  // between a favourable trade and racing face — see archetypes.js `pickAttackTarget`.
   const you = b.you;
-  const taunts = you.board.filter(c=>c.taunt && c.hp>0);
   for (const atk of ai.board){
     if (atk.exhausted || atk.summoning || isOver(b).over) continue;
-    if (taunts.length) attack(b, ai.board.indexOf(atk), "creature", you.board.indexOf(taunts[0]));
-    else attack(b, ai.board.indexOf(atk), "wiz", -1);
+    const tauntIdx = you.board.findIndex(c=>c.taunt && c.hp>0);
+    const enemyBoard = you.board.map(x=>({atk:x.atk, hp:x.hp}));
+    const target = ARCH.pickAttackTarget(policy, {atk:atk.atk, hp:atk.hp}, enemyBoard, tauntIdx>=0?tauntIdx:null);
+    if (target === "face") attack(b, ai.board.indexOf(atk), "wiz", -1);
+    else attack(b, ai.board.indexOf(atk), "creature", target);
   }
   endTurn(b);
+}
+
+// A boss's escalations (BACKLOG "multi-phase bosses"). Checked once per AI turn; a phase, once
+// triggered, is permanent for the rest of the duel — `b.enemy.phasesApplied` is the record of
+// which ones already fired, so healing back above a threshold cannot un-trigger it.
+function applyBossPhase(b, ai){
+  if (ai.archetype !== "boss" || ai.maxHp <= 0) return;
+  ai.phasesApplied = ai.phasesApplied || [];
+  // A LOOP, not a single check: a big player hit between the boss's turns can cross both
+  // thresholds at once, and archetypes.js promises both fire "in order" when that happens rather
+  // than making the boss wait a whole extra turn to catch up on the one it skipped.
+  let phase;
+  while ((phase = ARCH.nextBossPhase(ai.hp / ai.maxHp, ai.phasesApplied))){
+    ai.phasesApplied.push(phase.id);
+    for (const c of ai.board) c.atk += phase.buffAtk;
+    ai.atkBonus = (ai.atkBonus || 0) + phase.buffAtk;   // creatures played AFTER the phase too
+    ai.shield = (ai.shield || 0) + phase.shield;
+    b.log.push(ai.id + " " + phase.log);
+  }
 }
 
 // ---------- Self-test (smoke reference route) ----------
@@ -782,7 +1161,38 @@ export function runSelfTest(){
 
 // ---------- getters for UI ----------
 export function totalCollectionValue(s){
-  return s.cards.reduce((m,c)=>m+cardValue(c.id,c.roll),0);
+  return s.cards.reduce((m,c)=>m+instanceValue(c),0);
+}
+
+// ---------------------------------------------------------------- collection value analytics
+// (BACKLOG §5 "Collection value analytics"). `totalCollectionValue` already existed but only ever
+// answered "how much is everything worth" — not WHERE that value sits or WHICH cards actually
+// carry it, the two questions an actual player asking "what's my collection worth" has next. All
+// DERIVED from `s.cards` on every read, same rule as everything else here: sell a card and its
+// slice of every one of these totals shrinks immediately, with nothing left over to drift.
+export function valueBySchool(s){
+  const out = {};
+  for (const c of s.cards){
+    const card = CARD_MAP[c.id]; if (!card) continue;
+    out[card.school] = (out[card.school] || 0) + instanceValue(c);
+  }
+  return out;
+}
+export function valueByRarity(s){
+  const out = {};
+  for (const c of s.cards){
+    const card = CARD_MAP[c.id]; if (!card) continue;
+    out[card.rarity] = (out[card.rarity] || 0) + instanceValue(c);
+  }
+  return out;
+}
+/** The `n` single most valuable cards owned, each instance counted on its own (two copies of the
+ * same card can carry very different value — a slabbed prismatic vs. a plain ungraded one). */
+export function topValuableCards(s, n = 5){
+  return s.cards
+    .map(c => ({ uid: c.uid, id: c.id, value: instanceValue(c) }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, n);
 }
 export function ownedCount(s, id){ return s.cards.filter(c=>c.id===id).length; }
 export function cardInstance(s, uidC){ return s.cards.find(c=>c.uid===uidC); }

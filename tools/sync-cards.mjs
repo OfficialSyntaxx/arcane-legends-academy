@@ -13,6 +13,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { CARDS, SCHOOL_BONUS } from "../public/cards.js";
+import { AFFINITY_FX, ULTIMATES, ULT_CHARGE_MAX } from "../public/schoolmagic.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOGIC = path.join(ROOT, "logic.js");
@@ -29,13 +30,22 @@ function cardLine(c){
 }
 
 function generate(){
+  // Only the {k,n} an effect needs to RESOLVE travels here — name/icon/text are UI-only and the
+  // client already has public/schoolmagic.js to import them from directly (index.html is not
+  // sandboxed the way logic.js is).
+  const affinity = Object.fromEntries(Object.entries(AFFINITY_FX).map(([id, fx]) => [id, { k: fx.k, n: fx.n }]));
+  const ultFx = Object.fromEntries(Object.entries(ULTIMATES).map(([id, u]) => [id, u.fx]));
   const lines = [
     BEGIN,
-    "// Mirrors public/cards.js. Source of truth is cards.js — edit there, then re-run the script. >>>",
+    "// Mirrors public/cards.js and public/schoolmagic.js. Source of truth is those files — edit",
+    "// there, then re-run the script. >>>",
     "const C = [",
     ...CARDS.map(cardLine),
     "];",
     `const SCHOOL_BONUS = ${j(SCHOOL_BONUS)};`,
+    `const SCHOOL_AFFINITY_FX = ${j(affinity)};`,
+    `const SCHOOL_ULT_FX = ${j(ultFx)};`,
+    `const ULT_CHARGE_MAX = ${ULT_CHARGE_MAX};`,
     END,
   ];
   return lines.join("\n");
@@ -53,16 +63,16 @@ const next = generate();
 
 if (process.argv.includes("--check")){
   if (current === next){
-    console.log(`card catalog in sync (${CARDS.length} cards, ${SCHOOL_BONUS.length} elemental links)`);
+    console.log(`generated block in sync (${CARDS.length} cards, ${SCHOOL_BONUS.length} elemental links, ${Object.keys(ULTIMATES).length} school ultimates)`);
     process.exit(0);
   }
-  console.error("✗ logic.js card catalog is STALE — run: node tools/sync-cards.mjs");
+  console.error("✗ logic.js generated block is STALE — run: node tools/sync-cards.mjs");
   process.exit(1);
 }
 
 if (current === next){
-  console.log("card catalog already up to date — nothing to write");
+  console.log("generated block already up to date — nothing to write");
 } else {
   fs.writeFileSync(LOGIC, src.slice(0, start) + next + src.slice(stop + END.length));
-  console.log(`✔ regenerated logic.js catalog (${CARDS.length} cards, ${SCHOOL_BONUS.length} elemental links)`);
+  console.log(`✔ regenerated logic.js block (${CARDS.length} cards, ${SCHOOL_BONUS.length} elemental links, ${Object.keys(ULTIMATES).length} school ultimates)`);
 }

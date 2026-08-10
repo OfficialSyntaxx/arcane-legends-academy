@@ -1,3 +1,8 @@
+> **HISTORICAL — do not edit.** This is an unformatted earlier copy of `design/plan.md`,
+> which is the maintained version. Kept only so links to this path still resolve; every
+> change belongs in `design/plan.md`. (Flagged during the 2026-08-08 docs review: two
+> near-identical plan files is how a future session ends up updating the wrong one.)
+
 # Wizard TCG — Game Plan (mode S, merged §§1–5) — v3 (current implementation)
 
 ## Profile (9 axes + delivery context)

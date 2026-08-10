@@ -41,7 +41,7 @@ function withDefaults(zone){
   z.terrain = { ...ZONE_DEFAULTS.terrain, ...(zone.terrain || {}) };
   z.bounds  = { ...ZONE_DEFAULTS.bounds,  ...(zone.bounds  || {}) };
   for (const k of ["buildings","landmarks","props","npcs","wanderers","resourceNodes",
-                   "enemies","exits","dungeonEntrances","treeRing"]) z[k] = z[k] || [];
+                   "enemies","exits","dungeonEntrances","treeRing","treasures"]) z[k] = z[k] || [];
   z.nodeModels = z.nodeModels || {};
   return z;
 }
@@ -73,6 +73,7 @@ export function validateZone(z, opts = {}){
     ...z.landmarks.map(l => ["landmark:" + l.key, l.x, l.z]),
     ...z.npcs.map(n => ["npc:" + n.key, n.x, n.z]),
     ...z.dungeonEntrances.map(d => ["dungeon:" + d.id, d.x, d.z]),
+    ...z.treasures.map(t => ["treasure:" + t.id, t.x, t.z]),
     ...z.props.filter(p => p.x != null).map(p => ["prop:" + p.url, p.x, p.z]),
     ...z.resourceNodes.filter(n => n.x != null).map(n => ["node:" + n.id, n.x, n.z]),
   ];
@@ -175,6 +176,24 @@ export function validateExits(world){
   return problems;
 }
 
+/**
+ * Whole-world treasure check (BACKLOG §3 "Hidden areas / treasure"). A found treasure is recorded
+ * in the save as a flat id (`s.worldState.treasuresFound`, no per-zone nesting like a dungeon's
+ * `defeated` list has) — so an id that repeats across two zones would let opening one silently
+ * mark the other found too. Same contract as validateExits: a list of problems, not a throw.
+ */
+export function validateTreasureIds(world){
+  const problems = [];
+  const seenAt = {};
+  for (const id of world.zoneIds){
+    for (const t of world.get(id).treasures){
+      if (seenAt[t.id]) problems.push(`treasure id "${t.id}" is used in both ${seenAt[t.id]} and ${id} — ids must be globally unique`);
+      else seenAt[t.id] = id;
+    }
+  }
+  return problems;
+}
+
 /** Normalise a raw {zones:[...]} document into a lookup, applying defaults. */
 export function buildWorld(doc){
   const zones = {};
@@ -249,6 +268,19 @@ export function scatterZone(zone, opts = {}){
     return true;
   };
 
+  // A fishing spot on a hilltop is not a fishing spot. `nearWater` asks for a position within
+  // `shoreBand` metres of open water, which is the shoreline — it cannot simply be "in the water",
+  // because the player has to stand on land to reach the prompt. Only meaningful in a zone that
+  // declares a waterLevel; elsewhere the flag is ignored rather than silently placing nothing.
+  const SHORE_BAND = opts.shoreBand != null ? opts.shoreBand : 9;
+  const onShore = (x, z) => {
+    if (water == null) return true;
+    for (let a = -SHORE_BAND; a <= SHORE_BAND; a += 3)
+      for (let b = -SHORE_BAND; b <= SHORE_BAND; b += 3)
+        if (Math.hypot(a, b) <= SHORE_BAND && heightAt(x + a, z + b, zone.terrain, flats) < water) return true;
+    return false;
+  };
+
   const expand = (list, defaultR) => {
     const out = [];
     for (const entry of list || []){
@@ -263,6 +295,7 @@ export function scatterZone(zone, opts = {}){
           const z = minZ + rand() * (maxZ - minZ);
           if (Math.hypot(x - (zone.spawn ? zone.spawn.x : 0), z - (zone.spawn ? zone.spawn.z : 0)) < clear) continue;
           if (!groundOk(x, z)) continue;
+          if (entry.nearWater && !onShore(x, z)) continue;
           if (!fits(x, z, r)) continue;
           const item = { ...entry, x: +x.toFixed(3), z: +z.toFixed(3) };
           delete item.count;

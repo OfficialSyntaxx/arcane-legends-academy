@@ -13,9 +13,14 @@
 <title>Arcane Legends — Wizard TCG</title>
 <style>
 :root{
-  --gold:#c9a86a; --gold2:#a88750; --violet:#1a1d26; --panel:#1b1f29; --panel2:#232836;
-  --ink:#e8eaf0; --muted:#8b92a3; --line:rgba(255,255,255,.09);
-  --danger:#e06c6c; --ok:#6fbf97; --info:#6f9fd0;
+  --gold:#ffc94d; --gold2:#e8a33d; --violet:#2a1f4d; --panel:#1a1430; --panel2:#241c44;
+  --ink:#f2ecff; --muted:#a99fc9; --line:rgba(255,201,77,.25);
+  --danger:#ff6b6b; --ok:#6ee7a0; --info:#7aa8ff;
+  /* School accent (set from JS — applyAccent() — to the player's chosen school colour, defaulting
+     to gold here so an old save or the pre-boot flash of the page still looks like today). Only
+     the chrome (top bar, active nav) wears it — panels stay neutral so it reads as identity, not
+     a full reskin every time someone changes school. */
+  --accent:#ffc94d; --accent-glow:rgba(255,201,77,.45); --accent-dim:rgba(255,201,77,.22);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;background:#12141a;color:var(--ink);
@@ -32,8 +37,9 @@ html,body{margin:0;height:100%;background:#12141a;color:var(--ink);
 
 /* top bar */
 #topbar{display:flex;align-items:center;gap:8px;padding:calc(10px + var(--sat)) 14px 10px;
-  background:linear-gradient(180deg,rgba(18,20,26,.95),rgba(18,20,26,.8));
-  border-bottom:1px solid var(--line);z-index:5;flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
+  background:linear-gradient(180deg,rgba(20,14,40,.95),rgba(20,14,40,.7));
+  border-bottom:1px solid var(--accent);box-shadow:0 2px 16px -4px var(--accent-glow);
+  z-index:5;flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
 #topbar::-webkit-scrollbar{display:none;}
 #topbar .logo{font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--gold);
   text-shadow:0 0 12px rgba(255,201,77,.5);letter-spacing:1px;margin-right:auto;}
@@ -52,7 +58,7 @@ html,body{margin:0;height:100%;background:#12141a;color:var(--ink);
   border:1px solid transparent;background:transparent;color:var(--muted);font-size:10px;cursor:pointer;min-width:44px;min-height:52px;transition:color .15s,background .15s;}
 .navbtn .ic{font-size:19px;transition:transform .15s;}
 @media (hover:hover){ .navbtn:hover{background:var(--panel2);color:var(--ink);} }
-.navbtn.on{background:var(--panel2);color:var(--gold);border-color:var(--line);}
+.navbtn.on{background:var(--panel2);color:var(--accent);border-color:var(--accent);box-shadow:0 0 12px -3px var(--accent-glow);}
 .navbtn.on .ic{transform:translateY(-1px);}
 
 /* screens */
@@ -69,17 +75,25 @@ html,body{margin:0;height:100%;background:#12141a;color:var(--ink);
 h2{font-family:Georgia,serif;color:var(--gold);margin:2px 0 12px;font-size:22px;letter-spacing:.5px;}
 h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .sub{color:var(--muted);font-size:13px;margin:-6px 0 12px;}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px;}
+/* A flat fill + 1px border read as a wireframe, not a designed surface. A gentle top-lit gradient
+   plus a real drop shadow is the cheapest possible "this has depth" cue, and costs nothing —
+   still pure CSS, no new assets. The inset highlight fakes a soft top edge, like light catching
+   a beveled panel. */
+.panel{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);
+  border-radius:14px;padding:14px;margin-bottom:14px;
+  box-shadow:0 6px 18px -4px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);}
 .row{display:flex;gap:10px;flex-wrap:wrap;}
 
 /* buttons */
-.btn{background:linear-gradient(180deg,#2a3040,#1c2029);color:var(--ink);border:1px solid var(--line);border-radius:10px;
-  padding:10px 16px;font-size:14px;cursor:pointer;font-weight:600;min-height:44px;touch-action:manipulation;}
+.btn{background:linear-gradient(180deg,#3a2d6e,#241c44);color:var(--ink);border:1px solid var(--line);border-radius:10px;
+  padding:10px 16px;font-size:14px;cursor:pointer;font-weight:600;min-height:44px;touch-action:manipulation;
+  box-shadow:0 3px 8px -2px rgba(0,0,0,.5);transition:transform .08s ease,box-shadow .08s ease;}
 @media (hover:hover){ .btn:hover{filter:brightness(1.15);} }
-.btn.gold{background:linear-gradient(180deg,#c9a86a,#a88750);color:#241a0d;border-color:#dcc397;}
+.btn:active{transform:translateY(1px);box-shadow:0 1px 4px -1px rgba(0,0,0,.5);}
+.btn.gold{background:linear-gradient(180deg,#e8a33d,#b97a1e);color:#24170a;border-color:#ffd98a;}
 .btn.ok{background:linear-gradient(180deg,#2f9e63,#1f6b42);border-color:#6ee7a0;}
 .btn.danger{background:linear-gradient(180deg,#b33,#6e1f1f);border-color:#ff6b6b;}
-.btn:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.4);}
+.btn:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.4);box-shadow:none;}
 .btn.sm{padding:6px 10px;font-size:12px;border-radius:8px;min-height:34px;}
 
 /* cards */
@@ -102,6 +116,11 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .card .tx{font-size:10px;color:var(--muted);line-height:1.2;margin-top:2px;min-height:26px;}
 .card .grade{position:absolute;top:4px;right:4px;font-size:14px;background:rgba(0,0,0,.5);border-radius:8px;padding:1px 5px;}
 .card .serial{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--gold);background:rgba(0,0,0,.6);border-radius:6px;padding:1px 6px;letter-spacing:1px;font-weight:700;white-space:nowrap;}
+/* Printings (variants.js). The badge row sits top-LEFT because the grade already owns top-right
+   and the two must be readable at once — a Gem Mint holo is the whole point of the system. */
+.card .printing{position:absolute;top:4px;left:4px;font-size:12px;background:rgba(0,0,0,.55);border-radius:8px;padding:1px 5px;letter-spacing:1px;}
+/* A diagonal sheen across the art, so a foil reads as a foil in a grid without any text. */
+.card .sheen{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;}
 .card.slab{border-image:linear-gradient(135deg,#e8c36a,#fff,#7be0ff,#e8c36a) 1;box-shadow:0 0 14px rgba(255,201,77,.55),0 4px 12px rgba(0,0,0,.5);}
 .card.slab .art{outline:1px solid rgba(255,215,120,.6);}
 .card .val{position:absolute;bottom:4px;right:4px;font-size:10px;color:var(--gold);background:rgba(0,0,0,.55);padding:1px 5px;border-radius:6px;}
@@ -112,6 +131,24 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .card.disabled{opacity:.45;cursor:not-allowed;}
 .card.tired{opacity:.6;}
 .card .tired-ic{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:20px;opacity:.9;text-shadow:0 0 6px #000;}
+
+/* booster pack opening (BACKLOG §5 "Booster opening animations") — rendered into the app's
+   existing generic #overlay/showOverlay() modal rather than a bespoke one. */
+.packgrid{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin:6px 0 16px;}
+/* Sized to match .card's own clamp so the face-down back and the revealed .card front line up. */
+.packcard{width:clamp(84px,23vw,108px);perspective:900px;cursor:pointer;}
+.packcard .flip{position:relative;width:100%;aspect-ratio:0.68;transform-style:preserve-3d;
+  transition:transform .6s cubic-bezier(.2,.8,.2,1);}
+.packcard.flipped .flip{transform:rotateY(180deg);}
+.packcard .face{position:absolute;inset:0;backface-visibility:hidden;border-radius:10px;overflow:hidden;}
+.packcard .back{background:linear-gradient(160deg,#3a2d6e,#1a1440);border:2px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:34px;}
+.packcard .front{transform:rotateY(180deg);}
+.packcard .front .card{width:100%;cursor:inherit;}
+/* A rare printing or a high base rarity pulses its own border colour once revealed — the flip
+   itself already sells "something happened"; the glow is what says "something GOOD happened". */
+.packcard.rare-glow.flipped .flip{animation:packglow 1.3s ease-in-out infinite alternate;}
+@keyframes packglow{from{filter:drop-shadow(0 0 3px var(--glowcolor));}to{filter:drop-shadow(0 0 16px var(--glowcolor));}}
 
 /* list rows */
 .lrow{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--panel2);flex-wrap:wrap;}
@@ -181,6 +218,12 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 #zoomOut{bottom:calc(42px + var(--sab));}
 /* the zoom buttons are a desktop/one-handed affordance; pinch covers multi-touch */
 body.has-touch .worldbtn{display:flex;}
+/* the map/fast-travel button is useful on every input method, unlike zoom, so it is not gated
+   behind .has-touch the way #zoomIn/#zoomOut are. */
+#mapBtn{position:absolute;left:calc(16px + var(--sal));bottom:calc(26px + var(--sab));width:44px;
+  height:44px;border-radius:50%;z-index:4;display:flex;align-items:center;justify-content:center;
+  font-size:20px;background:rgba(20,14,40,.72);color:var(--accent);border:1px solid var(--line);
+  cursor:pointer;touch-action:manipulation;line-height:1;padding:0;}
 
 /* ---------------- responsive ----------------
    Card sizes are fluid (clamp) above, so these breakpoints only handle chrome density and
@@ -291,6 +334,7 @@ body.has-touch .worldbtn{display:flex;}
     <div id="prompt"></div>
     <button id="zoomIn" class="worldbtn" aria-label="Zoom in">+</button>
     <button id="zoomOut" class="worldbtn" aria-label="Zoom out">−</button>
+    <button id="mapBtn" aria-label="Fast travel" onclick="window.__ev('openFastTravel')">🗺️</button>
   </div>
   <div id="nav"></div>
 </div>
@@ -321,6 +365,23 @@ body.has-touch .worldbtn{display:flex;}
     <div id="spBody" style="margin-top:16px"></div>
   </div>
 </div>
+<!-- Character creation (BACKLOG §2). The 3D preview canvas lives here rather than reusing the
+     world canvas: creation runs BEFORE the world exists, and can be reopened later while a world
+     is already running on its own canvas. -->
+<div id="charCreate" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:100;overflow-y:auto">
+  <div style="max-width:820px;margin:5vh auto;background:var(--panel);border:1px solid var(--gold);border-radius:22px;padding:24px">
+    <div style="color:var(--gold);font-weight:800;font-size:24px;text-align:center" id="ccTitle">Create Your Wizard</div>
+    <div style="color:var(--muted);font-size:13px;margin-top:6px;text-align:center" id="ccSub"></div>
+    <div class="row" style="margin-top:16px;align-items:stretch;gap:16px;flex-wrap:wrap">
+      <div style="flex:0 0 240px;min-width:200px;display:flex;flex-direction:column;align-items:center">
+        <canvas id="ccPreview" style="width:100%;height:300px;border-radius:16px;background:radial-gradient(circle at 50% 35%, #2a2340, #14101f)"></canvas>
+        <div class="sub" style="margin-top:6px" id="ccLook"></div>
+      </div>
+      <div style="flex:1;min-width:280px;text-align:left" id="ccBody"></div>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-top:16px" id="ccNav"></div>
+  </div>
+</div>
 <script src="./vendor/three.min.js"></script>
 <script src="./vendor/GLTFLoader.js"></script>
 <script src="./vendor/DRACOLoader.js"></script>
@@ -328,7 +389,7 @@ body.has-touch .worldbtn{display:flex;}
 <script type="module">
 import { STR } from "./strings.js";
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
-import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS } from "./items.js";
+import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats, pristineVariantFor } from "./items.js";
 import * as G from "./game.js";
 import { createWorld } from "./world.js";
 import { createAudio, SFX } from "./audio.js";
@@ -342,6 +403,19 @@ import * as ADVICE from "./advice.js";
 import * as ZQ from "./zonequests.js";
 import * as REP from "./reputation.js";
 import * as ACADEMY from "./academy.js";
+import * as LSN from "./lessons.js";
+import * as VAR from "./variants.js";
+import * as CX from "./codex.js";
+import * as ARCH from "./archetypes.js";
+import * as RANK from "./pvprank.js";
+import * as MAGIC from "./schoolmagic.js";
+import * as CB from "./cardbacks.js";
+import * as ACHV from "./achievements.js";
+import * as DORM from "./dorm.js";
+import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
+import * as CC from "./charcreate.js";
+import * as EQ3 from "./equipment3d.js";
+import { createPreview } from "./preview3d.js";
 import { CREATURES, traitForCard } from "./creatures.js";
 
 // ================= state =================
@@ -355,6 +429,22 @@ let online = null;          // online duel state
 let duelTimeLeft = 30, duelTimerInt = null;   // 30s turn timer (docs)
 
 const $ = id => document.getElementById(id);
+
+// School accent: the top bar and the active nav tab wear the player's own school colour
+// (SCHOOLS[x].color), so the chrome reads as THIS wizard's academy rather than an identical
+// shell for every save. Deliberately confined to those two spots — a full reskin per school
+// would fight the game's own palette instead of accenting it. Called once at boot and again
+// anywhere G.setSchool runs (chooseSchool, ccSchool).
+function applyAccent(){
+  const school = SCHOOLS[S.school] || SCHOOLS.balance;
+  const hex = school.color;
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  const root = document.documentElement.style;
+  root.setProperty("--accent", hex);
+  root.setProperty("--accent-glow", `rgba(${r},${g},${b},.45)`);
+  root.setProperty("--accent-dim", `rgba(${r},${g},${b},.22)`);
+}
+applyAccent();
 
 // ================= helpers =================
 // Every state change funnels through here, which is also the right place to re-derive the
@@ -494,13 +584,75 @@ function renderSPAll(){
   }).join("") + `</div>`;
 }
 function showOverlay(title, html){ $("ovTitle").textContent = title; $("ovBody").innerHTML = html; $("overlay").style.display = "block"; }
+// ================= CLASSES (lessons.js) =================
+// One builder, used both by the Dean's dialogue in the world and by the Hall panel — the syllabus
+// must read identically wherever it is opened, and two renderers would drift.
+function yearIndex(){ return ACADEMY.yearIndexFor(G.academyScore(S)); }
+function lessonRow(l, kind){
+  const p = LSN.progressOf(S, l);
+  const skill = SKILLS[l.assign.id];
+  const teach = Object.entries(l.teaches).map(([k,v]) =>
+    `${LSN.TECHNIQUES[k].name} +${v}${LSN.TECHNIQUES[k].unit}`).join(", ");
+  const bar = `<div class="pbar" style="margin:6px 0"><div style="width:${Math.round(p.have/p.need*100)}%"></div></div>`;
+  let action = "";
+  if (kind === "available") action = `<button class="btn sm gold" onclick="window.__ev('lsnEnroll|${l.id}')">Enrol</button>`;
+  else if (kind === "active") action = p.done
+    ? `<button class="btn sm ok" onclick="window.__ev('lsnSubmit|${l.id}')">Submit</button>`
+    : `<span class="sub">${p.have}/${p.need}</span>`;
+  else if (kind === "done") action = `<span class="sub" style="color:var(--ok)">✔ passed</span>`;
+  else action = `<span class="sub">Year ${l.year + 1}</span>`;
+  return `<div class="panel" style="margin-bottom:8px;${kind==="locked"?"opacity:.55":""}">
+    <div class="row" style="align-items:center">
+      <div class="grow">
+        <div style="font-weight:700">${l.title} <span class="sub">· ${ACADEMY.YEARS[l.year].name}</span></div>
+        <div class="sub" style="margin:2px 0">${l.brief}</div>
+        <div class="sub"><b>Assignment:</b> ${LSN.assignText(l, skill && skill.name)}${kind==="done"?"":` · <b>Teaches:</b> ${teach}`}</div>
+        ${kind==="active"?bar:""}
+      </div>
+      <div style="text-align:right;min-width:88px">${action}
+        ${kind==="done"?"":`<div class="sub" style="font-size:11px">🪙${l.reward.gold}${l.reward.cards?` · ${l.reward.cards}🃏`:""}</div>`}</div>
+    </div></div>`;
+}
+function buildClasses(){
+  const yi = yearIndex();
+  const m = LSN.masteryFor(S);
+  const yp = LSN.yearProgress(S, yi);
+  let h = `<p class="sub">You are in <b>${ACADEMY.YEARS[yi].name}</b> year — ${yp.done}/${yp.total} of its classes passed.
+    Classes are taken deliberately and teach a technique that changes how something already in the
+    game behaves; your <i>year</i> arrives on its own and gives a flat bonus. They are not the same thing.</p>`;
+  // what you have learned
+  const learned = Object.entries(m).filter(([,v]) => v > 0);
+  h += `<div class="panel"><h3>🎓 Techniques learned</h3>` + (learned.length
+    ? `<div class="row">` + learned.map(([k,v]) =>
+        `<div class="kpi"><div class="lv" style="font-size:16px">+${v}${LSN.TECHNIQUES[k].unit}</div><div class="nm">${LSN.TECHNIQUES[k].name}</div><div style="font-size:10px;color:var(--muted)">${LSN.TECHNIQUES[k].desc}</div></div>`).join("") + `</div>`
+    : `<p class="sub">Nothing yet. Pass a class and it will show here.</p>`) + `</div>`;
+
+  const sections = [
+    ["Ready to submit", LSN.submittable(S), "active"],
+    ["In progress", LSN.active(S).filter(l => !LSN.progressOf(S, l).done), "active"],
+    ["Open to enrol", LSN.available(S, yi), "available"],
+    ["Later years", LSN.locked(S, yi), "locked"],
+    ["Passed", LSN.LESSONS.filter(l => LSN.isDone(S, l.id)), "done"],
+  ];
+  for (const [title, list, kind] of sections){
+    if (!list.length) continue;
+    h += `<h3 style="margin-top:14px">${title}</h3>` + list.map(l => lessonRow(l, kind)).join("");
+  }
+  return h;
+}
+
 // ---- Creature Codex: the 39 deployed creatures and their battle identities ----
-function renderCodex(filter){
+// NAMED "Bestiary" in its own events (openBestiary/bestiaryFilter), not "Codex" — this project
+// already has an unrelated "Card Codex" (buildCodex(), window.__EV.openCodex, below) for the
+// collection browser. Reusing the same event name here would silently clobber whichever handler
+// got assigned last, and a player opening "the Codex" from two different buttons would land on
+// two different, unrelated screens depending on load order.
+function renderCreatureBestiary(filter){
   const SCHOOL_ICONL = SCHOOL_ICON || {};
   const entries = Object.entries(CREATURES).filter(([k,c])=>!filter || c.cat.toLowerCase()===filter.toLowerCase() || c.school===filter);
   let h = `<div class="sub" style="margin-bottom:10px">${entries.length} creatures · each with a unique battle identity</div><div class="row" style="gap:8px;margin-bottom:12px;flex-wrap:wrap;justify-content:center">`;
   const cats = [...new Set(Object.values(CREATURES).map(c=>c.cat))];
-  h += `<button class="btn sm ${!filter?'on':''}" onclick="window.__ev('codexFilter|')">All</button>` + cats.map(c=>`<button class="btn sm ${filter===c?'on':''}" onclick="window.__ev('codexFilter|${c}')">${c}</button>`).join("") + `</div>`;
+  h += `<button class="btn sm ${!filter?'on':''}" onclick="window.__ev('bestiaryFilter|')">All</button>` + cats.map(c=>`<button class="btn sm ${filter===c?'on':''}" onclick="window.__ev('bestiaryFilter|${c}')">${c}</button>`).join("") + `</div>`;
   h += `<div class="row" style="flex-wrap:wrap;justify-content:center;gap:10px">`;
   for (const [k,c] of entries){
     const sc = SCHOOLS[c.school];
@@ -515,9 +667,9 @@ function renderCodex(filter){
     </div>`;
   }
   h += `</div>`;
-  showOverlay("🐾 Creature Codex", h);
+  showOverlay("🐾 Creature Bestiary", h);
 }
-if (window.__EV){ window.__EV.codexFilter = (f)=>renderCodex(f); window.__EV.openCodex = ()=>renderCodex(""); }
+if (window.__EV){ window.__EV.bestiaryFilter = (f)=>renderCreatureBestiary(f); window.__EV.openBestiary = ()=>renderCreatureBestiary(""); }
 // ---- Display Case: showcase the player's slabbed (Mint/Gem Mint) cards ----
 function renderDisplayCases(){
   const slabs = S.cards.filter(c => c.graded && gradeForRoll(c.roll).slab)
@@ -601,11 +753,23 @@ function cardFace(c, opts={}){
   if (opts.tired) flag = `<div class="tired-ic">😴</div>`;
   let attrs = "";
   if (opts.onclick) attrs = ` onclick="window.__ev('${opts.onclick}')"`;
-  return `<div class="${cls.join(" ")}" style="border-color:${rarity.color}" ${attrs}>
+  // Printings (variants.js). `opts.inst` is the card INSTANCE, so the face can show what this
+  // particular copy is — a foil border sheen and the badges. Passing nothing keeps the plain
+  // catalog face, which is what the deckbuilder and the duel want.
+  const badges = opts.inst ? VAR.badgesFor(opts.inst) : [];
+  const printing = opts.inst ? VAR.variantOf(opts.inst) : null;
+  // The border is the printing's colour when it has one: a rare printing has to be visible in a
+  // grid of ninety cards without reading every badge.
+  const border = printing && printing.color != null ? "#" + printing.color.toString(16).padStart(6,"0") : rarity.color;
+  const sheen = printing && printing.glow
+    ? `<div class="sheen" style="opacity:${(0.18 + printing.glow * 0.3).toFixed(2)};background:linear-gradient(115deg,transparent 30%,${border} 50%,transparent 70%)"></div>` : "";
+  return `<div class="${cls.join(" ")}" style="border-color:${border}${printing&&printing.glow?`;box-shadow:0 0 ${Math.round(6+printing.glow*10)}px ${border}66`:""}" ${attrs}>
     <div class="art" style="background-image:url(./assets/${art})">
+      ${sheen}
       <div class="cost">${c.cost}</div>
       ${c.type==="creature" ? `<div class="atk">${c.atk}</div><div class="hp">${c.hp}</div>` : ""}
       ${grade ? `<div class="grade" title="${grade.name}">${grade.icon}</div>` : ""}
+      ${badges.length ? `<div class="printing" title="${VAR.labelFor(opts.inst)}">${badges.map(b=>b.badge).join("")}</div>` : ""}
       ${opts.slab ? `<div class="serial">#${opts.serial}</div>` : ""}
       ${opts.value!=null ? `<div class="val">🪙${val}</div>` : ""}
       ${flag}
@@ -633,12 +797,114 @@ window.__EV.previewSchool = (s)=>setPreviewColor(SCHOOLS[s].color);
 window.__EV.chooseSchool = (s)=>{
   G.setSchool(S, s); S.flags.schoolPicked = true;
   G.issueSchoolStarter(S, s);
+  applyAccent();
   save();
   stopCharacterPreview();
   $("schoolPicker").style.display = "none";
-  if (world) world.setPlayerColor(SCHOOLS[s].color);
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
   toast(`Welcome to the ${SCHOOLS[s].name} School! Your school's cards were added to your collection.`); render();
+  // The school picker is now step 2 of character creation. If creation is still unfinished
+  // (no name yet, or no look chosen), fall back into it rather than dumping the player into the
+  // world half-created — the whole point of the flow is that it completes.
+  if (ccOpen && !CC.isComplete(S)) showCharCreate();
 };
+
+// ================= character creation (BACKLOG §2) =================
+// Three steps, each DERIVED from the save by charcreate.js — there is no step cursor to desync.
+// The live 3D preview applies the SAME appearance object world.js does, so what is shown here is
+// literally what gets rendered in the world.
+let preview = null, ccOpen = false, ccDraftName = "";
+function showCharCreate(){
+  ccOpen = true;
+  $("charCreate").style.display = "block";
+  ccDraftName = S.name || "";
+  if (!preview){
+    try { preview = createPreview($("ccPreview")); } catch(e){ console.warn("preview unavailable:", e && e.message); }
+  }
+  if (preview){ preview.resize(); preview.setAppearance(CC.appearanceFor(S)); preview.setGear(EQ3.attachmentsFor(S)); preview.start(); }
+  renderCharCreate();
+}
+function closeCharCreate(){
+  ccOpen = false;
+  $("charCreate").style.display = "none";
+  if (preview) preview.stop();          // stop the loop; keep the context so reopening is instant
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
+  render();
+}
+function renderCharCreate(){
+  if (!ccOpen) return;
+  const step = CC.currentStep(S) || CC.STEPS[CC.STEPS.length - 1];
+  const prog = CC.progress(S);
+  const look = CC.appearanceFor(S);
+  if (preview){ preview.setAppearance(look); preview.setGear(EQ3.attachmentsFor(S)); }
+  $("ccSub").textContent = `${step.sub}  ·  step ${prog.index + 1} of ${prog.total}`;
+  $("ccLook").textContent = look.label;
+
+  let h = "";
+  // --- name ---
+  h += `<div class="panel" style="margin-bottom:10px"><div style="font-weight:700">1 · Your name</div>
+    <input id="ccName" type="text" maxlength="${CC.NAME_MAX}" value="${escapeAttr(ccDraftName)}"
+      placeholder="${CC.DEFAULT_NAME}" oninput="window.__ev('ccName')"
+      style="width:100%;margin-top:6px;padding:10px;border-radius:10px;border:1px solid var(--line);background:#12101c;color:var(--ink);font-size:15px">
+    <div class="sub" id="ccNameErr" style="margin-top:4px;min-height:16px"></div></div>`;
+  // --- school ---
+  const sc = SCHOOLS[S.school];
+  h += `<div class="panel" style="margin-bottom:10px"><div style="font-weight:700">2 · Your school</div>
+    <div class="sub" style="margin:4px 0">${SCHOOL_ICON[S.school]} <b style="color:${sc.color}">${sc.name}</b> — ${SCHOOL_DESC[S.school].split(".")[0]}.</div>
+    <div class="row" style="flex-wrap:wrap;gap:5px">` +
+    Object.keys(SCHOOLS).map(id=>`<button class="btn sm ${id===S.school?"gold":""}"
+      onclick="window.__ev('ccSchool|${id}')">${SCHOOL_ICON[id]} ${SCHOOLS[id].name}</button>`).join("") +
+    `</div><div class="sub" style="margin-top:6px">Changing school swaps your starter deck and your colours. Not sure? <a href="#" onclick="window.__ev('ccQuiz');return false;" style="color:var(--gold)">take the quiz</a>.</div></div>`;
+  // --- look ---
+  h += `<div class="panel"><div style="font-weight:700">3 · Your look</div>
+    <div class="sub" style="margin:6px 0 4px">Robe dye</div><div class="row" style="flex-wrap:wrap;gap:5px">` +
+    CC.VARIANTS.map(v=>`<button class="btn sm ${v.id===CC.variantFor(S).id?"gold":""}"
+      onclick="window.__ev('ccVariant|${v.id}')">${v.label}</button>`).join("") +
+    `</div><div class="sub" style="margin:10px 0 4px">Arcane aura</div><div class="row" style="flex-wrap:wrap;gap:5px">` +
+    CC.AURAS.map(a=>`<button class="btn sm ${a.id===CC.auraFor(S).id?"gold":""}"
+      onclick="window.__ev('ccAura|${a.id}')">${a.label}</button>`).join("") +
+    `</div></div>`;
+  $("ccBody").innerHTML = h;
+
+  const problem = CC.nameProblem(ccDraftName);
+  $("ccNameErr").textContent = ccDraftName ? (problem || "") : "";
+  $("ccNameErr").style.color = problem ? "var(--danger)" : "var(--muted)";
+  const ready = !problem;
+  $("ccNav").innerHTML = `<button class="btn" onclick="window.__ev('ccSpin')">🔄 Spin</button>
+    <button class="btn gold" ${ready?"":"disabled"} onclick="window.__ev('ccDone')">${ready?"Enter the Academy":"Choose a name first"}</button>`;
+}
+function esc(v){ return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function escapeAttr(v){ return String(v).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+window.__EV.ccName = ()=>{
+  // Re-render the whole panel on every keystroke would blow away focus, so only the error line
+  // and the confirm button update here.
+  ccDraftName = $("ccName").value;
+  const problem = CC.nameProblem(ccDraftName);
+  $("ccNameErr").textContent = ccDraftName ? (problem || "") : "";
+  $("ccNameErr").style.color = problem ? "var(--danger)" : "var(--muted)";
+  const btn = $("ccNav").querySelector(".btn.gold");
+  if (btn){ btn.disabled = !!problem; btn.textContent = problem ? "Choose a name first" : "Enter the Academy"; }
+};
+window.__EV.ccSchool = (id)=>{
+  if (!SCHOOLS[id]) return;
+  G.setSchool(S, id); S.flags.schoolPicked = true;
+  G.issueSchoolStarter(S, id);
+  applyAccent();
+  save(); renderCharCreate();
+};
+window.__EV.ccVariant = (id)=>{ CC.applyAppearance(S, { variant:id }); save(); renderCharCreate(); };
+window.__EV.ccAura = (id)=>{ CC.applyAppearance(S, { aura:id }); save(); renderCharCreate(); };
+window.__EV.ccSpin = ()=>{ if (preview) preview.nudge(90); };
+window.__EV.ccQuiz = ()=>{ $("charCreate").style.display = "none"; showSchoolPicker(); };
+window.__EV.ccDone = ()=>{
+  const r = CC.applyAppearance(S, { name: ccDraftName });
+  if (!r.ok){ err(r.err); return; }
+  CC.applyAppearance(S, { variant: CC.variantFor(S).id, aura: CC.auraFor(S).id });  // pin the defaults
+  save();
+  closeCharCreate();
+  toast(`Welcome, ${S.name}.`);
+};
+window.__EV.openCharCreate = ()=>{ showCharCreate(); };
 
 // ================= navigation =================
 const NAV = [
@@ -751,14 +1017,49 @@ function renderCurriculum(){
   const prog = ACADEMY.progressToNext(score);
   const perkRow = (label, pct) => pct > 0
     ? `<div class="kpi"><div class="lv" style="font-size:16px">+${pct}%</div><div class="nm">${label}</div></div>` : "";
+  // Classes are the content half of the curriculum; the perks below are the passive half. Both
+  // live on this panel so the player is never told about one without the other.
+  const yi = ACADEMY.yearIndexFor(score);
+  const yp = LSN.yearProgress(S, yi);
+  const ready = LSN.submittable(S).length, doing = LSN.active(S).length, open = LSN.available(S, yi).length;
+  const classLine = `<div class="row" style="align-items:center;margin-top:8px">
+    <div class="grow sub">Classes this year: <b>${yp.done}/${yp.total}</b>${
+      ready ? ` · <span style="color:var(--ok)">${ready} ready to submit</span>` : doing ? ` · ${doing} in progress` : open ? ` · ${open} open to enrol` : ""}</div>
+    <button class="btn sm ${ready?"ok":""}" onclick="window.__ev('openClasses')">🎓 Classes</button></div>`;
   return `<div class="panel" style="margin-top:12px"><h3>📖 Curriculum — ${year.name}, ${year.subtitle}</h3>
     <div class="row">${perkRow("Quest Gold", year.perks.questGold)}${perkRow("Market Discount", year.perks.market)}${perkRow("XP Gain", year.perks.xp)}</div>
     ${prog.maxed
       ? `<p class="sub" style="margin-top:8px">You have completed the curriculum. There is nothing left to teach you here.</p>`
       : `<p class="sub" style="margin-top:8px">${prog.have}/${prog.need} toward ${prog.next.name}</p>
          <div class="pbar"><div style="width:${prog.pct}%"></div></div>`}
+    ${classLine}
   </div>`;
 }
+window.__EV.openClasses = ()=>{ showOverlay("The Arcanum Curriculum", buildClasses()); };
+window.__EV.lsnEnroll = (id)=>{
+  const r = LSN.enroll(S, id);
+  if (r.ok) toast(`📚 Enrolled: ${r.lesson.title}`);
+  save(); refreshClasses();
+};
+window.__EV.lsnSubmit = (id)=>{
+  const r = LSN.submit(S, id);
+  if (!r.ok){ err(r.err === "unfinished" ? "That assignment is not finished" : "Not enrolled"); return; }
+  // lessons.js stays pure and hands the reward back; applying it is the engine's job — the same
+  // split zonequests.js uses.
+  const gold = ACADEMY.applyBonus(r.reward.gold, G.academyPerks(S).questGold);
+  S.gold += gold; G.addWizardXp(S, ACADEMY.applyBonus(r.reward.xp, G.academyPerks(S).xp));
+  const drops = r.reward.cards ? G.dropCards(S, r.reward.cards) : [];
+  toast(`🎓 Passed ${r.lesson.title}! +${gold}g${drops.length?` +${drops.length} cards`:""}`);
+  winSfx();
+  save(); refreshClasses();
+};
+// The syllabus can be open as an overlay (from the Dean) or as a Hall panel. Refresh whichever
+// is actually on screen rather than assuming.
+function refreshClasses(){
+  if ($("overlay").style.display === "block") showOverlay("The Arcanum Curriculum", buildClasses());
+  render();
+}
+
 // Reputation with the NPCs the player has actually quested for. Empty until the first field
 // quest is accepted, rather than listing every giver in the game with zero standing.
 function renderReputationPanel(){
@@ -777,15 +1078,111 @@ function renderReputationPanel(){
   h += `</div>`;
   return h;
 }
+// The Dorm panel: the tier the room is at, what is in each slot, the furniture shop, and the
+// display cases. Everything shown is DERIVED from the save by dorm.js — this only formats it.
+// `selDormSlot` is transient UI state (which slot the player is filling), deliberately not saved.
+let selDormSlot = null;
+function renderDormPanel(){
+  if (!S.home.owned) return "";
+  const tier = DORM.tierFor(S), prog = DORM.progressToNextTier(S);
+  const slots = DORM.slotsFor(S);
+  const furniture = S.home.furniture || {};
+  const stock = DORM.unplaced(S);
+  let h = `<div class="panel" style="margin-top:12px"><h3>🛏️ Your Dorm — ${tier.name}</h3>
+    <p class="sub">${tier.w}×${tier.d}m · ${tier.slots} furnishing slots. Walk to the Student Dorms on campus to go inside.
+    ${prog.maxed ? "This room is as grand as it gets." : `${prog.have}/${prog.need} upgrade levels toward <b>${prog.next.name}</b>.`}</p>
+    ${prog.maxed ? "" : `<div class="pbar" style="margin-bottom:10px"><div style="width:${prog.pct}%"></div></div>`}`;
+
+  // slots
+  h += `<div class="row" style="flex-wrap:wrap;gap:6px">`;
+  for (const s of slots){
+    const item = DORM.FURNITURE_MAP[furniture[s.id]];
+    const sel = selDormSlot === s.id;
+    h += `<button class="btn sm ${sel?"gold":""}" onclick="window.__ev('dormSlot|${s.id}')"
+      title="${s.kind} slot">${item ? `${item.icon} ${item.name}` : `➕ empty (${s.kind})`}</button>`;
+  }
+  h += `</div>`;
+
+  if (selDormSlot){
+    const slot = DORM.slotById(S, selDormSlot);
+    const held = furniture[selDormSlot];
+    h += `<div class="panel" style="margin-top:10px;background:rgba(0,0,0,.18)">
+      <div style="font-weight:700">Slot “${selDormSlot}” · ${slot ? slot.kind : "?"}</div>`;
+    if (held){
+      h += `<div class="sub" style="margin:6px 0">Holding ${DORM.FURNITURE_MAP[held].icon} ${DORM.FURNITURE_MAP[held].name}.</div>
+        <button class="btn sm" onclick="window.__ev('dormUnplace|${selDormSlot}')">Take it back</button>`;
+      if (held === "case"){
+        const shown = (S.home.cases || {})[selDormSlot];
+        const card = shown && S.cards.find(c => c.uid === shown);
+        h += `<div style="margin-top:10px"><b>Display case</b>
+          <div class="sub">${card ? `Showing ${CARD_MAP[card.id].name} · ${gradeForRoll(card.roll).name} · #${card.serial}` : "Empty."}</div>`;
+        const options = DORM.displayable(S, gradeForRoll);
+        if (!options.length) h += `<div class="sub" style="margin-top:4px">You have no slabbed cards yet — grade a card to a 9 or 10 first.</div>`;
+        else {
+          h += `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">`;
+          for (const o of options.slice(0, 12))
+            h += `<button class="btn sm ${shown===o.uid?"ok":""}" onclick="window.__ev('dormDisplay|${selDormSlot}|${o.uid}')">${CARD_MAP[o.id].name} · ${o.grade.name} #${o.serial}</button>`;
+          h += `</div>`;
+          if (card) h += `<button class="btn sm" style="margin-top:6px" onclick="window.__ev('dormClearCase|${selDormSlot}')">Empty the case</button>`;
+        }
+        h += `</div>`;
+      }
+    } else if (!stock.length){
+      h += `<div class="sub" style="margin:6px 0">Nothing in storage. Buy furniture below, then place it here.</div>`;
+    } else {
+      h += `<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">`;
+      for (const u of stock){
+        const f = DORM.FURNITURE_MAP[u.id];
+        const bad = DORM.placementProblem(S, selDormSlot, u.id);
+        h += `<button class="btn sm ${bad?"":"ok"}" ${bad?"disabled":""} title="${bad||""}"
+          onclick="window.__ev('dormPlace|${selDormSlot}|${u.id}')">${f.icon} ${f.name} ×${u.count}</button>`;
+      }
+      h += `</div>`;
+    }
+    h += `</div>`;
+  }
+
+  // shop
+  h += `<div style="margin-top:12px"><b>Furnishings</b> <span class="sub">bought with gold and timber</span></div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">`;
+  for (const f of DORM.FURNITURE){
+    const owned = (S.home.stock || {})[f.id] || 0;
+    const afford = S.gold >= f.gold && (S.inventory.oak_log || 0) >= f.timber;
+    h += `<button class="btn sm ${afford?"gold":""}" ${afford?"":"disabled"} onclick="window.__ev('dormBuy|${f.id}')">
+      ${f.icon} ${f.name} · 🪙${f.gold}${f.timber?` 🪵${f.timber}`:""}${owned?` (own ${owned})`:""}</button>`;
+  }
+  h += `</div>`;
+
+  const trophies = DORM.trophiesFor(S);
+  h += `<div style="margin-top:12px"><b>Trophies</b> <span class="sub">earned by beating bosses — they appear in the room on their own</span></div>
+    <div class="sub">${trophies.length ? trophies.map(t=>`${t.icon} ${t.name}`).join(" · ") : "No boss trophies yet."}</div>`;
+  h += `</div>`;
+  return h;
+}
+window.__EV.dormSlot = (id)=>{ selDormSlot = (selDormSlot === id ? null : id); render(); };
+window.__EV.dormBuy = (id)=>{ const r = DORM.buyFurniture(S, id); r.ok ? toast(`${r.item.icon} ${r.item.name} delivered to your dorm`) : err(r.err==="gold"?"Not enough gold":r.err==="timber"?"Need timber (chop wood)":""); save(); render(); };
+window.__EV.dormPlace = (slot,item)=>{ const r = DORM.place(S, slot, item); r.ok ? toast("Placed.") : err(r.err); save(); render(); };
+window.__EV.dormUnplace = (slot)=>{ DORM.unplace(S, slot); save(); render(); };
+window.__EV.dormDisplay = (slot,uid)=>{ const r = DORM.displayIn(S, slot, uid); r.ok ? toast("🏆 On display.") : err(r.err); save(); render(); };
+window.__EV.dormClearCase = (slot)=>{ DORM.clearCase(S, slot); save(); render(); };
+
 function renderHome(el){
-  let h = `<h2>${STR.hall_title}</h2>`;
+  // The player's name and school look are chosen at creation and never shown anywhere else, so
+  // the Dorm header is where they live — and where they can be changed.
+  const look = CC.appearanceFor(S);
+  let h = `<h2>${STR.hall_title}</h2>
+    <div class="panel" style="margin-bottom:10px"><div class="row" style="align-items:center">
+      <div class="grow"><div style="font-weight:800;font-size:17px">${esc(S.name || CC.DEFAULT_NAME)}${ACHV.equippedTitle(S).id===ACHV.DEFAULT_TITLE?"":` <span style="color:var(--accent);font-weight:700;font-size:13px">"${esc(ACHV.equippedTitle(S).name)}"</span>`}</div>
+        <div class="sub">${SCHOOL_ICON[S.school]} ${SCHOOLS[S.school].name} · ${look.label}${look.aura==null?"":" · aura"}</div></div>
+      <button class="btn sm" onclick="window.__ev('openCharCreate')">✨ Appearance</button>
+    </div></div>`;
   if (!S.home.owned){
     h += `<div class="panel"><div class="t" style="font-weight:700;font-size:16px">🏰 ${STR.hall_locked}</div>
       <p class="sub">${STR.hall_prompt}</p>
       <button class="btn gold" onclick="window.__ev('buyHome')">${STR.hall_buy}</button></div>`;
   } else {
     h += `<div class="panel"><div class="row" style="justify-content:space-between;align-items:center">
-      <div><div style="font-weight:700;font-size:18px">🏰 Your Guild Hall</div>
+      <div><div style="font-weight:700;font-size:18px">🏰 Your Dorm</div>
       <div class="sub">${STR.tagline}</div></div>
       <div><button class="btn ok" onclick="window.__ev('toPvp')">⚔️ ${STR.nav_pvp}</button></div></div></div>`;
     h += `<div class="row">`;
@@ -812,6 +1209,7 @@ function renderHome(el){
   h += `</div>`;
   h += renderCurriculum();
   h += renderReputationPanel();
+  h += renderDormPanel();
   // daily quest
   const dl = G.dailyLabel(S);
   h += `<div class="panel" style="margin-top:12px"><h3>📅 Daily Quest</h3><div class="row" style="align-items:center">
@@ -840,9 +1238,61 @@ function renderHome(el){
   h += `<div class="panel" style="margin-top:14px"><h3>${STR.skills_title}</h3><div class="row">`;
   for (const [skill,info] of Object.entries(SKILLS)) h += `<div class="kpi"><div class="lv" style="font-size:20px">${info.icon} ${S.skills[skill]}</div><div class="nm">${info.name}</div></div>`;
   h += `</div></div>`;
+  // Save backup/import/export (BACKLOG §9). The one place player progress lives is this browser's
+  // localStorage — no account, no server copy — so it is also the one thing this game cannot
+  // regenerate if it is ever lost. A backup is honest specifically because it is nothing but the
+  // exact bytes save() already writes.
+  h += `<div class="panel" style="margin-top:14px"><h3>💾 Save Data</h3>
+    <p class="sub">Your save lives only in this browser. Download a backup, or restore one on another device.</p>
+    <div class="row">
+      <button class="btn" onclick="window.__ev('exportSave')">⬇️ Download Backup</button>
+      <label class="btn" style="cursor:pointer">⬆️ Import Backup<input id="importFile" type="file" accept="application/json" style="display:none" onchange="window.__ev('importPick')"></label>
+    </div></div>`;
   el.innerHTML = h;
 }
-window.__EV.buyHome = ()=>{ const r=G.buyHome(S); r.ok?toast("🏰 Guild hall acquired!"):err(r.err==="gold"?"Not enough gold (200g)":""); render(); };
+window.__EV.exportSave = ()=>{
+  const blob = new Blob([G.exportSave(S)], { type:"application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0,10);
+  a.href = url; a.download = `arcane-legends-save-${(S.name||"wizard").replace(/[^a-z0-9]+/gi,"_")}-${stamp}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast("Backup downloaded.");
+};
+window.__EV.importPick = ()=>{
+  const input = $("importFile"); const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const r = G.importSave(reader.result);
+    input.value = "";   // so picking the SAME file again still fires a change event
+    if (!r.ok){
+      err(r.err==="json" ? "That file isn't valid JSON." : r.err==="version" || r.err==="shape" ? "That doesn't look like an Arcane Legends save." : "Couldn't read that save.");
+      return;
+    }
+    pendingImport = r.save;
+    showOverlay("⬆️ Import Backup", `<p class="sub">This REPLACES your current save. It cannot be undone unless you also have a backup of what's here now.</p>
+      <div class="panel"><div style="font-weight:700">${esc(r.save.name || CC.DEFAULT_NAME)}</div>
+        <div class="sub">${SCHOOLS[r.save.school]?.name||r.save.school} · Level ${r.save.level} · ${r.save.gold}g · ${r.save.cards.length} cards</div></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn danger" onclick="window.__ev('importConfirm')">Replace my save</button>
+        <button class="btn" onclick="window.__ev('ovClose')">Cancel</button>
+      </div>`);
+  };
+  reader.readAsText(file);
+};
+let pendingImport = null;
+window.__EV.importConfirm = ()=>{
+  if (!pendingImport) return;
+  S = pendingImport; pendingImport = null;
+  applyAccent();   // an imported save can carry a different school than the one just replaced
+  save();
+  document.getElementById("overlay").style.display = "none";
+  toast("Save imported.");
+  refreshGear(); render();
+};
+window.__EV.buyHome = ()=>{ const r=G.buyHome(S); r.ok?toast("🏰 Dorm claimed! Walk to the Student Dorms to go inside."):err(r.err==="gold"?"Not enough gold (200g)":""); render(); };
 window.__EV.upgrade = (id)=>{ const r=G.upgradeHome(S,id); r.ok?toast("Upgraded!"):err(r.err==="gold"?"Not enough gold":r.err==="timber"?"Need timber (chop wood)":"Max"); render(); };
 window.__EV.toPvp = ()=>{ screen="pvp"; render(); };
 window.__EV.claimDaily = ()=>{ const r=G.claimDaily(S); if(r.ok){ toast(`📅 Daily complete! +${r.reward}g +${r.drops.length} cards`); winSfx(); } save(); render(); };
@@ -865,10 +1315,13 @@ function renderSkills(el){
   h += `<h3>⛏️ Gather</h3><div class="row">`;
   for (const m of MATERIALS){
     const can = G.canGather(S,m);
+    const remaining = G.gatherCooldownRemaining(S, m.id);
+    const regenerating = remaining > 0;
+    const label = !can ? "Lv too low" : regenerating ? `${Math.ceil(remaining/1000)}s` : "Gather";
     h += `<div class="panel" style="flex:1;min-width:150px">
       <div style="font-weight:700"><span class="ic">${m.icon}</span> ${m.name}</div>
       <div class="sub">${SKILLS[m.skill].name} ${m.lvl} · +${m.xp} xp</div>
-      <button class="btn sm ${can&&gatherCooldown<=0?"ok":""}" ${can?"":"disabled"} onclick="window.__ev('gather|${m.id}')">${can?"Gather":"Lv too low"}</button>
+      <button class="btn sm ${can&&!regenerating?"ok":""}" ${can&&!regenerating?"":"disabled"} onclick="window.__ev('gather|${m.id}')">${label}</button>
     </div>`;
   }
   h += `</div>`;
@@ -936,12 +1389,29 @@ function renderSkills(el){
   el.innerHTML = h;
 }
 function fname(id){ const m=MATERIALS.find(x=>x.id===id); return m?m.name:id; }
+// Shared by both gather entry points (the Skills-screen button and the 3D world's onGather) so a
+// Pristine find (BACKLOG §6 "Rare resource variants") is celebrated identically no matter which
+// path the player gathered through.
+function gatherToast(m, r){
+  // toast() replaces the single #toast element's text rather than queuing — a second call would
+  // silently swallow the first, so a Pristine find is appended to the SAME toast, not a second one.
+  if (r.pristine){
+    const p = pristineVariantFor(m);
+    toast(`${m.icon} +${m.name} (+${r.xp} xp) · ${p.icon} Pristine find! ${p.name} (worth ${p.value}g)`);
+    AUDIO.play("slab");
+  } else {
+    toast(`${m.icon} +${m.name} (+${r.xp} xp)`);
+    AUDIO.play("gather");
+  }
+}
 window.__EV.gather = (id)=>{
   if (gatherCooldown>0) return;
   const m = MATERIALS.find(x=>x.id===id);
   const r = G.gather(S,m);
-  if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); AUDIO.play("gather"); gatherCooldown = 1.4; }
+  if (r.ok){ gatherToast(m, r); gatherCooldown = 1.4; }
+  else if (r.err === "cooldown") err(STR.gather_regenerating.replace("{s}", Math.ceil(r.remaining/1000)));
   else err(LTL);
+  save();
   render();
 };
 window.__EV.smelt = (id)=>{ const b=BARS.find(x=>x.id===id); const r=G.smelt(S,b); r.ok?toast(`+${b.icon} ${b.name}`):err(LTL); render(); };
@@ -964,14 +1434,27 @@ function renderCollection(el){
   h += `<div class="row" style="margin-bottom:10px">
     <button class="btn gold" onclick="window.__ev('pack')">🃏 Open Pack (${G.PACK_COST}g)</button>
     <button class="btn" onclick="window.__ev('toLoadout')">🗡️ ${STR.nav_loadout}</button>
-    <button class="btn" onclick="window.__ev('openCodex')">🐾 Creature Codex</button>
+    <button class="btn" onclick="window.__ev('openCodex')">📖 Codex</button>
+    <button class="btn" onclick="window.__ev('openBestiary')">🐾 Creature Bestiary</button>
     <button class="btn" onclick="window.__ev('openDisplayCase')">🖼️ Display Case</button></div>`;
+  // Printings tally, so a collection is something to look at and not just a pile. Derived from
+  // the cards every render — nothing about it is stored.
+  const tally = VAR.tallyFor(S.cards);
+  const tallyRow = VAR.VARIANTS.filter(v => v.id !== "normal" && tally[v.id])
+    .map(v => `<div class="kpi"><div class="lv" style="font-size:16px">${v.badge} ${tally[v.id]}</div><div class="nm">${v.name}</div></div>`).join("");
+  if (tallyRow || tally.firstEditions){
+    h += `<div class="row" style="margin-bottom:8px">${tallyRow}` +
+      (tally.firstEditions ? `<div class="kpi"><div class="lv" style="font-size:16px">${VAR.FIRST_EDITION_BADGE} ${tally.firstEditions}</div><div class="nm">First Editions</div></div>` : "") +
+      `</div>`;
+  }
   h += `<div class="row">`;
-  for (const c of S.cards){
+  // Rare printings and first editions float to the top: the best thing you own should not be
+  // ninety cards down a scroll.
+  for (const c of [...S.cards].sort((a,b) => VAR.collectionRank(b) - VAR.collectionRank(a))){
     const def = CARD_MAP[c.id];
-    const val = cardValue(c.id, c.roll);
+    const val = G.instanceValue(c);          // printing + first edition, not just the grade
     const g = c.graded ? gradeForRoll(c.roll) : null;
-    h += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">${cardFace(def, { grade:c.graded?c.roll:null, value:val, slab:g&&g.slab, serial:c.serial })}
+    h += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">${cardFace(def, { inst:c, grade:c.graded?c.roll:null, value:val, slab:g&&g.slab, serial:c.serial })}
       <div class="row" style="gap:4px">
         <button class="btn sm ok" ${c.graded?"disabled":""} onclick="window.__ev('grade|${c.uid}')">${c.graded?`<span style="font-size:10px">${g.icon} ${g.name}</span>`:"Grade"}</button>
         ${c.graded?`<button class="btn sm" onclick="window.__ev('regrade|${c.uid}')">Regrade</button>`:""}
@@ -984,13 +1467,228 @@ function renderCollection(el){
   h += `</div></div>`;
   el.innerHTML = h;
 }
-window.__EV.pack = ()=>{ const r=G.openPack(S); if(!r.ok){ err("Not enough gold"); return; } sfx(600,.2); toast("✨ Pack opened!"); render(); };
+
+// ================= CODEX (codex.js) =================
+// The collection screen shows what you OWN. The Codex shows the whole catalog, so the question a
+// collection game exists to keep asking — *what am I missing?* — is answerable at all. Filters
+// live here rather than on the collection grid for the same reason: you cannot filter a list of
+// owned cards for the ones you do not own.
+let codexView = { filter:"all", sort:"school", school:"", query:"" };
+function buildCodex(){
+  const comp = CX.overallCompletion(CARDS, S.cards);
+  const bySchool = CX.completionBy(CARDS, S.cards, d => d.school);
+  const ach = CX.achievementsFor(CARDS, S.cards);
+  const achDone = ach.filter(a => a.done).length;
+
+  let h = `<p class="sub">${comp.owned}/${comp.total} cards discovered · ${achDone}/${ach.length} achievements</p>
+    <div class="pbar" style="margin-bottom:10px"><div style="width:${comp.pct}%"></div></div>`;
+
+  // per-school completion
+  h += `<div class="row" style="flex-wrap:wrap;margin-bottom:10px">`;
+  for (const [id, g] of Object.entries(bySchool)){
+    const sc = SCHOOLS[id];
+    h += `<div class="kpi" style="min-width:96px"><div class="lv" style="font-size:15px;color:${sc.color}">${SCHOOL_ICON[id]} ${g.owned}/${g.total}</div>
+      <div class="nm">${sc.name}</div><div class="pbar" style="margin-top:4px"><div style="width:${g.pct}%"></div></div></div>`;
+  }
+  h += `</div>`;
+
+  // controls
+  h += `<div class="row" style="flex-wrap:wrap;gap:5px;margin-bottom:6px">` +
+    CX.FILTERS.map(f => `<button class="btn sm ${codexView.filter===f.id?"gold":""}" onclick="window.__ev('cxFilter|${f.id}')">${f.label}</button>`).join("") +
+    `</div>`;
+  h += `<div class="row" style="flex-wrap:wrap;gap:5px;margin-bottom:6px"><span class="sub" style="align-self:center">Sort</span>` +
+    CX.SORTS.map(o => `<button class="btn sm ${codexView.sort===o.id?"gold":""}" onclick="window.__ev('cxSort|${o.id}')">${o.label}</button>`).join("") +
+    `</div>`;
+  h += `<div class="row" style="flex-wrap:wrap;gap:5px;margin-bottom:6px">
+    <button class="btn sm ${codexView.school===""?"gold":""}" onclick="window.__ev('cxSchool|')">All schools</button>` +
+    Object.keys(SCHOOLS).map(id => `<button class="btn sm ${codexView.school===id?"gold":""}" onclick="window.__ev('cxSchool|${id}')">${SCHOOL_ICON[id]}</button>`).join("") +
+    `<input id="cxQ" type="text" placeholder="Search…" value="${escapeAttr(codexView.query)}" oninput="window.__ev('cxQuery')"
+      style="flex:1;min-width:120px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:#12101c;color:var(--ink)"></div>`;
+
+  const rows = CX.browse(CARDS, S, codexView);
+  h += `<p class="sub">${rows.length} card${rows.length===1?"":"s"}</p><div class="row">`;
+  for (const r of rows){
+    // An unowned card is shown as a silhouette rather than hidden: a codex that hides what you
+    // are missing cannot tell you what to chase.
+    const face = cardFace(r.def, { inst: r.owned ? { variant:r.owned.bestVariant, fe:r.owned.fe } : null,
+                                   grade: r.owned && r.owned.graded ? r.owned.bestRoll : null });
+    h += `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;${r.owned?"":"opacity:.34;filter:grayscale(1)"}">
+      ${face}
+      <div class="row" style="gap:4px;align-items:center">
+        <button class="btn sm ${r.favorite?"gold":""}" title="Favourite" onclick="window.__ev('cxFav|${r.def.id}')">${r.favorite?"★":"☆"}</button>
+        <span class="sub" style="font-size:11px">${r.owned ? `×${r.owned.count}` : "not owned"}</span>
+      </div></div>`;
+  }
+  h += `</div>`;
+
+  // achievements
+  h += `<div class="panel" style="margin-top:14px"><h3>🏅 Collection Achievements</h3><div class="row" style="flex-wrap:wrap">`;
+  for (const a of ach){
+    h += `<div class="kpi" style="min-width:150px;${a.done?"":"opacity:.6"}">
+      <div class="lv" style="font-size:18px">${a.icon} ${a.done?"✔":""}</div>
+      <div class="nm">${a.name}</div>
+      <div style="font-size:10px;color:var(--muted)">${a.desc}</div>
+      ${a.done?"":`<div class="pbar" style="margin-top:4px"><div style="width:${a.pct}%"></div></div>
+      <div style="font-size:10px;color:var(--muted)">${a.have}/${a.need}</div>`}</div>`;
+  }
+  h += `</div></div>`;
+
+  // card backs (cardbacks.js) — unlocked by the achievements just above, not a second grind
+  const doneIds = ach.filter(a => a.done).map(a => a.id);
+  const equipped = CB.equippedBack(S).id;
+  h += `<div class="panel" style="margin-top:14px"><h3>🎴 Card Backs</h3><p class="sub">Unlocked by the achievements above. Pick one to show on face-down cards.</p><div class="row" style="flex-wrap:wrap">`;
+  for (const b of CB.CARD_BACKS){
+    const unlocked = CB.isUnlocked(b.id, doneIds);
+    h += `<div class="packcard" style="${unlocked?"cursor:pointer":"cursor:not-allowed;opacity:.35"}" ${unlocked?`onclick="window.__ev('backEquip|${b.id}')"`:""} title="${unlocked?b.name:b.name+" (locked)"}">
+      <div class="flip" style="transform:none">
+        <div class="face front" style="position:static;transform:none;background:${b.css};display:flex;align-items:center;justify-content:center;height:100%;border-radius:10px;
+          ${b.id===equipped?"outline:3px solid var(--gold)":"border:2px solid var(--line)"}">
+          <span style="color:${b.emblemColor};font-size:26px">${unlocked?b.emblem:"🔒"}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+  h += `</div></div>`;
+
+  // account-wide achievements + player titles (achievements.js) — everything BESIDES the
+  // collection: field quests, dungeon bosses, PvP rank, wealth, crafting, reputation.
+  const achv = ACHV.achievementsFor(S);
+  const achvDoneIds = achv.filter(a => a.done).map(a => a.id);
+  const equippedTitle = ACHV.equippedTitle(S).id;
+  h += `<div class="panel" style="margin-top:14px"><h3>🏆 Achievements</h3><div class="row" style="flex-wrap:wrap">`;
+  for (const a of achv){
+    h += `<div class="kpi" style="min-width:150px;${a.done?"":"opacity:.6"}">
+      <div class="lv" style="font-size:18px">${a.icon} ${a.done?"✔":""}</div>
+      <div class="nm">${a.name}</div>
+      <div style="font-size:10px;color:var(--muted)">${a.desc}</div>
+      ${a.done?"":`<div class="pbar" style="margin-top:4px"><div style="width:${a.pct}%"></div></div>
+      <div style="font-size:10px;color:var(--muted)">${a.have}/${a.need}</div>`}</div>`;
+  }
+  h += `</div></div>`;
+  h += `<div class="panel" style="margin-top:14px"><h3>🎖️ Titles</h3><p class="sub">Unlocked by the achievements above. Pick one to show next to your name.</p><div class="row" style="flex-wrap:wrap">`;
+  for (const t of ACHV.TITLES){
+    const unlocked = ACHV.isTitleUnlocked(t.id, achvDoneIds);
+    h += `<button class="btn ${t.id===equippedTitle?"primary":""}" style="${unlocked?"":"opacity:.4;cursor:not-allowed"}" ${unlocked?`onclick="window.__ev('titleEquip|${t.id}')"`:""} title="${unlocked?t.name:t.name+" (locked)"}">${unlocked?"":"🔒 "}${t.name}</button>`;
+  }
+  h += `</div></div>`;
+
+  // collection value analytics (BACKLOG §5) — where the total sits, not just what it is
+  const bySchoolValue = G.valueBySchool(S);
+  const byRarityValue = G.valueByRarity(S);
+  const topCards = G.topValuableCards(S, 5);
+  h += `<div class="panel" style="margin-top:14px"><h3>📊 Collection Value</h3>
+    <p class="sub">Total: <b style="color:var(--gold)">${G.totalCollectionValue(S)}g</b> across ${S.cards.length} cards</p>
+    <div class="row" style="flex-wrap:wrap;gap:14px;align-items:flex-start">
+      <div style="flex:1;min-width:180px"><div class="sub" style="margin-bottom:4px">By school</div>` +
+      Object.entries(bySchoolValue).sort((a,b)=>b[1]-a[1]).map(([id,v])=>
+        `<div class="row" style="justify-content:space-between;font-size:13px"><span>${SCHOOL_ICON[id]||"◇"} ${SCHOOLS[id]?.name||id}</span><span>${v}g</span></div>`).join("") +
+      `</div>
+      <div style="flex:1;min-width:180px"><div class="sub" style="margin-bottom:4px">By rarity</div>` +
+      Object.entries(byRarityValue).sort((a,b)=>b[1]-a[1]).map(([id,v])=>
+        `<div class="row" style="justify-content:space-between;font-size:13px"><span style="color:${RARITY[id]?.color||"var(--ink)"}">${RARITY[id]?.name||id}</span><span>${v}g</span></div>`).join("") +
+      `</div>
+      <div style="flex:1;min-width:180px"><div class="sub" style="margin-bottom:4px">Most valuable</div>` +
+      topCards.map(t => { const c = CARD_MAP[t.id]; return c ?
+        `<div class="row" style="justify-content:space-between;font-size:13px"><span>${c.name}</span><span>${t.value}g</span></div>` : ""; }).join("") +
+      (topCards.length===0 ? `<div class="sub">Nothing owned yet.</div>` : "") +
+      `</div>
+    </div></div>`;
+  return h;
+}
+function refreshCodex(){
+  if ($("overlay").style.display === "block") showOverlay("📖 Card Codex", buildCodex());
+}
+window.__EV.openCodex = ()=>{ showOverlay("📖 Card Codex", buildCodex()); };
+window.__EV.cxFilter = (id)=>{ codexView.filter = id; refreshCodex(); };
+window.__EV.cxSort   = (id)=>{ codexView.sort = id; refreshCodex(); };
+window.__EV.cxSchool = (id)=>{ codexView.school = id || ""; refreshCodex(); };
+window.__EV.cxQuery  = ()=>{
+  // Re-render on every keystroke would blow away focus in the search box, so the query is read
+  // and the grid rebuilt with the caret restored — the same problem the name field on the
+  // creation screen has, solved the other way because here the whole list must change.
+  const el = $("cxQ"); const pos = el.selectionStart;
+  codexView.query = el.value;
+  refreshCodex();
+  const again = $("cxQ"); if (again){ again.focus(); again.setSelectionRange(pos, pos); }
+};
+window.__EV.cxFav = (id)=>{ CX.toggleFavorite(S, id); save(); refreshCodex(); render(); };
+window.__EV.backEquip = (id)=>{
+  const doneIds = CX.achievementsFor(CARDS, S.cards).filter(a=>a.done).map(a=>a.id);
+  const r = CB.setBack(S, id, doneIds);
+  if (r.ok){ save(); toast(`${CB.BACK_MAP[id].emblem} ${CB.BACK_MAP[id].name} equipped`); refreshCodex(); }
+};
+window.__EV.titleEquip = (id)=>{
+  const doneIds = ACHV.achievementsFor(S).filter(a=>a.done).map(a=>a.id);
+  const r = ACHV.setTitle(S, id, doneIds);
+  if (r.ok){ save(); toast(`🎖️ "${ACHV.equippedTitle(S).name}" equipped`); refreshCodex(); render(); }
+};
+// Booster opening (BACKLOG §5): opening a pack used to be a toast and nothing else — the five
+// cards it minted appeared in the collection with no moment to look at what you got. Reused the
+// app's existing generic #overlay/showOverlay() rather than a bespoke modal.
+// The face-down side of a pack card wears the player's equipped card back (cardbacks.js) — the
+// same look also used in the Codex's "Card Backs" gallery (buildCodex).
+function equippedCardBackCss(){ return CB.equippedBack(S).css; }
+function equippedCardBackEmblem(){ const b = CB.equippedBack(S); return `<span style="color:${b.emblemColor};font-size:28px">${b.emblem}</span>`; }
+let packReveal = null;
+function sfxForDrop(d){
+  const c = CARD_MAP[d.id];
+  // A rare PRINTING is the bigger deal than base rarity — a common card can roll Prismatic and
+  // out-shine a plain legendary — so it gets the top fanfare regardless of the card underneath.
+  if (d.variant && d.variant !== "normal") return "slab";
+  if (c.rarity === "legendary" || c.rarity === "epic") return "levelUp";
+  return "card";
+}
+function packRevealHtml(drops){
+  let h = `<p class="sub">Tap a card to flip it, or reveal them all at once.</p><div class="packgrid">`;
+  drops.forEach((d,i)=>{
+    const c = CARD_MAP[d.id];
+    const printing = VAR.variantOf(d);
+    const glow = printing && printing.color != null ? "#"+printing.color.toString(16).padStart(6,"0") : RARITY[c.rarity].color;
+    const rare = (d.variant && d.variant !== "normal") || c.rarity === "epic" || c.rarity === "legendary";
+    h += `<div class="packcard${rare?" rare-glow":""}" id="packcard-${i}" style="--glowcolor:${glow}" onclick="window.__ev('packFlip|${i}')">
+      <div class="flip">
+        <div class="face back" style="background:${equippedCardBackCss()}">${equippedCardBackEmblem()}</div>
+        <div class="face front">${cardFace(c, { inst:d })}</div>
+      </div>
+    </div>`;
+  });
+  h += `</div><div class="row" style="justify-content:center;gap:10px">
+    <button class="btn" onclick="window.__ev('packSkip')">Reveal All ▶</button>
+    <button class="btn gold" onclick="window.__ev('ovClose')">Continue</button>
+  </div>`;
+  return h;
+}
+window.__EV.pack = ()=>{
+  const r = G.openPack(S);
+  if (!r.ok){ err("Not enough gold"); return; }
+  save();
+  packReveal = r.drops;
+  render();   // the Collection screen underneath updates (gold, card count) while the overlay is on top
+  showOverlay("🎁 Booster Pack", packRevealHtml(r.drops));
+  // Sequential auto-flip, one card at a time — packFlip is idempotent (guarded on .flipped), so a
+  // player who taps ahead of the timer just gets there early, nothing double-fires.
+  r.drops.forEach((d,i)=>{ setTimeout(()=>window.__EV.packFlip(i), 450 + i*450); });
+};
+window.__EV.packFlip = (i)=>{
+  const card = $("packcard-"+i);
+  if (!card || card.classList.contains("flipped") || !packReveal || !packReveal[i]) return;
+  card.classList.add("flipped");
+  AUDIO.play(sfxForDrop(packReveal[i]));
+};
+window.__EV.packSkip = ()=>{ (packReveal||[]).forEach((d,i)=>window.__EV.packFlip(i)); };
 window.__EV.grade = (uid)=>{ const c=G.cardInstance(S,uid); if(!c||c.graded) return; const fee=gradeFee(c.id); const r=G.gradeCard(S,uid); r.ok?toast(`${r.grade.icon} ${r.grade.name}!`):err(`Need ${fee}g to grade`); render(); };
 window.__EV.regrade = (uid)=>{ const r=G.regradeCard(S,uid); if(!r.ok){ err("Not enough gold"); return; } toast(`Regraded: ${r.old.icon} ${r.old.name} → ${r.grade.icon} ${r.grade.name}!`); sfx(500,.1); render(); };
 window.__EV.sell = (uid)=>{ const r=G.sellCard(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
 window.__EV.toLoadout = ()=>{ screen="loadout"; render(); };
 
 // ================= LOADOUT =================
+// Equipping, unequipping or selling gear must re-derive what hangs off the 3D character. One
+// function so a future gear action cannot forget half of it.
+function refreshGear(){
+  const list = EQ3.attachmentsFor(S);
+  if (world) world.setPlayerGear(list);
+  if (preview) preview.setGear(list);
+}
 function renderLoadout(el){
   const gear = G.equipStats(S);
   let h = `<h2>${STR.loadout_title}</h2>`;
@@ -1002,6 +1700,8 @@ function renderLoadout(el){
     h += `<div class="panel" style="flex:1;min-width:150px;text-align:center">
       <div style="font-size:26px">${slot.icon}</div>
       <div class="nm" style="font-weight:700;font-size:13px">${slot.name}</div>
+      ${EQ3.UNSUPPORTED[slot.id] ? `<div class="sub" style="font-size:10px" title="${EQ3.UNSUPPORTED[slot.id]}">stats only</div>`
+        : `<div class="sub" style="font-size:10px;color:var(--ok)">shown on you</div>`}
       ${def ? `<div style="color:var(--gold);font-size:13px;font-weight:700">${def.name}</div>
         <div class="sub">${equipStatsLabel(def)}</div>
         <button class="btn sm danger" onclick="window.__ev('unequip|${slot.id}')">Unequip</button>`
@@ -1015,13 +1715,28 @@ function renderLoadout(el){
   for (const e of S.equipment){
     const def = equipmentFor(e.metal, e.slot);
     const equipped = Object.values(S.loadout).includes(e.uid);
+    // Enchanting (BACKLOG §6): a per-item bonus layered on top of the metal×slot base stats,
+    // shown as its own line so it never reads as part of the item's own printed value.
+    const enchLine = e.enchant && ENCHANT_MAP[e.enchant]
+      ? `<div class="sub" style="color:var(--gold)">🔮 ${ENCHANT_MAP[e.enchant].name} (+${ENCHANT_MAP[e.enchant].n} ${ENCHANT_MAP[e.enchant].stat.toUpperCase()})</div>` : "";
     h += `<div class="panel" style="flex:1;min-width:150px">
       <div style="font-weight:700">${def.icon} ${def.name} ${equipped?"<span style='color:var(--ok)'>✓</span>":""}</div>
       <div class="sub">${equipStatsLabel(def)}</div>
+      ${enchLine}
       <div class="row">
         <button class="btn sm ok" ${equipped?"disabled":""} onclick="window.__ev('equip|${e.uid}')">Equip</button>
+        <button class="btn sm" onclick="window.__ev('openEnchant|${e.uid}')">🔮 Enchant</button>
         <button class="btn sm danger" onclick="window.__ev('sellEq|${e.uid}')">Sell ${def.value}g</button>
       </div></div>`;
+  }
+  h += `</div></div>`;
+  // deck archetypes (BACKLOG §5): auto-build a deck from what you actually own, weighted the same
+  // way an AI opponent's deck of that personality would be. REPLACES the current deck — a clean
+  // starting point to hand-tune from, not a merge.
+  h += `<div class="panel"><h3>🧩 Deck Archetypes</h3><p class="sub">Auto-build a deck from your collection, weighted for one playstyle. Replaces your current deck.</p><div class="row" style="flex-wrap:wrap;gap:6px">`;
+  for (const id of ARCH.ARCHETYPE_IDS){
+    if (id === "boss") continue;   // boss escalation is a monster mechanic, not a player build
+    h += `<button class="btn" onclick="window.__ev('autoBuild|${id}')">${LAB_ICON[id]||"⚔️"} ${ARCH.ARCHETYPES[id].name}</button>`;
   }
   h += `</div></div>`;
   // deck
@@ -1048,11 +1763,51 @@ function renderLoadout(el){
   h += `</div></div>`;
   el.innerHTML = h;
 }
-window.__EV.equip = (uid)=>{ G.equip(S,uid); syncPlayerWeapon(); render(); };
-window.__EV.unequip = (slot)=>{ G.unequip(S,slot); syncPlayerWeapon(); render(); };
-window.__EV.sellEq = (uid)=>{ const r=G.sellEquipment(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
+window.__EV.equip = (uid)=>{ G.equip(S,uid); refreshGear(); render(); };
+window.__EV.unequip = (slot)=>{ G.unequip(S,slot); refreshGear(); render(); };
+window.__EV.sellEq = (uid)=>{ const r=G.sellEquipment(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; refreshGear(); render(); };
+// syncPlayerWeapon() (world.setWeapon, wand-only) also runs on every render() while the world
+// screen is active, so it stays in sync a moment later either way — refreshGear() (equipment3d.js,
+// wand+amulet, world AND the character-preview) is the fuller of the two and is what these
+// handlers call directly.
+// Enchanting (BACKLOG §6): a picker in the generic overlay, one row per rune. Reuses the same
+// "row shows what it costs, disables what you can't afford yet" shape the Skills tab's own
+// crafting rows already use, rather than inventing a second UI language for it.
+function buildEnchantPicker(uid){
+  const eq = S.equipment.find(x=>x.uid===uid); if (!eq) return `<p class="sub">Item not found.</p>`;
+  let h = `<p class="sub">One rune per item — applying a new one replaces the old, at full cost again.</p><div class="row" style="flex-wrap:wrap">`;
+  for (const en of ENCHANTS){
+    const can = G.canEnchant(S, en.id);
+    const active = eq.enchant === en.id;
+    const barId = Object.keys(en.req)[0];
+    const bar = BARS.find(b => b.id === barId);
+    h += `<div class="panel" style="flex:1;min-width:160px;${can||active?"":"opacity:.55"}">
+      <div style="font-weight:700">${en.name} ${active?`<span style="color:var(--ok)">✓</span>`:""}</div>
+      <div class="sub">+${en.n} ${en.stat.toUpperCase()} · Enchanting Lv${en.lvl}</div>
+      <div class="sub">${en.cost}g + 1 ${bar.icon} ${bar.name}</div>
+      <button class="btn sm ${active?"":"gold"}" ${(can && !active) ? "" : "disabled"} onclick="window.__ev('doEnchant|${uid}|${en.id}')">${active?"Equipped":"Apply"}</button>
+    </div>`;
+  }
+  h += `</div>`;
+  return h;
+}
+window.__EV.openEnchant = (uid)=>{ showOverlay("🔮 Enchant Item", buildEnchantPicker(uid)); };
+window.__EV.doEnchant = (uid, enchantId)=>{
+  const r = G.enchantItem(S, uid, enchantId);
+  if (r.ok){ save(); AUDIO.play("levelUp"); toast(`${r.enchant.name} applied!`); showOverlay("🔮 Enchant Item", buildEnchantPicker(uid)); render(); }
+  else err(r.err==="gold"?"Not enough gold":r.err==="level"?"Enchanting level too low":r.err==="resources"?"Missing materials":"Error");
+};
 window.__EV.deckAdd = (id)=>{ const r=G.addToDeck(S,id); if(!r.ok) err(r.err==="full"?"Deck full (20)":r.err==="max"?"Max 3 copies":r.err==="copies"?"You don't own that many":"Error"); render(); };
 window.__EV.deckRm = (id)=>{ G.removeFromDeck(S,id); render(); };
+window.__EV.autoBuild = (archetype)=>{
+  const owned = {}; for (const c of S.cards) owned[c.id] = (owned[c.id]||0)+1;
+  const deck = ARCH.autoBuildDeck(archetype, owned, CARDS);
+  S.deck = deck;
+  save();
+  const short = deck.length < G.MAX_DECK;
+  toast(`${ARCH.ARCHETYPES[archetype].name} deck built: ${deck.length}/${G.MAX_DECK} cards.${short?" Collect more to fill it out.":""}`);
+  render();
+};
 
 // ================= MARKET =================
 function renderMarket(el){
@@ -1067,7 +1822,11 @@ function renderMarket(el){
   h += `</div></div>`;
   // bazaar: sell items
   h += `<div class="panel"><h3>📦 Sell Materials</h3><div class="row">`;
-  const mats = [...MATERIALS, ...BARS, ...POTIONS].filter(m => (S.inventory[m.id]||0)>0);
+  // Pristine finds (BACKLOG §6 "Rare resource variants") aren't in MATERIALS themselves — they're
+  // a derived sell-only bonus, synthesised here in the exact {id,name,icon,value} shape a plain
+  // material has so they drop into the same list/row/sell handler with no special-casing.
+  const pristineOwned = MATERIALS.map(pristineVariantFor).filter(p => (S.inventory[p.id]||0)>0);
+  const mats = [...MATERIALS, ...BARS, ...POTIONS, ...pristineOwned].filter(m => (S.inventory[m.id]||0)>0);
   if (mats.length===0) h += `<div class="sub">No materials to sell.</div>`;
   for (const m of mats){
     h += `<div class="panel" style="flex:1;min-width:150px">
@@ -1081,7 +1840,12 @@ function renderMarket(el){
   if (S.auctions.length===0) h += `<div class="sub">${STR.no_auctions}</div>`;
   for (const a of S.auctions){
     const c = CARD_MAP[a.card.id];
-    const left = Math.max(0, Math.ceil((a.ends - performance.now())/1000));
+    // BUG (found while adding price history nearby): `a.ends` is a Date.now() wall-clock
+    // timestamp (fixed to be exactly that so a listing survives a reload — see listAuction's own
+    // comment), but this was comparing it against performance.now(), which is relative to page
+    // navigation start, not the Unix epoch. The subtraction was still ~1.7 trillion regardless of
+    // real time left, so the countdown never read anywhere near "60s" — it read millions.
+    const left = Math.max(0, Math.ceil((a.ends - Date.now())/1000));
     h += `<div class="lrow"><span class="ic">${gradeForRoll(a.card.roll).icon}</span>
       <div class="grow"><div class="t">${c.name}</div>
       <div class="d">${gradeForRoll(a.card.roll).name} · ${a.card.graded?"graded":"ungraded"} · bid ${a.bid||a.price}g</div></div>
@@ -1092,14 +1856,38 @@ function renderMarket(el){
   h += `<div class="panel"><h3>List a card for auction</h3><div class="row">`;
   for (const c of S.cards.slice(0,40)){
     const def = CARD_MAP[c.id];
-    h += cardFace(def, { grade:c.graded?c.roll:null, value:cardValue(c.id,c.roll), onclick:`listA|${c.uid}` });
+    h += cardFace(def, { inst:c, grade:c.graded?c.roll:null, value:G.instanceValue(c), onclick:`listA|${c.uid}` });
   }
   h += `</div></div>`;
+  // Auction history (BACKLOG §6 "Auction history / price history") — the player's own past
+  // sales, honestly local: this project has no persistent server, so it can never be a real
+  // cross-player price feed, the same reason PvP has a season history instead of a leaderboard.
+  h += `<div class="panel"><h3>📈 Price History</h3>`;
+  if (!S.marketHistory.length){
+    h += `<div class="sub">Nothing has sold yet — list a card above and let it run its 60s.</div>`;
+  } else {
+    const byCard = {};
+    for (const rec of S.marketHistory){ (byCard[rec.cardId] = byCard[rec.cardId] || []).push(rec); }
+    const cardIds = Object.keys(byCard).sort((a,b) => byCard[b].length - byCard[a].length).slice(0, 12);
+    h += `<div class="row" style="flex-wrap:wrap">`;
+    for (const id of cardIds){
+      const c = CARD_MAP[id]; if (!c) continue;
+      const avg = G.avgSalePrice(S, id);
+      const recent = G.priceHistoryFor(S, id, 3);
+      h += `<div class="panel" style="flex:1;min-width:160px">
+        <div style="font-weight:700">${c.name}</div>
+        <div class="sub">Avg sale: <b style="color:var(--gold)">${avg}g</b> · ${byCard[id].length} sold</div>
+        <div class="sub">Recent: ${recent.map(r=>`${r.pay}g`).join(", ")}</div>
+      </div>`;
+    }
+    h += `</div>`;
+  }
+  h += `</div>`;
   el.innerHTML = h;
 }
 window.__EV.buy = (id)=>{ const r=G.buyCard(S,id); r.ok?toast("Purchased!"):err("Not enough gold"); render(); };
 window.__EV.sellItem = (id)=>{ const r=G.sellItem(S,id); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
-window.__EV.listA = (uid)=>{ const r=G.listAuction(S,uid, cardValue(G.cardInstance(S,uid)?.id||"", 100)); r.ok?toast("Listed for auction!"):null; render(); };
+window.__EV.listA = (uid)=>{ const c=G.cardInstance(S,uid); const r=G.listAuction(S,uid, c?G.instanceValue(c):0); r.ok?toast("Listed for auction!"):null; render(); };
 
 // ================= QUESTS =================
 function renderQuests(el){
@@ -1152,8 +1940,40 @@ function renderPvp(el){
   h += `</div>`;
   h += `<div class="row"><div class="kpi"><div class="lv">${S.pvp.wins}</div><div class="nm">PvP Wins</div></div>
   <div class="kpi"><div class="lv">${S.pvp.losses}</div><div class="nm">PvP Losses</div></div></div>`;
+  const tier = RANK.tierFor(S.pvp.rankPoints);
+  const prog = RANK.progressToNextTier(S.pvp.rankPoints);
+  const title = RANK.titleFor(S.pvp.rankPoints);
+  h += `<div class="panel"><h3>${tier.icon} Rank</h3>`;
+  h += `<div class="sub">${title} · ${S.pvp.rankPoints} pts${S.pvp.streak>1?` · 🔥 ${S.pvp.streak}-win streak`:""}</div>`;
+  if (prog.maxed){
+    h += `<div class="sub" style="margin-top:6px">Maximum rank reached.</div>`;
+  } else {
+    h += `<div class="sub" style="margin-top:6px">${prog.have}/${prog.need} to ${prog.next.icon} ${prog.next.name}</div>
+    <div class="pbar"><div style="width:${prog.pct}%"></div></div>`;
+  }
+  h += `</div>`;
+  if (S.pvp.history && S.pvp.history.length){
+    h += `<div class="panel"><h3>📜 Your Season History</h3><p class="sub">Your own past seasons — there is no cross-player leaderboard.</p><div class="list">`;
+    for (const s of S.pvp.history){
+      const t = RANK.TIERS.find(t=>t.id===s.tier) || RANK.TIERS[0];
+      h += `<div class="row" style="justify-content:space-between"><span>${s.season}</span><span>${t.icon} ${t.name} · ${s.points} pts</span></div>`;
+    }
+    h += `</div></div>`;
+  }
+  // Deck Testing Laboratory (BACKLOG §5): a deck's shape is a real question — does it fold to
+  // Aggro's early curve, does it out-grind Control — and the only honest way to answer it is to
+  // actually play it against one. No rewards and no record kept; see window.__EV.duelAgain's
+  // `isLab` branch for why.
+  h += `<div class="panel"><h3>🧪 Deck Testing Laboratory</h3>
+    <p class="sub">Play your current deck against a chosen AI personality. No gold, no cards, no PvP record — just reps.</p>
+    <div class="row" style="flex-wrap:wrap;gap:6px">`;
+  for (const id of ARCH.ARCHETYPE_IDS){
+    h += `<button class="btn" onclick="window.__ev('labDuel|${id}')">${LAB_ICON[id]||"⚔️"} ${ARCH.ARCHETYPES[id].name}</button>`;
+  }
+  h += `</div></div>`;
   el.innerHTML = h;
 }
+const LAB_ICON = { midrange:"⚔️", aggro:"🔥", control:"🛡️", tempo:"⚡", boss:"👑" };
 function randomAiDeck(){
   // build a 30-card deck from random cards
   const pool = [];
@@ -1165,9 +1985,28 @@ function randomAiDeck(){
 window.__EV.localPvp = ()=>{
   const gearTier = 1 + Math.floor(S.level/3);
   const gear = { hp: gearTier*5, atk: gearTier, def: Math.floor(gearTier/2), pip: gearTier>=4?1:0 };
-  startLocalDuel(randomAiDeck(), gear, "AI Wizard", -1, false);
+  // A random personality (never "boss" — that escalation is reserved for real bosses) so the
+  // quick-match AI is not the same opponent in a different deck every time.
+  const casual = ARCH.ARCHETYPE_IDS.filter(id => id !== "boss");
+  const archetype = casual[Math.floor(Math.random()*casual.length)];
+  startLocalDuel(randomAiDeck(), gear, "AI Wizard", -1, false, { archetype });
 };
 window.__EV.online = ()=>{ setupOnline(); };
+window.__EV.labDuel = (archetype)=>{
+  // A representative opponent for the chosen personality: a thematic deck (archetypeDeckFor
+  // already builds one from a school's card pool for dungeon monsters), a fixed mid-tier HP/gear
+  // so the result reflects the DECK, not a random gear roll, and a school picked round-robin from
+  // the schools that AREN'T the player's own — the interesting matchup is against someone else's
+  // magic, not a mirror of your own affinity bonus.
+  const schools = Object.keys(SCHOOLS).filter(s => s !== S.school);
+  const school = schools[Math.floor(Math.random()*schools.length)] || "balance";
+  const pool = CARDS.filter(c => c.school === school);
+  const deck = ARCH.archetypeDeckFor(archetype, pool.length ? pool : CARDS);
+  const gearTier = 2;
+  const gear = { hp: gearTier*5, atk: gearTier, def: Math.floor(gearTier/2), pip: 0 };
+  startLocalDuel(deck, gear, `Lab: ${ARCH.ARCHETYPES[archetype].name}`, -1, false, { archetype, school, hp: 100 });
+  battle.isLab = true;
+};
 
 // ================= LOCAL DUEL =================
 // Sync the 3D duel arena to the battle board (summon/remove creatures as played).
@@ -1187,12 +2026,16 @@ function startPracticeDuel(){
   const practiceDeck = ["fire_cat","fire_cat","fire_elf","fire_elf","firebolt","ice_golem","pixie","novice","elixir","fire_elf"];
   startLocalDuel(practiceDeck, {hp:0,atk:0,def:0,pip:0}, "Trainer Lyra", -1, false);
 }
-function startLocalDuel(enemyDeck, enemyGear, enemyName, questIdx, isQuest){
+function startLocalDuel(enemyDeck, enemyGear, enemyName, questIdx, isQuest, opts = {}){
   // ensure deck valid
   if (S.deck.length !== G.MAX_DECK){ err(STR.deck_need); return; }
-  const enemyHp = isQuest ? G.QUESTS[questIdx].hp : 100;
-  const enemySchool = isQuest ? G.QUESTS[questIdx].school : "balance";
+  // `opts.hp`/`opts.school`/`opts.archetype` let a caller override the quest-ladder defaults —
+  // dungeon and open-world enemies are not quests, but they still have their own declared HP
+  // (dungeons.json `boss.hp`) and their own battle personality (archetypes.js).
+  const enemyHp = opts.hp != null ? opts.hp : (isQuest ? G.QUESTS[questIdx].hp : 100);
+  const enemySchool = opts.school || (isQuest ? G.QUESTS[questIdx].school : "balance");
   battle = G.startDuel(S.deck, G.equipStats(S), enemyDeck, enemyGear, enemyHp, S.school, enemySchool);
+  battle.enemy.archetype = opts.archetype || (isQuest ? G.QUESTS[questIdx].archetype : "midrange");
   battle.enemyName = enemyName; battle.questIdx = questIdx; battle.isQuest = isQuest;
   pendingTarget = null;
   screen = "duel";
@@ -1244,6 +2087,15 @@ function renderDuel(el){
       disabled: !playable, onclick: playable ? (isTargeted?`cast|${i}`:`play|${i}`) : "" });
   }
   h += `</div></div>`;
+  // school ultimate (schoolmagic.js) — a once-per-duel finisher banked by playing your own school's cards
+  const ult = MAGIC.ultimateFor(you.school);
+  if (ult){
+    const charged = MAGIC.canUseUltimate(you.ultCharge, you.school, you.ultUsed);
+    const pct = Math.min(100, Math.round((you.ultCharge||0) / MAGIC.ULT_CHARGE_MAX * 100));
+    h += `<div class="row" style="justify-content:center;margin-top:4px">
+      <button class="btn ${charged&&myTurn&&!over.over?"gold":""}" ${charged&&myTurn&&!over.over?"":"disabled"} onclick="window.__ev('useUltimate')" title="${ult.text}">
+        ${ult.icon} ${ult.name}${you.ultUsed?" (used)":charged?"":` ${pct}%`}</button></div>`;
+  }
   // potions (brewed via Alchemy — 1 pip, one per turn)
   const potions = G.heldPotions(S);
   if (potions.length){
@@ -1369,9 +2221,26 @@ window.__EV.drink = (potionId)=>{
   if (r.ok){ AUDIO.play("heal"); toast(STR.potion_drunk.replace("{n}", r.healed)); G.save(S); }
   render();
 };
+window.__EV.useUltimate = ()=>{
+  const r = G.useUltimate(battle, battle.you);
+  if (r.ok){ AUDIO.play("levelUp"); toast(`${r.ultimate.icon} ${r.ultimate.name}!`); }
+  render();
+};
 window.__EV.endTurn = ()=>{ const r=G.endTurn(battle); render(); };
 window.__EV.duelAgain = ()=>{
   const over = G.isOver(battle);
+  // Deck Testing Laboratory (BACKLOG §5): a lab duel exists to answer "does this deck work against
+  // an Aggro/Control/Tempo/Boss opponent", not to be farmed — no gold, no cards, no PvP record, no
+  // rank change. It is the one duel outcome that changes nothing about the save except the log.
+  if (battle && battle.isLab){
+    over.winner==="you" ? winSfx() : loseSfx();
+    toast(over.draw ? "Draw." : over.winner==="you" ? "Lab win — no rewards, just reps." : "Lab loss — no penalty, try another build.");
+    clearInterval(duelTimerInt);
+    battle=null; pendingTarget=null;
+    screen = "pvp";
+    render();
+    return;
+  }
   const isQuest = battle && battle.isQuest;
   const qIdx = battle && battle.questIdx;
   const gear = G.equipStats(S);
@@ -1400,14 +2269,14 @@ window.__EV.duelAgain = ()=>{
     } else {
       const base = isQuest ? 30 : 40 + Math.floor(Math.random()*40);
       G.gainGold(S, base + bonus(base));
-      if (!isQuest){ S.pvp.wins++; S.stats.won++; G.dropCards(S,1); toast(`Victory! +${base+bonus(base)}g +1 card`); }
+      if (!isQuest){ S.pvp.wins++; S.stats.won++; G.dropCards(S,1); RANK.applyResult(S.pvp, true); toast(`Victory! +${base+bonus(base)}g +1 card`); }
       else toast(`+${base+bonus(base)}g`);
       winSfx();
     }
   } else {
     loseSfx();
     if (isQuest) toast("Defeated — try again!");
-    else { S.pvp.losses++; toast("Defeated"); }
+    else { S.pvp.losses++; RANK.applyResult(S.pvp, false); toast("Defeated"); }
   }
   save();
   clearInterval(duelTimerInt);
@@ -1455,6 +2324,14 @@ function renderOnline(el){
       h += `<div class="panel"><div class="zonecap" style="position:static">${STR.hand} (${v.you.hand.length})</div><div class="hand">`;
       for (let i=0;i<v.you.hand.length;i++){ const id=v.you.hand[i]; const c=CARD_MAP[id]; const playable=myTurn&&v.you.pips>=c.cost; const targeted=c.type==="spell"&&c.fx.some(f=>f.k==="dmg"); h += cardFace(c,{disabled:!playable, onclick: playable?(targeted?`oCast|${i}`:`oPlay|${i}`):""}); }
       h += `</div></div>`;
+      const ult = MAGIC.ultimateFor(v.you.school);
+      if (ult){
+        const charged = MAGIC.canUseUltimate(v.you.ultCharge, v.you.school, v.you.ultUsed);
+        const pct = Math.min(100, Math.round((v.you.ultCharge||0) / MAGIC.ULT_CHARGE_MAX * 100));
+        h += `<div class="row" style="justify-content:center;margin-bottom:4px">
+          <button class="btn ${charged&&myTurn?"gold":""}" ${charged&&myTurn?"":"disabled"} onclick="window.__ev('oUltimate')" title="${ult.text}">
+            ${ult.icon} ${ult.name}${v.you.ultUsed?" (used)":charged?"":` ${pct}%`}</button></div>`;
+      }
       h += `<div class="row" style="justify-content:center"><button class="btn gold" ${myTurn?"":"disabled"} onclick="window.__ev('oEnd')">${STR.end_turn}</button></div>`;
       h += `<div id="duelLog">${(v.log||[]).slice(-4).join(" · ")}</div>`;
     }
@@ -1474,7 +2351,7 @@ function connectOnline(){
   const base = location.pathname.replace(/\/+$/,"");
   const wsUrl = (location.protocol==="https:"?"wss://":"ws://") + location.host + base + "/ws/" + online.room;
   online.ws = new WebSocket(wsUrl);
-  online.ws.onopen = ()=>{ sendOnline({type:"join", playerId: online.playerId}); sendOnline({type:"action", action:{type:"setDeck", deck: online.deck}}); };
+  online.ws.onopen = ()=>{ sendOnline({type:"join", playerId: online.playerId}); sendOnline({type:"action", action:{type:"setDeck", deck: online.deck, school: S.school}}); };
   online.ws.onclose = ()=>{ setTimeout(connectOnline, 1500); };
   online.ws.onmessage = (e)=>{
     const msg = JSON.parse(e.data);
@@ -1483,8 +2360,8 @@ function connectOnline(){
     online.state = msg;
     if (msg.status==="over" && !online.rewarded){
       online.rewarded = true;
-      if (msg.result.winner===msg.you){ S.pvp.wins++; G.gainGold(S, 60); toast("+60g online win!"); }
-      else S.pvp.losses++;
+      if (msg.result.winner===msg.you){ S.pvp.wins++; RANK.applyResult(S.pvp, true); G.gainGold(S, 60); toast("+60g online win!"); }
+      else { S.pvp.losses++; RANK.applyResult(S.pvp, false); }
       save();
     }
     renderOnline();
@@ -1495,6 +2372,7 @@ window.__EV.oCast = (i)=>{ const c=CARD_MAP[online.state.view.you.hand[i]]; if(c
 window.__EV.oDmg = (ti)=>{ if(pendingTarget&&pendingTarget.kind==="oSpell"){ sendOnline({type:"action",action:{type:"play",handIndex:pendingTarget.idx,target:{kind:"creature",idx:ti}}}); pendingTarget=null; } else if(pendingTarget&&pendingTarget.kind==="oAtk"){ sendOnline({type:"action",action:{type:"attack",attacker:pendingTarget.idx,targetKind:"creature",targetIdx:ti}}); pendingTarget=null; } };
 window.__EV.oAtk = (i)=>{ const v=online.state.view; const hasTaunt=v.opp.board.some(c=>c.taunt&&c.hp>0); if(hasTaunt){ pendingTarget={kind:"oAtk",idx:i}; } else sendOnline({type:"action",action:{type:"attack",attacker:i,targetKind:"wiz"}}); };
 window.__EV.oEnd = ()=>{ sendOnline({type:"action",action:{type:"endTurn"}}); };
+window.__EV.oUltimate = ()=>{ sendOnline({type:"action",action:{type:"ultimate"}}); };
 window.__EV.oReset = ()=>{ sendOnline({type:"reset"}); online.rewarded=false; };
 
 // ================= WORLD (3D hub) =================
@@ -1510,6 +2388,10 @@ const QUEST_GIVERS = {
                    idle: ["The wood remembers every spell cast under it.", "Walk softly and it will show you what grows here."] },
   forest_warden: { name: "Warden Brisk", role: "Warden of Cinderhollow",
                    idle: ["I watch the cavern mouth so the village does not have to.", "Whatever is down there, it is getting bolder."] },
+  lake_hermit:   { name: "Hermit Calder", role: "Keeper of the Shore",
+                   idle: ["The lake was a valley once. Ask it nicely and it still remembers.", "Fish the shallows before you fish the shelf."] },
+  lake_diver:    { name: "Diver Nell",   role: "Vault Diver",
+                   idle: ["I have been down twice. I am not going a third time alone.", "Whatever the water took, it did not drown."] },
 };
 function questDialogue(giver){
   const g = QUEST_GIVERS[giver];
@@ -1564,12 +2446,17 @@ function turnInQuest(id){
 }
 
 const NPC_DIALOGUE = {
-  quests: { name:"Professor Echo", role:"Dean of the Arcanum", lines:["Welcome to the Arcanum Academy, young spellwright.","The rivals of the seven schools await. Defeat them to earn renown, gold, and rare cards."], buttons:[{label:"📜 View Quests", primary:true, action:()=>{screen="quests";render();}}] },
+  // The Dean is where CLASSES are taken (lessons.js). She reports what is submittable first,
+  // because a finished class the player has to go hunting for is the same as no class at all.
+  quests: { name:"Professor Echo", role:"Dean of the Arcanum",
+    lines:["Welcome to the Arcanum Academy, young spellwright.","The rivals of the seven schools await — and so does your coursework."],
+    buttons:[{label:"🎓 Classes", primary:true, action:()=>{ showOverlay("The Arcanum Curriculum", buildClasses()); }},
+             {label:"📜 View Quests", action:()=>{screen="quests";render();}}] },
   market: { name:"Merchant Vell", role:"Arcade Stalls", lines:["Fresh goods from the Merchant Arcade!","Cards, materials, and rare finds — coin well spent."], buttons:[{label:"🛒 Open Market", primary:true, action:()=>{screen="market";render();}}] },
   duel: { name:"Referee Kael", role:"Arena Master", lines:["The arena is open. Challenge an AI rival or duel a real player for glory."], buttons:[{label:"⚔️ Enter the Arena", primary:true, action:()=>{screen="pvp";render();}}] },
   scribe: { name:"Scribing Hall", role:"Card Creation", lines:["Refine wood, fish, and ore into canvas, ink, and reagent, then scribe spell cards."], buttons:[{label:"🪶 Scribe & Refine", primary:true, action:()=>{ showOverlay("Scribing Hall", buildScribing()); }}] },
   smith: { name:"Smithy", role:"Forge & Equipment", lines:["Smelt bars and forge equipment to boost your dueling power."], buttons:[{label:"⚒️ Forge & Brew", primary:true, action:()=>{ showOverlay("Smithy & Forge", buildForge()); }}] },
-  home: { name:"Student Dorms", role:"Your Home", lines:["Your own corner of the academy. Upgrade your guild hall."], buttons:[{label:"🏰 Your Hall", primary:true, action:()=>{screen="home";render();}}] },
+  home: { name:"Student Dorms", role:"Your Dorm", lines:["Your own corner of the academy."], buttons:[{label:"🏰 Dorm Management", primary:true, action:()=>{screen="home";render();}}] },
   trainer: { name:"Trainer Lyra", role:"Duel Coach", lines:["Want to warm up? I'll spar with you right here.","Drop your deck and let's see what you've got — a quick practice duel is the best way to test a new build."], buttons:[{label:"⚔️ Practice Duel", primary:true, action:()=>{ startPracticeDuel(); }}] },
   librarian: { name:"Librarian Ossa", role:"Keeper of the Library of Echoes", lines:["The Library of Echoes holds every lesson and challenge record of the Arcanum.","Take on the day's challenge when you're ready, young spellwright."], buttons:[{label:"📜 Daily Challenge", primary:true, action:()=>{screen="quests";render();}}] },
 };
@@ -1588,7 +2475,8 @@ function spawnWorld(canvas, zone, spawnAt){
       const p = $("prompt");
       if (target){
         const isNPC = target.kind==="station" && NPC_DIALOGUE[target.data];
-        p.innerHTML = `<button class="btn gold" onclick="window.__ev('worldGo')">${target.kind==="gather"?"⛏️":(isNPC?"💬":"🚪")} ${target.label}</button>`;
+        const icon = target.kind==="gather" ? "⛏️" : target.kind==="treasure" ? "✨" : isNPC ? "💬" : "🚪";
+        p.innerHTML = `<button class="btn gold" onclick="window.__ev('worldGo')">${icon} ${target.label}</button>`;
         p.style.display = "block";
       } else p.style.display = "none";
     },
@@ -1597,7 +2485,8 @@ function spawnWorld(canvas, zone, spawnAt){
       const m = MATERIALS.find(x=>x.id===matId);
       if (!m) return;
       const r = G.gather(S, m);
-      if (r.ok){ toast(`${m.icon} +${m.name} (+${r.xp} xp)`); AUDIO.play("gather"); gatherCooldown = 1.4; }
+      if (r.ok){ gatherToast(m, r); gatherCooldown = 1.4; }
+      else if (r.err === "cooldown") err(STR.gather_regenerating.replace("{s}", Math.ceil(r.remaining/1000)));
       else err(LTL);
       save();
     },
@@ -1621,17 +2510,48 @@ function spawnWorld(canvas, zone, spawnAt){
     onStation(station){
       const quest = questDialogue(station);
       if (quest){ showDialogue(quest.name, quest.role, quest.lines, quest.buttons); return; }
+      // A building that declares an `interior` is a PLACE, not a menu: walking up to it and
+      // pressing the prompt takes you inside. Generic on purpose — the Scribing Hall and Smithy
+      // get interiors the same way, with no new code here (see structures.js).
+      const interior = interiorFor(station);
+      if (interior === "dorm"){ enterDorm(); return; }
       const dlg = NPC_DIALOGUE[station];
       if (dlg){ showDialogue(dlg.name, dlg.role, dlg.lines, dlg.buttons); }
       else { screen = stationTarget(station); render(); }
     },
-    onZoneExit(e){ changeZone(e.toZone, e.fromZone); },
+    onZoneExit(e){
+      // Stepping out of an interior should put you back at the door you came in through, not at
+      // the zone's default spawn on the far side of campus. There is no reciprocal exit to derive
+      // that from (the academy's dorm door is a station, not a gateway), so it is passed
+      // explicitly — and pushed clear of the station's own prompt radius.
+      if (e.fromZone === "dorm"){
+        const b = BUILDINGS.find(x => x.interior === "dorm");
+        const d = b && doorPos(b);
+        changeZone(e.toZone, e.fromZone, d ? { x: d.x, z: d.z - 6 } : null);
+        return;
+      }
+      changeZone(e.toZone, e.fromZone);
+    },
     onDungeon(id){ enterDungeon(id); },
     onEnemy(name){ startDungeonFight(name); },
+    onTreasure(id){
+      const r = G.claimTreasure(S, id);
+      if (!r.ok) return;                      // already claimed or unknown — silently no-op, never re-grant
+      if (world && world.removeTreasure) world.removeTreasure(id);
+      const bits = [];
+      if (r.reward.gold) bits.push(`+${r.reward.gold}g`);
+      toast(`✨ Hidden cache found! ${bits.join(" ")}`);
+      AUDIO.play("coin");
+      save(); render();
+    },
   }, zone, {
     spawnAt,
     // enemies this save has already killed — they must not respawn on re-entry
     defeated: (S.worldState.dungeons[zone.id] || {}).defeated || [],
+    // hidden treasures this save has already claimed (BACKLOG §3) — a flat, globally-unique list,
+    // not nested per-zone the way dungeon `defeated` is, so it's passed through unfiltered; a
+    // treasure whose id belongs to a DIFFERENT zone simply never matches anything this zone places.
+    foundTreasures: S.worldState.treasuresFound || [],
     zoneNames: worldCfg ? Object.fromEntries(worldCfg.zoneIds.map(id => [id, worldCfg.get(id).name])) : {},
   });
 }
@@ -1649,15 +2569,26 @@ function enterDungeon(id){
   S.worldState.dungeons[id] = S.worldState.dungeons[id] || { cleared: [], defeated: [], bossDead: false };
   changeZone(id, activeZone && activeZone.id);
 }
-// Bumping into a dungeon enemy starts a duel. The enemy's level picks the quest deck it fights
-// with, so a Lv3 slime is not shuffling the Archon's endgame list.
+// Bumping into a dungeon enemy starts a duel. Level picks the GEAR tier off the quest ladder
+// (so a Lv3 slime is not geared like the Archon's endgame) — but the DECK and the battle
+// personality are the monster's own, built from archetypes.js rather than borrowed from a human
+// rival's authored list. A Cinder Slime playing "The Academy Rookie"'s exact fire deck was the
+// "one strategy, different decks" problem this system exists to fix.
 function startDungeonFight(id){
   const zone = activeZone;
   const foe = (zone && zone.enemies || []).find(e => e.id === id);
   if (!foe) return;
   const tier = Math.max(0, Math.min(G.QUESTS.length - 1, Math.floor((foe.level || 1) / 2)));
   const q = G.QUESTS[tier];
-  startLocalDuel(q.deck, q.gear, foe.name, tier, false);
+  const archetype = ARCH.archetypeFor(foe);
+  const school = ARCH.flavorSchoolFor(foe);
+  const pool = CARDS.filter(c => c.school === school);
+  const deck = ARCH.archetypeDeckFor(archetype, pool);
+  // The boss's own declared HP (dungeons.json `boss.hp`) — previously ignored entirely, so the
+  // Cinder Wyrm and the Drowned Archon were fighting at the open-world default of 100, not the
+  // 200/280 their own data declares. That undersells a boss fight and, now that boss phases exist,
+  // also mistimes them (the phase thresholds are HP FRACTIONS of the intended total).
+  startLocalDuel(deck, q.gear, foe.name, tier, false, { archetype, school, hp: foe.hp });
   // Remembered on the battle so the reward/persistence step knows what was actually beaten.
   battle.dungeonFoe = { zone: zone.id, id: foe.id, room: foe.room, boss: !!foe.boss };
 }
@@ -1678,14 +2609,59 @@ function recordDungeonKill(foe){
     }
   }
 }
-function changeZone(toZoneId, fromZoneId){
+// The Dorm phases, D1. The dorm is COMPILED FRESH on every entry rather than registered once at
+// boot, because its geometry depends on the save: buying a hall upgrade grows the room and adds
+// furniture slots (D4), and furniture placed since the last visit has to be in it. Recompiling is
+// cheap (it is pure maths over one room) and it removes an entire class of staleness bug.
+function enterDorm(){
+  if (!worldCfg) return;
+  if (!S.home.owned){
+    showDialogue("Student Dorms", "Your Home",
+      ["The warden looks you over. \"No room assigned to you yet, student.\"",
+       "A dorm of your own costs 200 gold."],
+      [{ label:"🏰 Open the Hall", primary:true, action:()=>{ screen="home"; render(); } }]);
+    return;
+  }
+  const z = DORM.dormZone(S, {
+    entranceZone: "academy",
+    schoolColor: SCHOOLS[S.school].color,
+    gradeOf: gradeForRoll,
+  });
+  worldCfg.zones[z.id] = z;
+  if (!worldCfg.zoneIds.includes(z.id)) worldCfg.zoneIds.push(z.id);
+  changeZone(z.id, activeZone && activeZone.id);
+}
+// Fast travel (BACKLOG §3). Reuses changeZone exactly as a zone gateway would — no separate
+// teleport path to keep in sync — just called with no `fromZoneId`, so entryPointFor finds no
+// reciprocal exit and falls back to the zone's own default spawn point (worldconfig.js). Limited
+// to zones this save has actually WALKED to at least once (`S.worldState.visited`, already tracked
+// by changeZone below) and to outdoor zones (`!z.interior`) — dungeons and the dorm are entered
+// through their own doorway/entrance on purpose, the same way a real place should be reached.
+window.__EV.openFastTravel = ()=>{
+  if (!worldCfg) return;
+  const visited = new Set(S.worldState.visited || []);
+  const zones = worldCfg.zoneIds.map(id => worldCfg.get(id)).filter(z => z && !z.interior && visited.has(z.id));
+  let h = `<p class="sub">Instantly travel to any outdoor zone you've already discovered on foot.</p><div class="row" style="flex-wrap:wrap;gap:8px">`;
+  for (const z of zones){
+    const here = activeZone && activeZone.id === z.id;
+    h += `<button class="btn ${here?"":"gold"}" style="${here?"opacity:.5;cursor:not-allowed":""}" ${here?"disabled":`onclick="window.__ev('fastTravel|${z.id}')"`}>${here?"📍":"🗺️"} ${esc(z.name)}${here?" (here)":""}</button>`;
+  }
+  h += `</div>`;
+  showOverlay("🗺️ Fast Travel", h);
+};
+window.__EV.fastTravel = (zoneId)=>{
+  if (!worldCfg || !worldCfg.get(zoneId)) return;
+  document.getElementById("overlay").style.display = "none";
+  changeZone(zoneId, null);
+};
+function changeZone(toZoneId, fromZoneId, spawnOverride){
   if (zoning || !worldCfg) return;
   const target = worldCfg.get(toZoneId);
   if (!target){ console.warn("exit to unknown zone", toZoneId); return; }
   if (window.__analytics) window.__analytics.track("zone_visit", { zone: toZoneId, from: fromZoneId || null });
   zoning = true;
   const canvas = $("world");
-  const spawnAt = entryPointFor(worldCfg, toZoneId, fromZoneId);
+  const spawnAt = spawnOverride || entryPointFor(worldCfg, toZoneId, fromZoneId);
   try {
     // Dispose FIRST: two live worlds would each hold a WebGL context on the same canvas and
     // both would keep running their rAF loops.
@@ -1698,7 +2674,8 @@ function changeZone(toZoneId, fromZoneId){
     activeZone = target;
     world = spawnWorld(canvas, target, spawnAt);
     window.__world = world;
-    world.setPlayerColor(SCHOOLS[S.school].color);
+    world.setPlayerAppearance(CC.appearanceFor(S));
+    world.setPlayerGear(EQ3.attachmentsFor(S));
     world.resize();
     S.worldState.zone = toZoneId;
     if (!S.worldState.visited.includes(toZoneId)) S.worldState.visited.push(toZoneId);
@@ -1724,6 +2701,15 @@ async function initWorld(){
         if (!worldCfg.zoneIds.includes(z.id)) worldCfg.zoneIds.push(z.id);
       }
     } catch(e){ console.warn("dungeons unavailable:", e && e.message); }
+    // Register the dorm at boot too, so a player who quit inside it is not silently teleported
+    // back to the hub on the next load — `S.worldState.zone` would name a zone nothing knew about.
+    if (S.home && S.home.owned){
+      try {
+        const dz = DORM.dormZone(S, { entranceZone:"academy", schoolColor: SCHOOLS[S.school].color, gradeOf: gradeForRoll });
+        worldCfg.zones[dz.id] = dz;
+        if (!worldCfg.zoneIds.includes(dz.id)) worldCfg.zoneIds.push(dz.id);
+      } catch(e){ console.warn("dorm unavailable:", e && e.message); }
+    }
     // ?zone= wins, then wherever the player last logged out, then the hub.
     const wanted = new URLSearchParams(location.search).get("zone") || (S.worldState && S.worldState.zone);
     activeZone = (wanted && worldCfg.get(wanted)) || worldCfg.get(worldCfg.hub);
@@ -1876,8 +2862,18 @@ window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
 // Test hooks for tools/browser-test.mjs. They drive the REAL functions rather than reimplementing
 // them, so the test cannot pass against a path the game does not actually use.
 window.__testBattle = ()=> battle;
+window.__testSave = ()=> S;
+window.__testAiTurn = ()=>{ if (battle) G.aiTurn(battle); };
+// Leave the duel screen cleanly without going through a real win/loss, for tests that only need
+// to inspect the battle object mid-fight rather than play it out.
+window.__testEndBattle = ()=>{ battle = null; screen = "world"; render(); };
 window.__testGather = ()=>{ const m = MATERIALS.find(x=>x.id==="oak_log"); G.gather(S, m); save(); };
+// Calls the pure gather() directly with an explicit `now`, bypassing both the UI's client-only
+// 1.4s debounce and the real regen cooldown — for tests that need many gathers in quick succession
+// (e.g. confirming a Pristine find, BACKLOG §6, is reachable) without waiting on wall-clock time.
+window.__testGatherAt = (matId, now)=>{ const m = MATERIALS.find(x=>x.id===matId); return m ? G.gather(S, m, now) : null; };
 window.__testDuel = ()=>{ startPracticeDuel(); };
+window.__testRender = ()=>{ render(); };
 window.__testGold = ()=> S.gold;
 // Grant exactly the materials a gather quest asks for — the alternative is mining eight logs in
 // a browser test, which tests the gather loop rather than the quest turn-in.
@@ -1887,6 +2883,67 @@ window.__testGrant = (questId)=>{
   S.inventory[q.objective.id] = (S.inventory[q.objective.id]||0) + q.objective.n;
   save(); return true;
 };
+// Give the player a furnished dorm without playing an hour of economy first. It uses the real
+// buy/place/display functions, so the test still exercises the code the game runs — only the
+// gold and the boss kill are handed over.
+window.__testDorm = ()=>{
+  S.gold += 5000; S.inventory.oak_log = (S.inventory.oak_log||0) + 60;
+  G.buyHome(S);
+  for (const u of HOME_UPGRADES) for (let i=0;i<3;i++) G.upgradeHome(S, u.id);
+  for (const id of ["bed","bookshelf","case","brazier"]) DORM.buyFurniture(S, id);
+  DORM.place(S, "floor_a", "bed"); DORM.place(S, "wall_a", "bookshelf");
+  DORM.place(S, "case_a", "case"); DORM.place(S, "floor_b", "brazier");
+  // a slabbed card to display, and a dead boss to earn a trophy
+  const slab = { uid:"testslab", id:S.cards[0].id, roll:99, graded:true, serial:9001 };
+  S.cards.push(slab);
+  DORM.displayIn(S, "case_a", slab.uid);
+  S.worldState.dungeons.cinderhollow_caverns = S.worldState.dungeons.cinderhollow_caverns || { cleared:[], defeated:[] };
+  S.worldState.dungeons.cinderhollow_caverns.bossDead = true;
+  save();
+  return { tier: DORM.tierFor(S).id, placed: Object.keys(S.home.furniture).length };
+};
+window.__testEnterDorm = ()=>{ enterDorm(); };
+window.__testPreview = ()=> preview;
+// Satisfy one class's assignment by writing the counter it reads, so the browser test can drive
+// the real enrol -> submit -> technique-applied loop without playing an hour of economy first.
+window.__testLessonReady = (id)=>{
+  const l = LSN.byId(id); if (!l) return false;
+  const a = l.assign;
+  if (a.kind === "skill") S.skills[a.id] = a.level;
+  else if (a.kind === "level") S.level = a.n;
+  else if (a.kind === "collect") while (S.cards.length < a.n) S.cards.push({ uid:G.uid(), id:S.cards[0].id, roll:1, graded:false });
+  else S.stats[{ scribe:"scribed", refine:"refined", grade:"graded", slabs:"slabs", win:"won", packs:"packs" }[a.kind]] = a.n;
+  save(); return true;
+};
+window.__testMastery = ()=> LSN.masteryFor(S);
+// Give the player one of each printing so the collection grid can be inspected. Uses mintCard so
+// the instances are shaped exactly as the game makes them.
+window.__testPrintings = ()=>{
+  for (const v of VAR.VARIANTS) G.mintCard(S, CARDS[0].id, 55, { variant: v.id });
+  save(); return VAR.tallyFor(S.cards);
+};
+// Forge and equip a full set at one metal tier, then re-derive the attachments. Uses the real
+// engine functions so the test cannot pass against a path the game does not take.
+window.__testEquipStats = ()=> G.equipStats(S);
+window.__testGear = (metal)=>{
+  for (const slot of SLOTS){
+    const def = equipmentFor(metal, slot.id);
+    const item = { uid: G.uid(), id: def.id, metal, slot: slot.id, tier: def.tier };
+    S.equipment.push(item);
+    G.equip(S, item.uid);
+  }
+  refreshGear(); save();
+  return { attachments: EQ3.attachmentsFor(S).map(a=>({slot:a.slot,bone:a.bone,model:a.model,h:a.height})),
+           bones: window.__testBones(), gear: window.__world && window.__world.gearDebug ? window.__world.gearDebug() : null };
+};
+window.__testBones = ()=>{
+  const w = window.__world && window.__world.playerBones && window.__world.playerBones();
+  return w || null;
+};
+window.__testAppearance = ()=> CC.appearanceFor(S);
+window.__testDormRoom = ()=>{ const r = DORM.dormRoom(S); return [r.w, r.d]; };
+window.__testDormUpgrade = ()=>{ S.gold += 5000; S.inventory.oak_log = (S.inventory.oak_log||0) + 60;
+  for (const u of HOME_UPGRADES) G.upgradeHome(S, u.id); save(); return DORM.tierFor(S).id; };
 window.__testBoard = ()=>{
   battle.you.pips = 9; battle.enemy.pips = 9;
   battle.you.hand[0] = "fire_dragon"; window.__ev("play|0");
@@ -1917,8 +2974,12 @@ window.__EV.toggleMute = ()=>{
 async function boot(){
   $("muteBtn").textContent = AUDIO.isMuted() ? "🔇" : "🔊";
   await initWorld();
-  if (world) world.setPlayerColor(SCHOOLS[S.school].color);
-  if (!S.flags.schoolPicked) showSchoolPicker();
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
+  // Character creation replaces the bare school picker on a fresh save. It is skipped for any
+  // save that already finished it, and `CC.isComplete` is DERIVED, so an older save that has a
+  // school but no name is walked through the remaining steps rather than either re-doing the
+  // school or being left half-created.
+  if (!CC.isComplete(S)) showCharCreate();
   // online room from URL
   const roomParam = new URLSearchParams(location.search).get("room");
   if (roomParam){
@@ -1932,6 +2993,8 @@ async function boot(){
   setInterval(()=>{ if (gatherCooldown>0) gatherCooldown-=0.1; }, 100);
   // auction tick
   setInterval(()=>{ if (screen==="market") render(); }, 1000);
+  // live countdown on the Skills screen's Gather buttons (BACKLOG §6 "Resource node regeneration")
+  setInterval(()=>{ if (screen==="skills") render(); }, 1000);
   setInterval(()=>{ G.save(S); }, 3000);
 }
 boot();

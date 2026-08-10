@@ -38,11 +38,21 @@ export const BUILDINGS = [
     model:"./assets/models/hex_blacksmith.glb", modelRy:0 },
   { id:"market",  label:"Merchant Stall",  x:31,  z:12,  w:12.8, d:9.4,  h:7,  ry:0.3,  wall:0x8a6a3a, roof:0x2f6f4f, face:"z-",
     model:"./assets/models/hex_market.glb", modelRy:0 },
+  // `interior` makes a building a PLACE you walk into rather than a menu you open. It is a
+  // generic field, not a dorm special case, because docs/DESIGN-DECISIONS.md §1 wants the same
+  // for the Scribing Hall and Smithy — the two buildings players actually spend time in. The
+  // value names an interior zone; index.html enters it instead of switching `screen`.
   { id:"home",    label:"Student Dorms",   x:0,   z:32,  w:6.8,  d:7.3,  h:8,  ry:0,    wall:0x6a5b9e, roof:0x2f4f8a, face:"z-",
-    model:"./assets/models/hex_home_A.glb", modelRy:0 },
+    model:"./assets/models/hex_home_A.glb", modelRy:0, interior:"dorm" },
   { id:"tavern",  label:"The Rested Quill", x:-16, z:26, w:7.6,  d:8.6,  h:9,  ry:0.5,  wall:0x8a6a3a, roof:0x8a3a2a, face:"z-", noStation:true,
     model:"./assets/models/hex_tavern.glb", modelRy:0 },
 ];
+
+/** The interior zone a station leads into, or null if that station opens a screen instead. */
+export function interiorFor(stationId){
+  const b = BUILDINGS.find(x => x.id === stationId);
+  return (b && b.interior) || null;
+}
 
 // How far outside a building's face its station prompt sits.
 export const DOOR_OFFSET = 3.0;
@@ -100,6 +110,18 @@ export const NPCS = [
   { key:"duel",      role:"duel",      station:"duel",      label:"Referee — Duel",       x:9,     z:-21, main:0x4a3a7a, hat:0x2a1f4d, orb:0xff6b6b, model:"referee.glb" },
   { key:"trainer",   role:"trainer",   station:"trainer",   label:"Trainer — Practice",   x:17,    z:24,    main:0x3a6bd8, hat:0x8a3a2a, orb:0xffd766, model:"trainer.glb" },
   { key:"librarian", role:"librarian", station:"librarian", label:"Librarian — Lore",     x:-31,   z:22,    main:0x6a5b9e, hat:0x2a1f4d, orb:0x7be0ff, model:"librarian.glb" },
+];
+
+// ---------------------------------------------------------------- hidden treasure (BACKLOG §3)
+// Off the beaten path — away from the tower/arena/NPCs, not on the paths a new player is guided
+// down — so finding one rewards actually exploring the corners of the hub rather than the route
+// the onboarding chain already walks a player through. Ids are globally unique across every zone
+// (worldconfig.js's `validateTreasureIds` enforces it) because a found treasure is recorded as one
+// flat id in the save (`s.worldState.treasuresFound`), not nested per-zone like a dungeon kill is.
+export const TREASURES = [
+  { id:"academy_grove_cache", x:-50, z:40 },
+  { id:"academy_cliff_cache", x:55, z:-50 },
+  { id:"academy_courtyard_cache", x:-45, z:-45 },
 ];
 export const WANDERERS = [
   { key:"wander0", main:0x3ddc84, hat:0xff6b6b, model:"student_emerald.glb" },
