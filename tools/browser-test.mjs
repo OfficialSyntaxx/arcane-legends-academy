@@ -1196,6 +1196,24 @@ if (hasWorld){
   check("the second dungeon is populated", lake.vaultEnemies > 0, String(lake.vaultEnemies));
   check("leaving the second dungeon returns to the lake", lake.zoneAfter === "lake_arcanum", String(lake.zoneAfter));
 
+  // --- Fast travel (BACKLOG §3) ---
+  // By this point in the run the player has walked academy -> forest -> lake -> the vault and
+  // back for real, so S.worldState.visited genuinely holds all three outdoor zones — the panel is
+  // proven against real progress, not a seeded save.
+  const travel = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    window.__ev("openFastTravel");
+    await settle(200);
+    const panelHtml = document.getElementById("ovBody").innerHTML;
+    window.__ev("fastTravel|academy");
+    await settle(1600);
+    return { panelHtml, zoneAfter: window.__worldDebug().zone };
+  });
+  check("the Fast Travel panel lists every outdoor zone visited on foot",
+        /Arcanum Academy/.test(travel.panelHtml) && /Whispering Forest/.test(travel.panelHtml) && /Lake Arcanum/.test(travel.panelHtml),
+        travel.panelHtml.slice(0, 300));
+  check("fast travel actually moves the player to the chosen zone", travel.zoneAfter === "academy", String(travel.zoneAfter));
+
 }
 
 

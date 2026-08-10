@@ -98,7 +98,10 @@
 - [x] The Drowned Vault — 5-room dungeon under Lake Arcanum, cold flooded palette, the Drowned Archon (Lv14) at the bottom
 - [x] Zone transitions — walkable gateways, reciprocal arrival, world state persisted in the save
 - [x] Chunk streaming — scatter-once/bucket-once with load/unload hysteresis and GPU disposal
-- [ ] Fast travel
+- [x] Fast travel — a 🗺️ map button in the 3D world, always visible, opens a panel of every
+  outdoor zone `S.worldState.visited` already records the player having walked to; picking one
+  calls the existing `changeZone`/`entryPointFor` exactly as a real gateway would (no new teleport
+  path, no new save field).
 - [ ] Hidden areas / treasure
 - [ ] Day/night cycle
 - [ ] Weather
@@ -354,7 +357,13 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Achievements and player titles** (§1/§2 — `achievements.js`:
+**Changes made, most recent first:** **Fast travel** (§3 — a 🗺️ map button in the 3D world opens a
+panel of every outdoor zone `S.worldState.visited` already records; picking one reuses
+`changeZone`/`entryPointFor` exactly as a real gateway would, since `entryPointFor` already falls
+back to a zone's default spawn with no `fromZoneId` — no new save field, no new pure module,
+covered end-to-end by `tools/browser-test.mjs` walking the real route academy → forest → lake → the
+Drowned Vault and back before proving the panel and a chosen destination) → **Achievements and
+player titles** (§1/§2 — `achievements.js`:
 the last unchecked line in §1/§2's original scope; 10 account-wide achievements deliberately
 covering everything the collection-scoped `codex.js` achievements and PvP-scoped `pvprank.js` title
 already covered would NOT — field quests, dungeon bosses, PvP rank, wealth, crafting, reputation —
@@ -431,7 +440,11 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Achievements and player titles is done** (§1/§2 — the last unchecked line in that
+**Next step:** **Fast travel is done** (§3). A UI-only feature: `changeZone`/`entryPointFor`
+already had everything it needed, so this just calls them one more way. 497 engine / 42
+online-rules / 173 real-browser / `check:models`, all green.
+
+Before that: **Achievements and player titles is done** (§1/§2 — the last unchecked line in that
 section). Covered by `tools/test.mjs` (derivation, un-earning when state regresses, lock/unlock,
 `setTitle`, migration) and `tools/browser-test.mjs` (a locked title can't be equipped, earning the
 achievement unlocks it for real, shows on the Dorm header and the Codex gallery). 497 engine / 42

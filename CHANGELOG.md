@@ -14,6 +14,26 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Fast travel — 2026-08-10
+
+### Fast travel — *pending*
+- BACKLOG §3. `changeZone(toZoneId, fromZoneId, spawnOverride)` already tears down the current zone
+  and rebuilds the target from `worldconfig.js`, and `entryPointFor` already falls back to a zone's
+  own default `spawn` point whenever there's no reciprocal exit to line up against — exactly what
+  happens when `fromZoneId` is omitted. So this is not a second teleport system, it's `changeZone`
+  called the way a gateway calls it, just without a `fromZoneId`.
+- A 🗺️ map button in the 3D world (always visible, unlike the zoom buttons which are touch-only)
+  opens a panel of every OUTDOOR zone (`!zone.interior` — dungeons and the dorm stay reached through
+  their own doorway) that `S.worldState.visited` already records. Current zone shows disabled
+  rather than being hidden, so the panel reads as a map.
+- No new save field (`visited` already existed, tracked by `changeZone` itself), no new pure
+  module, no new `tools/test.mjs` checks — there is no new derivable rule to assert, just existing
+  zone-transition machinery invoked one more way.
+- Covered by `tools/browser-test.mjs` against a save that ACTUALLY walked academy → forest → lake →
+  the Drowned Vault and back in the same test run: the panel lists exactly the three outdoor zones
+  it saw with its own eyes, and choosing one actually moves the live 3D world.
+- *497 engine / 42 online / 173 browser.*
+
 ## Achievements & player titles — 2026-08-10
 
 ### Achievements & player titles — `e82ffe1`

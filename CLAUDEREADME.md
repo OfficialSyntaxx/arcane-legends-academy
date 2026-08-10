@@ -244,6 +244,7 @@ It will: download (if a URL) → convert FBX/GLTF→GLB → resize textures to 5
 - **Save Backup / Import / Export** (`game.js` `exportSave`/`importSave`) — download/restore the whole save as a real file, conservative validation, confirmation before overwrite. See §6.28.
 - **UI depth & school accenting, world sky gradient** (`index.html`, `world.js`) — panel/button box-shadows, a runtime `--accent` retint driven by the player's actual school, and a real gradient sky replacing the flat clear colour outdoors. See §6.29.
 - **Achievements & player titles** (`achievements.js`) — 10 account-wide achievements spanning quests, dungeon bosses, PvP rank, wealth, crafting and reputation, each unlocking a title the player can equip next to their name. See §6.30.
+- **Fast travel** (`index.html`, no new module) — a map button in the 3D world instantly warps to any outdoor zone the player has already walked to, reusing `changeZone`/`entryPointFor` exactly as a real gateway would. See §6.31.
 - **The Codex** (`codex.js`) — catalog browser with filters, completion per school, favourites and nine derived collection achievements. See §6.13.
 - **Card printings** (`variants.js`) — foil/holo/prismatic and first editions, with per-source luck and a visible treatment on the card face. See §6.12.
 - **Academy classes** (`lessons.js`) — 21 classes across the seven years, each teaching a technique that changes grading, scribing, gathering or selling. See §6.11.
@@ -810,7 +811,27 @@ reputation, and nothing let a player pick a title to actually wear.
   the moment the new Titles panel landed after it — fixed by selecting on heading text instead of
   position, which is what it should have done from the start.
 
-### 6.31 Retention
+### 6.31 Fast travel (`index.html`, no new module, BACKLOG §3)
+The world already had everything this needed: `changeZone(toZoneId, fromZoneId, spawnOverride)`
+tears down the current zone and rebuilds the target from `worldconfig.js`, and `entryPointFor`
+already falls back to a zone's own default `spawn` point whenever there's no reciprocal exit to
+line up against (exactly the case with no `fromZoneId`). So fast travel is not a second teleport
+system — it is `changeZone` called the same way a gateway calls it, just with `fromZoneId` omitted.
+
+- A 🗺️ map button, always visible (not gated to touch like the zoom buttons — a desktop player
+  wants this just as much), opens an overlay listing every OUTDOOR zone (`!zone.interior` — this
+  excludes dungeons and the dorm on purpose, the same way a real place is entered through its own
+  doorway) that `S.worldState.visited` already records the player having walked to. The current
+  zone shows disabled rather than being omitted, so the list reads as a map, not a puzzle.
+- No new save field: `visited` already existed (WORLDSPEC §10), tracked by `changeZone` itself on
+  every real transition. Fast travel only reads it — nothing new to migrate or desync.
+- No new pure module and no new `tools/test.mjs` checks: there is no new derivable state or rule to
+  assert, just existing zone-transition machinery invoked one more way. Covered by
+  `tools/browser-test.mjs` against a save that has ACTUALLY walked academy → forest → lake → the
+  Drowned Vault and back for real in the same test run — the panel lists all three outdoor zones
+  it saw with its own eyes, and choosing one actually moves the live world, not a mocked one.
+
+### 6.32 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -852,7 +873,7 @@ Individually:
 node tools/test.mjs          # 497 engine checks (economy, combat, world/zone/dungeon/quest/dorm data)
 node tools/logic-test.mjs    # 42 online-rules checks
 node tools/ui-smoke.mjs      # UI boot smoke test
-npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (171 checks)
+npm run test:browser         # 8 viewports + input gestures + world/dungeon/quest/dorm/VFX flows, real Chromium (173 checks)
 npm run check:models         # loads AND renders every shipped GLB in a real browser
 ```
 `npm test` is the fast headless suite and gates every push. `npm run test:browser` needs a
@@ -899,7 +920,7 @@ Use the `deploy_game` tool:
 > (Phases A–D, the original correctness/systems pass) is archived in `docs/NEXT-PHASE-PLAN.md`
 > for historical context; everything in it is done and superseded by the two docs above.
 
-**All tests green:** 497 engine / 42 online-rules / 171 real-browser (layout + gestures + world +
+**All tests green:** 497 engine / 42 online-rules / 173 real-browser (layout + gestures + world +
 dungeon + quest + VFX flows) / `check:models` (every shipped GLB loads and renders). `npm test`
 gates every push.
 
@@ -946,7 +967,17 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Achievements & player titles** (§6.30, BACKLOG §1/§2) — the last unchecked line in
+**Last landed: Fast travel** (§6.31, BACKLOG §3). The world already had everything this needed —
+`changeZone`/`entryPointFor` already fell back to a zone's default spawn with no `fromZoneId`, and
+`S.worldState.visited` already tracked every zone reached — so this is a UI-only feature: a 🗺️ map
+button in the 3D world (always visible, not gated to touch) opens an overlay of every OUTDOOR zone
+visited, current zone shown disabled, and picking one calls `changeZone` exactly the way a real
+gateway would. No new save field, no new pure module, no new engine tests — covered by
+`tools/browser-test.mjs` against a save that ACTUALLY walked academy → forest → lake → the Drowned
+Vault and back in the same run, proving the panel lists real progress and a chosen zone actually
+moves the live world. 497 engine / 42 online-rules / 173 real-browser / `check:models`, all green.
+
+**Before that: Achievements & player titles** (§6.30, BACKLOG §1/§2) — the last unchecked line in
 §1/§2's original scope. 10 account-wide achievements spanning field quests, dungeon bosses, PvP
 rank, wealth, crafting and reputation — deliberately everything the collection-scoped `codex.js`
 achievements and the PvP-scoped `pvprank.js` title didn't cover — each unlocking a title a player
@@ -976,7 +1007,7 @@ actionability-checked one because the character-creation overlay can still be co
 a fresh save; two fixed `waitForTimeout` sleeps were replaced with `page.waitForFunction` polling
 the real DOM condition; `setInputFiles` got a resilient wrapper with its own timeout so an
 environment hiccup fails one check with a diagnostic instead of killing the whole suite) — all
-tests confirmed green afterward: 497 engine / 42 online-rules / 171 real-browser / `check:models`.
+tests confirmed green afterward: 485 engine / 42 online-rules / 166 real-browser / `check:models`.
 
 **Before that: an end-to-end audit, then Deck Archetypes** (§6.22). Asked to check the previous
 stretch of work for anything left unfinished before continuing: the working tree was already clean
@@ -991,7 +1022,7 @@ at 3 owned copies, never invents a card the player doesn't have, and returns an 
 (not a hang) when the collection is too thin for the archetype. §5 Cards & Collection now has only
 card evolution, card backs and booster-opening animations left unstarted.
 
-Tests: **497 engine / 42 online-rules / 171 browser / 8 viewports / model-check clean.**
+Tests: **497 engine / 42 online-rules / 173 browser / 8 viewports / model-check clean.**
 
 **Before that: online/local combat parity** (§6.21, BACKLOG §1 "Combat rules cleanup"). `logic.js`
 runs sandboxed with no imports, so it never automatically inherits anything landed in `game.js` —
