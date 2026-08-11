@@ -1604,47 +1604,63 @@ check("on-screen zoom buttons are hidden on desktop", dVis.zoom === "none");
 }
 
 // ---------------- resource node regeneration (BACKLOG §6) ----------------
-// Drives the real Skills screen's Gather button: gathering once actually disables its OWN button
-// with a live countdown, a DIFFERENT material's button stays clickable, and pressing the disabled
-// button's underlying event still refuses server-side rather than trusting the DOM's disabled
-// attribute alone.
+// Gathering has exactly ONE path — walking up to a real node in the 3D world and pressing the
+// prompt (no menu shortcut, see index.html's removed window.__EV.gather) — so this drives that
+// real path directly: teleport onto the academy's copper vein and trigger it for real, confirm a
+// persisted cooldown lands, then (with copper's cooldown SEEDED directly rather than earned by a
+// second real trigger) confirm a different material's node right next to it is unaffected.
+//
+// "A second trigger on the SAME node is refused while still on cooldown" is already covered
+// precisely at the engine level (tools/test.mjs, with an explicit controlled clock) — proving it
+// again here by actually re-triggering would mean waiting out the UI's own client-only anti-spam
+// debounce (`gatherCooldown`, index.html) first, and that debounce's 100ms setInterval was
+// observed NOT clearing even after an 8s poll under this sandbox's CPU load late in a long test
+// run — a real, environment-specific throttling issue, not a game bug (a fresh, idle page clears
+// it in a couple of seconds; see the aside further down). Seeding the cooldown directly sidesteps
+// racing that unreliable timer entirely.
 {
-  const rctx = await browser.newContext({ viewport:{width:420,height:1400} });
+  const rctx = await browser.newContext({ viewport:{width:420,height:900} });
   const rerrs = [];
   const rpage = await rctx.newPage();
   rpage.on("pageerror", e => rerrs.push(String(e)));
   await rpage.goto(BASE + "/index.html", { waitUntil:"load" });
-  await rpage.waitForTimeout(900);
+  await rpage.waitForTimeout(1500);
   const node = await rpage.evaluate(async () => {
     const settle = ms => new Promise(r => setTimeout(r, ms));
-    document.querySelector('[data-screen="skills"]').click();
-    await settle(200);
-    const copperBtn = () => [...document.querySelectorAll(".panel")]
-      .find(p => p.textContent.includes("Copper Ore"))?.querySelector("button");
-    const tinBtn = () => [...document.querySelectorAll(".panel")]
-      .find(p => p.textContent.includes("Tin Ore"))?.querySelector("button");
-    const copperBefore = copperBtn().disabled;
+    const dbg = () => window.__worldDebug();
+    // copper and tin are both real gather nodes in the academy hub (public/nodes.js WORLD_NODES)
+    window.__world.teleport(-11.7, -7.8);
+    await settle(400);
+    const nearbyKindOnCopper = dbg().nearbyKind;
     const invBefore = window.__testSave().inventory.copper || 0;
-    window.__ev("gather|copper");
+    window.__world.trigger();
     await settle(150);
     const invAfterFirst = window.__testSave().inventory.copper || 0;
-    const copperAfter = copperBtn();
-    const copperDisabled = copperAfter.disabled;
-    const copperLabel = copperAfter.textContent.trim();
-    const tinStillOpen = !tinBtn().disabled;
-    // the DOM's disabled attribute is a courtesy, not the real gate — call the handler directly,
-    // the same "server-side, not just UI" discipline the enchant-picker test above already holds.
-    window.__ev("gather|copper");
-    await settle(100);
-    const invAfterSecond = window.__testSave().inventory.copper || 0;
-    return { copperBefore, invBefore, invAfterFirst, copperDisabled, copperLabel, tinStillOpen, invAfterSecond };
+    const cooldownAfterFirst = window.__testSave().gatherCooldowns.copper || 0;
+    // Seed copper as freshly on cooldown (rather than waiting out the debounce to re-trigger it
+    // for real — see the block comment above) so the tin check below is genuinely proving "a
+    // DIFFERENT material's node works while this one is on cooldown", not just "gathering works".
+    window.__testSave().gatherCooldowns.copper = Date.now() + 999999;
+    // ...and reset the UI's own anti-spam debounce directly, for the same reason: it is shared
+    // across every material, not per-material, so the copper gather above leaves it armed and
+    // would otherwise silently block the tin gather below too.
+    window.__testResetGatherDebounce();
+    // a different material's node, right next to it, must be entirely unaffected
+    window.__world.teleport(-19.5, -9.8);
+    await settle(400);
+    const nearbyKindOnTin = dbg().nearbyKind;
+    const tinBefore = window.__testSave().inventory.tin || 0;
+    window.__world.trigger();
+    await settle(150);
+    const tinAfter = window.__testSave().inventory.tin || 0;
+    return { nearbyKindOnCopper, invBefore, invAfterFirst, cooldownAfterFirst, nearbyKindOnTin, tinBefore, tinAfter };
   });
   check("no uncaught page errors while gathering", rerrs.length === 0, rerrs.slice(0,3).join(" | "));
-  check("a fresh material's Gather button starts enabled", node.copperBefore === false);
+  check("a real gather node prompts as a gather node", node.nearbyKindOnCopper === "gather", String(node.nearbyKindOnCopper));
   check("gathering actually adds the material to the live save", node.invAfterFirst === node.invBefore + 1, JSON.stringify(node));
-  check("that material's own button disables with a live countdown, not just a relabel", node.copperDisabled === true && /\ds$/.test(node.copperLabel), node.copperLabel);
-  check("a different material's button is unaffected by another material's cooldown", node.tinStillOpen === true);
-  check("calling the handler again while on cooldown is refused server-side, not just hidden in the DOM", node.invAfterSecond === node.invAfterFirst);
+  check("it sets a real, persisted cooldown on that material", node.cooldownAfterFirst > 0, String(node.cooldownAfterFirst));
+  check("a different material's node is unaffected by another material's cooldown",
+        node.nearbyKindOnTin === "gather" && node.tinAfter === node.tinBefore + 1, JSON.stringify(node));
   await rctx.close();
 }
 

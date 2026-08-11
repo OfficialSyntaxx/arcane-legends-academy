@@ -998,7 +998,42 @@ walkable, with nothing authored on top of it yet.
 gather/regen/pristine systems already built), a third dungeon + boss gated behind the quest chain,
 then an atmosphere/landmark polish pass.
 
-### 6.37 Retention
+### 6.37 Gathering is open-world-only now (`index.html`, BACKLOG "Connect existing systems")
+§6.33 shipped `gather()`'s regen cooldown across BOTH places that could call it — the 3D world's
+real nodes and a Skills-screen menu button that minted materials with no walking required. Asked
+directly whether that matched the intent, the answer was no: the game is meant to be **OSRS-style
+open-world gathering** — walk up to a vein/spot/tree and gather it yourself — not a menu shortcut
+that happens to also exist in the world for flavour.
+
+- **`window.__EV.gather` (the menu handler) is gone.** The 3D world's `onGather(matId)` — walking
+  onto a real registered node and pressing the prompt — is now the ONLY path into `game.js`
+  `gather()`. Nothing else in the UI mints a raw material.
+- The Skills screen's "⛏️ Gather" panel is now a **reference, not a control**: shows each
+  material's skill/level requirement, xp, and how many you currently own, with no button — telling
+  a player what to go look for without letting them skip looking for it.
+- `regenMsFor`/`gatherCooldowns`/pristine finds are all engine-side (`game.js`) and untouched —
+  this was a UI-surface change, not a rules change. `s.gatherCooldowns` still exists for exactly
+  the reason §6.33 built it: even with one path in, the same material across many scattered nodes
+  in the outdoor zones still needs one shared cooldown, not per-mesh state that can't survive a
+  chunk reload.
+- Covered by `tools/test.mjs` (unchanged — it drives `gather()` directly, which never depended on
+  which UI called it) and a rewritten `tools/browser-test.mjs` "resource node regeneration" block:
+  where it used to click a Skills-screen button, it now teleports onto the academy's real copper
+  and tin veins and triggers them exactly the way a player walking up and pressing the prompt
+  would.
+- **A real environment quirk found while rewriting that test, not a game bug**: `gatherCooldown`
+  (the UI's own 1.4s client-only anti-spam debounce, unrelated to the real per-material cooldown)
+  is ticked down by a 100ms `setInterval`, and that interval was observed NOT clearing even after
+  an 8-second poll late in a long, CPU-loaded test run — the interval itself gets throttled well
+  behind wall-clock time under load. Waiting it out (with a fixed sleep OR a `waitForFunction` poll)
+  turned out to be exactly the kind of flake this project already has a convention against, so the
+  fix is structural: two new test-only hooks, `window.__testGatherDebounce()` (reads it) and
+  `window.__testResetGatherDebounce()` (zeroes it directly), let a test move straight to the next
+  real gather without racing an unreliable timer at all. `world.js`'s `__worldDebug()` also gained
+  `nearbyData` (not just `nearbyKind`) — the concrete debugging step that found the bug was
+  invisible until the interactable's actual data payload, not just its kind, could be inspected.
+
+### 6.38 Retention
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
@@ -1134,7 +1169,33 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Ashen Mountains, step 1 of 5 — zone shell** (§6.36, BACKLOG §3). The last open
+**Last landed: gathering is open-world-only now** (§6.37). Asked directly whether the Skills
+screen's menu-button gathering matched the intent — it didn't; this is meant to be OSRS-style, walk
+up and gather it yourself. Removed `window.__EV.gather` entirely; the 3D world's `onGather` (a real
+node, a real prompt) is now the only path into `gather()`. The Skills panel is now a reference
+(requirement/xp/owned count, no button), not a shortcut. Rewrote the `tools/browser-test.mjs`
+coverage that used to click the menu button to instead teleport onto real nodes and trigger them,
+proving the cooldown/isolation/refuse-repeat rules still hold through the one remaining path.
+
+**Before that: `main` merged into this branch and pushed to `main` via PR #1.** `main` had
+diverged substantially during parallel development — a full creature-keyword combat system
+(`creatures.js`: taunt/drain/poison/thorns/evade/survive/spell-immune/freeze-immune/warband/rage,
+36 dedicated tests), baked GLB zone maps, its own Ashen Mountains + dungeon, a Creature Bestiary,
+an ongoing "Adventurer's Path" advisor, analytics, and its own UI palette. Reconciled conflict by
+conflict rather than picking a side wholesale: kept both academy-progression systems (they reward
+different things), kept this branch's PvP ranking/auction history/UI accent system/Lake Arcanum
+(main had none of these), adopted main's fuller Ashen Mountains over this branch's own shell,
+renamed a colliding event name (`openCodex` meant two different screens on the two branches).
+`zones.json`/`dungeons.json` were reconstructed programmatically rather than hand-edited through
+conflict markers, to avoid corrupting structured data. Found and fixed two real bugs surfaced only
+by finally running the FULL `npm test` pipeline together (a `document.documentElement`-less test
+stub crashing on this branch's own `applyAccent()`; a terrain-height check hardcoded to a formula
+that's wrong for zones now riding a baked map — fixed by exposing `world.groundYAt(x,z)`, the
+engine's own function, instead of duplicating it). Also gave the bare one-line root `README.md` a
+real project overview. 534 engine / 42 online-rules / UI smoke / 36 creature-rule / 194 real-browser
+(one pre-existing, untouched-by-either-side VFX flake) / `check:models`, all green.
+
+**Before that: Ashen Mountains, step 1 of 5 — zone shell** (§6.36, BACKLOG §3). The last open
 outdoor zone, taken as a content pass split into separately committable steps this time rather than
 one large one. This step proves the smallest possible slice: a fourth zone off Whispering Forest's
 unused north edge, using the `mountains` terrain biome that had shipped unused since the terrain

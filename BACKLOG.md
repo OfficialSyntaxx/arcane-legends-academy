@@ -373,7 +373,14 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Ashen Mountains, step 1 of 5: zone shell** (§3 — a fourth
+**Changes made, most recent first:** **Gathering is open-world-only** ("Connect existing systems" —
+removed the Skills-screen menu Gather button entirely; the 3D world's real nodes are now the only
+path into `gather()`, matching the intended OSRS-style "walk up and gather it yourself" design; the
+Skills panel is now a requirement/xp/owned reference, not a control) → **`main` merged into this
+branch and pushed to `main` via PR #1** (reconciled a substantial independent divergence — creature
+combat, baked GLB maps, main's own Ashen Mountains + dungeon, an advisor/analytics system — keeping
+both sides' non-overlapping work and resolving real conflicts like a colliding event name and two
+different Ashen Mountains; also wrote a real root `README.md`) → **Ashen Mountains, step 1 of 5: zone shell** (§3 — a fourth
 outdoor zone off Whispering Forest's unused north edge, using the `mountains` terrain biome that
 had shipped unused since the terrain system itself was built; amplitude 18 for real peaks; two
 treasures placed immediately so the "every outdoor zone places at least one" invariant is never
@@ -484,7 +491,15 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Ashen Mountains step 1 of 5 (zone shell) is done** (§3). Steps 2–5: NPCs + field
+**Next step:** **Gathering is open-world-only, is done.** `window.__EV.gather` removed; the 3D
+world's `onGather` is the only path into `gather()`; the Skills panel is a reference now, not a
+control. Covered by a rewritten `tools/browser-test.mjs` block driving the real academy nodes.
+
+Before that: **`main` merged into this branch, pushed to `main` via PR #1, is done.** Reconciled a
+substantial independent divergence conflict by conflict; see CLAUDEREADME.md's "Where we left off"
+for the full account of what was kept, dropped, and renamed.
+
+Before that: **Ashen Mountains step 1 of 5 (zone shell) is done** (§3). Steps 2–5: NPCs + field
 quests, mining-flavoured resource nodes, a third dungeon + boss gated behind the quest chain, then
 an atmosphere/landmark polish pass. Covered by `tools/browser-test.mjs` (walks the real gateway
 chain, confirms the zone builds and the return exit works) — world-config validation already

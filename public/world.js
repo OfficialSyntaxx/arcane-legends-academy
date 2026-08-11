@@ -1706,6 +1706,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       rooms: (ZONE.rooms||[]).length,
       wallCount: (ZONE.obstacles||[]).filter(o=>String(o.id).startsWith("wall:")).length,
       nearbyKind: nearby ? nearby.kind : null,
+      nearbyData: nearby ? nearby.data : null,
       nearbyLabel: nearby ? nearby.label : null,
       npcs: (ZONE.npcs||[]).map(n=>({key:n.key, station:n.station, x:n.x, z:n.z})),
       enemies: Object.keys(enemyGroups).length,

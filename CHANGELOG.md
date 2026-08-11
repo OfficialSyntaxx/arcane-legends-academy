@@ -14,6 +14,63 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Gathering is open-world-only — 2026-08-10
+
+### Gathering is open-world-only — *pending*
+- Asked directly whether the Skills-screen menu Gather button matched the intent — it didn't: the
+  design is OSRS-style, walk up to a real node and gather it yourself, not a menu shortcut that
+  happened to coexist with the real 3D nodes.
+- `window.__EV.gather` (the menu handler) removed entirely. `index.html`'s world `onGather(matId)`
+  — a real registered node, a real prompt — is now the ONLY path into `game.js` `gather()`.
+- The Skills screen's "⛏️ Gather" panel is now a reference, not a control: each material's
+  skill/level requirement, xp, and current owned count, no button.
+- Engine-side (`game.js` `gather`/`gatherCooldowns`/pristine finds) untouched — this was a UI-
+  surface change, not a rules change.
+- `tools/test.mjs` needed no changes (drives `gather()` directly, never depended on which UI called
+  it); rewrote the `tools/browser-test.mjs` "resource node regeneration" block to teleport onto the
+  academy's real copper/tin veins and trigger them, the same interaction a player walking up and
+  pressing the prompt performs, instead of clicking the now-removed menu button.
+- A real environment quirk found while rewriting that test, not a game bug: the UI's own 1.4s
+  client-only anti-spam debounce is ticked by a 100ms `setInterval` that was observed NOT clearing
+  even after an 8s poll late in a long, CPU-loaded test run. Waiting it out (fixed sleep or a
+  `waitForFunction` poll) was itself a flake, so two new test-only hooks —
+  `window.__testGatherDebounce()`/`window.__testResetGatherDebounce()` — let a test skip straight
+  to the next real gather instead. `world.js`'s `__worldDebug()` also gained `nearbyData` alongside
+  `nearbyKind`, which is what made the bug visible to debug in the first place.
+- *534 engine / 42 online / 194 browser, all green (including the previously-flaky VFX check).*
+
+## Merge `main` into this branch, push to `main` via PR #1 — 2026-08-10
+
+### Reconcile parallel development — `0db41ef`
+- `main` had diverged substantially during parallel development: a full creature-keyword combat
+  system (`creatures.js` — taunt, drain, poison, thorns, evade, survive, spell immunity, freeze
+  immunity, warband, rage, 36 dedicated tests), baked GLB zone maps replacing procedural-only
+  terrain for several zones, its own independently-built Ashen Mountains + Ashen Caverns dungeon, a
+  Creature Bestiary + Display Case, an ongoing "Adventurer's Path" advisor system, analytics, and
+  its own UI palette pass.
+- Reconciled conflict by conflict rather than picking a side wholesale. Kept both academy-
+  progression systems (lessons.js's 21-class curriculum and main's gold-cost classes reward
+  different things). Kept this branch's PvP ranking, auction/price history, dynamic UI accent
+  system, and Lake Arcanum + the Drowned Vault — main had none of these. Adopted main's fuller
+  Ashen Mountains (mining nodes, NPCs, a dungeon+boss) over this branch's own shell from earlier the
+  same day. Renamed main's Creature Codex event handlers (`openCodex`/`codexFilter` →
+  `openBestiary`/`bestiaryFilter`) — they collided with this branch's unrelated Card Codex using the
+  same names, which would have silently clobbered one handler with the other.
+- `zones.json`/`dungeons.json` reconstructed programmatically from both branches' clean JSON rather
+  than hand-edited through conflict markers, to avoid corrupting structured data; backfilled a
+  treasure into each newly-adopted zone so the existing "every outdoor zone places at least one"
+  invariant holds.
+- Two real bugs found and fixed, both surfaced only by finally running the FULL `npm test` pipeline
+  (previously verified via its component scripts separately): `tools/ui-smoke.mjs`'s DOM stub had
+  no `document.documentElement` or a `style` with `setProperty`, crashing on this branch's own
+  `applyAccent()` — a stub gap, not an app bug. `tools/browser-test.mjs`'s terrain-height regression
+  check compared against a hardcoded procedural formula, wrong for zones now riding a baked GLB
+  map's real surface — fixed by adding `world.groundYAt(x,z)`, exposing the engine's own height
+  function, so the check can never drift from what the engine actually does again.
+- Also wrote a real root `README.md` (was a bare one-line description) and, separately, opened and
+  merged PR #1 into `main` so the reconciled history is on the repo's default branch.
+- *534 engine / 42 online / 194 browser (1 pre-existing, untouched-by-either-side VFX flake) / model-check clean.*
+
 ## Ashen Mountains, step 1: zone shell — 2026-08-10
 
 ### Ashen Mountains, step 1 of 5: zone shell — `fd4c119`

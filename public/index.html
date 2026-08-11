@@ -1311,17 +1311,18 @@ function renderSkills(el){
       <div style="font-size:10px;color:var(--muted)">${Math.floor(xp)}/${need} xp</div></div>`;
   }
   h += `</div>`;
-  // gathering
-  h += `<h3>⛏️ Gather</h3><div class="row">`;
+  // Gathering (BACKLOG "connect existing systems" — an open world, not a menu): raw materials are
+  // no longer mintable from here. This panel is a reference for what's out there and what it
+  // takes, not an action — mine/fish/chop it for real by walking up to a node in the 3D world and
+  // pressing the prompt, the OSRS shape this game has always meant to be. See index.html's world
+  // onGather() for the one real gather path.
+  h += `<h3>⛏️ Gather (in the 3D world)</h3><p class="sub">Walk up to a mining vein, fishing spot, or tree in the open world and press the prompt — materials are earned there, not from a menu.</p><div class="row">`;
   for (const m of MATERIALS){
     const can = G.canGather(S,m);
-    const remaining = G.gatherCooldownRemaining(S, m.id);
-    const regenerating = remaining > 0;
-    const label = !can ? "Lv too low" : regenerating ? `${Math.ceil(remaining/1000)}s` : "Gather";
-    h += `<div class="panel" style="flex:1;min-width:150px">
-      <div style="font-weight:700"><span class="ic">${m.icon}</span> ${m.name}</div>
-      <div class="sub">${SKILLS[m.skill].name} ${m.lvl} · +${m.xp} xp</div>
-      <button class="btn sm ${can&&!regenerating?"ok":""}" ${can&&!regenerating?"":"disabled"} onclick="window.__ev('gather|${m.id}')">${label}</button>
+    const have = S.inventory[m.id]||0;
+    h += `<div class="panel" style="flex:1;min-width:150px;${can?"":"opacity:.55"}">
+      <div style="font-weight:700"><span class="ic">${m.icon}</span> ${m.name} <span style="color:var(--muted);font-weight:400">×${have}</span></div>
+      <div class="sub">${SKILLS[m.skill].name} ${m.lvl} · +${m.xp} xp${can?"":" · level too low"}</div>
     </div>`;
   }
   h += `</div>`;
@@ -1404,16 +1405,11 @@ function gatherToast(m, r){
     AUDIO.play("gather");
   }
 }
-window.__EV.gather = (id)=>{
-  if (gatherCooldown>0) return;
-  const m = MATERIALS.find(x=>x.id===id);
-  const r = G.gather(S,m);
-  if (r.ok){ gatherToast(m, r); gatherCooldown = 1.4; }
-  else if (r.err === "cooldown") err(STR.gather_regenerating.replace("{s}", Math.ceil(r.remaining/1000)));
-  else err(LTL);
-  save();
-  render();
-};
+// Deliberately no window.__EV.gather (a menu shortcut) — the ONLY way to gather a raw material is
+// walking up to a real node in the 3D world and pressing the prompt (onGather below), the OSRS
+// shape this game has always meant to be. Everything downstream of gathering (smelt/forge/brew/
+// refine/scribe) stays a menu action — those are things you DO with materials, not the materials
+// themselves.
 window.__EV.smelt = (id)=>{ const b=BARS.find(x=>x.id===id); const r=G.smelt(S,b); r.ok?toast(`+${b.icon} ${b.name}`):err(LTL); render(); };
 window.__EV.forge = (id)=>{ const e=equipmentFor(id.split("_")[0],id.split("_")[1]); const r=G.forge(S,e); r.ok?toast(`⚒️ Forged ${e.name}!`):err(r.err==="resources"?"Not enough bars":LTL); render(); };
 window.__EV.brew = (id)=>{ const p=POTIONS.find(x=>x.id===id); const r=G.brew(S,p); r.ok?toast(`+${p.icon} ${p.name}`):err(r.err==="resources"?"Not enough fish":LTL); render(); };
@@ -2875,6 +2871,11 @@ window.__testGatherAt = (matId, now)=>{ const m = MATERIALS.find(x=>x.id===matId
 window.__testDuel = ()=>{ startPracticeDuel(); };
 window.__testRender = ()=>{ render(); };
 window.__testGold = ()=> S.gold;
+window.__testGatherDebounce = ()=> gatherCooldown;
+// The debounce's own 100ms setInterval can lag well behind wall-clock time under CPU load (seen in
+// this project's own browser-test.mjs), so tests that need to gather twice in the same session
+// reset it directly rather than sleeping/polling for an interval tick that may not come promptly.
+window.__testResetGatherDebounce = ()=>{ gatherCooldown = 0; };
 // Grant exactly the materials a gather quest asks for — the alternative is mining eight logs in
 // a browser test, which tests the gather loop rather than the quest turn-in.
 window.__testGrant = (questId)=>{
