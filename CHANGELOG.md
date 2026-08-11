@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Real shadows + a live wind ambience — 2026-08-11
 
-### Real shadows + a live wind ambience — *pending*
+### Real shadows + a live wind ambience — `9f64a18`
 - Asked to check the graphics — "shadows and depths, lighting, sound." A grep across `world.js`
   found dozens of meshes (the generic `add()` helper, every GLB model, treasure chests) already
   setting `castShadow`/`receiveShadow = true` with zero effect, because `renderer.shadowMap.enabled`
