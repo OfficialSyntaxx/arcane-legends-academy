@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Day/night cycle — 2026-08-11
 
-### Day/night cycle — *pending*
+### Day/night cycle — `3ec4be9`
 - The first unchecked item in BACKLOG §3. A 20-real-minute day derived from `Date.now()` — no
   save field, no per-session timer, nothing to desync between tabs/players or migrate on reload.
 - `alt = sin((phase-0.25)·2π)` (-1 midnight, 0 dawn/dusk, +1 noon) drives everything: the `sun`
