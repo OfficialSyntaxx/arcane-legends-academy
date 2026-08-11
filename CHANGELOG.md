@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Ashen Mountains quests — 2026-08-11
 
-### Ashen Mountains quests — *pending*
+### Ashen Mountains quests — `c230c79`
 - The Ashen Mountains zone/dungeon shell shipped fully built during the `main` merge — resource
   nodes, two NPCs (`mountain_miner`, `mountain_smith`), Ashen Caverns with the Ember Wyrm boss —
   but the NPCs had `role:"quest"` with nothing in `ZONE_QUESTS` to offer, and the boss had no
