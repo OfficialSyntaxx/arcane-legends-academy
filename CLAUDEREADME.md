@@ -1091,6 +1091,23 @@ with no quests in `ZONE_QUESTS` to offer, and the boss had no achievement or dor
 - 534 engine / 42 online / 36 creature-rule / 194 browser (no flake this run) / `check:models`, all
   green.
 
+### 6.41 Music per zone (`audio.js`, `index.html`, BACKLOG §9)
+Closed the last `[~]` item in §9 Technical/Quality. Music mode used to change only per SCREEN
+(campus/duel/menu) — walking from the academy into the forest, the lake or the mountains was
+silent about it. `MODES` gained one entry per outdoor zone (`forest`/`lake`/`mountains`/`snow`,
+each a different scale + tempo — e.g. mountains is A phrygian at a slightly faster, more ominous
+72bpm, lake is F lydian at a calm 58bpm) plus a `dungeon` mode shared by every interior (a slower
+G harmonic minor, deliberately distinct from `duel`'s own harmonic-minor combat tempo so a dungeon
+crawl doesn't sound identical to the fight at the bottom of it).
+- `audioModeForZone(zoneId, interior)` is the one function that knows the zone→mode table, exported
+  from `audio.js` so `index.html` never duplicates it. Zones with no bespoke entry fall back to
+  `"world"` (the campus theme) — every zone works with zero changes when a new one ships; only the
+  memorable ones need their own mood.
+- Two call sites: `render()`'s existing screen-context switch (now zone-aware for the `"world"`
+  case) and `changeZone()` itself, so the music switches the instant you step through a gateway
+  rather than waiting for the next unrelated re-render.
+- 534 engine / 42 online / 36 creature-rule / 194 browser / `check:models`, all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1223,7 +1240,12 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Ashen Mountains quests** (§6.40). The zone/dungeon shell shipped fully built during
+**Last landed: music per zone** (§6.41). Music mode only ever changed per screen, not per place —
+gave each outdoor zone (forest/lake/mountains/snow) and every dungeon interior its own scale/tempo
+via `audioModeForZone()`, switching the instant a gateway is crossed. Closes the last `[~]` item in
+BACKLOG §9.
+
+**Before that: Ashen Mountains quests** (§6.40). The zone/dungeon shell shipped fully built during
 the `main` merge, but its two NPCs offered nothing and its boss had no achievement/trophy. Added
 the missing quest chain, achievement, and dorm trophy — no new systems, just wiring the existing
 patterns onto content that was sitting there unused.

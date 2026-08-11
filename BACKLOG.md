@@ -320,7 +320,9 @@
 - [x] Input + camera feel — touch-joystick inversion fixed; time-based smooth camera follow
 - [x] Audio system — `public/audio.js`, fully procedural (SFX + ambience + music), zero asset bytes
 - [x] Ambient world audio — procedural pad in the 3D world
-- [~] Music per zone / activity — mode changes per screen (campus/duel/menu); per-*zone* pending step 4
+- [x] Music per zone / activity — mode changes per screen (campus/duel/menu) AND per outdoor zone
+  (forest/lake/mountains/snow, each its own scale + tempo) plus a shared dungeon mode for every
+  interior, via `audio.js` `audioModeForZone()`
 
 ## 10. Long-Term Endgame
 
@@ -500,7 +502,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Ashen Mountains quests, is done** (§3). `mountain_miner`/`mountain_smith` had
+**Next step:** **Music per zone, is done** (§9). Each outdoor zone and every dungeon interior now
+has its own music mode (scale + tempo) instead of sharing one generic "world" theme; switches the
+instant a gateway is crossed. 534 engine / 42 online / 36 creature-rule / 194 browser /
+`check:models`, all green.
+
+Before that: **Ashen Mountains quests, is done** (§3). `mountain_miner`/`mountain_smith` had
 stood in the zone since the merge with nothing to say — added a 5-quest chain gated behind the
 Drowned Archon (gather iron/gold, slay + clear + boss inside Ashen Caverns), a `wyrm_render`
 achievement, and an Ember Wyrm Skull dorm trophy, matching the exact pattern the Forest/Lake chains

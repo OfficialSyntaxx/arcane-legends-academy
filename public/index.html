@@ -392,7 +392,7 @@ import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, grad
 import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats, pristineVariantFor } from "./items.js";
 import * as G from "./game.js";
 import { createWorld } from "./world.js";
-import { createAudio, SFX } from "./audio.js";
+import { createAudio, SFX, audioModeForZone } from "./audio.js";
 import { createBattle3d } from "./battle3d.js";
 import * as VFX from "./vfx.js";
 import { loadWorldConfig, entryPointFor } from "./worldconfig.js";
@@ -969,7 +969,8 @@ function syncPlayerWeapon(){
   world.setWeapon(eq ? eq.metal : null);
 }
 function render(){
-  AUDIO.setContext(screen === "world" ? "world" : (screen === "duel" || screen === "online") ? "duel" : "menu");
+  AUDIO.setContext(screen === "world" ? audioModeForZone(activeZone && activeZone.id, activeZone && activeZone.interior)
+    : (screen === "duel" || screen === "online") ? "duel" : "menu");
   buildNav();
   buildObjective();
   const scr = $("screen");
@@ -2668,6 +2669,7 @@ function changeZone(toZoneId, fromZoneId, spawnOverride){
     worldPrompt = null;
     $("prompt").style.display = "none";
     activeZone = target;
+    AUDIO.setContext(audioModeForZone(target.id, !!target.interior));
     world = spawnWorld(canvas, target, spawnAt);
     window.__world = world;
     world.setPlayerAppearance(CC.appearanceFor(S));

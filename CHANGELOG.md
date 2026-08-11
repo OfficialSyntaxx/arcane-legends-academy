@@ -14,6 +14,22 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Music per zone — 2026-08-11
+
+### Music per zone — *pending*
+- Closed the last `[~]` item in BACKLOG §9. Music mode used to change only per screen
+  (campus/duel/menu) — walking between outdoor zones was silent about it.
+- `audio.js` `MODES` gained `forest`/`lake`/`mountains`/`snow` (each a distinct scale + tempo) and
+  a shared `dungeon` mode for every interior, deliberately different from `duel`'s own
+  harmonic-minor combat tempo so a dungeon crawl doesn't sound like the boss fight at its end.
+- New `audioModeForZone(zoneId, interior)`, exported from `audio.js` so `index.html` never
+  duplicates the zone→mode table; unlisted zones fall back to `"world"`, so a new zone works with
+  no changes here unless it earns its own mood.
+- Wired at two call sites: `render()`'s existing screen-context switch (now zone-aware for
+  `"world"`) and `changeZone()` itself, so the music switches the instant a gateway is crossed
+  rather than waiting for an unrelated re-render.
+- *534 engine / 42 online / 36 creature-rule / 194 browser / `check:models`, all green.*
+
 ## Ashen Mountains quests — 2026-08-11
 
 ### Ashen Mountains quests — `c230c79`

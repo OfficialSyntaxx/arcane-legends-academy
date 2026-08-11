@@ -18,14 +18,42 @@ const STORE_KEY = "arcane_audio_v1";
 // note helper: MIDI number -> Hz
 const hz = n => 440 * Math.pow(2, (n - 69) / 12);
 
-// Scales used by the music layer. Each screen context picks one, so the academy, a duel and a
-// victory all feel different without needing separate compositions.
+// Scales used by the music layer. Each context picks one, so the academy, a duel and a victory
+// all feel different without needing separate compositions. Originally one mode per SCREEN
+// ("world"/"duel"/"menu") — extended to one mode per outdoor ZONE too, so walking from campus
+// into the forest is audibly a different place, not just a different backdrop.
 const MODES = {
-  world:   { root: 57, steps: [0, 2, 3, 5, 7, 8, 10], bpm: 68 },  // A aeolian — wistful campus
-  duel:    { root: 50, steps: [0, 2, 3, 5, 7, 8, 11], bpm: 96 },  // D harmonic minor — tense
-  victory: { root: 60, steps: [0, 2, 4, 7, 9],        bpm: 108 }, // C major pentatonic
-  menu:    { root: 55, steps: [0, 2, 4, 5, 7, 9, 11], bpm: 60 },  // G ionian — calm
+  world:     { root: 57, steps: [0, 2, 3, 5, 7, 8, 10], bpm: 68 },  // A aeolian — wistful campus
+  duel:      { root: 50, steps: [0, 2, 3, 5, 7, 8, 11], bpm: 96 },  // D harmonic minor — tense
+  victory:   { root: 60, steps: [0, 2, 4, 7, 9],        bpm: 108 }, // C major pentatonic
+  menu:      { root: 55, steps: [0, 2, 4, 5, 7, 9, 11], bpm: 60 },  // G ionian — calm
+  forest:    { root: 52, steps: [0, 2, 3, 5, 7, 9, 10], bpm: 64 },  // E dorian — woody, watchful
+  lake:      { root: 53, steps: [0, 2, 4, 6, 7, 9, 11], bpm: 58 },  // F lydian — open water, calm
+  mountains: { root: 45, steps: [0, 1, 3, 5, 7, 8, 10], bpm: 72 },  // A phrygian — rugged, ominous
+  snow:      { root: 50, steps: [0, 2, 4, 6, 8, 10],    bpm: 54 },  // D whole-tone — cold, sparse
+  dungeon:   { root: 43, steps: [0, 2, 3, 5, 7, 8, 11], bpm: 50 },  // G harmonic minor — slow dread,
+                                                                     // distinct from duel's own
+                                                                     // harmonic-minor combat tempo
 };
+
+// Which zone id plays which mode. Not every zone needs an entry — an unlisted outdoor zone (or
+// the academy hub itself) falls back to the default "world" campus theme; any interior falls back
+// to "dungeon" regardless of which one it is, since a dorm and a cavern share nothing sonically
+// with an outdoor zone but don't yet each need their own bespoke mode.
+const ZONE_MODES = {
+  whispering_forest: "forest",
+  lake_arcanum: "lake",
+  ashen_mountains: "mountains",
+  snow: "snow",
+};
+
+/** The music mode for a zone: caller passes the zone id and whether it's an interior. Exported
+ * so index.html can compute it the same way on every zone change/tab switch without duplicating
+ * this table. */
+export function audioModeForZone(zoneId, interior){
+  if (interior) return "dungeon";
+  return ZONE_MODES[zoneId] || "world";
+}
 
 export const SFX = {
   gather:    { kind:"pluck", freq: 420, dur: 0.14, type:"triangle", gain: 0.20, sweep: 1.5 },
