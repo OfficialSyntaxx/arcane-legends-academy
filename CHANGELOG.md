@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Music per zone — 2026-08-11
 
-### Music per zone — *pending*
+### Music per zone — `74c4024`
 - Closed the last `[~]` item in BACKLOG §9. Music mode used to change only per screen
   (campus/duel/menu) — walking between outdoor zones was silent about it.
 - `audio.js` `MODES` gained `forest`/`lake`/`mountains`/`snow` (each a distinct scale + tempo) and
