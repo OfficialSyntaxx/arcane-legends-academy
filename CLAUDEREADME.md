@@ -1108,6 +1108,32 @@ crawl doesn't sound identical to the fight at the bottom of it).
   rather than waiting for the next unrelated re-render.
 - 534 engine / 42 online / 36 creature-rule / 194 browser / `check:models`, all green.
 
+### 6.42 Day/night cycle (`world.js`, BACKLOG §3)
+The first unchecked item in §3 Open World. A 20-real-minute day, derived entirely from
+**wall-clock time** — `dayPhase()` reads `Date.now()`, not a save field or a per-session timer —
+so it needs no migration, cannot desync across tabs/players, and survives a reload with nothing to
+resume. `alt = sin((phase-0.25)·2π)` gives an altitude curve (-1 midnight, 0 dawn/dusk, +1 noon);
+`dayAmt`/`nightAmt` are its clamped positive/negative halves and drive everything else:
+- `sun`'s intensity fades toward a 5% floor by night, `moon`'s ramps up to compensate — the same
+  sun/moon pair the §6.39 shadow work introduced, so night now visibly hands lighting duty from one
+  to the other instead of just dimming uniformly.
+- The hemisphere light dims and cools (lerped toward a darker tint) rather than just dimming, so
+  night reads as blue-cold, not merely darker daylight.
+- The sky dome, fog, and `renderer`'s clear colour all lerp toward darker/cooler variants; the
+  existing star field (always present at 0.7 opacity) now fades in at night and the sun-glow sprite
+  fades out — both were static regardless of time before this.
+- **Interiors are explicitly exempt** (`updateDayNight()` returns immediately for them) — a
+  dungeon/dorm is lit by its own torches/fixtures per `ZONE.lightScale`, and time of day has no
+  meaning underground.
+- **`ZONE.fixedTimeOfDay`** (0=midnight..0.5=noon) lets a specific zone opt out of the live clock
+  and sit at one permanent moment — the mechanism a zone can use for an eternally dusk-lit or
+  night-lit mood. Nothing opts in yet; it's there for the next zone whose art direction wants it.
+- Verified with real Playwright screenshots at two forced times (`Date.now()` overridden via
+  `page.addInitScript`, not shipped) rather than trusting the maths on paper: noon is full daylight
+  with sharp shadows, midnight is a convincingly dark, star-lit, blue-cool scene that stays legible
+  (deliberately not crushed to black — a game world has to stay navigable at any hour).
+- 534 engine / 42 online / 36 creature-rule / 194 browser / `check:models`, all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1240,7 +1266,15 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: music per zone** (§6.41). Music mode only ever changed per screen, not per place —
+**Last landed: day/night cycle** (§6.42). A 20-real-minute day derived from wall-clock time (no
+save field, nothing to desync) fades the sun down and the moon up, cools the hemisphere light,
+and darkens the sky/fog/stars together — built directly on the sun/moon pair and shadow rig
+§6.39 introduced. Interiors are exempt (lit by their own fixtures); a zone can opt into a fixed
+time of day via `ZONE.fixedTimeOfDay` for a permanently dusk/night mood, though none currently do.
+Verified with real screenshots at forced noon/midnight, not just the maths. Closes the first
+unchecked item in BACKLOG §3.
+
+**Before that: music per zone** (§6.41). Music mode only ever changed per screen, not per place —
 gave each outdoor zone (forest/lake/mountains/snow) and every dungeon interior its own scale/tempo
 via `audioModeForZone()`, switching the instant a gateway is crossed. Closes the last `[~]` item in
 BACKLOG §9.

@@ -112,7 +112,9 @@
   (`structures.js`/`zones.json`, `game.js` `claimTreasure`); pays out gold once and never
   respawns, ids globally unique across every zone, slots into the existing gather/dungeon-entrance
   interaction machinery with no new system.
-- [ ] Day/night cycle
+- [x] Day/night cycle — a 20-real-minute cycle derived from wall-clock time (no save field), sun
+  fades down/moon fades up, hemisphere light cools, sky/fog/stars darken together; interiors
+  exempt; a zone can opt into a fixed time of day via `ZONE.fixedTimeOfDay` (none do yet)
 - [ ] Weather
 - [ ] Dynamic world events
 
@@ -502,7 +504,13 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Music per zone, is done** (§9). Each outdoor zone and every dungeon interior now
+**Next step:** **Day/night cycle, is done** (§3). Wall-clock-derived (no save field), 20-minute
+cycle fades sun/moon against each other, cools the hemisphere light, darkens sky/fog/stars;
+interiors exempt; `ZONE.fixedTimeOfDay` lets a future zone lock to one moment. Verified with real
+screenshots at forced noon/midnight. 534 engine / 42 online / 36 creature-rule / 194 browser /
+`check:models`, all green.
+
+Before that: **Music per zone, is done** (§9). Each outdoor zone and every dungeon interior now
 has its own music mode (scale + tempo) instead of sharing one generic "world" theme; switches the
 instant a gateway is crossed. 534 engine / 42 online / 36 creature-rule / 194 browser /
 `check:models`, all green.

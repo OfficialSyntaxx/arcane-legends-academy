@@ -14,6 +14,26 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Day/night cycle — 2026-08-11
+
+### Day/night cycle — *pending*
+- The first unchecked item in BACKLOG §3. A 20-real-minute day derived from `Date.now()` — no
+  save field, no per-session timer, nothing to desync between tabs/players or migrate on reload.
+- `alt = sin((phase-0.25)·2π)` (-1 midnight, 0 dawn/dusk, +1 noon) drives everything: the `sun`
+  fades to a 5% floor by night while `moon` ramps up to compensate (the same sun/moon pair the
+  shadow work introduced), the hemisphere light dims AND cools rather than just dimming, and the
+  sky dome/fog/`renderer` clear colour all lerp toward darker variants together.
+- The existing star field (previously always visible at a fixed 0.7 opacity) now fades in at
+  night; the sun-glow sprite fades out. Both were static regardless of time before this.
+- Interiors are explicitly exempt — a dungeon/dorm is lit by its own fixtures per
+  `ZONE.lightScale`, and time of day has no meaning underground.
+- `ZONE.fixedTimeOfDay` lets a zone opt out of the live clock for a permanent moment (an eternally
+  dusk-lit or night-lit place) — the mechanism ships, nothing currently opts in.
+- Verified with real Playwright screenshots at forced noon/midnight (`Date.now()` overridden via
+  `page.addInitScript`, test-only), not just the trig on paper: midnight reads as a convincingly
+  dark, star-lit, blue-cool scene that stays legible rather than crushed to black.
+- *534 engine / 42 online / 36 creature-rule / 194 browser / `check:models`, all green.*
+
 ## Music per zone — 2026-08-11
 
 ### Music per zone — `74c4024`

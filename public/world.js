@@ -146,7 +146,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // — which reads as broken, not atmospheric. `ZONE.lightScale` lets a zone say how lit it is
   // instead of inferring it from `interior`, and the dorm asks for a warm, lived-in room.
   const INTERIOR = !!ZONE.interior;
-  let sun = null;
+  let sun = null, moon = null, hemi = null;
+  // Base intensities for the day/night cycle below to scale against — captured once, at their
+  // original "always noon" values, so the cycle multiplies rather than replaces this rig's
+  // existing careful tuning (boost for baked maps, ZONE.lightScale for interiors).
+  let sunBase = 0, moonBase = 0, hemiBase = 0;
   if (INTERIOR){
     const k = ZONE.lightScale || 1;
     scene.add(new THREE.HemisphereLight(ZONE.lightTint || 0x585070, 0x140e22, 0.30 * k));
@@ -157,8 +161,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // world's flat material colours — same fixtures, higher output (the bakes were authored in a
   // bright renderer; under the dim procedural rig they read as black/grey).
   const boost = MAP ? 1.9 : 1;
-  scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a1f4d, 0.42 * boost));
-  sun = new THREE.DirectionalLight(0xffd9a0, 0.55 * boost);
+  hemiBase = 0.42 * boost;
+  hemi = new THREE.HemisphereLight(0xcfd8ff, 0x2a1f4d, hemiBase);
+  scene.add(hemi);
+  sunBase = 0.55 * boost;
+  sun = new THREE.DirectionalLight(0xffd9a0, sunBase);
   sun.position.set(20, 40, 14);
   // Only the sun casts — one shadow-casting light reads as a believable time-of-day and keeps
   // the draw cost down. The frustum is sized to the player's actual play radius (roughly a
@@ -173,18 +180,56 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   sun.shadow.normalBias = 0.02;
   sun.target.position.set(0, 0, 0);
   scene.add(sun); scene.add(sun.target);
-  const moon = new THREE.DirectionalLight(0x9fb4ff, 0.15 * boost);
+  moonBase = 0.15 * boost;
+  moon = new THREE.DirectionalLight(0x9fb4ff, moonBase);
   moon.position.set(-20, 30, -20); scene.add(moon);
   }
   // warm courtyard glow
   const glow = new THREE.PointLight(0xff8844, ZONE.interior ? 0 : 0.55, 90);
   glow.position.set(0, 12, 0); scene.add(glow);
 
+  // ---- day/night cycle (outdoor zones only) ----
+  // Derived from WALL-CLOCK time, not a save field or a per-session timer — the same "derive,
+  // don't store" rule as the rest of this game applies to time of day: every player, every zone,
+  // every tab agrees on what time it is with nothing to desync or migrate. A zone can override it
+  // with a fixed moment of day (`ZONE.fixedTimeOfDay`, 0=midnight..0.5=noon..1=midnight again) for
+  // a permanently dusk-lit or night-lit place — none currently opt in, but the mechanism is here
+  // for a zone whose mood calls for it (e.g. an eternally torchlit ash-lands or a snowbound dusk).
+  const DAY_CYCLE_SECONDS = 20 * 60;   // a full day every 20 real minutes — a session sees a few
+  const dayPhase = () => {
+    if (typeof ZONE.fixedTimeOfDay === "number") return ((ZONE.fixedTimeOfDay % 1) + 1) % 1;
+    return (Date.now() / 1000 % DAY_CYCLE_SECONDS) / DAY_CYCLE_SECONDS;
+  };
+  const dayNightColors = {
+    fogDay: new THREE.Color(0x2a1a4a), fogNight: new THREE.Color(0x0a0818),
+    domeDay: new THREE.Color(0xffffff), domeNight: new THREE.Color(0x40456f),
+    clearDay: new THREE.Color(ZONE.background != null ? ZONE.background : 0x1a1440),
+    clearNight: new THREE.Color(0x07050f),
+  };
+  function updateDayNight(){
+    if (INTERIOR) return;   // interiors are lit by their own fixtures, not the sky
+    const alt = Math.sin((dayPhase() - 0.25) * Math.PI * 2);   // -1 midnight .. +1 noon
+    const dayAmt = Math.max(0, alt), nightAmt = Math.max(0, -alt);
+    if (sun) sun.intensity = sunBase * (0.05 + 0.95 * dayAmt);
+    if (moon) moon.intensity = moonBase * (0.5 + 1.6 * nightAmt);
+    if (hemi){
+      hemi.intensity = hemiBase * (0.22 + 0.78 * dayAmt);
+      hemi.color.copy(dayNightColors.domeDay).lerp(dayNightColors.domeNight, nightAmt * 0.6);
+    }
+    if (scene.fog) scene.fog.color.copy(dayNightColors.fogDay).lerp(dayNightColors.fogNight, nightAmt);
+    renderer.setClearColor(dayNightColors.clearDay.clone().lerp(dayNightColors.clearNight, nightAmt));
+    if (skyDome) skyDome.material.color.copy(dayNightColors.domeDay).lerp(dayNightColors.domeNight, nightAmt);
+    if (skyStars) skyStars.material.opacity = 0.1 + 0.65 * nightAmt;
+    if (skySun) skySun.material.opacity = dayAmt;
+  }
+
   // ---- sky dome: replaces the flat clear-color void for outdoor zones ----
   // A large unlit gradient sphere that follows the camera, plus a soft sun glow + a few stars.
   // Interiors (dungeons) keep the flat background + fog — see the INTERIOR branch below.
   let skyGroup = null;
   let cloudGroup = null;
+  // Handles the day/night cycle above tints/fades, set once the sky actually builds below.
+  let skyDome = null, skyStars = null, skySun = null;
   if (!ZONE.interior){
     skyGroup = new THREE.Group();
     try {
@@ -218,6 +263,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       );
       dome.renderOrder = -10; dome.frustumCulled = false;
       skyGroup.add(dome);
+      skyDome = dome;
       // sun glow (a bright soft disc near the horizon)
       const sg = document.createElement('canvas'); sg.width = 64; sg.height = 64;
       const sgx = sg.getContext('2d');
@@ -227,9 +273,10 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       srad.addColorStop(1, 'rgba(255,180,90,0)');
       sgx.fillStyle = srad; sgx.fillRect(0, 0, 64, 64);
       const stex = new THREE.CanvasTexture(sg);
-      const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: stex, transparent: true, depthWrite: false, fog: false }));
-      sun.scale.set(120, 120, 1); sun.position.set(300, 90, -180);
-      skyGroup.add(sun);
+      const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: stex, transparent: true, depthWrite: false, fog: false }));
+      sunSprite.scale.set(120, 120, 1); sunSprite.position.set(300, 90, -180);
+      skyGroup.add(sunSprite);
+      skySun = sunSprite;
       // sparse stars
       const starGeo = new THREE.BufferGeometry();
       const starN = 220, starPos = new Float32Array(starN * 3);
@@ -243,6 +290,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 2.2, transparent: true, opacity: 0.7, sizeAttenuation: true, fog: false, depthWrite: false }));
       stars.renderOrder = -9; stars.frustumCulled = false;
       skyGroup.add(stars);
+      skyStars = stars;
       // drifting procedural clouds (flattened translucent puffs, animated in the frame loop)
       cloudGroup = new THREE.Group();
       const cloudMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, fog: false, depthWrite: false, side: THREE.DoubleSide });
@@ -1669,6 +1717,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       g.userData.glint.position.y = 1.35 + Math.sin(now / 500) * 0.08;
     }
     stepAura(now / 1000);
+    updateDayNight();
     if (sun && sun.castShadow){
       // Keep the sun's fixed offset from the player so its shadow frustum always covers the
       // area actually on screen, instead of only the zone origin the light was authored at.
