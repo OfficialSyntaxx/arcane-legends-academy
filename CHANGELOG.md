@@ -14,6 +14,26 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Prestige — 2026-08-11
+
+### Prestige — *pending*
+- Scoped before building: `academyScore(s)` is uncapped, but academy.js's 7-year curriculum tops
+  out at Archmage (score 140) and stops — a player at hour 20 looks identical to one at hour 200.
+- New `prestige.js`, mirroring `pvprank.js`'s season pattern (soft reset + honest own-history, no
+  fake leaderboard) rather than a new design. 5 tiers, cumulative stacking perks (+2%/+1%/+2%
+  quest-gold/market/xp per tier), player-initiated once Archmage is reached.
+- Only `s.academyBonus` resets on prestige — level, collection value and win count never do.
+  `academyPerks(s)` now sums the curriculum's perks with the prestige tier's.
+- `s.prestige.history` records `{level, scoreAtPrestige, at}` per prestige, same "this save's own
+  past, honestly labelled" rule PvP's season history follows.
+- 5 new achievements (`prestige_1`..`prestige_5`), each granting a title equal to the tier name via
+  the existing achievement→title auto-derivation — no new equip machinery.
+- UI: the curriculum panel only shows the prestige option once the curriculum itself reports
+  `maxed`, naming the exact next perk before committing.
+- 15 new engine tests + 6 real-browser tests (button click through the real DOM, not a direct
+  function call). *545 engine / 42 online / 36 creature-rule / 199 browser / `check:models`, all
+  green.*
+
 ## Day/night cycle — 2026-08-11
 
 ### Day/night cycle — `3ec4be9`

@@ -21,6 +21,7 @@
 
 import { ZONE_QUESTS } from "./zonequests.js";
 import * as RANK from "./pvprank.js";
+import * as PRESTIGE from "./prestige.js";
 
 export const DEFAULT_TITLE = "wizard";
 
@@ -60,6 +61,14 @@ export const ACHIEVEMENTS = [
   { id: "well_liked",        name: "Well Liked",         icon: "🤝",
     desc: "Reach Honored standing with any quest giver", title: "Well Liked",
     of: (s) => ({ have: Math.max(0, ...Object.values(s.reputation || {}), 0), need: 120 }) },
+  // BACKLOG §10 "Prestige" — one achievement per tier, same shape as the PvP-rank pair above
+  // (dungeonBoss achievements read worldState; these read s.prestige.level). The title is the
+  // tier's own name, so equipping it is literally wearing the rank prestige just granted.
+  ...PRESTIGE.TIERS.map(t => ({
+    id: `prestige_${t.level}`, name: t.name, icon: t.icon,
+    desc: `Reach ${t.name} (Prestige ${t.level})`, title: t.name,
+    of: (s) => ({ have: (s.prestige && s.prestige.level) || 0, need: t.level }),
+  })),
 ];
 
 function dungeonBoss(s, dungeonId){
@@ -131,6 +140,7 @@ export function validateAchievements(){
       level: 999,
       pvp: { rankPoints: 99999 },
       reputation: { anyone: 99999 },
+      prestige: { level: PRESTIGE.MAX_PRESTIGE },
     };
     const p = a.of(maxSave);
     if (!(p.need > 0)) problems.push(`${a.id}: needs a positive target`);

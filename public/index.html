@@ -1034,8 +1034,36 @@ function renderCurriculum(){
       : `<p class="sub" style="margin-top:8px">${prog.have}/${prog.need} toward ${prog.next.name}</p>
          <div class="pbar"><div style="width:${prog.pct}%"></div></div>`}
     ${classLine}
+    ${prog.maxed ? renderPrestige() : ""}
   </div>`;
 }
+// BACKLOG §10 "Prestige" — only ever shown once the curriculum itself is maxed (renderCurriculum
+// above), so a player mid-curriculum is never confused by a second, unrelated progress track.
+function renderPrestige(){
+  const p = G.prestigeState(S);
+  if (p.maxed) return `<div class="panel" style="margin-top:10px;border-color:var(--accent)">
+    <div style="font-weight:700">${p.tier.icon} ${p.tier.name} — the highest prestige</div>
+    <p class="sub" style="margin-top:4px">Every prestige tier earned. Your curriculum bonuses are permanent.</p>
+  </div>`;
+  const cur = p.tier;
+  const next = p.progress.next;
+  return `<div class="panel" style="margin-top:10px;border-color:var(--accent)">
+    <div style="font-weight:700">${cur ? `${cur.icon} ${cur.name}` : "🌱 Not yet prestiged"}</div>
+    <p class="sub" style="margin-top:4px">Prestiging resets your class credit (attend classes again to
+      re-climb the curriculum) and permanently grants ${next.name}'s bonus: +${next.perks.questGold}%
+      quest gold, +${next.perks.market}% market discount, +${next.perks.xp}% XP — on top of everything
+      the curriculum already gives you.</p>
+    <button class="btn gold" style="margin-top:8px" onclick="window.__ev('prestige')">${next.icon} Become ${next.name}</button>
+  </div>`;
+}
+window.__EV.prestige = ()=>{
+  const r = G.doPrestige(S);
+  if (!r.ok){ err(r.err === "maxed" ? "You have already reached the highest prestige." : "You must complete the curriculum first."); return; }
+  save();
+  AUDIO.play("levelUp");
+  toast(`${r.tier.icon} ${r.tier.name}!`);
+  render();
+};
 window.__EV.openClasses = ()=>{ showOverlay("The Arcanum Curriculum", buildClasses()); };
 window.__EV.lsnEnroll = (id)=>{
   const r = LSN.enroll(S, id);

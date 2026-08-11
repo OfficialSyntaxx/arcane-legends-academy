@@ -23,6 +23,7 @@ import * as RANK from "../public/pvprank.js";
 import * as MAGIC from "../public/schoolmagic.js";
 import * as CB from "../public/cardbacks.js";
 import * as ACHV from "../public/achievements.js";
+import * as PRESTIGE from "../public/prestige.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -3155,6 +3156,71 @@ check("game.js newGame() equips the default title", G.newGame().title === ACHV.D
 check("game.js load() never leaves title unset or pointing at a fake title", (()=>{
   const s = G.load();
   return !!s.title && ACHV.TITLES.some(t => t.id === s.title);
+})());
+
+// ---------------------------------------------------------------- prestige.js (BACKLOG §10)
+check("validatePrestige reports no problems", PRESTIGE.validatePrestige().length === 0);
+check("a fresh save cannot prestige (score is nowhere near Archmage)", (()=>{
+  const s = G.newGame();
+  return G.prestigeState(s).canPrestige === false;
+})());
+check("canPrestige turns true once academyScore reaches the Archmage threshold", (()=>{
+  const s = G.newGame();
+  s.level = 200;   // trivially clears ACADEMY's Archmage minimum via academyScore alone
+  return G.prestigeState(s).canPrestige === true;
+})());
+check("doPrestige refuses below Archmage and leaves the save untouched", (()=>{
+  const s = G.newGame();
+  const before = JSON.stringify(s.prestige);
+  const r = G.doPrestige(s);
+  return r.ok === false && JSON.stringify(s.prestige) === before;
+})());
+check("doPrestige at Archmage bumps the level, records history, and resets academyBonus", (()=>{
+  const s = G.newGame();
+  s.level = 200; s.academyBonus = 40;
+  const r = G.doPrestige(s);
+  return r.ok === true && s.prestige.level === 1 && s.academyBonus === 0
+      && s.prestige.history.length === 1 && s.prestige.history[0].level === 1;
+})());
+check("prestige perks are additive on top of the curriculum's own perks", (()=>{
+  const s = G.newGame();
+  s.level = 200;
+  const before = G.academyPerks(s).questGold;
+  G.doPrestige(s);
+  const after = G.academyPerks(s).questGold;
+  return after === before + PRESTIGE.TIERS[0].perks.questGold;
+})());
+check("prestige cannot exceed MAX_PRESTIGE", (()=>{
+  const s = G.newGame();
+  s.level = 200;
+  for (let i = 0; i < PRESTIGE.MAX_PRESTIGE + 3; i++) G.doPrestige(s);
+  return s.prestige.level === PRESTIGE.MAX_PRESTIGE && G.prestigeState(s).maxed === true;
+})());
+check("every prestige tier grants an achievement, and its title equals the tier name", (()=>{
+  return PRESTIGE.TIERS.every(t => {
+    const a = ACHV.ACHIEVEMENTS.find(x => x.id === `prestige_${t.level}`);
+    return a && a.title === t.name;
+  });
+})());
+check("reaching a prestige level unlocks exactly that tier's achievement, not the next one", (()=>{
+  const s = G.newGame();
+  s.prestige.level = 2;
+  const list = ACHV.achievementsFor(s);
+  return list.find(a => a.id === "prestige_1").done === true
+      && list.find(a => a.id === "prestige_2").done === true
+      && list.find(a => a.id === "prestige_3").done === false;
+})());
+check("game.js newGame() starts with prestige level 0 and empty history", (()=>{
+  const s = G.newGame();
+  return s.prestige.level === 0 && Array.isArray(s.prestige.history) && s.prestige.history.length === 0;
+})());
+check("game.js load() backfills prestige on an old save missing the field", (()=>{
+  const s = G.newGame();
+  delete s.prestige;
+  // migrate() runs inside load(); the simplest real path is round-tripping through save()/load().
+  G.save(s);
+  const loaded = G.load();
+  return loaded.prestige && loaded.prestige.level === 0 && Array.isArray(loaded.prestige.history);
 })());
 
 // ---------------------------------------------------------------- enchanting (BACKLOG §6)

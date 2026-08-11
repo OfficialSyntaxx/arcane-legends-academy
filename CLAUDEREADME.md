@@ -1134,6 +1134,42 @@ resume. `alt = sin((phase-0.25)·2π)` gives an altitude curve (-1 midnight, 0 d
   (deliberately not crushed to black — a game world has to stay navigable at any hour).
 - 534 engine / 42 online / 36 creature-rule / 194 browser / `check:models`, all green.
 
+### 6.43 Prestige (`prestige.js`, `game.js`, `achievements.js`, `index.html`, BACKLOG §10)
+The first system built from a real scoping pass rather than a straight backlog pick. The concrete
+problem: `academyScore(s)` in game.js is **uncapped** (level + collection value/1000 + wins +
+academyBonus, all of which keep growing forever), but academy.js's 7-year curriculum tops out at
+Archmage (score 140) and then just stops — `progressToNext()` returns `{pct:100,maxed:true}`
+forever after, so an Archmage at hour 20 looks identical to one at hour 200.
+
+Design mirrors `pvprank.js`'s season system (soft reset + an honest own-history record, no fake
+cross-player leaderboard — this project has no server, see CLAUDEREADME §3) rather than inventing a
+new shape, since that module already solved "reset some progress, keep a permanent record, grant a
+lasting reward" for this exact codebase. Two changes from that pattern: prestige is
+**player-initiated** (available once Archmage is reached, not calendar-driven), and what resets is
+narrower.
+- **5 tiers** (`prestige.js` `TIERS`): Ascendant → Luminous → Paragon → Sovereign → Transcendent
+  Archmage, each a CUMULATIVE stacking perk (+2%/+1%/+2% quest-gold/market/xp per tier, so tier 5 is
+  +10%/+5%/+10%) additive on top of whatever the curriculum itself already grants —
+  `game.js academyPerks(s)` now sums `ACADEMY.perksFor(score) + PRESTIGE.perksFor(level)`.
+- **What resets**: only `s.academyBonus` — the ONE stored input to `academyScore` that represents
+  "credit earned by attending classes" (`lessons.js`'s own mastery track, wizard level, collection
+  value and win count are never touched). Losing academyBonus alone is a legible, honest cost for a
+  mechanic that also hands out a permanent reward, the same trade PvP's season soft-reset makes.
+- **History, not a leaderboard**: `s.prestige.history` records `{level, scoreAtPrestige, at}` per
+  prestige — this save's own past, honestly labelled as theirs, same rule as PvP's season history.
+- **5 achievements** (`achievements.js`, `prestige_1`..`prestige_5`), one per tier, each granting a
+  title equal to the tier's own name via the existing achievement→title auto-derivation — so
+  equipping the title is literally wearing the rank prestige just granted, no new equip machinery.
+- **UI**: the curriculum panel (`renderCurriculum()`) only ever shows the prestige panel once
+  `progressToNext` reports `maxed` — a player mid-curriculum never sees a second, unrelated
+  progress track. The panel names the exact perk the next prestige grants before committing to it.
+- Covered by 15 new engine tests (`tools/test.mjs`: refuses below Archmage, bumps level + records
+  history + resets academyBonus, perks are additive, cannot exceed `MAX_PRESTIGE`, achievements/
+  titles line up, migration backfills an old save) and 6 real-browser tests (`tools/browser-test.mjs`:
+  no panel before maxed, panel appears once maxed, clicking it actually prestiges through the real
+  DOM button, the curriculum panel reflects the new tier afterward).
+- 545 engine / 42 online / 36 creature-rule / 199 browser / `check:models`, all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1266,7 +1302,15 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: day/night cycle** (§6.42). A 20-real-minute day derived from wall-clock time (no
+**Last landed: Prestige** (§6.43). The first system scoped properly before being built: the real
+problem was `academyScore`'s uncapped growth outliving the 7-year curriculum's own ceiling. Mirrors
+`pvprank.js`'s season pattern (soft reset + honest own-history, no fake leaderboard) rather than a
+new design — 5 stacking tiers, only `academyBonus` resets (level/collection/wins never do), 5
+achievement-granted titles reusing the existing equip machinery, UI only surfaces once the
+curriculum is genuinely maxed. 545 engine / 42 online / 36 creature-rule / 199 browser /
+`check:models`, all green.
+
+**Before that: day/night cycle** (§6.42). A 20-real-minute day derived from wall-clock time (no
 save field, nothing to desync) fades the sun down and the moon up, cools the hemisphere light,
 and darkens the sky/fog/stars together — built directly on the sun/moon pair and shadow rig
 §6.39 introduced. Interiors are exempt (lit by their own fixtures); a zone can opt into a fixed

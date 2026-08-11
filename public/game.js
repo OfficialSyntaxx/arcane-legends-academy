@@ -9,6 +9,7 @@ import * as RANK from "./pvprank.js";
 import * as MAGIC from "./schoolmagic.js";
 import * as CB from "./cardbacks.js";
 import * as ACHV from "./achievements.js";
+import * as PRESTIGE from "./prestige.js";
 import { traitForCard } from "./creatures.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
@@ -54,6 +55,9 @@ export function newGame(){
     // fresh save has never "started" a season until load() calls settleSeason.
     pvp:{ wins:0, losses:0, rankPoints:0, streak:0, season:null, seasonBest:0, history:[] },
     stats:{ packs:0, graded:0, won:0, slabs:0, scribed:0, refined:0 }, academyBonus:0,
+    // BACKLOG §10 "Prestige" — see prestige.js's own header for why this resets on prestige and
+    // level/collection/wins never do.
+    prestige:{ level:0, history:[] },
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
     // `treasuresFound` (BACKLOG §3 "Hidden areas / treasure") is a flat list of globally-unique
@@ -171,6 +175,9 @@ function migrate(s){
   if (s.pvp.streak == null) s.pvp.streak = 0;
   if (!Array.isArray(s.pvp.history)) s.pvp.history = [];
   if (s.pvp.seasonBest == null) s.pvp.seasonBest = s.pvp.rankPoints;
+  if (!s.prestige || typeof s.prestige !== "object") s.prestige = { level:0, history:[] };
+  if (s.prestige.level == null) s.prestige.level = 0;
+  if (!Array.isArray(s.prestige.history)) s.prestige.history = [];
   if (!s.lessons) s.lessons = { enrolled: [], done: [] };
   if (!Array.isArray(s.lessons.enrolled)) s.lessons.enrolled = [];
   if (!Array.isArray(s.lessons.done)) s.lessons.done = [];
@@ -449,7 +456,29 @@ export function dailyLabel(s){
 // existing save's rank does not shift under it — only what the rank DOES is new.
 export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won + (s.academyBonus||0); }
 export function academyRank(s){ return ACADEMY.yearFor(academyScore(s)).name; }
-export function academyPerks(s){ return ACADEMY.perksFor(academyScore(s)); }
+// Curriculum perks PLUS any prestige tier's cumulative bonus (BACKLOG §10 "Prestige") — additive,
+// so a prestiged Archmage keeps every perk the curriculum already granted and stacks more on top.
+export function academyPerks(s){
+  const base = ACADEMY.perksFor(academyScore(s));
+  const p = PRESTIGE.perksFor(PRESTIGE.levelOf(s));
+  return { questGold: base.questGold + p.questGold, market: base.market + p.market, xp: base.xp + p.xp };
+}
+// BACKLOG §10 "Archmage progression" / "Prestige" — what academyScore's uncapped growth actually
+// DOES once it clears the curriculum's own top year, so a maxed-out Archmage isn't just a player
+// whose score keeps rising with nothing to show for it. See prestige.js's header for the design.
+export function prestigeState(s){
+  const score = academyScore(s);
+  const level = PRESTIGE.levelOf(s);
+  return {
+    level, tier: PRESTIGE.tierFor(level), progress: PRESTIGE.progressToNext(s),
+    canPrestige: PRESTIGE.canPrestige(s, score), maxed: level >= PRESTIGE.MAX_PRESTIGE, score,
+  };
+}
+export function doPrestige(s){
+  const r = PRESTIGE.prestige(s, academyScore(s));
+  if (r.ok) s.academyBonus = 0;   // the one stored input to academyScore this mechanic resets — see prestige.js
+  return r;
+}
 // Techniques learned in class (lessons.js). Derived from the classes PASSED, never stored, so
 // re-tuning what a class teaches applies to every existing save with no migration.
 export function masteries(s){ return LESSONS.masteryFor(s); }

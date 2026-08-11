@@ -329,8 +329,10 @@
 ## 10. Long-Term Endgame
 
 - [x] Academy ranks — Novice → Archmage, driven by level + collection value + wins
-- [ ] Archmage progression
-- [ ] Prestige
+- [x] Archmage progression / Prestige — 5 tiers (`prestige.js`), player-initiated once Archmage is
+  reached, mirrors `pvprank.js`'s season pattern (soft reset + honest own-history). Only
+  `academyBonus` resets — level/collection value/wins never do. Each tier grants a permanent,
+  cumulative perk stacking on top of the curriculum's own, plus an achievement-granted title.
 - [ ] Seasonal events
 - [ ] Rare collectibles
 - [ ] Endgame dungeon tiers
@@ -504,7 +506,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Day/night cycle, is done** (§3). Wall-clock-derived (no save field), 20-minute
+**Next step:** **Prestige, is done** (§10). Scoped properly first (see CLAUDEREADME §6.43 for the
+real problem it solves), then built to mirror `pvprank.js`'s season pattern: 5 stacking tiers,
+player-initiated at Archmage, only `academyBonus` resets, 5 achievement-granted titles. 545 engine
+/ 42 online / 36 creature-rule / 199 browser / `check:models`, all green.
+
+Before that: **Day/night cycle, is done** (§3). Wall-clock-derived (no save field), 20-minute
 cycle fades sun/moon against each other, cools the hemisphere light, darkens sky/fog/stars;
 interiors exempt; `ZONE.fixedTimeOfDay` lets a future zone lock to one moment. Verified with real
 screenshots at forced noon/midnight. 534 engine / 42 online / 36 creature-rule / 194 browser /

@@ -1096,6 +1096,43 @@ if (hasWorld){
   })(), `${JSON.stringify(cls.masteryBefore)} -> ${JSON.stringify(cls.masteryAfter)}`);
   check("the Dorm curriculum panel reports class progress", /Classes this year/.test(cls.hallText || ""));
 
+  // --- prestige (BACKLOG §10): only reachable through the real curriculum panel, once maxed ---
+  const prestige = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const out = {};
+    const s = window.__testSave();
+    out.beforeCanPrestige = false;   // a fresh-ish save is nowhere near Archmage
+    document.querySelector('.navbtn[data-screen="home"]').click();
+    await settle(200);
+    out.hallTextBefore = document.getElementById("scr_home").innerText;
+    // Clear the curriculum the real way a very long-lived save would: raise the score input
+    // academy.js actually reads (wizard level), not a prestige-specific shortcut.
+    s.level = 200;
+    document.querySelector('.navbtn[data-screen="home"]').click();   // re-render off the mutated save
+    await settle(200);
+    out.hallTextMaxed = document.getElementById("scr_home").innerText;
+    const btn = [...document.querySelectorAll("#scr_home button")].find(b => /Become/.test(b.textContent));
+    out.hasPrestigeButton = !!btn;
+    if (!btn) return out;
+    out.academyBonusBefore = s.academyBonus;
+    s.academyBonus = 7;   // give it something real to reset, not just a zero staying zero
+    btn.click();
+    await settle(250);
+    const saved = JSON.parse(localStorage.getItem("arcane_legends_save_v1"));
+    out.levelAfter = saved.prestige.level;
+    out.historyAfter = saved.prestige.history.length;
+    out.academyBonusAfter = saved.academyBonus;
+    out.hallTextAfter = document.getElementById("scr_home").innerText;
+    return out;
+  });
+  check("a save nowhere near Archmage sees no prestige panel", !/Become/.test(prestige.hallTextBefore || ""));
+  check("the curriculum panel offers prestige once maxed", prestige.hasPrestigeButton === true, prestige.hallTextMaxed);
+  check("prestiging bumps the level and records history", prestige.levelAfter === 1 && prestige.historyAfter === 1,
+        `level=${prestige.levelAfter} history=${prestige.historyAfter}`);
+  check("prestiging resets academyBonus, not wizard level", prestige.academyBonusAfter === 0, String(prestige.academyBonusAfter));
+  check("the curriculum panel reflects the new prestige tier after prestiging",
+        /Ascendant Archmage/.test(prestige.hallTextAfter || ""), prestige.hallTextAfter);
+
   // --- visible equipment on the 3D character (BACKLOG §2) ---
   // Only a browser can answer the question that matters here: does the weapon actually end up
   // parented to a bone, at a sane size, moving with the character? Bone axes on a generated rig
