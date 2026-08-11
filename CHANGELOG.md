@@ -14,6 +14,25 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Ashen Mountains quests — 2026-08-11
+
+### Ashen Mountains quests — *pending*
+- The Ashen Mountains zone/dungeon shell shipped fully built during the `main` merge — resource
+  nodes, two NPCs (`mountain_miner`, `mountain_smith`), Ashen Caverns with the Ember Wyrm boss —
+  but the NPCs had `role:"quest"` with nothing in `ZONE_QUESTS` to offer, and the boss had no
+  achievement or dorm trophy.
+- Added a **5-quest chain**, gated behind `archon` (the Drowned Archon), same pacing the lake
+  chain uses gating on the Cinder Wyrm: `ore_run`/`gold_seam` (gather iron then gold) from Foreman
+  Grund, `cindercleave`/`deepmines`/`ember_wyrm` (slay → clear → boss inside Ashen Caverns) from
+  Smelter Voss.
+- `cindercleave` asks for 6 kills, not a round 10 — `validateQuests` caught it asking for more than
+  Ashen Caverns' 7 non-boss enemies, the same invariant that already protects the Forest/Lake
+  chains from a silently uncompletable quest.
+- **`wyrm_render`** achievement (Ember Wyrm dead → auto-derived title) and an **Ember Wyrm Skull**
+  dorm trophy, matching the exact `wyrmslayer`/`vault_breaker`/cinder-wyrm-skull pattern.
+- *534 engine / 42 online / 36 creature-rule / 194 browser (no flake this run) / `check:models`,
+  all green.*
+
 ## Real shadows + a live wind ambience — 2026-08-11
 
 ### Real shadows + a live wind ambience — `9f64a18`

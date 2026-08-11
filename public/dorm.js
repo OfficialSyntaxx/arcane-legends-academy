@@ -277,6 +277,8 @@ export function caseContents(save, gradeOf){
 export const TROPHIES = [
   { id: "cinder_wyrm", dungeon: "cinderhollow_caverns", name: "Cinder Wyrm Skull", icon: "🐲",
     color: 0x8a3a2a, h: 1.8 },
+  { id: "ember_wyrm", dungeon: "ashen_caverns", name: "Ember Wyrm Skull", icon: "🔥",
+    color: 0xc45a1e, h: 2.0 },
 ];
 
 export function trophiesFor(save){

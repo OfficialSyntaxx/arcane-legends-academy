@@ -125,6 +125,61 @@ export const ZONE_QUESTS = [
     reward: { gold: 1400, xp: 1000, cards: 3 },
     requires: ["vaultmouth"],
   },
+
+  // ---- Ashen Mountains (WORLDSPEC step 6, third content zone) ----
+  // Gated on the Drowned Archon, same reasoning as the lake gating on the Cinder Wyrm: a player
+  // who can reach these ore veins has already cleared two dungeons, so the level-12 Ember Wyrm at
+  // the bottom of Ashen Caverns is a real step up rather than a wall met on arrival.
+  {
+    id: "ore_run",
+    zone: "ashen_mountains",
+    giver: "mountain_miner",
+    title: "The Ore Run",
+    brief: "Iron doesn't dig itself out of ash. Bring me twelve pieces and I'll cut you in on the smelter's rate.",
+    objective: { kind: "gather", id: "iron", n: 12 },
+    reward: { gold: 560, xp: 380 },
+    requires: ["archon"],
+  },
+  {
+    id: "gold_seam",
+    zone: "ashen_mountains",
+    giver: "mountain_miner",
+    title: "The Gold Seam",
+    brief: "There's a seam of gold under the ridge that the last crew never finished. Six pieces and it's yours to boast about.",
+    objective: { kind: "gather", id: "gold", n: 6 },
+    reward: { gold: 640, xp: 420 },
+    requires: ["ore_run"],
+  },
+  {
+    id: "cindercleave",
+    zone: "ashen_mountains",
+    giver: "mountain_smith",
+    title: "Cindercleave",
+    brief: "Skeletons keep dragging ore off the carts before it reaches the forge. Put six of them down.",
+    objective: { kind: "slay", dungeon: "ashen_caverns", n: 6 },
+    reward: { gold: 700, xp: 480 },
+    requires: ["archon"],
+  },
+  {
+    id: "deepmines",
+    zone: "ashen_mountains",
+    giver: "mountain_smith",
+    title: "The Deep Mines",
+    brief: "There's a chamber past the forge nobody's cleared since the wyrm moved in. Make it safe.",
+    objective: { kind: "clear", dungeon: "ashen_caverns", room: "deepmines" },
+    reward: { gold: 780, xp: 540 },
+    requires: ["cindercleave"],
+  },
+  {
+    id: "ember_wyrm",
+    zone: "ashen_mountains",
+    giver: "mountain_smith",
+    title: "The Ember Wyrm",
+    brief: "The thing nesting in the forge chamber is why the mountain never cools. End it and the mines are ours again.",
+    objective: { kind: "boss", dungeon: "ashen_caverns" },
+    reward: { gold: 1600, xp: 1200, cards: 3 },
+    requires: ["cindercleave"],
+  },
 ];
 
 const state = s => (s && s.zoneQuests) || { accepted: [], done: [] };
@@ -157,6 +212,7 @@ export function progressOf(s, q){
 export const DUNGEON_NAMES = {
   cinderhollow_caverns: "Cinderhollow Caverns",
   drowned_vault: "the Drowned Vault",
+  ashen_caverns: "Ashen Caverns",
 };
 const dungeonName = id => DUNGEON_NAMES[id] || id;
 

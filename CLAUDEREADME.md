@@ -1072,6 +1072,25 @@ mapping were already correct (§ earlier sessions) — this was purely the one f
   documented in §6.37's own note above — unrelated 2D duel-canvas VFX, not this change).
   `npm run check:models` clean.
 
+### 6.40 Ashen Mountains quests (`zonequests.js`, `achievements.js`, `dorm.js`, BACKLOG §3)
+The Ashen Mountains zone/dungeon shell shipped with the `main` merge (§6.x above) fully built —
+resource nodes, two NPCs, Ashen Caverns with the Ember Wyrm boss — but the NPCs had `role:"quest"`
+with no quests in `ZONE_QUESTS` to offer, and the boss had no achievement or dorm trophy. Closed it:
+
+- **5 quests**, gated behind `archon` (the Drowned Archon) — the same "you've already cleared two
+  dungeons" pacing the lake chain uses gating on the Cinder Wyrm. `mountain_miner` (Foreman Grund)
+  offers gather quests (iron, then gold); `mountain_smith` (Smelter Voss) offers slay → clear →
+  boss inside Ashen Caverns, ending in `ember_wyrm`.
+- `cindercleave`'s slay count is 6, not a round 10 — `validateQuests` catches a slay quest asking
+  for more kills than the dungeon actually holds (Ashen Caverns ships 7 non-boss enemies across its
+  four rooms), the same invariant that already protected the Forest/Lake chains.
+- **`wyrm_render`** achievement (Ember Wyrm dead) and its auto-derived title, same
+  `dungeonBoss(s, "ashen_caverns")` pattern as `wyrmslayer`/`vault_breaker`.
+- **Ember Wyrm Skull** trophy in `dorm.js`'s `TROPHIES` — one line, since a trophy is pure
+  derivation from `worldState.dungeons[...].bossDead`, never stored.
+- 534 engine / 42 online / 36 creature-rule / 194 browser (no flake this run) / `check:models`, all
+  green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1204,7 +1223,12 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: real shadows + a live wind ambience** (§6.39). Asked to check the graphics — shadows,
+**Last landed: Ashen Mountains quests** (§6.40). The zone/dungeon shell shipped fully built during
+the `main` merge, but its two NPCs offered nothing and its boss had no achievement/trophy. Added
+the missing quest chain, achievement, and dorm trophy — no new systems, just wiring the existing
+patterns onto content that was sitting there unused.
+
+**Before that: real shadows + a live wind ambience** (§6.39). Asked to check the graphics — shadows,
 depth, lighting, sound — and found `renderer.shadowMap.enabled` was `false` despite every mesh in
 `world.js` already setting `castShadow`/`receiveShadow`. Flipped it on with `PCFSoftShadowMap`,
 made the outdoor `sun` light the sole shadow caster with a player-centered frustum that repositions

@@ -36,6 +36,9 @@ export const ACHIEVEMENTS = [
   { id: "vault_breaker",     name: "Vault Breaker",      icon: "🌊",
     desc: "Defeat the Drowned Archon", title: "Vault Breaker",
     of: (s) => ({ have: dungeonBoss(s, "drowned_vault") ? 1 : 0, need: 1 }) },
+  { id: "wyrm_render",       name: "Wyrmrender",         icon: "🔥",
+    desc: "Defeat the Ember Wyrm", title: "Wyrmrender",
+    of: (s) => ({ have: dungeonBoss(s, "ashen_caverns") ? 1 : 0, need: 1 }) },
   { id: "veteran_duelist",   name: "Veteran Duelist",    icon: "⚔️",
     desc: "Win 50 duels", title: "Veteran Duelist",
     of: (s) => ({ have: s.stats?.won || 0, need: 50 }) },
@@ -121,7 +124,7 @@ export function validateAchievements(){
     // discipline codex.js's own validator holds card achievements to.
     const maxSave = {
       zoneQuests: { done: ZONE_QUESTS.map(q => q.id) },
-      worldState: { dungeons: { cinderhollow_caverns: { bossDead: true }, drowned_vault: { bossDead: true } } },
+      worldState: { dungeons: { cinderhollow_caverns: { bossDead: true }, drowned_vault: { bossDead: true }, ashen_caverns: { bossDead: true } } },
       stats: { won: 9999 },
       gold: 999999,
       skills: { mining: 99, fishing: 99, woodcutting: 99, smithing: 99, alchemy: 99, scribing: 99, enchanting: 99 },

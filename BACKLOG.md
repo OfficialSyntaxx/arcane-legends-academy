@@ -93,9 +93,13 @@
 - [x] Lake Arcanum — a real lake (29% water) reached through the forest's west gateway; shoreline
   fishing (salmon/lobster/shark), silver + mithril + magic trees, 3 NPCs, 5 quests gated behind
   the Cinder Wyrm, and the Drowned Vault entrance
-- [~] Ashen Mountains — step 1 of 5 done (zone shell: `mountains`-biome terrain, gateway off the
-  forest's unused north edge, two treasures). Steps 2–5 (NPCs/quests, resource nodes, a third
-  dungeon + boss, an atmosphere/landmark polish pass) are not yet done.
+- [x] Ashen Mountains — a fourth outdoor zone (adopted from `main`'s independent build during the
+  branch merge): mining-flavoured resource nodes (iron/gold/mithril/runite), two NPCs, two
+  treasures, and Ashen Caverns (4-room dungeon, the Ember Wyrm boss, Lv12/260hp). The zone/dungeon
+  shell shipped with the merge but its NPCs had no quests wired to them and the boss had no
+  achievement/trophy — closed that gap with a 5-quest chain (gated behind the Drowned Archon, same
+  "already cleared two dungeons" pacing as the lake gating on the forest), a `wyrm_render`
+  achievement, and an Ember Wyrm Skull trophy for the Dorm.
 - [x] Cinderhollow Caverns — 4-room dungeon reachable from the Whispering Forest, boss + persistent kill/room/boss progress
 - [x] The Drowned Vault — 5-room dungeon under Lake Arcanum, cold flooded palette, the Drowned Archon (Lv14) at the bottom
 - [x] Zone transitions — walkable gateways, reciprocal arrival, world state persisted in the save
@@ -496,7 +500,14 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Real shadows + a live wind ambience, is done.** `renderer.shadowMap.enabled` (was
+**Next step:** **Ashen Mountains quests, is done** (§3). `mountain_miner`/`mountain_smith` had
+stood in the zone since the merge with nothing to say — added a 5-quest chain gated behind the
+Drowned Archon (gather iron/gold, slay + clear + boss inside Ashen Caverns), a `wyrm_render`
+achievement, and an Ember Wyrm Skull dorm trophy, matching the exact pattern the Forest/Lake chains
+already established. 534 engine / 42 online / 36 creature-rule / 194 browser / `check:models`, all
+green.
+
+Before that: **Real shadows + a live wind ambience, is done.** `renderer.shadowMap.enabled` (was
 `false`) now `true` with `PCFSoftShadowMap`; the outdoor `sun` DirectionalLight is the sole shadow
 caster with a 2048² map and a 140×140 orthographic frustum that recenters on the player every frame;
 `audio.js`'s ambience pad gained a randomised wind-gust layer. Verified with a real Playwright
