@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Prestige — 2026-08-11
 
-### Prestige — *pending*
+### Prestige — `845d869`
 - Scoped before building: `academyScore(s)` is uncapped, but academy.js's 7-year curriculum tops
   out at Archmage (score 140) and stops — a player at hour 20 looks identical to one at hour 200.
 - New `prestige.js`, mirroring `pvprank.js`'s season pattern (soft reset + honest own-history, no
