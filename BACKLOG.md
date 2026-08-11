@@ -373,7 +373,12 @@ For each feature we select, we should decide:
 **Repository:** `OfficialSyntaxx/arcane-legends-academy`
 **Branch:** `claude/integrate-cc0-and-systems`
 
-**Changes made, most recent first:** **Gathering is open-world-only** ("Connect existing systems" —
+**Changes made, most recent first:** **Real shadows + a live wind ambience** (asked to check the
+graphics — shadows, depth, lighting, sound; found `renderer.shadowMap.enabled` was `false` despite
+every mesh already flagged `castShadow`/`receiveShadow`; enabled it with `PCFSoftShadowMap`, made
+the outdoor sun the sole shadow caster with a player-centered, per-frame-repositioned frustum, and
+added a randomised wind-gust layer to the previously-static ambience pad; verified with a real
+Playwright screenshot) → **Gathering is open-world-only** ("Connect existing systems" —
 removed the Skills-screen menu Gather button entirely; the 3D world's real nodes are now the only
 path into `gather()`, matching the intended OSRS-style "walk up and gather it yourself" design; the
 Skills panel is now a requirement/xp/owned reference, not a control) → **`main` merged into this
@@ -491,7 +496,14 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Gathering is open-world-only, is done.** `window.__EV.gather` removed; the 3D
+**Next step:** **Real shadows + a live wind ambience, is done.** `renderer.shadowMap.enabled` (was
+`false`) now `true` with `PCFSoftShadowMap`; the outdoor `sun` DirectionalLight is the sole shadow
+caster with a 2048² map and a 140×140 orthographic frustum that recenters on the player every frame;
+`audio.js`'s ambience pad gained a randomised wind-gust layer. Verified with a real Playwright
+screenshot showing the player/trees casting real ground shadows. 193/194 browser (the one failure is
+the pre-existing §6.37 VFX flake, unrelated), `check:models` clean.
+
+Before that: **Gathering is open-world-only, is done.** `window.__EV.gather` removed; the 3D
 world's `onGather` is the only path into `gather()`; the Skills panel is a reference now, not a
 control. Covered by a rewritten `tools/browser-test.mjs` block driving the real academy nodes.
 

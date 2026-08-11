@@ -59,7 +59,12 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 1.5));
   renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-  renderer.shadowMap.enabled = false;
+  // Every mesh in this file already sets castShadow/receiveShadow (add() helper, GLB models,
+  // treasure chests) — this master switch was left off, so all of that was dead code with zero
+  // visual effect. Soft (PCF) shadows read as believable at this game's camera distance without
+  // the harsher aliasing of the default map type.
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setClearColor(ZONE.background != null ? ZONE.background : 0x1a1440);
   // COLOUR MANAGEMENT. Without this, glTF textures — which GLTFLoader correctly tags as sRGB —
   // are rendered as if they were linear, which is why generated models looked rich in the
@@ -141,6 +146,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // — which reads as broken, not atmospheric. `ZONE.lightScale` lets a zone say how lit it is
   // instead of inferring it from `interior`, and the dorm asks for a warm, lived-in room.
   const INTERIOR = !!ZONE.interior;
+  let sun = null;
   if (INTERIOR){
     const k = ZONE.lightScale || 1;
     scene.add(new THREE.HemisphereLight(ZONE.lightTint || 0x585070, 0x140e22, 0.30 * k));
@@ -152,9 +158,21 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // bright renderer; under the dim procedural rig they read as black/grey).
   const boost = MAP ? 1.9 : 1;
   scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a1f4d, 0.42 * boost));
-  const sun = new THREE.DirectionalLight(0xffd9a0, 0.55 * boost);
+  sun = new THREE.DirectionalLight(0xffd9a0, 0.55 * boost);
   sun.position.set(20, 40, 14);
-  scene.add(sun);
+  // Only the sun casts — one shadow-casting light reads as a believable time-of-day and keeps
+  // the draw cost down. The frustum is sized to the player's actual play radius (roughly a
+  // zone's walkable footprint around wherever the camera currently is), not the whole map, so
+  // the shadow map's resolution isn't wasted on geometry far off-screen.
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = -70; sun.shadow.camera.right = 70;
+  sun.shadow.camera.top = 70; sun.shadow.camera.bottom = -70;
+  sun.shadow.camera.near = 5; sun.shadow.camera.far = 160;
+  sun.shadow.bias = -0.0025;
+  sun.shadow.normalBias = 0.02;
+  sun.target.position.set(0, 0, 0);
+  scene.add(sun); scene.add(sun.target);
   const moon = new THREE.DirectionalLight(0x9fb4ff, 0.15 * boost);
   moon.position.set(-20, 30, -20); scene.add(moon);
   }
@@ -1651,6 +1669,14 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       g.userData.glint.position.y = 1.35 + Math.sin(now / 500) * 0.08;
     }
     stepAura(now / 1000);
+    if (sun && sun.castShadow){
+      // Keep the sun's fixed offset from the player so its shadow frustum always covers the
+      // area actually on screen, instead of only the zone origin the light was authored at.
+      const px = player.position.x, pz = player.position.z;
+      sun.position.set(px + 20, 40, pz + 14);
+      sun.target.position.set(px, 0, pz);
+      sun.target.updateMatrixWorld();
+    }
     updateCamera(dt);
     if (skyGroup) skyGroup.position.copy(camera.position);   // keep the sky centered on the camera
     if (cloudGroup){                                        // drift clouds around the sky

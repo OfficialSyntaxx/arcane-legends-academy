@@ -122,7 +122,25 @@ export function createAudio(){
     } catch(e){}
   }
 
-  // ---- ambience: a slow two-oscillator pad, only while the 3D world is on screen ----
+  // ---- ambience: a slow two-oscillator pad, plus occasional wind, only while the 3D world is
+  // on screen. The pad alone was static — a held chord never changes, which reads as a looping
+  // background track rather than a place. A soft filtered-noise gust every 10-25s (randomised,
+  // never on a fixed beat so it doesn't read as a loop point) is what actually sells "outdoors".
+  function windGust(){
+    if (!ambience || !ctx || prefs.muted) return;
+    try {
+      const t0 = ctx.currentTime;
+      const dur = 2.5 + Math.random()*2.5;
+      const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+      const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = 320 + Math.random()*200; f.Q.value = 0.7;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.045, t0 + dur*0.4);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      src.connect(f); f.connect(g); g.connect(musicBus);
+      src.start(t0); src.stop(t0 + dur + 0.1);
+    } catch(e){}
+    ambience.windTimer = setTimeout(windGust, 10000 + Math.random()*15000);
+  }
   function startAmbience(){
     if (ambience || !ensure() || prefs.muted) return;
     try {
@@ -138,7 +156,8 @@ export function createAudio(){
         o.connect(g); o.start(); lfo.start();
         oscs.push(o, lfo);
       }
-      ambience = { g, oscs };
+      ambience = { g, oscs, windTimer: null };
+      ambience.windTimer = setTimeout(windGust, 6000 + Math.random()*8000);
     } catch(e){}
   }
   function stopAmbience(){
@@ -146,6 +165,7 @@ export function createAudio(){
     try {
       ambience.g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
       const dead = ambience.oscs;
+      clearTimeout(ambience.windTimer);
       setTimeout(()=>{ for (const o of dead){ try{ o.stop(); }catch(e){} } }, 1500);
     } catch(e){}
     ambience = null;

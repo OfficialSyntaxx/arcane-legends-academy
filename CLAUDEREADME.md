@@ -1037,6 +1037,41 @@ that happens to also exist in the world for flavour.
 - **Daily quests** (win duels / gather materials / scribe cards) with a gold + card reward.
 - **Academy rank** (Novice → Apprentice → … → Archmage) — now a real curriculum, not just a label; see §6.7.
 
+### 6.39 Real shadows + a live wind ambience (`world.js`, `audio.js`)
+Asked to make the world "feel alive and detailed — shadows and depth, lighting, sound." A grep
+across `world.js` turned up dozens of meshes (the generic `add()` helper, every GLB model, treasure
+chests) dutifully setting `castShadow`/`receiveShadow = true` with zero visual effect, because the
+renderer's master switch, `renderer.shadowMap.enabled`, was `false`. Colour management and tone
+mapping were already correct (§ earlier sessions) — this was purely the one flag nobody had flipped.
+
+- **`renderer.shadowMap.enabled = true`**, `THREE.PCFSoftShadowMap` (soft edges read as believable
+  at this game's camera distance; the default hard PCF map aliased badly on the procedural terrain).
+- Only the outdoor **`sun` DirectionalLight** casts — one shadow-casting light per scene keeps the
+  draw cost down and reads as a single believable light source, same reasoning as the existing
+  sun/moon split (moon is fill only). `sun.shadow.camera` is a 140×140 orthographic frustum
+  (`-70..70` each axis, near 5 / far 160) with a 2048² map, `bias:-0.0025`/`normalBias:0.02` to
+  avoid the classic acne/peter-panning trade-off.
+- The frustum is centered on the **player**, not the zone origin: `sun`/`sun.target` are
+  repositioned every frame in `frame()` to `player.position + (20,40,14)` / `player.position`,
+  keeping the light's fixed direction (so lighting doesn't visibly rotate as you walk) while the
+  shadow map's limited resolution is always spent on what's actually on screen, not wherever a
+  zone's authored origin happens to be.
+- Interiors are untouched — dungeons/dorms light by torches and fill lights already tuned per
+  `ZONE.lightScale`, and adding shadow casters there risked making already-carefully-tuned "lit
+  cave" interiors read as patchy instead of atmospheric. Verified by an actual Playwright
+  screenshot (walking the player into the forest): the wizard and the trees now cast real shadows
+  onto the ground plane.
+- **Sound**: the ambience pad (`audio.js`) was static — a held drone chord that never varies reads
+  as a looped background track, not a place. Added a **wind gust layer**: filtered noise
+  (bandpass, randomised centre frequency + duration, 6-25s between gusts on no fixed beat so it
+  never sounds like a loop point) mixed under the pad at low gain, started/stopped alongside
+  `startAmbience()`/`stopAmbience()`. SFX and the music-mode system (`world`/`duel`/`victory`/`menu`)
+  were already comprehensive and untouched.
+- `npm run test:browser`: 193/194 (the one failure, "the bolt spell effect renders" scoring
+  1326 lit px vs a 1326 baseline at exactly 1.000x, is the pre-existing environmental flake
+  documented in §6.37's own note above — unrelated 2D duel-canvas VFX, not this change).
+  `npm run check:models` clean.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1169,7 +1204,15 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: gathering is open-world-only now** (§6.37). Asked directly whether the Skills
+**Last landed: real shadows + a live wind ambience** (§6.39). Asked to check the graphics — shadows,
+depth, lighting, sound — and found `renderer.shadowMap.enabled` was `false` despite every mesh in
+`world.js` already setting `castShadow`/`receiveShadow`. Flipped it on with `PCFSoftShadowMap`,
+made the outdoor `sun` light the sole shadow caster with a player-centered frustum that repositions
+every frame, and added a randomised wind-gust layer under the previously-static ambience pad.
+Verified visually via a real Playwright screenshot, not just code review. 193/194 browser (the one
+failure is the pre-existing, documented VFX flake from §6.37, unrelated), `check:models` clean.
+
+**Before that: gathering is open-world-only now** (§6.37). Asked directly whether the Skills
 screen's menu-button gathering matched the intent — it didn't; this is meant to be OSRS-style, walk
 up and gather it yourself. Removed `window.__EV.gather` entirely; the 3D world's `onGather` (a real
 node, a real prompt) is now the only path into `gather()`. The Skills panel is now a reference

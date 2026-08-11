@@ -14,9 +14,33 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Real shadows + a live wind ambience — 2026-08-11
+
+### Real shadows + a live wind ambience — *pending*
+- Asked to check the graphics — "shadows and depths, lighting, sound." A grep across `world.js`
+  found dozens of meshes (the generic `add()` helper, every GLB model, treasure chests) already
+  setting `castShadow`/`receiveShadow = true` with zero effect, because `renderer.shadowMap.enabled`
+  was `false`. Colour management/tone mapping were already correct — this was one dead flag.
+- `renderer.shadowMap.enabled = true`, `THREE.PCFSoftShadowMap` for soft edges at this game's
+  camera distance.
+- Only the outdoor `sun` DirectionalLight casts (one shadow-casting light keeps draw cost down and
+  reads as one believable light source, same split as the existing sun/moon fill). Shadow camera:
+  140×140 orthographic frustum, 2048² map, `bias:-0.0025`/`normalBias:0.02`.
+- The frustum is centered on the player, not the zone origin: `sun`/`sun.target` reposition every
+  frame in `frame()` to stay a fixed offset from `player.position`, so the shadow map's resolution
+  is always spent on what's on screen rather than a zone's authored origin.
+- Interiors untouched — dungeons/dorms already light by torches/fill tuned per `ZONE.lightScale`.
+- `audio.js`: the ambience pad was a static held chord — added a wind-gust layer (filtered noise,
+  randomised centre frequency/duration, 6-25s between gusts on no fixed beat) mixed under it,
+  tied to the existing `startAmbience()`/`stopAmbience()` lifecycle.
+- Verified with a real Playwright screenshot (not just code review): the player and forest trees
+  now cast real ground shadows.
+- *534 engine / 42 online / 36 creature-rule / 193 browser (1 pre-existing, documented VFX flake,
+  unrelated) / `check:models`, all green.*
+
 ## Gathering is open-world-only — 2026-08-10
 
-### Gathering is open-world-only — *pending*
+### Gathering is open-world-only — `45ca13e`
 - Asked directly whether the Skills-screen menu Gather button matched the intent — it didn't: the
   design is OSRS-style, walk up to a real node and gather it yourself, not a menu shortcut that
   happened to coexist with the real 3D nodes.
