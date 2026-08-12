@@ -1209,6 +1209,34 @@ already cleared everything else, not a second one-time reward, so it never touch
 - 557 engine / 42 online / 36 creature-rule / 204/205 browser (the one failure is the pre-existing
   §6.37 VFX flake, unrelated) / `check:models`, all green.
 
+### 6.45 Card evolution (`evolution.js`, `game.js`, `index.html`, BACKLOG §5)
+The last item in §5 that needed a design decision before it could be built (three options were
+costed out there — stat buff, tiered creature line, cosmetic-only — asked the user, picked
+**tiered creature line**, spend-copies trigger).
+
+- **Zero new cards.** Every school's existing cost-tiered creature spread already reads as a line
+  once named one — Fire Cat (1-cost) → Fire Elf (2-cost) → Fire Dragon (7-cost, legendary), and the
+  same shape for the other six schools (`evolution.js` `EVOLUTION_LINES`). No new art, no new
+  catalog entries — the same trick `variants.js`'s printings played, finding a whole system inside
+  data that already existed.
+- **Spend N ungraded copies → mint one of the next tier.** The cost step from base→mid (3) is
+  cheaper than mid→top (5), since the top tier is a school's own legendary. `game.js evolveCard`
+  owns the one rule `evolution.js` deliberately doesn't know: **a graded copy is never spent** —
+  the same "a stored choice survives an unrelated system touching the same pool" rule that keeps a
+  displayed slab's case from emptying itself and a trophy from disappearing when something else
+  sells. Among ungraded copies, the cheapest (by `instanceValue`) are spent first, so a lucky roll
+  or rare printing a player happened to pull always survives being spent on ordinary copies.
+- Shown as a new "🧬 Card Evolution" panel in the Codex, alongside Rare Collectibles and Collection
+  Value — every possible evolution step listed with current copies owned, an Evolve button that
+  enables exactly at the cost threshold.
+- 12 new engine tests (`tools/test.mjs`: validated against the real card catalog, cost/line
+  boundaries, the graded exclusion, cheapest-first spending) + 4 real-browser tests (a real DOM
+  button click, disabled below cost / enabled at cost / spends exactly the right copies through the
+  actual event handler — deltas, not absolute counts, since this runs deep into a long-lived shared
+  save that's accumulated cards from every earlier test in the suite).
+- 569 engine / 42 online / 36 creature-rule / 208/209 browser (the one failure is the pre-existing
+  §6.37 VFX flake, unrelated) / `check:models`, all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1341,7 +1369,14 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Rare collectibles + Endgame dungeon tiers** (§6.44), two more §10 items scoped and
+**Last landed: Card evolution** (§6.45). The last §5 item needing a design decision — asked the
+user, picked a tiered creature line (Fire Cat → Fire Elf → Fire Dragon, same shape every school)
+using ONLY existing cards, spend-ungraded-copies trigger. Guilds/Multiplayer were discussed and
+correctly left alone — BACKLOG §8 already documents them as blocked on server infrastructure this
+project doesn't have, not a design gap. 569 engine / 42 online / 36 creature-rule / 208/209
+browser (1 pre-existing unrelated flake) / `check:models`, all green.
+
+**Before that: Rare collectibles + Endgame dungeon tiers** (§6.44), two more §10 items scoped and
 built together. Collectibles are treasure-sourced (not boss-sourced — bosses die once per save,
 so a %-drop off a one-time event would be unreachable for most players), a shared pool rolled by
 `game.js claimTreasure` on top of the normal reward. Hard Mode is a repeatable menu-duel rematch

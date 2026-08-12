@@ -25,6 +25,7 @@ import * as CB from "../public/cardbacks.js";
 import * as ACHV from "../public/achievements.js";
 import * as PRESTIGE from "../public/prestige.js";
 import * as COLLECT from "../public/collectibles.js";
+import * as EVO from "../public/evolution.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -3270,6 +3271,63 @@ check("game.js load() backfills collectibles on an old save missing the field", 
   G.save(s);
   const loaded = G.load();
   return Array.isArray(loaded.collectibles);
+})());
+
+// ---------------------------------------------------------------- evolution.js (BACKLOG §5)
+check("validateEvolution reports no problems against the real card catalog", (()=>{
+  return EVO.validateEvolution(CARDS.map(c => c.id)).length === 0;
+})());
+check("every evolution line's tiers actually belong to that line's own school", (()=>{
+  return EVO.EVOLUTION_LINES.every(line => line.tiers.every(id => CARD_MAP[id].school === line.school));
+})());
+check("evolveCost is null for a card not in any line", EVO.evolveCost("firebolt") === null);
+check("evolveCost is null for a card already at the top of its line", EVO.evolveCost("fire_dragon") === null);
+check("evolveCost is the line's own declared cost for a mid-line card", EVO.evolveCost("fire_cat") === 3 && EVO.evolveCost("fire_elf") === 5);
+check("evolvesInto walks exactly one step, not the whole line", EVO.evolvesInto("fire_cat") === "fire_elf" && EVO.evolvesInto("fire_elf") === "fire_dragon" && EVO.evolvesInto("fire_dragon") === null);
+check("canEvolve is false below the required copy count and true at/above it", (()=>{
+  const two = [{id:"fire_cat"},{id:"fire_cat"}];
+  const three = [...two, {id:"fire_cat"}];
+  return EVO.canEvolve(two, "fire_cat") === false && EVO.canEvolve(three, "fire_cat") === true;
+})());
+check("game.js evolveCard refuses a card that isn't in any line", (()=>{
+  const s = G.newGame();
+  return G.evolveCard(s, "firebolt").ok === false;
+})());
+check("game.js evolveCard refuses below the required copy count and leaves the collection untouched", (()=>{
+  const s = G.newGame();
+  G.mintCard(s, "fire_cat", 50);
+  G.mintCard(s, "fire_cat", 50);   // 2 of the 3 needed
+  const before = s.cards.length;
+  const r = G.evolveCard(s, "fire_cat");
+  return r.ok === false && s.cards.length === before;
+})());
+check("game.js evolveCard spends the required copies and mints exactly one of the next tier", (()=>{
+  const s = G.newGame();
+  for (let i = 0; i < 3; i++) G.mintCard(s, "fire_cat", 50);
+  const before = s.cards.length;
+  const elfBefore = EVO.copiesOf(s.cards, "fire_elf");   // fire_elf ships in the starter deck too
+  const r = G.evolveCard(s, "fire_cat");
+  return r.ok === true && r.to === "fire_elf" && EVO.copiesOf(s.cards, "fire_cat") === 0
+      && EVO.copiesOf(s.cards, "fire_elf") === elfBefore + 1 && s.cards.length === before - 3 + 1;
+})());
+check("game.js evolveCard never spends a graded copy", (()=>{
+  const s = G.newGame();
+  const graded = G.mintCard(s, "fire_cat", 50);
+  graded.graded = true;
+  G.mintCard(s, "fire_cat", 50);
+  G.mintCard(s, "fire_cat", 50);   // only 2 UNGRADED fire_cat — below the cost of 3
+  const r = G.evolveCard(s, "fire_cat");
+  const stillThere = s.cards.find(c => c.uid === graded.uid);
+  return r.ok === false && stillThere && stillThere.graded === true;
+})());
+check("game.js evolveCard spends the cheapest copies first, keeping the best roll", (()=>{
+  const s = G.newGame();
+  const best = G.mintCard(s, "fire_cat", 100, { variant: "prismatic" });
+  G.mintCard(s, "fire_cat", 5);
+  G.mintCard(s, "fire_cat", 5);
+  G.mintCard(s, "fire_cat", 5);   // 4 copies total, only 3 needed — the worst 3 should be spent
+  G.evolveCard(s, "fire_cat");
+  return s.cards.some(c => c.uid === best.uid);   // the prismatic 100-roll copy must have survived
 })());
 
 // ---------------------------------------------------------------- endgame dungeon tiers (BACKLOG §10)

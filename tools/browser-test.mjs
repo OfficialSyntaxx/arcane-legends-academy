@@ -1317,6 +1317,50 @@ if (hasWorld){
   check("the Codex shows every collectible as a mystery slot before any are found",
         /Rare Collectibles/.test(collect.before) && /\?\?\?/.test(collect.before), collect.before.slice(0, 300));
 
+  // --- Card evolution (BACKLOG §5) ---
+  // This runs deep into a long-lived shared save that's accumulated packs/drops from every test
+  // above it, so fire_cat's count going in is NOT reliably zero — top up to exactly one short of
+  // the cost (never assume a starting count), then assert DELTAS around the click, not absolutes.
+  const evo = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const COST = 3;   // fire_cat -> fire_elf, per evolution.js
+    const findBtn = () => [...document.querySelectorAll("#ovBody button")]
+      .find(b => b.getAttribute("onclick") === "window.__ev('evolve|fire_cat')");
+    // Reset to a known count instead of topping up from whatever this long-lived shared save has
+    // accumulated from every pack/drop earlier in the suite — otherwise a lucky run could already
+    // own >= COST fire_cat and the "disabled below cost" half of this test would be untestable.
+    const s0 = window.__testSave();
+    s0.cards = s0.cards.filter(c => c.id !== "fire_cat");
+    for (let i = 0; i < COST - 1; i++) window.__testMint("fire_cat", 50);
+    window.__ev("openCodex");
+    await settle(300);
+    const btnBefore = findBtn();
+    const disabledBefore = btnBefore ? btnBefore.disabled : null;
+    document.getElementById("overlay").style.display = "none";
+    window.__testMint("fire_cat", 50);   // now at exactly COST
+    window.__ev("openCodex");
+    await settle(300);
+    const fireCatBefore = window.__testSave().cards.filter(c => c.id === "fire_cat").length;
+    const cardsBefore = window.__testSave().cards.length;
+    const btn = findBtn();
+    const hasButton = !!btn;
+    if (!btn) return { disabledBefore, hasButton };
+    btn.click();
+    await settle(300);
+    const after = document.getElementById("ovBody").innerText;
+    const saved = window.__testSave();
+    document.getElementById("overlay").style.display = "none";
+    return { disabledBefore, hasButton, after,
+             fireCatDelta: saved.cards.filter(c => c.id === "fire_cat").length - fireCatBefore,
+             cardsDelta: saved.cards.length - cardsBefore };
+  });
+  check("the Evolve button is disabled below the required copy count", evo.disabledBefore === true);
+  check("the Evolve button enables once enough copies are owned", evo.hasButton === true);
+  check("clicking Evolve through the real DOM spends exactly the required copies and mints one next-tier card",
+        evo.fireCatDelta === -3 && evo.cardsDelta === -2,
+        `fire_cat delta=${evo.fireCatDelta} cards delta=${evo.cardsDelta}`);
+  check("the Codex reflects the evolution immediately", /Fire Elf/.test(evo.after || ""), (evo.after||"").slice(0,300));
+
   // --- Endgame dungeon tiers / Hard Mode (BACKLOG §10) ---
   const hard = await page.evaluate(async () => {
     const settle = ms => new Promise(r => setTimeout(r, ms));

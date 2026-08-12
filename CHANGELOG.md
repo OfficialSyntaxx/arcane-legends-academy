@@ -14,6 +14,25 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Card evolution — 2026-08-11
+
+### Card evolution — *pending*
+- The last BACKLOG §5 item flagged as needing a design decision before it could be built. Asked
+  the user; picked a tiered creature line (option B), spend-copies trigger.
+- `evolution.js`: every school's own cost-tiered creature spread doubles as an evolution line
+  using ONLY existing cards — e.g. Fire Cat (1-cost) → Fire Elf (2-cost) → Fire Dragon (7-cost,
+  legendary) — zero new cards, zero new art, one per school.
+- `game.js evolveCard`: spend N ungraded copies of the current tier to mint one of the next
+  (3 for the first step, 5 for the second — the top tier is a legendary). A **graded copy is
+  never spent**; among ungraded copies, the cheapest by value are spent first, so a rare printing
+  or a lucky roll always survives.
+- Shown as a new "🧬 Card Evolution" panel in the Codex.
+- 12 new engine tests + 4 new real-browser tests (a real DOM button click; disabled below cost,
+  enabled at cost, spends exactly the right copies — asserted as deltas, since this test runs deep
+  into a long-lived shared save that's accumulated cards from every earlier test in the suite).
+- *569 engine / 42 online / 36 creature-rule / 208/209 browser (1 pre-existing unrelated VFX
+  flake) / `check:models`, all green.*
+
 ## Rare collectibles + Endgame dungeon tiers — 2026-08-11
 
 ### Rare collectibles + Endgame dungeon tiers — `010a40d`

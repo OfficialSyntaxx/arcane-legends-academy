@@ -412,6 +412,7 @@ import * as MAGIC from "./schoolmagic.js";
 import * as CB from "./cardbacks.js";
 import * as ACHV from "./achievements.js";
 import * as COLLECT from "./collectibles.js";
+import * as EVO from "./evolution.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -1612,6 +1613,23 @@ function buildCodex(){
   }
   h += `</div></div>`;
 
+  // card evolution (BACKLOG §5) — spend copies of a base creature to mint its next tier.
+  h += `<div class="panel" style="margin-top:14px"><h3>🧬 Card Evolution</h3>
+    <p class="sub">Spend ungraded copies of a base creature to evolve it into the next tier. Your best copy of a card is always spent last.</p>`;
+  for (const step of EVO.evolutionSteps()){
+    const fromCard = CARD_MAP[step.from], toCard = CARD_MAP[step.to];
+    if (!fromCard || !toCard) continue;
+    const have = EVO.copiesOf(S.cards, step.from);
+    const can = EVO.canEvolve(S.cards, step.from);
+    h += `<div class="lrow">
+      <div class="ic">${SCHOOL_ICON[step.school]||"◇"}</div>
+      <div class="grow"><div class="t">${fromCard.name} → ${toCard.name}</div>
+      <div class="d">${have}/${step.cost} copies owned</div></div>
+      <button class="btn sm ${can?"gold":""}" ${can?"":"disabled"} onclick="window.__ev('evolve|${step.from}')">🧬 Evolve</button>
+    </div>`;
+  }
+  h += `</div>`;
+
   // collection value analytics (BACKLOG §5) — where the total sits, not just what it is
   const bySchoolValue = G.valueBySchool(S);
   const byRarityValue = G.valueByRarity(S);
@@ -1656,6 +1674,14 @@ window.__EV.backEquip = (id)=>{
   const doneIds = CX.achievementsFor(CARDS, S.cards).filter(a=>a.done).map(a=>a.id);
   const r = CB.setBack(S, id, doneIds);
   if (r.ok){ save(); toast(`${CB.BACK_MAP[id].emblem} ${CB.BACK_MAP[id].name} equipped`); refreshCodex(); }
+};
+window.__EV.evolve = (cardId)=>{
+  const r = G.evolveCard(S, cardId);
+  if (!r.ok){ err(r.err === "not_enough_copies" ? `Need ${r.need}, have ${r.have}.` : "This card cannot evolve."); return; }
+  save();
+  AUDIO.play("levelUp");
+  toast(`🧬 Evolved into ${CARD_MAP[r.to].name}!`);
+  refreshCodex();
 };
 window.__EV.titleEquip = (id)=>{
   const doneIds = ACHV.achievementsFor(S).filter(a=>a.done).map(a=>a.id);
@@ -2990,6 +3016,9 @@ window.__testGrant = (questId)=>{
   S.inventory[q.objective.id] = (S.inventory[q.objective.id]||0) + q.objective.n;
   save(); return true;
 };
+// Mint a real card instance through the real engine function — for tests that need to own a
+// specific number of copies (evolution) without opening N packs.
+window.__testMint = (cardId, roll)=>{ const c = G.mintCard(S, cardId, roll!=null?roll:50); save(); return c; };
 // Give the player a furnished dorm without playing an hour of economy first. It uses the real
 // buy/place/display functions, so the test still exercises the code the game runs — only the
 // gold and the boss kill are handed over.

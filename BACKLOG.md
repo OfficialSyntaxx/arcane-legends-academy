@@ -155,27 +155,12 @@
 
 ## 5. Cards & Collection
 
-- [ ] Card evolution — **needs a design decision before this can be built**; not started because
-  "evolve into what" is a game-balance/content call, not something to invent unilaterally. Options
-  to pick from (or mix), roughly cheapest-to-build first:
-  - **A: Stat evolution (no new cards).** A card you've graded/owned enough copies of gets a small
-    permanent buff (e.g. +1/+1) — reuses `roll`/`graded`/count fields already on a card instance,
-    no new catalog entries, closest in spirit to the printings system (`variants.js`) that already
-    changes a card's VALUE without changing what it IS.
-  - **B: Tiered creature line (new cards, small set).** Explicit lines like Fire Cat → Fire Elf →
-    Fire Dragon (creature costs already step up within each school) — "evolve" consumes N copies
-    of the base card to mint one copy of the next tier. Needs 1–2 new evolved-only cards per
-    school (or reuse the existing 3-cost-tier creatures already in `cards.js` as the line, which
-    would need zero new cards at all — just an `evolvesFrom`/`evolvesInto` link between existing
-    entries).
-  - **C: Cosmetic evolution (art/frame only, printings-style).** An "evolved" card is a fourth
-    printing tier above Prismatic — same stats, a different frame/art treatment, unlocked by
-    grading multiple copies to Gem Mint. Cheapest to build (extends `variants.js`'s existing
-    tier list), but doesn't touch gameplay at all — closer to a card-back than an evolution.
-  - Whichever direction: needs an explicit trigger the player performs (spend copies? spend gold?
-    hit a grading milestone?) so it stays a CHOICE that gets stored, not something that fires
-    automatically and silently changes a deck's math underneath a player who wasn't paying
-    attention.
+- [x] Card evolution — design decision made (option B, tiered creature line): every school's own
+  cost-tiered creature spread doubles as an evolution line using ONLY existing cards (`evolution.js`
+  `EVOLUTION_LINES`, e.g. Fire Cat → Fire Elf → Fire Dragon) — zero new cards, zero new art. Spend
+  N ungraded copies of the current tier to mint one of the next (`game.js` `evolveCard`); a graded
+  copy is never spent, and among ungraded copies the cheapest are spent first so a rare printing
+  survives. Shown as a "🧬 Card Evolution" panel in the Codex.
 - [x] Foil / holo / special variants — `variants.js`: Foil ✨ ×2.2, Holographic 🌈 ×4.5,
   Prismatic 💠 ×12, rolled rarest-first with per-source luck (packs are the lucky path). Coloured
   border, diagonal sheen and a badge on the card face; rare printings sort to the top of the
@@ -511,7 +496,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Rare collectibles + Endgame dungeon tiers, is done** (§10). Collectibles are
+**Next step:** **Card evolution, is done** (§5). The last item needing a design decision — asked
+the user, picked a tiered creature line using only existing cards, spend-ungraded-copies trigger,
+graded copies and rare printings always protected. 569 engine / 42 online / 36 creature-rule /
+208/209 browser (1 pre-existing unrelated flake) / `check:models`, all green.
+
+Before that: **Rare collectibles + Endgame dungeon tiers, is done** (§10). Collectibles are
 treasure-sourced (a shared 8-item pool, 20% per claim), shown in a Codex gallery. Hard Mode is a
 repeatable, unlimited boss rematch from the Quests screen once a dungeon's boss is dead, at 1.6×
 HP for a scaled reward. Seasonal events and The Arcanum deliberately deferred out of this pass.

@@ -11,6 +11,7 @@ import * as CB from "./cardbacks.js";
 import * as ACHV from "./achievements.js";
 import * as PRESTIGE from "./prestige.js";
 import * as COLLECT from "./collectibles.js";
+import * as EVO from "./evolution.js";
 import { traitForCard } from "./creatures.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
@@ -244,6 +245,27 @@ export function mintCard(s, cardId, roll, opts = {}){
 }
 /** A card instance's value, including its printing and first-edition stamp. */
 export function instanceValue(c){ return VAR.valueOf(c, cardValue(c.id, c.roll)); }
+
+// ---------------------------------------------------------------- card evolution (BACKLOG §5)
+// See evolution.js's own header for the design (tiered creature lines, spend-copies trigger).
+// This function owns the one rule evolution.js deliberately doesn't know about: a GRADED copy is
+// never spent. evolution.js only says whether a step is possible in principle (raw copy count);
+// this checks the save's actual UNGRADED copies before committing to anything.
+export function evolveCard(s, cardId){
+  const cost = EVO.evolveCost(cardId);
+  if (cost == null) return { ok:false, err:"not_evolvable" };
+  const spendable = s.cards.filter(c => c.id === cardId && !c.graded);
+  if (spendable.length < cost) return { ok:false, err:"not_enough_copies", have: spendable.length, need: cost };
+  // Cheapest copies spent first — a player's best roll of a base card survives being spent on
+  // three ordinary ones, the same "don't destroy the thing worth keeping" instinct the graded
+  // exclusion above follows, just for value instead of a stored choice.
+  spendable.sort((a, b) => instanceValue(a) - instanceValue(b));
+  const spend = new Set(spendable.slice(0, cost).map(c => c.uid));
+  s.cards = s.cards.filter(c => !spend.has(c.uid));
+  const nextId = EVO.evolvesInto(cardId);
+  const minted = mintCard(s, nextId, Math.floor(rng() * 101), { luck: 1.2 });
+  return { ok:true, minted, consumed: cost, from: cardId, to: nextId };
+}
 
 let _uid = 0; export function uid(){ return "c" + (Date.now().toString(36)) + (++_uid).toString(36) + Math.floor(rng()*1000); }
 
