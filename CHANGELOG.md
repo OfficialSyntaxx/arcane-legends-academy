@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Polish pass: memory-leak fixes + SFX gaps — 2026-08-12
 
-### Polish pass — *pending*
+### Polish pass — `3b696d4`
 - Asked for a quality pass rather than another feature after §7 shipped.
 - **Real memory leak found and fixed**: `world.js` `setPet` removed the outgoing pet model from
   the scene without disposing its geometry/materials — switching pets a few times would leak
