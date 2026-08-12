@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Weather + Dynamic world events — 2026-08-12
 
-### Weather + Dynamic world events — *pending*
+### Weather + Dynamic world events — `3d6c39c`
 - The last two BACKLOG §3 items, closing out §3 entirely. Both share the "no server, derive from
   wall-clock time" constraint day/night/seasons already established.
 - **Weather** (`weather.js`): a 15-minute window per zone, 30% chance of rain. Purely atmospheric
