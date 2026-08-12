@@ -1237,6 +1237,43 @@ costed out there — stat buff, tiered creature line, cosmetic-only — asked th
 - 569 engine / 42 online / 36 creature-rule / 208/209 browser (the one failure is the pre-existing
   §6.37 VFX flake, unrelated) / `check:models`, all green.
 
+### 6.46 Seasonal events (`seasons.js`, `game.js`, `achievements.js`, `cardbacks.js`, `index.html`, BACKLOG §10)
+The last remaining §10 item, scoped with the user first: this game has no persistent server (see
+§3), so "seasonal" can only ever mean content honestly gated by the **real calendar date** — never
+a server-pushed live event. Landed as **4 real astronomical seasons** (meteorological months —
+Spring Mar-May, Summer Jun-Aug, Autumn Sep-Nov, Winter Dec-Feb — not equinox maths, since a season
+starting on a month boundary is what a player expects), each granting a small gold/xp bonus while
+active plus a one-time-claimable exclusive card back.
+
+- `seasons.js`: `currentSeason(now)` derives the active season from `Date.now()` — same "derive
+  from wall-clock time, not a stored counter" rule the day/night cycle already follows. The
+  bonus/current-season lookup needs no save at all.
+- **The claim is a third deliberate exception to "derive, don't store"** (`pvprank.js`'s rank
+  points are the first, `variants.js`'s printings the second): there is no way to recompute after
+  the fact whether a season's real window was open when a claim happened, so the outcome itself
+  must be the stored fact (`s.seasons.claimed`).
+- **The unlock reuses existing machinery with zero new code paths**: `achievements.js` gained one
+  `season_<id>` achievement per season, `of()` reading the stored claim — the exact same shape
+  `prestige_1..5` already established (an achievement reading arbitrary save state, not just
+  collection/PvP data). `cardbacks.js` needed literally zero changes — a seasonal back's
+  `achievement` field just points at the new id, using the exact same `isUnlocked` function every
+  other back already uses.
+- **A real bug found while wiring this in**: `backEquip` and the Codex's Card Backs gallery had
+  only ever consulted `codex.js`'s collection-scoped achievements, never `achievements.js`'s
+  account-wide ones — meaning `prestige_1..5`-gated backs (had any existed) would have been
+  permanently unreachable through the real UI despite `cardbacks.js`'s own logic being correct.
+  Fixed by unioning both catalogs' done-ids at both call sites, and widened the invariant test that
+  would have caught this at the data level (it only checked ids against `codex.js`) to check both.
+- `academyPerks(s)` gained the season's bonus as a third additive term, the same seam Prestige's
+  own bonus already stacks through — no new call sites needed anywhere gold/xp is paid out.
+- Shown as a small always-visible banner on the Dorm screen — no countdown/urgency chrome, the
+  season simply IS whatever the calendar says.
+- 12 new engine tests (season boundaries incl. December wrapping into the same Winter as January,
+  claim idempotency, the union-path unlock, migration) + 4 real-browser tests (asserted against
+  whatever today's REAL season actually is, not a fixture date — a real DOM claim click).
+- 581 engine / 42 online / 36 creature-rule / 212/213 browser (the one failure is the pre-existing
+  §6.37 VFX flake, unrelated) / `check:models`, all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1369,7 +1406,15 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Card evolution** (§6.45). The last §5 item needing a design decision — asked the
+**Last landed: Seasonal events** (§6.46) — the last BACKLOG §10 item. 4 real astronomical seasons,
+derived from `Date.now()` (no server, so nothing else was honest), each granting a small gold/xp
+bonus while active plus a one-time exclusive card back. Found and fixed a real pre-existing bug
+while wiring the unlock in: `backEquip`/the Codex gallery only ever checked `codex.js`'s
+achievements, never `achievements.js`'s — any account-wide-achievement-gated back (Prestige's,
+had one existed) was unreachable through the real UI. 581 engine / 42 online / 36 creature-rule /
+212/213 browser (1 pre-existing unrelated flake) / `check:models`, all green.
+
+**Before that: Card evolution** (§6.45). The last §5 item needing a design decision — asked the
 user, picked a tiered creature line (Fire Cat → Fire Elf → Fire Dragon, same shape every school)
 using ONLY existing cards, spend-ungraded-copies trigger. Guilds/Multiplayer were discussed and
 correctly left alone — BACKLOG §8 already documents them as blocked on server infrastructure this

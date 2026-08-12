@@ -22,6 +22,7 @@
 import { ZONE_QUESTS } from "./zonequests.js";
 import * as RANK from "./pvprank.js";
 import * as PRESTIGE from "./prestige.js";
+import * as SEASONS from "./seasons.js";
 
 export const DEFAULT_TITLE = "wizard";
 
@@ -68,6 +69,16 @@ export const ACHIEVEMENTS = [
     id: `prestige_${t.level}`, name: t.name, icon: t.icon,
     desc: `Reach ${t.name} (Prestige ${t.level})`, title: t.name,
     of: (s) => ({ have: (s.prestige && s.prestige.level) || 0, need: t.level }),
+  })),
+  // BACKLOG §10 "Seasonal events" — one per season, `of()` reads a STORED claim (`s.seasons`
+  // is one of the few deliberate exceptions to "derive, don't store"; see seasons.js's own header
+  // for why: there is no way to recompute after the fact whether a season's real window was open
+  // when the claim happened). Reaching this achievement unlocks the matching exclusive card back
+  // in cardbacks.js via the existing achievement-gated shape — no new unlock system needed.
+  ...SEASONS.SEASONS.map(sn => ({
+    id: `season_${sn.id}`, name: sn.name, icon: sn.icon,
+    desc: `Claim the ${sn.name} card back during its real-world season`, title: sn.name,
+    of: (s) => ({ have: (s.seasons && s.seasons.claimed || []).includes(sn.id) ? 1 : 0, need: 1 }),
   })),
 ];
 
@@ -141,6 +152,7 @@ export function validateAchievements(){
       pvp: { rankPoints: 99999 },
       reputation: { anyone: 99999 },
       prestige: { level: PRESTIGE.MAX_PRESTIGE },
+      seasons: { claimed: SEASONS.SEASONS.map(sn => sn.id) },
     };
     const p = a.of(maxSave);
     if (!(p.need > 0)) problems.push(`${a.id}: needs a positive target`);

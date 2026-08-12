@@ -42,6 +42,17 @@ export const CARD_BACKS = [
   { id: "scholar",    name: "Full Faculty Robe",    achievement: "scholar",
     css: "conic-gradient(from 0deg,#ff6b35,#5fd6ff,#a06bff,#3ddc84,#ff9ecb,#e8e6f0,#ffc94d,#ff6b35)",
     emblem: "🎓", emblemColor: "#1a1440" },
+  // BACKLOG §10 "Seasonal events" — one per real season, unlocked by the matching season_<id>
+  // achievement in achievements.js (which reads a STORED claim, see seasons.js's own header for
+  // why). This module needs no changes to support them: `achievement` is just another id here.
+  { id: "season_spring", name: "Spring Bloom",    achievement: "season_spring",
+    css: "linear-gradient(160deg,#4a6e3a,#1a2e14)", emblem: "🌸", emblemColor: "#ffb3d9" },
+  { id: "season_summer", name: "Summer Solstice", achievement: "season_summer",
+    css: "linear-gradient(160deg,#6e5a1a,#2e2408)", emblem: "☀️", emblemColor: "#ffe066" },
+  { id: "season_autumn", name: "Autumn Harvest",  achievement: "season_autumn",
+    css: "linear-gradient(160deg,#8a4a1a,#3a1e08)", emblem: "🍂", emblemColor: "#ff9a4d" },
+  { id: "season_winter", name: "Winter's Hush",   achievement: "season_winter",
+    css: "linear-gradient(160deg,#2a4a6e,#0a1a2e)", emblem: "❄️", emblemColor: "#a8d8ff" },
 ];
 export const BACK_MAP = Object.fromEntries(CARD_BACKS.map(b => [b.id, b]));
 

@@ -318,9 +318,9 @@
   reached, mirrors `pvprank.js`'s season pattern (soft reset + honest own-history). Only
   `academyBonus` resets — level/collection value/wins never do. Each tier grants a permanent,
   cumulative perk stacking on top of the curriculum's own, plus an achievement-granted title.
-- [ ] Seasonal events — deferred: this game has no server (BACKLOG/CLAUDEREADME §3), so "seasonal"
-  can only mean content honestly gated by the real calendar date, not a server-pushed live event.
-  Needs the exact mechanic scoped with the user before building.
+- [x] Seasonal events — 4 real astronomical seasons derived from `Date.now()` (no server, so
+  nothing else was honest), each a small gold/xp bonus while active plus a one-time exclusive
+  card back, unlocked via a `season_<id>` achievement reading a stored claim (`seasons.js`).
 - [x] Rare collectibles — an 8-item pool, 20% chance per hidden-treasure-cache claim (treasure-
   sourced, not boss-sourced — see CLAUDEREADME §6.44 for why), shown as a Codex gallery.
 - [x] Endgame dungeon tiers — "Hard Mode": once a dungeon's boss is dead, an unlimited, repeatable
@@ -496,7 +496,14 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Card evolution, is done** (§5). The last item needing a design decision — asked
+**Next step:** **Seasonal events, is done** (§10 — the last item in that section). 4 real
+astronomical seasons derived from wall-clock time, a small stacking gold/xp bonus, a one-time
+exclusive card back per season. Found and fixed a real bug while wiring the unlock in: card-back
+equip only ever checked codex.js's achievements, never achievements.js's account-wide ones. 581
+engine / 42 online / 36 creature-rule / 212/213 browser (1 pre-existing unrelated flake) /
+`check:models`, all green.
+
+Before that: **Card evolution, is done** (§5). The last item needing a design decision — asked
 the user, picked a tiered creature line using only existing cards, spend-ungraded-copies trigger,
 graded copies and rare printings always protected. 569 engine / 42 online / 36 creature-rule /
 208/209 browser (1 pre-existing unrelated flake) / `check:models`, all green.

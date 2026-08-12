@@ -1361,6 +1361,29 @@ if (hasWorld){
         `fire_cat delta=${evo.fireCatDelta} cards delta=${evo.cardsDelta}`);
   check("the Codex reflects the evolution immediately", /Fire Elf/.test(evo.after || ""), (evo.after||"").slice(0,300));
 
+  // --- Seasonal events (BACKLOG §10) ---
+  // currentSeason() is derived from real wall-clock time, so this test asserts against whatever
+  // TODAY's actual season is rather than picking one — the same "don't fight the real calendar"
+  // discipline the day/night cycle's own tests follow.
+  const season = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    document.querySelector('.navbtn[data-screen="home"]').click();
+    await settle(200);
+    const before = document.getElementById("scr_home").innerText;
+    const btn = [...document.querySelectorAll("#scr_home button")].find(b => /Claim/.test(b.textContent));
+    const hasButton = !!btn;
+    if (!btn) return { before, hasButton };
+    btn.click();
+    await settle(250);
+    const after = document.getElementById("scr_home").innerText;
+    const saved = window.__testSave();
+    return { before, hasButton, after, claimed: saved.seasons.claimed.slice() };
+  });
+  check("the Dorm shows the real current season with its bonus", /while this season is active/.test(season.before || ""), (season.before||"").slice(0,200));
+  check("the Claim button is present before the season's back is claimed", season.hasButton === true);
+  check("clicking Claim through the real DOM records the claim", season.claimed && season.claimed.length === 1, JSON.stringify(season.claimed));
+  check("the Dorm shows the claim confirmed, not the button, right after", /Card back claimed/.test(season.after || ""), (season.after||"").slice(0,200));
+
   // --- Endgame dungeon tiers / Hard Mode (BACKLOG §10) ---
   const hard = await page.evaluate(async () => {
     const settle = ms => new Promise(r => setTimeout(r, ms));

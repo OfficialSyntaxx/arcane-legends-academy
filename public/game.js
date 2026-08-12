@@ -12,6 +12,7 @@ import * as ACHV from "./achievements.js";
 import * as PRESTIGE from "./prestige.js";
 import * as COLLECT from "./collectibles.js";
 import * as EVO from "./evolution.js";
+import * as SEASONS from "./seasons.js";
 import { traitForCard } from "./creatures.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
@@ -61,6 +62,7 @@ export function newGame(){
     // level/collection/wins never do.
     prestige:{ level:0, history:[] },
     collectibles:[],   // BACKLOG §10 "Rare collectibles" — ids found, see collectibles.js's own header
+    seasons:{ claimed:[] },   // BACKLOG §10 "Seasonal events" — see seasons.js's own header
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
     // `treasuresFound` (BACKLOG §3 "Hidden areas / treasure") is a flat list of globally-unique
@@ -182,6 +184,8 @@ function migrate(s){
   if (s.prestige.level == null) s.prestige.level = 0;
   if (!Array.isArray(s.prestige.history)) s.prestige.history = [];
   if (!Array.isArray(s.collectibles)) s.collectibles = [];
+  if (!s.seasons || typeof s.seasons !== "object") s.seasons = { claimed: [] };
+  if (!Array.isArray(s.seasons.claimed)) s.seasons.claimed = [];
   if (!s.lessons) s.lessons = { enrolled: [], done: [] };
   if (!Array.isArray(s.lessons.enrolled)) s.lessons.enrolled = [];
   if (!Array.isArray(s.lessons.done)) s.lessons.done = [];
@@ -506,12 +510,16 @@ export function dailyLabel(s){
 // existing save's rank does not shift under it — only what the rank DOES is new.
 export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won + (s.academyBonus||0); }
 export function academyRank(s){ return ACADEMY.yearFor(academyScore(s)).name; }
-// Curriculum perks PLUS any prestige tier's cumulative bonus (BACKLOG §10 "Prestige") — additive,
-// so a prestiged Archmage keeps every perk the curriculum already granted and stacks more on top.
+// Curriculum perks PLUS any prestige tier's cumulative bonus (BACKLOG §10 "Prestige") PLUS the
+// current real season's bonus (BACKLOG §10 "Seasonal events") — additive, all three stack. This is
+// the one seam every gold/xp reward in the game already reads through (quest rewards, class pay,
+// market discount), so a new stacking bonus source only ever needs to land here, not at every call
+// site — same reasoning Prestige's own addition to this function already documented.
 export function academyPerks(s){
   const base = ACADEMY.perksFor(academyScore(s));
   const p = PRESTIGE.perksFor(PRESTIGE.levelOf(s));
-  return { questGold: base.questGold + p.questGold, market: base.market + p.market, xp: base.xp + p.xp };
+  const season = SEASONS.activeBonus();
+  return { questGold: base.questGold + p.questGold + season.gold, market: base.market + p.market, xp: base.xp + p.xp + season.xp };
 }
 // BACKLOG §10 "Archmage progression" / "Prestige" — what academyScore's uncapped growth actually
 // DOES once it clears the curriculum's own top year, so a maxed-out Archmage isn't just a player
@@ -528,6 +536,18 @@ export function doPrestige(s){
   const r = PRESTIGE.prestige(s, academyScore(s));
   if (r.ok) s.academyBonus = 0;   // the one stored input to academyScore this mechanic resets — see prestige.js
   return r;
+}
+// BACKLOG §10 "Seasonal events" — see seasons.js's own header for why this is honest-calendar,
+// not server-pushed. `claimSeason` is the one write path; everything else about a season (which
+// one is active, its bonus) is derived fresh from wall-clock time on every read.
+export function seasonState(s){
+  const cur = SEASONS.currentSeason();
+  return { current: cur, bonus: SEASONS.activeBonus(), claimed: SEASONS.hasClaimed(s, cur.id), canClaim: SEASONS.canClaim(s) };
+}
+export function claimSeason(s){
+  const cur = SEASONS.claim(s);
+  if (!cur) return { ok:false, err:"already_claimed" };
+  return { ok:true, season: cur };
 }
 // Techniques learned in class (lessons.js). Derived from the classes PASSED, never stored, so
 // re-tuning what a class teaches applies to every existing save with no migration.

@@ -14,6 +14,34 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Seasonal events — 2026-08-11
+
+### Seasonal events — *pending*
+- The last remaining BACKLOG §10 item. Scoped with the user first: this game has no persistent
+  server, so "seasonal" can only mean content honestly gated by the real calendar date.
+- `seasons.js`: 4 real astronomical seasons (meteorological months — Spring/Summer/Autumn/Winter),
+  derived from `Date.now()`, same "wall-clock time, not a stored counter" rule the day/night cycle
+  already follows. Each grants a small gold/xp bonus while active, plus a one-time-claimable
+  exclusive card back.
+- The claim (`s.seasons.claimed`) is a third deliberate exception to "derive, don't store" —
+  there's no way to recompute after the fact whether a season's window was open when claimed.
+- The unlock reuses existing machinery with zero new code: one `season_<id>` achievement per
+  season in `achievements.js` (reading the stored claim, same shape Prestige's tier achievements
+  already use), and `cardbacks.js` needed no changes at all.
+- **Found and fixed a real pre-existing bug** while wiring this in: `backEquip` and the Codex's
+  Card Backs gallery only ever consulted `codex.js`'s achievements, never `achievements.js`'s —
+  any account-wide-achievement-gated back was unreachable through the real UI. Fixed by unioning
+  both catalogs at both call sites, and widened the data-level invariant test that should have
+  caught it.
+- `academyPerks(s)` gained the season bonus as a third additive term (curriculum + prestige +
+  season), the same seam every gold/xp reward already reads through.
+- Shown as an always-visible Dorm-screen banner naming the real current season — no
+  countdown/urgency chrome.
+- 12 new engine tests + 4 real-browser tests (asserted against whatever today's actual season is,
+  not a fixture date).
+- *581 engine / 42 online / 36 creature-rule / 212/213 browser (1 pre-existing unrelated VFX
+  flake) / `check:models`, all green.*
+
 ## Card evolution — 2026-08-11
 
 ### Card evolution — `9947407`

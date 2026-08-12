@@ -26,6 +26,7 @@ import * as ACHV from "../public/achievements.js";
 import * as PRESTIGE from "../public/prestige.js";
 import * as COLLECT from "../public/collectibles.js";
 import * as EVO from "../public/evolution.js";
+import * as SEASONS from "../public/seasons.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -3093,9 +3094,12 @@ check("setBack accepts an unlocked back", (()=>{
   const r = CB.setBack(save, "scholar", ["scholar"]);
   return r.ok === true && save.cardBack === "scholar";
 })());
-check("every card back's achievement id (if any) is a real codex achievement", (()=>{
-  const ids = CX.ACHIEVEMENTS.map(a => a.id);
-  return CB.CARD_BACKS.every(b => b.achievement == null || ids.includes(b.achievement));
+check("every card back's achievement id (if any) is a real achievement in one of the two catalogs", (()=>{
+  // A card back can be gated by either codex.js's collection achievements or achievements.js's
+  // account-wide ones (Prestige, seasonal events) — index.html's real backEquip/gallery code
+  // unions both, so this invariant must too.
+  const ids = new Set([...CX.ACHIEVEMENTS.map(a => a.id), ...ACHV.ACHIEVEMENTS.map(a => a.id)]);
+  return CB.CARD_BACKS.every(b => b.achievement == null || ids.has(b.achievement));
 })());
 check("game.js newGame() equips the default card back", G.newGame().cardBack === CB.DEFAULT_BACK);
 check("game.js load() never leaves cardBack unset or pointing at a fake back", (()=>{
@@ -3328,6 +3332,76 @@ check("game.js evolveCard spends the cheapest copies first, keeping the best rol
   G.mintCard(s, "fire_cat", 5);   // 4 copies total, only 3 needed — the worst 3 should be spent
   G.evolveCard(s, "fire_cat");
   return s.cards.some(c => c.uid === best.uid);   // the prismatic 100-roll copy must have survived
+})());
+
+// ---------------------------------------------------------------- seasons.js (BACKLOG §10)
+check("validateSeasons reports no problems", SEASONS.validateSeasons().length === 0);
+check("the four seasons cover all 12 months exactly once", (()=>{
+  const months = new Set();
+  for (const s of SEASONS.SEASONS) for (const m of s.months) months.add(m);
+  return months.size === 12;
+})());
+check("currentSeason picks the right season for a real date in each quarter", (()=>{
+  const at = (y,m,d) => new Date(y,m-1,d).getTime();
+  return SEASONS.currentSeason(at(2026,4,15)).id === "spring"
+      && SEASONS.currentSeason(at(2026,7,15)).id === "summer"
+      && SEASONS.currentSeason(at(2026,10,15)).id === "autumn"
+      && SEASONS.currentSeason(at(2026,1,15)).id === "winter"
+      && SEASONS.currentSeason(at(2026,12,15)).id === "winter";   // December wraps into the same winter as January
+})());
+check("a fresh save has claimed no season", (()=>{
+  const s = G.newGame();
+  return SEASONS.SEASONS.every(sn => !SEASONS.hasClaimed(s, sn.id));
+})());
+check("claim records exactly the current season and is idempotent within that season", (()=>{
+  const s = G.newGame();
+  const now = new Date(2026,3,15).getTime();   // April -> spring
+  const first = SEASONS.claim(s, now);
+  const second = SEASONS.claim(s, now);   // same season again — must be a no-op, not a double-grant
+  return first.id === "spring" && second === null && s.seasons.claimed.length === 1;
+})());
+check("game.js seasonState reports canClaim honestly and claimSeason flips it", (()=>{
+  const s = G.newGame();
+  const before = G.seasonState(s);
+  const r = G.claimSeason(s);
+  const after = G.seasonState(s);
+  return before.canClaim === true && r.ok === true && after.canClaim === false && after.claimed === true;
+})());
+check("game.js claimSeason refuses a second claim of the same season", (()=>{
+  const s = G.newGame();
+  G.claimSeason(s);
+  const r = G.claimSeason(s);
+  return r.ok === false;
+})());
+check("game.js academyPerks includes exactly the active season's gold/xp bonus on top of the curriculum's own", (()=>{
+  const s = G.newGame();   // level 1, prestige 0 — so the only two contributors are curriculum + season
+  const perks = G.academyPerks(s);
+  const base = ACADEMY.perksFor(G.academyScore(s));
+  const season = SEASONS.activeBonus();
+  return perks.questGold === base.questGold + season.gold && perks.xp === base.xp + season.xp;
+})());
+check("game.js newGame() starts with an empty seasons.claimed list", (()=>{
+  const s = G.newGame();
+  return s.seasons && Array.isArray(s.seasons.claimed) && s.seasons.claimed.length === 0;
+})());
+check("game.js load() backfills seasons on an old save missing the field", (()=>{
+  const s = G.newGame();
+  delete s.seasons;
+  G.save(s);
+  const loaded = G.load();
+  return loaded.seasons && Array.isArray(loaded.seasons.claimed);
+})());
+check("every season achievement grants a title equal to the season's own name", (()=>{
+  return SEASONS.SEASONS.every(sn => {
+    const a = ACHV.ACHIEVEMENTS.find(x => x.id === `season_${sn.id}`);
+    return a && a.title === sn.name;
+  });
+})());
+check("reaching a season achievement unlocks its matching card back through the real union path", (()=>{
+  const s = G.newGame();
+  SEASONS.claim(s, new Date(2026,3,15).getTime());   // spring
+  const doneIds = ACHV.achievementsFor(s).filter(a => a.done).map(a => a.id);
+  return CB.isUnlocked("season_spring", doneIds) === true && CB.isUnlocked("season_summer", doneIds) === false;
 })());
 
 // ---------------------------------------------------------------- endgame dungeon tiers (BACKLOG §10)

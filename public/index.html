@@ -413,6 +413,7 @@ import * as CB from "./cardbacks.js";
 import * as ACHV from "./achievements.js";
 import * as COLLECT from "./collectibles.js";
 import * as EVO from "./evolution.js";
+import * as SEASONS from "./seasons.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -1197,12 +1198,35 @@ window.__EV.dormUnplace = (slot)=>{ DORM.unplace(S, slot); save(); render(); };
 window.__EV.dormDisplay = (slot,uid)=>{ const r = DORM.displayIn(S, slot, uid); r.ok ? toast("🏆 On display.") : err(r.err); save(); render(); };
 window.__EV.dormClearCase = (slot)=>{ DORM.clearCase(S, slot); save(); render(); };
 
+// BACKLOG §10 "Seasonal events" — a small always-visible banner naming the real current season,
+// its active gold/xp bonus, and (once, ever, per season id) a claim button for its exclusive card
+// back. No countdown/urgency chrome: the season simply IS whatever the calendar says, honestly.
+function renderSeasonBanner(){
+  const st = G.seasonState(S);
+  const c = st.current;
+  return `<div class="panel" style="margin-bottom:10px;border-color:var(--accent)">
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <div><div style="font-weight:700">${c.icon} ${c.name}</div>
+      <div class="sub">+${st.bonus.gold}% gold · +${st.bonus.xp}% XP while this season is active</div></div>
+      ${st.claimed ? `<span class="sub">✓ Card back claimed</span>`
+        : `<button class="btn sm gold" onclick="window.__ev('claimSeason')">${c.icon} Claim ${c.name} Back</button>`}
+    </div></div>`;
+}
+window.__EV.claimSeason = ()=>{
+  const r = G.claimSeason(S);
+  if (!r.ok) return;   // already claimed this season — the button shouldn't even be showing
+  save();
+  AUDIO.play("levelUp");
+  toast(`${r.season.icon} ${r.season.name} card back claimed!`);
+  render();
+};
 function renderHome(el){
   // The player's name and school look are chosen at creation and never shown anywhere else, so
   // the Dorm header is where they live — and where they can be changed.
   const look = CC.appearanceFor(S);
-  let h = `<h2>${STR.hall_title}</h2>
-    <div class="panel" style="margin-bottom:10px"><div class="row" style="align-items:center">
+  let h = `<h2>${STR.hall_title}</h2>`;
+  h += renderSeasonBanner();
+  h += `<div class="panel" style="margin-bottom:10px"><div class="row" style="align-items:center">
       <div class="grow"><div style="font-weight:800;font-size:17px">${esc(S.name || CC.DEFAULT_NAME)}${ACHV.equippedTitle(S).id===ACHV.DEFAULT_TITLE?"":` <span style="color:var(--accent);font-weight:700;font-size:13px">"${esc(ACHV.equippedTitle(S).name)}"</span>`}</div>
         <div class="sub">${SCHOOL_ICON[S.school]} ${SCHOOLS[S.school].name} · ${look.label}${look.aura==null?"":" · aura"}</div></div>
       <button class="btn sm" onclick="window.__ev('openCharCreate')">✨ Appearance</button>
@@ -1560,8 +1584,12 @@ function buildCodex(){
   }
   h += `</div></div>`;
 
-  // card backs (cardbacks.js) — unlocked by the achievements just above, not a second grind
-  const doneIds = ach.filter(a => a.done).map(a => a.id);
+  // card backs (cardbacks.js) — unlocked by EITHER achievement catalog: the collection
+  // achievements just above (codex.js), or the account-wide ones (achievements.js — Prestige
+  // tiers, seasonal events). The two lists are deliberately independent everywhere else, but a
+  // card back doesn't care which kind of achievement unlocked it.
+  const doneIds = ach.filter(a => a.done).map(a => a.id)
+    .concat(ACHV.achievementsFor(S).filter(a => a.done).map(a => a.id));
   const equipped = CB.equippedBack(S).id;
   h += `<div class="panel" style="margin-top:14px"><h3>🎴 Card Backs</h3><p class="sub">Unlocked by the achievements above. Pick one to show on face-down cards.</p><div class="row" style="flex-wrap:wrap">`;
   for (const b of CB.CARD_BACKS){
@@ -1671,7 +1699,9 @@ window.__EV.cxQuery  = ()=>{
 };
 window.__EV.cxFav = (id)=>{ CX.toggleFavorite(S, id); save(); refreshCodex(); render(); };
 window.__EV.backEquip = (id)=>{
-  const doneIds = CX.achievementsFor(CARDS, S.cards).filter(a=>a.done).map(a=>a.id);
+  // Same union as the Codex gallery above — a card back can be gated by either achievement catalog.
+  const doneIds = CX.achievementsFor(CARDS, S.cards).filter(a=>a.done).map(a=>a.id)
+    .concat(ACHV.achievementsFor(S).filter(a=>a.done).map(a=>a.id));
   const r = CB.setBack(S, id, doneIds);
   if (r.ok){ save(); toast(`${CB.BACK_MAP[id].emblem} ${CB.BACK_MAP[id].name} equipped`); refreshCodex(); }
 };
