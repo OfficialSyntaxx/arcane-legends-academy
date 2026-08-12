@@ -28,6 +28,8 @@ import * as COLLECT from "../public/collectibles.js";
 import * as EVO from "../public/evolution.js";
 import * as SEASONS from "../public/seasons.js";
 import * as COOK from "../public/cooking.js";
+import * as WEATHER from "../public/weather.js";
+import * as WEVT from "../public/worldevents.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -3522,6 +3524,71 @@ check("game.js load() backfills cooking and foodBuff on an old save missing them
   G.save(s);
   const loaded = G.load();
   return loaded.skills.cooking === 1 && loaded.skillXp.cooking === 0 && loaded.foodBuff === null;
+})());
+
+// ---------------------------------------------------------------- Weather (BACKLOG §3)
+check("validateWeather reports no problems", WEATHER.validateWeather().length === 0);
+check("isRaining is false with no zone id", WEATHER.isRaining(null) === false);
+check("isRaining is deterministic for the same zone and time window", (()=>{
+  const now = 1_770_000_000_000;
+  return WEATHER.isRaining("whispering_forest", now) === WEATHER.isRaining("whispering_forest", now);
+})());
+check("isRaining varies by zone at the same moment, given enough zones (not a single global flag)", (()=>{
+  const now = 1_770_000_000_000;
+  const zones = Array.from({length: 12}, (_, i) => `zone_${i}`);
+  const results = new Set(zones.map(z => WEATHER.isRaining(z, now)));
+  return results.size === 2;
+})());
+check("isRaining changes across different time windows for the same zone (over enough samples)", (()=>{
+  const base = 1_770_000_000_000;
+  const seen = new Set();
+  for (let i = 0; i < 20; i++) seen.add(WEATHER.isRaining("academy", base + i * WEATHER.WEATHER_INTERVAL_MS));
+  return seen.size === 2;   // both true and false show up somewhere across 20 real windows
+})());
+
+// ---------------------------------------------------------------- Dynamic world events (BACKLOG §3)
+check("validateWorldEvents reports no problems", WEVT.validateWorldEvents().length === 0);
+check("activeEventFor is null with no zone id or no materials", (()=>{
+  return WEVT.activeEventFor(null, ["copper"]) === null && WEVT.activeEventFor("academy", []) === null;
+})());
+check("activeEventFor only ever picks a material actually in that zone's list", (()=>{
+  const base = 1_770_000_000_000;
+  const mats = ["copper", "tin", "iron"];
+  for (let i = 0; i < 30; i++){
+    const evt = WEVT.activeEventFor("academy", mats, base + i * WEVT.EVENT_INTERVAL_MS);
+    if (evt && !mats.includes(evt.materialId)) return false;
+  }
+  return true;
+})());
+check("activeEventFor is deterministic for the same zone/materials/time", (()=>{
+  const now = 1_770_000_000_000;
+  const mats = ["copper","tin"];
+  const a = WEVT.activeEventFor("academy", mats, now);
+  const b = WEVT.activeEventFor("academy", mats, now);
+  return JSON.stringify(a) === JSON.stringify(b);
+})());
+check("activeEventFor turns on and off across enough real time windows", (()=>{
+  const base = 1_770_000_000_000;
+  const mats = ["copper","tin","iron"];
+  let onCount = 0, offCount = 0;
+  for (let i = 0; i < 30; i++){
+    const evt = WEVT.activeEventFor("academy", mats, base + i * WEVT.EVENT_INTERVAL_MS);
+    evt ? onCount++ : offCount++;
+  }
+  return onCount > 0 && offCount > 0;
+})());
+check("game.js gather() grants a guaranteed bonus unit when eventBonus is true", (()=>{
+  const s = G.newGame();
+  const mat = MATERIALS.find(m => m.id === "copper");
+  const before = s.inventory.copper || 0;
+  const r = G.gather(s, mat, Date.now(), true);
+  return r.ok === true && r.eventBonus === true && (s.inventory.copper - before) >= 2;   // 1 base + 1 guaranteed
+})());
+check("game.js gather() never grants the event bonus when eventBonus is false", (()=>{
+  const s = G.newGame();
+  const mat = MATERIALS.find(m => m.id === "tin");
+  const r = G.gather(s, mat, Date.now(), false);
+  return r.ok === true && r.eventBonus === false;
 })());
 
 // ---------------------------------------------------------------- endgame dungeon tiers (BACKLOG §10)

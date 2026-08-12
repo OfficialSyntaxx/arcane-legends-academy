@@ -115,8 +115,12 @@
 - [x] Day/night cycle — a 20-real-minute cycle derived from wall-clock time (no save field), sun
   fades down/moon fades up, hemisphere light cools, sky/fog/stars darken together; interiors
   exempt; a zone can opt into a fixed time of day via `ZONE.fixedTimeOfDay` (none do yet)
-- [ ] Weather
-- [ ] Dynamic world events
+- [x] Weather — a 15-minute, 30%-chance rain window per zone, derived from wall-clock time
+  (`weather.js`). Purely atmospheric (layers on top of the day/night darkening, no gameplay
+  effect) — deliberately split from Dynamic world events so the two don't overlap.
+- [x] Dynamic world events — a 20-minute, 40%-chance "Bountiful Harvest" window per zone
+  (`worldevents.js`), on one of that zone's own materials. `game.js gather()` grants a guaranteed
+  bonus unit while the event matches; the interaction prompt flags a hosting node before you commit.
 
 ## 4. PvE & Combat
 
@@ -503,7 +507,13 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **§6 Crafting & Economy closed out, is done** — the last four unchecked items. Rune
+**Next step:** **Weather + Dynamic world events, is done** — the last two §3 items, closing out §3
+entirely. Weather is purely atmospheric, derived from wall-clock time, layered onto the existing
+day/night darkening. Dynamic world events gives a guaranteed bonus gather unit during a zone's
+timed "Bountiful Harvest" — the deliberate split so the two features don't overlap mechanically.
+610 engine / 42 online / 36 creature-rule / 219/219 browser (no flake) / `check:models`, all green.
+
+Before that: **§6 Crafting & Economy closed out, is done** — the last four unchecked items. Rune
 crafting turned out to already be shipped as Enchanting (checked off, no new code). Advanced
 Scribing (pay triple materials to choose a school), Expand Alchemy (buff potions), and Cooking (a
 new skill, timed gold/xp buffs eaten outside combat) are all new. §6 has no unchecked items left.

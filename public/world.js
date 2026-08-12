@@ -8,6 +8,7 @@ import { modelUrl, CDN } from "./cdn.js";
 import { tintTree } from "./tint.js";
 import { heightAt, isWater, flatsForZone, groundColorAt, BIOMES } from "./terrain.js";
 import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS, ZONE_MAPS } from "./worldconfig.js";
+import { isRaining } from "./weather.js";
 
 // `zone` is an optional normalised zone config (see worldconfig.js). Omitted, the world falls
 // back to the academy tables in structures.js/nodes.js — the migration state described in
@@ -206,21 +207,60 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     clearDay: new THREE.Color(ZONE.background != null ? ZONE.background : 0x1a1440),
     clearNight: new THREE.Color(0x07050f),
   };
+  // ---- weather (BACKLOG §3) ----
+  // Purely atmospheric — see weather.js's own header for why this never touches gameplay (that's
+  // Dynamic world events' job). Rain adds an extra overcast darkening ON TOP OF whatever the
+  // day/night cycle already computed, so a rainy noon still reads as brighter than a clear night —
+  // the two systems compose rather than one overriding the other.
+  let rainGroup = null, rainPos = null;
+  const RAIN_N = 500, RAIN_RADIUS = 55, RAIN_HEIGHT = 36, RAIN_FALL = 24;
+  if (!INTERIOR){
+    const geo = new THREE.BufferGeometry();
+    rainPos = new Float32Array(RAIN_N * 3);
+    for (let i = 0; i < RAIN_N; i++){
+      rainPos[i*3]   = (Math.random()*2-1) * RAIN_RADIUS;
+      rainPos[i*3+1] = Math.random() * RAIN_HEIGHT;
+      rainPos[i*3+2] = (Math.random()*2-1) * RAIN_RADIUS;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+    rainGroup = new THREE.Points(geo, new THREE.PointsMaterial({
+      color: 0xaad4ff, size: 0.5, transparent: true, opacity: 0.5, sizeAttenuation: true, fog: false, depthWrite: false,
+    }));
+    rainGroup.visible = false; rainGroup.frustumCulled = false; rainGroup.renderOrder = -8;
+    scene.add(rainGroup);
+  }
+  function updateWeather(dt){
+    if (!rainGroup) return;
+    const raining = isRaining(ZONE.id);
+    rainGroup.visible = raining;
+    if (!raining) return;
+    rainGroup.position.set(player.position.x, 0, player.position.z);   // falls around the player
+    for (let i = 1; i < rainPos.length; i += 3){
+      rainPos[i] -= RAIN_FALL * dt;
+      if (rainPos[i] < 0) rainPos[i] = RAIN_HEIGHT;
+    }
+    rainGroup.geometry.attributes.position.needsUpdate = true;
+  }
+
   function updateDayNight(){
     if (INTERIOR) return;   // interiors are lit by their own fixtures, not the sky
     const alt = Math.sin((dayPhase() - 0.25) * Math.PI * 2);   // -1 midnight .. +1 noon
     const dayAmt = Math.max(0, alt), nightAmt = Math.max(0, -alt);
-    if (sun) sun.intensity = sunBase * (0.05 + 0.95 * dayAmt);
+    const raining = isRaining(ZONE.id);
+    const overcast = raining ? 0.35 : 0;                 // extra darkening, stacks with night
+    const visualDark = Math.min(1, nightAmt + overcast);
+    if (sun) sun.intensity = sunBase * (0.05 + 0.95 * dayAmt) * (raining ? 0.6 : 1);
     if (moon) moon.intensity = moonBase * (0.5 + 1.6 * nightAmt);
     if (hemi){
-      hemi.intensity = hemiBase * (0.22 + 0.78 * dayAmt);
-      hemi.color.copy(dayNightColors.domeDay).lerp(dayNightColors.domeNight, nightAmt * 0.6);
+      hemi.intensity = hemiBase * (0.22 + 0.78 * dayAmt) * (raining ? 0.75 : 1);
+      hemi.color.copy(dayNightColors.domeDay).lerp(dayNightColors.domeNight, Math.min(1, nightAmt * 0.6 + overcast * 0.5));
     }
-    if (scene.fog) scene.fog.color.copy(dayNightColors.fogDay).lerp(dayNightColors.fogNight, nightAmt);
-    renderer.setClearColor(dayNightColors.clearDay.clone().lerp(dayNightColors.clearNight, nightAmt));
-    if (skyDome) skyDome.material.color.copy(dayNightColors.domeDay).lerp(dayNightColors.domeNight, nightAmt);
-    if (skyStars) skyStars.material.opacity = 0.1 + 0.65 * nightAmt;
-    if (skySun) skySun.material.opacity = dayAmt;
+    if (scene.fog) scene.fog.color.copy(dayNightColors.fogDay).lerp(dayNightColors.fogNight, visualDark);
+    renderer.setClearColor(dayNightColors.clearDay.clone().lerp(dayNightColors.clearNight, visualDark));
+    if (skyDome) skyDome.material.color.copy(dayNightColors.domeDay).lerp(dayNightColors.domeNight, visualDark);
+    // Stars read as broken behind rainclouds — hide them outright rather than just dimming.
+    if (skyStars) skyStars.material.opacity = raining ? 0 : (0.1 + 0.65 * nightAmt);
+    if (skySun) skySun.material.opacity = raining ? dayAmt * 0.3 : dayAmt;
   }
 
   // ---- sky dome: replaces the flat clear-color void for outdoor zones ----
@@ -1718,6 +1758,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     }
     stepAura(now / 1000);
     updateDayNight();
+    updateWeather(dt);
     if (sun && sun.castShadow){
       // Keep the sun's fixed offset from the player so its shadow frustum always covers the
       // area actually on screen, instead of only the zone origin the light was authored at.
@@ -1782,6 +1823,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       wallCount: (ZONE.obstacles||[]).filter(o=>String(o.id).startsWith("wall:")).length,
       nearbyKind: nearby ? nearby.kind : null,
       nearbyData: nearby ? nearby.data : null,
+      raining: rainGroup ? rainGroup.visible : false,
       nearbyLabel: nearby ? nearby.label : null,
       npcs: (ZONE.npcs||[]).map(n=>({key:n.key, station:n.station, x:n.x, z:n.z})),
       enemies: Object.keys(enemyGroups).length,

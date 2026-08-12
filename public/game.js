@@ -412,14 +412,18 @@ export function gatherCooldownRemaining(s, matId, now = Date.now()){
   return Math.max(0, readyAt - now);
 }
 
-export function gather(s, mat, now = Date.now()){
+export function gather(s, mat, now = Date.now(), eventBonus = false){
   if (!canGather(s, mat)) return { ok:false, err:"level" };
   const remaining = gatherCooldownRemaining(s, mat.id, now);
   if (remaining > 0) return { ok:false, err:"cooldown", remaining };
   // "Husbandry", taught in the field-studies classes: a chance at a second unit. One of the four
   // places a lesson changes an existing system rather than adding a number to a screen.
   const bonus = masteries(s).gatherBonus;
-  const extra = bonus > 0 && rng() * 100 < bonus ? 1 : 0;
+  // BACKLOG §3 "Dynamic world events" — a live "Bountiful Harvest" on this exact material (decided
+  // by worldevents.js from wall-clock time + zone, the caller's job to check) is a GUARANTEED extra
+  // unit, not a chance — the event is meant to be worth detouring for. Reuses the same `extra`
+  // field Husbandry already adds rather than a second bonus-quantity system.
+  const extra = (bonus > 0 && rng() * 100 < bonus ? 1 : 0) + (eventBonus ? 1 : 0);
   addItem(s, mat.id, 1 + extra); addSkillXp(s, mat.skill, mat.xp);
   dailyProgress(s, "gather");
   if (!s.gatherCooldowns) s.gatherCooldowns = {};
@@ -429,7 +433,7 @@ export function gather(s, mat, now = Date.now()){
   // never costs the player the material they came for.
   const pristine = rng() * 100 < PRISTINE_CHANCE;
   if (pristine) addItem(s, pristineIdFor(mat.id), 1);
-  return { ok:true, item:mat, xp:mat.xp, extra, pristine };
+  return { ok:true, item:mat, xp:mat.xp, extra, pristine, eventBonus };
 }
 export function canCraft(s, spec){ return skillLevel(s,"smithing") >= spec.lvl && hasItems(s, spec.req); }
 export function smelt(s, bar){

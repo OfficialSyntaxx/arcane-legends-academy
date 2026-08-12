@@ -14,6 +14,24 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Weather + Dynamic world events — 2026-08-12
+
+### Weather + Dynamic world events — *pending*
+- The last two BACKLOG §3 items, closing out §3 entirely. Both share the "no server, derive from
+  wall-clock time" constraint day/night/seasons already established.
+- **Weather** (`weather.js`): a 15-minute window per zone, 30% chance of rain. Purely atmospheric
+  by design — no gameplay effect, so it can't double up on Dynamic world events' mechanic. Layers
+  on top of the day/night cycle's own darkening rather than overriding it. A `THREE.Points` rain
+  volume falls around the player; stars hide outright behind rainclouds.
+- **Dynamic world events** (`worldevents.js`): a 20-minute window per zone, 40% chance of a
+  "Bountiful Harvest" on one of that zone's own gatherable materials. `game.js gather()` gained a
+  guaranteed bonus unit when the live event matches — same `extra` field a lesson mastery already
+  uses. The interaction prompt flags a hosting node before a player commits.
+- Verified visually: a real Playwright screenshot at a `Date.now()` scanned forward to an actual
+  rain window shows the particles and darker sky rendering.
+- 12 new engine tests. *610 engine / 42 online / 36 creature-rule / 219/219 browser (no flake) /
+  `check:models`, all green.*
+
 ## §6 Crafting & Economy closed out — 2026-08-11
 
 ### §6 Crafting & Economy closed out — `1ab1f59`

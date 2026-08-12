@@ -1301,6 +1301,38 @@ Closed out the last four unchecked §6 items in one pass, scoped with the user f
 - 598 engine / 42 online / 36 creature-rule / 218/219 browser (the one failure is the pre-existing
   §6.37 VFX flake, unrelated) / `check:models`, all green.
 
+### 6.48 Weather + Dynamic world events (`weather.js`, `worldevents.js`, `world.js`, `game.js`, `index.html`, BACKLOG §3)
+The last two §3 items. Both share the "no server, so derive it from wall-clock time" constraint
+day/night/seasons already established — a new small hash function (`hash01`, duplicated in both
+modules on purpose, each staying a standalone unit) turns `(zone id, time window)` into a
+deterministic pseudo-random value every client agrees on with nothing to synchronise.
+
+- **Weather** (`weather.js`): a 15-minute window per zone, 30% chance of rain. Deliberately
+  **purely atmospheric** — no gameplay effect, so it can't double up on Dynamic world events'
+  mechanic. Rain layers ON TOP OF the day/night cycle's own darkening (`updateDayNight` now
+  composes `nightAmt` with an `overcast` term) rather than overriding it, so a rainy noon still
+  reads brighter than a clear night. A `THREE.Points` rain volume (same technique the sky dome's
+  star field already uses) falls around the player and recycles when it passes the ground; stars
+  hide outright behind rainclouds rather than just dimming (dimmed stars behind rain read as
+  broken, not atmospheric).
+- **Dynamic world events** (`worldevents.js`) — DOES touch gameplay, the deliberate split from
+  Weather: a 20-minute window per zone (matching day/night's own cadence), 40% chance of a
+  "Bountiful Harvest" on one of that zone's own gatherable materials (never a material that isn't
+  actually there). `game.js gather()` gained a 4th param, `eventBonus` — a GUARANTEED extra unit
+  when the live event matches the material being gathered, reusing the exact `extra` field
+  "Husbandry" (a lesson mastery) already adds, rather than a second bonus-quantity system. The
+  caller (`index.html`) checks the event fresh on every gather rather than caching it, since a
+  20-minute window can turn over mid-visit. The interaction prompt itself flags a hosting node
+  (`✨ Bountiful!`) before a player commits to gathering it.
+- Verified visually: a Playwright screenshot with `Date.now()` scanned forward to a real rain
+  window (test-only, not shipped) shows the rain particles and the darker sky actually rendering,
+  not just the maths on paper.
+- 12 new engine tests (determinism, zone/material honesty, the guaranteed-bonus gather path) — no
+  new UI test coverage needed since neither feature adds a dedicated screen (the event flare and
+  rain are read off existing gather/render paths already covered).
+- 610 engine / 42 online / 36 creature-rule / 219/219 browser (no flake this run) / `check:models`,
+  all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1433,7 +1465,15 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: §6 Crafting & Economy closed out** (§6.47) — the last four unchecked items: Rune
+**Last landed: Weather + Dynamic world events** (§6.48) — the last two §3 items, closing out §3
+entirely. Both derived from wall-clock time (no server): Weather is purely atmospheric (rain,
+darker sky, layers on top of day/night rather than overriding it), Dynamic world events DOES touch
+gameplay (a guaranteed bonus gather unit during a zone's live "Bountiful Harvest" window) —
+deliberately split so the two don't double up on the same mechanic. Verified with a real
+Playwright screenshot at a scanned-forward rain window. 610 engine / 42 online / 36 creature-rule
+/ 219/219 browser (no flake) / `check:models`, all green.
+
+**Before that: §6 Crafting & Economy closed out** (§6.47) — the last four unchecked items: Rune
 crafting turned out to already be shipped (Enchanting, under a different name — checked off with
 no new code), Advanced Scribing lets a player pay triple materials to guarantee a school, Expand
 Alchemy added buff potions (temporary atkBonus/defBonus), and Cooking is a whole new skill —
