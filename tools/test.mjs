@@ -27,6 +27,7 @@ import * as PRESTIGE from "../public/prestige.js";
 import * as COLLECT from "../public/collectibles.js";
 import * as EVO from "../public/evolution.js";
 import * as SEASONS from "../public/seasons.js";
+import * as COOK from "../public/cooking.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -1308,7 +1309,8 @@ check("cannot drink on the opponent's turn", (()=>{
   b4p.turn = "enemy";
   return G.usePotion(s4p, b4p, b4p.you, "potion_small").err === "turn";
 })());
-check("every brewable potion actually heals", POTIONS.every(p => p.heal > 0));
+check("every brewable potion either heals or grants a real buff (BACKLOG §6 'Expand Alchemy')",
+      POTIONS.every(p => p.heal > 0 || (p.buff && Object.values(p.buff).some(n => n > 0))));
 
 // ---- 9. home ----
 const s6 = G.newGame();
@@ -3402,6 +3404,124 @@ check("reaching a season achievement unlocks its matching card back through the 
   SEASONS.claim(s, new Date(2026,3,15).getTime());   // spring
   const doneIds = ACHV.achievementsFor(s).filter(a => a.done).map(a => a.id);
   return CB.isUnlocked("season_spring", doneIds) === true && CB.isUnlocked("season_summer", doneIds) === false;
+})());
+
+// ---------------------------------------------------------------- Advanced Scribing (BACKLOG §6)
+check("scribeAdvanced refuses below the scribing level gate, materials untouched", (()=>{
+  const s = G.newGame();
+  s.inventory.canvas = 10; s.inventory.ink = 10; s.inventory.reagent = 10;
+  const before = { c: s.inventory.canvas, i: s.inventory.ink, r: s.inventory.reagent };
+  const r = G.scribeAdvanced(s, "fire");
+  return r.ok === false && r.err === "level"
+      && s.inventory.canvas === before.c && s.inventory.ink === before.i && s.inventory.reagent === before.r;
+})());
+check("scribeAdvanced refuses an unknown school", (()=>{
+  const s = G.newGame();
+  s.skills.scribing = G.ADVANCED_SCRIBE_LVL;
+  s.inventory.canvas = 10; s.inventory.ink = 10; s.inventory.reagent = 10;
+  return G.scribeAdvanced(s, "not_a_school").ok === false;
+})());
+check("scribeAdvanced refuses below the triple-material cost", (()=>{
+  const s = G.newGame();
+  s.skills.scribing = G.ADVANCED_SCRIBE_LVL;
+  s.inventory.canvas = 2; s.inventory.ink = 2; s.inventory.reagent = 2;   // one short of ADVANCED_SCRIBE_COST
+  return G.scribeAdvanced(s, "fire").ok === false && G.scribeAdvanced(s, "fire").err === "materials";
+})());
+check("scribeAdvanced spends exactly the triple cost and mints a card of the chosen school", (()=>{
+  const s = G.newGame();
+  s.skills.scribing = G.ADVANCED_SCRIBE_LVL;
+  s.inventory.canvas = 5; s.inventory.ink = 5; s.inventory.reagent = 5;
+  const r = G.scribeAdvanced(s, "ice");
+  return r.ok === true && CARD_MAP[r.inst.id].school === "ice"
+      && s.inventory.canvas === 5 - G.ADVANCED_SCRIBE_COST
+      && s.inventory.ink === 5 - G.ADVANCED_SCRIBE_COST
+      && s.inventory.reagent === 5 - G.ADVANCED_SCRIBE_COST;
+})());
+check("scribeAdvanced honours the school across every real school id", (()=>{
+  const s = G.newGame();
+  s.skills.scribing = G.ADVANCED_SCRIBE_LVL;
+  return Object.keys(SCHOOLS).every(sc => {
+    s.inventory.canvas = 5; s.inventory.ink = 5; s.inventory.reagent = 5;
+    const r = G.scribeAdvanced(s, sc);
+    return r.ok && CARD_MAP[r.inst.id].school === sc;
+  });
+})());
+
+// ---------------------------------------------------------------- Expand Alchemy: buff potions (BACKLOG §6)
+check("a buff potion applies its stat bonus to the drinker for the rest of the duel", (()=>{
+  const s = G.newGame();
+  s.inventory.potion_focus = 1;
+  const b = G.startDuel(s.deck, G.equipStats(s), s.deck, {atk:0,def:0,hp:0,pip:0}, 100, s.school, "balance");
+  const before = b.you.atkBonus || 0;
+  const r = G.usePotion(s, b, b.you, "potion_focus");
+  return r.ok === true && r.buff && (b.you.atkBonus || 0) === before + 3;
+})());
+check("a buff potion still costs a pip and is once-per-turn, same as a healing potion", (()=>{
+  const s = G.newGame();
+  s.inventory.potion_focus = 2;
+  const b = G.startDuel(s.deck, G.equipStats(s), s.deck, {atk:0,def:0,hp:0,pip:0}, 100, s.school, "balance");
+  const pipsBefore = b.you.pips;
+  G.usePotion(s, b, b.you, "potion_focus");
+  const second = G.usePotion(s, b, b.you, "potion_focus");
+  return b.you.pips === pipsBefore - 1 && second.ok === false && second.err === "used";
+})());
+
+// ---------------------------------------------------------------- Cooking (BACKLOG §6)
+check("validateFoods reports no problems", COOK.validateFoods().length === 0);
+check("foodBuffActive is null before anything is eaten", COOK.foodBuffActive(G.newGame()) === null);
+check("cook refuses below the level gate and leaves the inventory untouched", (()=>{
+  const s = G.newGame();
+  s.inventory.raw_lobster = 5; s.inventory.willow_log = 5;
+  const before = { l: s.inventory.raw_lobster, w: s.inventory.willow_log };
+  const r = G.cook(s, COOK.FOOD_MAP.food_roast);   // needs cooking 40, fresh save is level 1
+  return r.ok === false && s.inventory.raw_lobster === before.l && s.inventory.willow_log === before.w;
+})());
+check("cook spends the recipe and mints the food item", (()=>{
+  const s = G.newGame();
+  s.inventory.raw_shrimp = 3; s.inventory.oak_log = 3;
+  const r = G.cook(s, COOK.FOOD_MAP.food_stew);
+  return r.ok === true && s.inventory.raw_shrimp === 2 && s.inventory.oak_log === 2 && s.inventory.food_stew === 1;
+})());
+check("eatFood refuses with none held", (()=>{
+  const s = G.newGame();
+  return G.eatFood(s, "food_stew").ok === false;
+})());
+check("eatFood starts a real, expiring buff", (()=>{
+  const s = G.newGame();
+  s.inventory.food_stew = 1;
+  const before = COOK.foodBuffActive(s);
+  const r = G.eatFood(s, "food_stew");
+  const now = COOK.foodBuffActive(s, Date.now());
+  const later = COOK.foodBuffActive(s, Date.now() + 11 * 60000);   // stew lasts 10 minutes
+  return before === null && r.ok === true && s.inventory.food_stew === 0
+      && now && now.gold === 5 && now.xp === 5 && later === null;
+})());
+check("eating a second meal overwrites the first rather than stacking", (()=>{
+  const s = G.newGame();
+  s.inventory.food_stew = 1; s.inventory.food_pie = 1;
+  G.eatFood(s, "food_stew");
+  G.eatFood(s, "food_pie");
+  const active = COOK.foodBuffActive(s);
+  return active && active.food.id === "food_pie" && active.gold === 8;
+})());
+check("game.js academyPerks includes an active food buff on top of everything else", (()=>{
+  const s = G.newGame();
+  const before = G.academyPerks(s);
+  s.inventory.food_stew = 1;
+  G.eatFood(s, "food_stew");
+  const after = G.academyPerks(s);
+  return after.questGold === before.questGold + 5 && after.xp === before.xp + 5;
+})());
+check("game.js newGame() starts with cooking level 1 and no active food buff", (()=>{
+  const s = G.newGame();
+  return s.skills.cooking === 1 && s.skillXp.cooking === 0 && s.foodBuff === null;
+})());
+check("game.js load() backfills cooking and foodBuff on an old save missing them", (()=>{
+  const s = G.newGame();
+  delete s.skills.cooking; delete s.skillXp.cooking; delete s.foodBuff;
+  G.save(s);
+  const loaded = G.load();
+  return loaded.skills.cooking === 1 && loaded.skillXp.cooking === 0 && loaded.foodBuff === null;
 })());
 
 // ---------------------------------------------------------------- endgame dungeon tiers (BACKLOG §10)

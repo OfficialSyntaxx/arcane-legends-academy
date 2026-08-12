@@ -201,16 +201,23 @@
 
 ## 6. Crafting & Economy
 
-- [ ] Expand Alchemy
+- [x] Expand Alchemy — two buff potions (Draught of Focus/Warding) alongside the existing healing
+  ones: same drink shape (1 pip, once per turn) but apply a flat, for-the-rest-of-the-duel bonus
+  to `atkBonus`/`defBonus` — fields gear and boss-phase escalation already mutate.
 - [x] Enchanting — a new Enchanting skill + `items.js` `ENCHANTS` (3 stats × 3 tiers), applied to
   ONE specific owned equipment instance (`eq.enchant`) via the Loadout screen's picker. Deliberately
   reuses bars already smelted via Smithing rather than inventing a new resource chain — an enchant
   is a metal thing done to a metal item. One enchant per item; re-enchanting overwrites at full
   cost, never stacks. `equipStats` folds the bonus in before the Armory home-upgrade multiplier,
   so a %-gear-stats bonus honestly covers enchants too
-- [ ] Rune crafting
-- [ ] Cooking
-- [ ] Advanced Scribing
+- [x] Rune crafting — already shipped as Enchanting above, under a different name (Whetting/
+  Warding/Vital Rune, tiered, crafted from smelted bars). No new code needed.
+- [x] Cooking — a new skill (`cooking.js`): meals eaten OUTSIDE a duel for a timed gold/xp buff,
+  deliberately distinct from Alchemy's in-duel potions. The active buff (`s.foodBuff`, an id + a
+  real expiry timestamp) stacks additively into `academyPerks` alongside curriculum/prestige/season.
+- [x] Advanced Scribing — spend triple canvas/ink/reagent (`game.js` `scribeAdvanced`, gated behind
+  Scribing 25) to guarantee which school a scribe mints — the rarity roll stays exactly as random
+  as a normal scribe, so this is control, not a strictly-better version of the base recipe.
 - [x] Resource node regeneration — a real, persisted, level-scaled cooldown per MATERIAL
   (`s.gatherCooldowns`, `game.js` `gather`/`gatherCooldownRemaining`), not per node instance (the
   outdoor zones' scattered nodes have no stable per-instance id chunk streaming preserves); one
@@ -496,7 +503,14 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Seasonal events, is done** (§10 — the last item in that section). 4 real
+**Next step:** **§6 Crafting & Economy closed out, is done** — the last four unchecked items. Rune
+crafting turned out to already be shipped as Enchanting (checked off, no new code). Advanced
+Scribing (pay triple materials to choose a school), Expand Alchemy (buff potions), and Cooking (a
+new skill, timed gold/xp buffs eaten outside combat) are all new. §6 has no unchecked items left.
+598 engine / 42 online / 36 creature-rule / 218/219 browser (1 pre-existing unrelated flake) /
+`check:models`, all green.
+
+Before that: **Seasonal events, is done** (§10 — the last item in that section). 4 real
 astronomical seasons derived from wall-clock time, a small stacking gold/xp bonus, a one-time
 exclusive card back per season. Found and fixed a real bug while wiring the unlock in: card-back
 equip only ever checked codex.js's achievements, never achievements.js's account-wide ones. 581

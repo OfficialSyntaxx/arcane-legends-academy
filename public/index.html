@@ -390,6 +390,7 @@ body.has-touch .worldbtn{display:flex;}
 import { STR } from "./strings.js";
 import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, gradeFee } from "./cards.js";
 import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats, pristineVariantFor } from "./items.js";
+import { FOODS } from "./cooking.js";
 import * as G from "./game.js";
 import { createWorld } from "./world.js";
 import { createAudio, SFX, audioModeForZone } from "./audio.js";
@@ -721,7 +722,7 @@ function buildForge(){
     h += `<div class="panel" style="flex:1;min-width:150px"><div style="font-weight:700">${e.icon} ${e.name}</div><div class="sub">Smelting ${e.lvl} · ${e.bars}× ${e.name.split(" ")[0]} bar</div><div class="sub" style="color:var(--gold)">${equipStatsLabel(e)}</div><button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('forge|${e.id}')">Forge</button></div>`;
   }
   h += `</div><h3>⚗️ Brew potions</h3><div class="row">`;
-  for (const p of POTIONS){ const ok = G.skillLevel(S,"alchemy") >= p.lvl && G.hasItems(S,p.req); const req = Object.entries(p.req).map(([id,n])=>`${fname(id)}×${n}`).join(" + "); h += `<div class="panel" style="flex:1;min-width:150px"><div style="font-weight:700">${p.icon} ${p.name}</div><div class="sub">Alchemy ${p.lvl} · heals ${p.heal}</div><div class="sub">${req}</div><button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('brew|${p.id}')">Brew</button></div>`; }
+  for (const p of POTIONS){ const ok = G.skillLevel(S,"alchemy") >= p.lvl && G.hasItems(S,p.req); const req = Object.entries(p.req).map(([id,n])=>`${fname(id)}×${n}`).join(" + "); h += `<div class="panel" style="flex:1;min-width:150px"><div style="font-weight:700">${p.icon} ${p.name}</div><div class="sub">Alchemy ${p.lvl} · ${potionEffectLabel(p)}</div><div class="sub">${req}</div><button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('brew|${p.id}')">Brew</button></div>`; }
   h += `</div>`;
   return h;
 }
@@ -1407,14 +1408,15 @@ function renderSkills(el){
     }
   }
   h += `</div>`;
-  // alchemy
+  // alchemy — heal potions and, since "Expand Alchemy" (BACKLOG §6), buff potions (a temporary
+  // atkBonus/defBonus for the rest of a duel). potionEffectLabel() covers both shapes.
   h += `<h3>⚗️ Brew potions</h3><div class="row">`;
   for (const p of POTIONS){
     const ok = G.skillLevel(S,"alchemy") >= p.lvl && G.hasItems(S,p.req);
     const req = Object.entries(p.req).map(([id,n])=>`${fname(id)}×${n}`).join(" + ");
     h += `<div class="panel" style="flex:1;min-width:150px">
       <div style="font-weight:700">${p.icon} ${p.name}</div>
-      <div class="sub">Alchemy ${p.lvl} · heals ${p.heal} in duels</div>
+      <div class="sub">Alchemy ${p.lvl} · ${potionEffectLabel(p)}</div>
       <div class="sub">${req}</div>
       <button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('brew|${p.id}')">Brew</button></div>`;
   }
@@ -1442,6 +1444,45 @@ function renderSkills(el){
   h += `<div class="panel"><div style="font-weight:700">🪶 Scribe a Spell Card</div>
     <div class="sub">Spend 1 🖼️ Canvas + 1 🖋️ Ink + 1 🧪 Reagent to create a random card (grade 1-10). Grades 9-10 become slabs with a serial number.</div>
     <button class="btn gold ${canScribe?"":"disabled"}" ${canScribe?"":"disabled"} onclick="window.__ev('scribe')">Scribe · 🖼️${S.inventory.canvas||0} 🖋️${S.inventory.ink||0} 🧪${S.inventory.reagent||0}</button></div>`;
+  // Advanced Scribing (BACKLOG §6) — spend triple materials to choose the school instead of
+  // leaving it to chance. Gated behind a scribing level, same as the game's other "advanced"
+  // recipes.
+  const advReady = G.canScribeAdvanced(S);
+  const advCanAfford = (S.inventory.canvas||0) >= G.ADVANCED_SCRIBE_COST && (S.inventory.ink||0) >= G.ADVANCED_SCRIBE_COST && (S.inventory.reagent||0) >= G.ADVANCED_SCRIBE_COST;
+  h += `<div class="panel" style="margin-top:8px"><div style="font-weight:700">🪶✨ Advanced Scribing</div>
+    <div class="sub">${advReady ? `Spend ${G.ADVANCED_SCRIBE_COST}× Canvas/Ink/Reagent to guarantee a specific school (rarity still rolls the same odds as a normal scribe).` : `Requires Scribing ${G.ADVANCED_SCRIBE_LVL} (currently ${G.skillLevel(S,"scribing")}).`}</div>`;
+  if (advReady){
+    h += `<div class="row" style="flex-wrap:wrap;gap:5px;margin-top:6px">`;
+    for (const sc of Object.keys(SCHOOLS)){
+      h += `<button class="btn sm ${advCanAfford?"gold":""}" ${advCanAfford?"":"disabled"} onclick="window.__ev('scribeAdvanced|${sc}')">${SCHOOL_ICON[sc]||"◇"} ${SCHOOLS[sc].name}</button>`;
+    }
+    h += `</div>`;
+  }
+  h += `</div>`;
+  // cooking (BACKLOG §6) — distinct from Alchemy: eaten outside a duel for a timed gold/xp buff.
+  const foodSt = G.foodState(S);
+  h += `<h3>🍳 Cook meals</h3>`;
+  if (foodSt.active){
+    const mins = Math.ceil(foodSt.remainingMs / 60000);
+    h += `<p class="sub">${foodSt.active.food.icon} ${foodSt.active.food.name} active: +${foodSt.active.gold}% gold, +${foodSt.active.xp}% xp for ${mins} more minute${mins===1?"":"s"}.</p>`;
+  } else {
+    h += `<p class="sub">No meal active. Cook, then eat one for a timed gold/xp buff — outside combat, distinct from Alchemy's in-duel potions.</p>`;
+  }
+  h += `<div class="row">`;
+  for (const f of FOODS){
+    const ok = G.skillLevel(S,"cooking") >= f.lvl && G.hasItems(S,f.req);
+    const req = Object.entries(f.req).map(([id,n])=>`${fname(id)}×${n}`).join(" + ");
+    const have = S.inventory[f.id]||0;
+    h += `<div class="panel" style="flex:1;min-width:160px">
+      <div style="font-weight:700">${f.icon} ${f.name} <span style="color:var(--gold)">×${have}</span></div>
+      <div class="sub">Cooking ${f.lvl} · +${f.buff.gold}% gold, +${f.buff.xp}% xp for ${f.minutes}m</div>
+      <div class="sub">${req}</div>
+      <div class="row" style="gap:4px">
+        <button class="btn sm ${ok?"ok":""}" ${ok?"":"disabled"} onclick="window.__ev('cook|${f.id}')">Cook</button>
+        <button class="btn sm ${have?"gold":""}" ${have?"":"disabled"} onclick="window.__ev('eatFood|${f.id}')">Eat</button>
+      </div></div>`;
+  }
+  h += `</div>`;
   el.innerHTML = h;
 }
 function fname(id){ const m=MATERIALS.find(x=>x.id===id); return m?m.name:id; }
@@ -1468,6 +1509,30 @@ function gatherToast(m, r){
 window.__EV.smelt = (id)=>{ const b=BARS.find(x=>x.id===id); const r=G.smelt(S,b); r.ok?toast(`+${b.icon} ${b.name}`):err(LTL); render(); };
 window.__EV.forge = (id)=>{ const e=equipmentFor(id.split("_")[0],id.split("_")[1]); const r=G.forge(S,e); r.ok?toast(`⚒️ Forged ${e.name}!`):err(r.err==="resources"?"Not enough bars":LTL); render(); };
 window.__EV.brew = (id)=>{ const p=POTIONS.find(x=>x.id===id); const r=G.brew(S,p); r.ok?toast(`+${p.icon} ${p.name}`):err(r.err==="resources"?"Not enough fish":LTL); render(); };
+// BACKLOG §6 "Expand Alchemy" — a potion's effect label, heal or buff, for every panel that lists
+// POTIONS (Skills screen, the Alchemy Lab overlay).
+function potionEffectLabel(p){
+  if (p.heal) return `heals ${p.heal} in duels`;
+  if (p.buff) return Object.entries(p.buff).map(([k,n]) => `+${n} ${k==="atkBonus"?"Attack":k==="defBonus"?"Defense":k} for the duel`).join(", ");
+  return "";
+}
+window.__EV.scribeAdvanced = (school)=>{
+  const r = G.scribeAdvanced(S, school);
+  if (!r.ok){ err(r.err==="level" ? `Requires Scribing ${G.ADVANCED_SCRIBE_LVL}` : `Need ${G.ADVANCED_SCRIBE_COST}× canvas/ink/reagent`); return; }
+  const g = gradeForRoll(r.inst.roll);
+  if (g.slab){ toast(`🪶✨ Scribed a ${g.icon} ${g.name} ${SCHOOLS[school].name} SLAB #${r.inst.serial}!`); sfx(700,.2); sfx(900,.25); }
+  else { toast(`🪶✨ Scribed ${CARD_MAP[r.inst.id].name} (${g.name})`); sfx(500,.12); }
+  render();
+};
+window.__EV.cook = (id)=>{ const f=FOODS.find(x=>x.id===id); const r=G.cook(S,f); r.ok?toast(`${f.icon} Cooked ${f.name}!`):err(r.err==="resources"?"Not enough materials":LTL); render(); };
+window.__EV.eatFood = (id)=>{
+  const r = G.eatFood(S, id);
+  if (!r.ok) return;
+  save();
+  AUDIO.play("heal");
+  toast(`${r.food.icon} ${r.food.name}: +${r.food.buff.gold}% gold, +${r.food.buff.xp}% xp for ${r.food.minutes}m`);
+  render();
+};
 window.__EV.refine = (cm,fid)=>{ const r=G.refine(S,cm,fid); r.ok?toast("Refined card material!"):err("No materials"); sfx(400,.05); render(); };
 window.__EV.scribe = ()=>{
   const r=G.scribe(S);
@@ -2238,7 +2303,8 @@ function renderDuel(el){
     h += `<div class="row" style="justify-content:center;flex-wrap:wrap;gap:6px">`;
     for (const p of potions){
       const usable = myTurn && !over.over && !you.potionUsed && you.pips >= 1;
-      h += `<button class="btn ${usable?"ok":""}" ${usable?"":"disabled"} onclick="window.__ev('drink|${p.id}')">${p.icon} ${p.name.replace(" Healing Potion","")} +${p.heal} ×${p.count}</button>`;
+      const potShort = p.heal ? `+${p.heal}` : Object.entries(p.buff).map(([k,n]) => `+${n} ${k==="atkBonus"?"Atk":"Def"}`).join(" ");
+      h += `<button class="btn ${usable?"ok":""}" ${usable?"":"disabled"} onclick="window.__ev('drink|${p.id}')">${p.icon} ${p.name.replace(" Healing Potion","")} ${potShort} ×${p.count}</button>`;
     }
     h += `</div>`;
     if (you.potionUsed) h += `<div style="text-align:center;font-size:11px;color:var(--muted)">${STR.potion_used}</div>`;

@@ -7,6 +7,7 @@ export const SKILLS = {
   alchemy: { name:"Alchemy", icon:"⚗️" },
   scribing: { name:"Scribing", icon:"🪶" },
   enchanting: { name:"Enchanting", icon:"🔮" },
+  cooking: { name:"Cooking", icon:"🍳" },
 };
 
 // Gatherable materials: [id, name, icon, skill, level, xp, value]
@@ -65,6 +66,13 @@ export const POTIONS = [
   { id:"potion_medium", name:"Healing Potion", icon:"🧪", lvl:20, xp:45, heal:35, value:40, req:{raw_salmon:1} },
   { id:"potion_large", name:"Great Healing Potion", icon:"🧪", lvl:40, xp:80, heal:60, value:80, req:{raw_lobster:1} },
   { id:"potion_great", name:"Master Healing Potion", icon:"🧪", lvl:65, xp:130, heal:100, value:160, req:{raw_shark:1} },
+  // BACKLOG §6 "Expand Alchemy" — buff potions, drunk the same way (1 pip, once per turn) as a
+  // healing potion, but apply a flat bonus to `atkBonus`/`defBonus` for the rest of the duel
+  // instead of restoring HP. Those two fields already exist on every duel participant (gear sets
+  // them at duel start, a boss phase escalation already mutates them mid-duel) — a buff potion is
+  // just a third, player-triggered way to move the same numbers, not a new stat-tracking system.
+  { id:"potion_focus", name:"Draught of Focus",   icon:"🎯", lvl:30, xp:60, buff:{atkBonus:3}, value:70, req:{raw_salmon:1, copper:1} },
+  { id:"potion_ward",  name:"Draught of Warding", icon:"🛡️", lvl:30, xp:60, buff:{defBonus:3}, value:70, req:{raw_salmon:1, tin:1} },
 ];
 
 // Metal tiers: stats scale with tier. tier: bronze=1, iron=2, gold=3, mithril=4, rune=5

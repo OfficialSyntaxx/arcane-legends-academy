@@ -1384,6 +1384,51 @@ if (hasWorld){
   check("clicking Claim through the real DOM records the claim", season.claimed && season.claimed.length === 1, JSON.stringify(season.claimed));
   check("the Dorm shows the claim confirmed, not the button, right after", /Card back claimed/.test(season.after || ""), (season.after||"").slice(0,200));
 
+  // --- Advanced Scribing, Expand Alchemy, Cooking (BACKLOG §6) ---
+  const crafting = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const s = window.__testSave();
+    document.querySelector('.navbtn[data-screen="skills"]').click();
+    await settle(200);
+    const beforeLevel = document.getElementById("scr_skills").innerText;
+    // Advanced Scribing: below the level gate, the school buttons must not even render.
+    const hasAdvBefore = /Advanced Scribing/.test(beforeLevel) && new RegExp(`window\\.__ev\\('scribeAdvanced\\|fire'\\)`).test(document.getElementById("scr_skills").innerHTML);
+    s.skills.scribing = 30;   // clears ADVANCED_SCRIBE_LVL (25)
+    s.inventory.canvas = 10; s.inventory.ink = 10; s.inventory.reagent = 10;
+    document.querySelector('.navbtn[data-screen="skills"]').click();
+    await settle(200);
+    const btn = [...document.querySelectorAll("#scr_skills button")].find(b => b.getAttribute("onclick") === "window.__ev('scribeAdvanced|ice')");
+    const hasAdvAfter = !!btn;
+    let scribedIceCount = 0;
+    if (btn){
+      const uidsBefore = new Set(s.cards.map(c => c.uid));
+      btn.click();
+      await settle(200);
+      scribedIceCount = window.__testSave().cards.filter(c => !uidsBefore.has(c.uid)).length;
+    }
+    // Expand Alchemy: a buff potion shows a stat label, not "heals undefined".
+    const brewText = document.getElementById("scr_skills").innerText;
+    const buffLabelOk = /Draught of Focus/.test(brewText) && !/heals undefined/.test(brewText);
+    // Cooking: cook a meal, eat it, confirm the active-buff banner appears.
+    s.inventory.raw_shrimp = 3; s.inventory.oak_log = 3;
+    s.skills.cooking = 5;
+    window.__ev("cook|food_stew");
+    await settle(200);
+    const cookedCount = window.__testSave().inventory.food_stew || 0;
+    window.__ev("eatFood|food_stew");
+    await settle(200);
+    document.querySelector('.navbtn[data-screen="skills"]').click();
+    await settle(200);
+    const afterEat = document.getElementById("scr_skills").innerText;
+    return { hasAdvBefore, hasAdvAfter, scribedIceCount, buffLabelOk, cookedCount, afterEat };
+  });
+  check("Advanced Scribing is hidden below the scribing level gate", crafting.hasAdvBefore === false);
+  check("Advanced Scribing offers a per-school button once the level is met", crafting.hasAdvAfter === true);
+  check("clicking a school button through the real DOM mints exactly one card via scribeAdvanced", crafting.scribedIceCount === 1, String(crafting.scribedIceCount));
+  check("a buff potion shows its stat effect, not a broken heal label", crafting.buffLabelOk === true);
+  check("cooking through the real DOM mints the food item", crafting.cookedCount === 1, String(crafting.cookedCount));
+  check("eating a meal through the real DOM shows the active buff banner", /Hearty Stew active/.test(crafting.afterEat || ""), (crafting.afterEat||"").slice(0,300));
+
   // --- Endgame dungeon tiers / Hard Mode (BACKLOG §10) ---
   const hard = await page.evaluate(async () => {
     const settle = ms => new Promise(r => setTimeout(r, ms));

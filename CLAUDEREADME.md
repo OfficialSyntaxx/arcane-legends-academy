@@ -1274,6 +1274,33 @@ active plus a one-time-claimable exclusive card back.
 - 581 engine / 42 online / 36 creature-rule / 212/213 browser (the one failure is the pre-existing
   §6.37 VFX flake, unrelated) / `check:models`, all green.
 
+### 6.47 §6 Crafting & Economy: Rune crafting (already done), Advanced Scribing, Expand Alchemy, Cooking
+Closed out the last four unchecked §6 items in one pass, scoped with the user first.
+
+- **Rune crafting** — checked off with no new code: `items.js` `ENCHANTS` already ships this under
+  a different backlog name (Whetting/Warding/Vital Rune, tiered, crafted from smelted bars).
+- **Advanced Scribing** (`game.js` `scribeAdvanced`) — a plain `scribe()` picks a random school;
+  this is the CONTROL upgrade, spending `ADVANCED_SCRIBE_COST` (3×, vs. 1× for a plain scribe) of
+  canvas/ink/reagent to guarantee a specific school. Deliberately does NOT also guarantee a better
+  rarity — same `rollRarity()` odds as a normal scribe — so it stays "control over a roll you'd
+  have gotten anyway," not a strictly-better scribe. Gated behind `ADVANCED_SCRIBE_LVL` (25).
+- **Expand Alchemy** (`items.js` `POTIONS`) — two buff potions (Draught of Focus/Warding) alongside
+  the existing healing ones, drunk the same way (1 pip, once per turn) but applying a flat bonus to
+  `atkBonus`/`defBonus` — fields that already exist on every duel participant (gear sets them at
+  duel start, a boss phase escalation already mutates them mid-fight) rather than a new stat system.
+- **Cooking** (new `cooking.js` + `game.js` `cook`/`eatFood`) — deliberately NOT a reskinned potion:
+  a meal is eaten OUTSIDE a duel for a timed gold/xp buff, not an in-duel effect, so the two skills
+  stack instead of competing for the same moment. The active buff (`s.foodBuff = {id, until}`) is a
+  fourth deliberate exception to "derive, don't store" (rank points, printings, season claims are
+  the first three) — "is a buff active right now" needs a real deadline to check against, the exact
+  reason `gatherCooldowns` is timestamped rather than derived. `academyPerks(s)` gained the active
+  food buff as a fourth additive stacking term (curriculum + prestige + season + food).
+- 17 new engine tests + 6 real-browser tests (a real DOM click through Advanced Scribing's
+  per-school buttons, a buff potion's label rendering correctly instead of "heals undefined", a
+  cook→eat round-trip showing the live buff banner).
+- 598 engine / 42 online / 36 creature-rule / 218/219 browser (the one failure is the pre-existing
+  §6.37 VFX flake, unrelated) / `check:models`, all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1406,7 +1433,17 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Seasonal events** (§6.46) — the last BACKLOG §10 item. 4 real astronomical seasons,
+**Last landed: §6 Crafting & Economy closed out** (§6.47) — the last four unchecked items: Rune
+crafting turned out to already be shipped (Enchanting, under a different name — checked off with
+no new code), Advanced Scribing lets a player pay triple materials to guarantee a school, Expand
+Alchemy added buff potions (temporary atkBonus/defBonus), and Cooking is a whole new skill —
+deliberately NOT a reskinned potion, a meal eaten outside combat for a timed gold/xp buff, the
+fourth deliberate exception to "derive, don't store" (a real expiry timestamp, same reason
+gatherCooldowns is timestamped). All four stack additively through `academyPerks`. 598 engine / 42
+online / 36 creature-rule / 218/219 browser (1 pre-existing unrelated flake) / `check:models`, all
+green. §6 has no unchecked items left.
+
+**Before that: Seasonal events** (§6.46) — the last BACKLOG §10 item. 4 real astronomical seasons,
 derived from `Date.now()` (no server, so nothing else was honest), each granting a small gold/xp
 bonus while active plus a one-time exclusive card back. Found and fixed a real pre-existing bug
 while wiring the unlock in: `backEquip`/the Codex gallery only ever checked `codex.js`'s

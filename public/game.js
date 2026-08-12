@@ -13,6 +13,7 @@ import * as PRESTIGE from "./prestige.js";
 import * as COLLECT from "./collectibles.js";
 import * as EVO from "./evolution.js";
 import * as SEASONS from "./seasons.js";
+import * as COOK from "./cooking.js";
 import { traitForCard } from "./creatures.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
@@ -38,8 +39,8 @@ export function newGame(){
   }
   return {
     version:1, school:"balance", gold:START_GOLD, xp:0, level:1,
-    skills:{ mining:1, fishing:1, woodcutting:1, smithing:1, alchemy:1, scribing:1, enchanting:1 },
-    skillXp:{ mining:0, fishing:0, woodcutting:0, smithing:0, alchemy:0, scribing:0, enchanting:0 },
+    skills:{ mining:1, fishing:1, woodcutting:1, smithing:1, alchemy:1, scribing:1, enchanting:1, cooking:1 },
+    skillXp:{ mining:0, fishing:0, woodcutting:0, smithing:0, alchemy:0, scribing:0, enchanting:0, cooking:0 },
     inventory:{}, cards, equipment:[],
     // Resource node regeneration (BACKLOG §6). matId -> the timestamp (ms) it's gatherable again.
     // Only materials actually gathered ever get an entry — an empty object is "everything ready."
@@ -63,6 +64,7 @@ export function newGame(){
     prestige:{ level:0, history:[] },
     collectibles:[],   // BACKLOG §10 "Rare collectibles" — ids found, see collectibles.js's own header
     seasons:{ claimed:[] },   // BACKLOG §10 "Seasonal events" — see seasons.js's own header
+    foodBuff:null,   // BACKLOG §6 "Cooking" — {id, until} or null; see cooking.js's own header
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
     // `treasuresFound` (BACKLOG §3 "Hidden areas / treasure") is a flat list of globally-unique
@@ -144,6 +146,9 @@ function migrate(s){
   if (!s.skillXp.scribing) s.skillXp.scribing = 0;
   if (!s.skills.enchanting) s.skills.enchanting = 1;
   if (!s.skillXp.enchanting) s.skillXp.enchanting = 0;
+  if (!s.skills.cooking) s.skills.cooking = 1;
+  if (!s.skillXp.cooking) s.skillXp.cooking = 0;
+  if (s.foodBuff === undefined) s.foodBuff = null;
   if (!s.stats.slabs) s.stats.slabs = 0;
   // Counters the onboarding chain asks about. They record an ACTION the save had no other record
   // of — a scribed card is indistinguishable from a starter one once it is in `cards`.
@@ -446,6 +451,30 @@ export function brew(s, potion){
   removeItems(s, potion.req); addItem(s, potion.id, 1); addSkillXp(s,"alchemy", potion.xp);
   return { ok:true, item:potion };
 }
+// ---------------------------------------------------------------- Cooking (BACKLOG §6)
+// Same two-step shape as Alchemy's brew/drink: cook() crafts a food item into inventory, eatFood()
+// consumes one to start its timed buff. See cooking.js's own header for why the buff is a real
+// gold/xp window instead of a duel effect.
+export function cook(s, food){
+  if (skillLevel(s,"cooking") < food.lvl) return { ok:false, err:'level' };
+  if (!hasItems(s, food.req)) return { ok:false, err:'resources' };
+  removeItems(s, food.req); addItem(s, food.id, 1); addSkillXp(s,"cooking", food.xp);
+  return { ok:true, item:food };
+}
+export function eatFood(s, foodId){
+  const food = COOK.FOOD_MAP[foodId];
+  if (!food) return { ok:false, err:"unknown" };
+  if ((s.inventory[foodId]||0) < 1) return { ok:false, err:"resources" };
+  s.inventory[foodId]--;
+  // Eating a new meal overwrites whatever buff was already running — the same "spend to change
+  // your mind" shape re-enchanting an item already has, not a stack.
+  s.foodBuff = { id: foodId, until: Date.now() + food.minutes * 60000 };
+  return { ok:true, food };
+}
+export function foodState(s){
+  const active = COOK.foodBuffActive(s);
+  return { active, remainingMs: active ? Math.max(0, active.until - Date.now()) : 0 };
+}
 
 // ---------- Scribing (the Arcanum card-craft loop) ----------
 // Refine one raw material into a card material (canvas <- wood, ink <- fish, reagent <- ore).
@@ -475,6 +504,39 @@ export function scribe(s){
   return { ok:true, inst };
 }
 export function countSlabs(s){ return s.cards.filter(c=>c.graded && gradeForRoll(c.roll).slab).length; }
+
+// ---------------------------------------------------------------- Advanced Scribing (BACKLOG §6)
+// A plain scribe() picks a random school — this is the CONTROL upgrade: spend triple materials to
+// guarantee a specific school instead. Deliberately does NOT also guarantee a better rarity roll
+// (same rollRarity() odds as a normal scribe) — this is "control over which of the rolls you'd
+// have gotten anyway", not a strictly-better scribe, so it stays a real choice rather than an
+// obvious always-take. Gated behind a scribing level, the same "advanced recipe needs the skill"
+// shape BARS/POTIONS already use for their own higher tiers.
+export const ADVANCED_SCRIBE_LVL = 25;
+export const ADVANCED_SCRIBE_COST = 3;   // ×canvas/ink/reagent, vs. 1 each for a plain scribe()
+export function canScribeAdvanced(s){ return skillLevel(s, "scribing") >= ADVANCED_SCRIBE_LVL; }
+export function scribeAdvanced(s, school){
+  if (!canScribeAdvanced(s)) return { ok:false, err:"level" };
+  if (!SCHOOLS[school]) return { ok:false, err:"school" };
+  const cost = ADVANCED_SCRIBE_COST;
+  if ((s.inventory.canvas||0) < cost || (s.inventory.ink||0) < cost || (s.inventory.reagent||0) < cost) return { ok:false, err:"materials" };
+  s.inventory.canvas -= cost; s.inventory.ink -= cost; s.inventory.reagent -= cost;
+  const lvl = skillLevel(s,"scribing");
+  const bonus = Math.min(30, Math.floor(lvl * 0.3)) + masteries(s).scribeBonus;
+  const roll = Math.min(100, Math.max(0, Math.floor(rng()*100) + bonus));
+  const rarity = rollRarity();
+  // That school may have nothing at this rolled rarity (e.g. a school with no legendary yet) —
+  // honour the CHOICE the player actually paid for (the school) over the rarity roll in that case,
+  // rather than failing the scribe or silently picking a different school.
+  let pool = CARDS.filter(c => c.school === school && c.rarity === rarity);
+  if (!pool.length) pool = CARDS.filter(c => c.school === school);
+  const c = pool[Math.floor(rng()*pool.length)];
+  const inst = mintCard(s, c.id, roll, { luck: 1.25 });
+  s.stats.scribed = (s.stats.scribed || 0) + 1;
+  addSkillXp(s, "scribing", 30);
+  dailyProgress(s, "scribe");
+  return { ok:true, inst };
+}
 
 // ---------- Daily quest / login + academy rank ----------
 export function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -510,16 +572,16 @@ export function dailyLabel(s){
 // existing save's rank does not shift under it — only what the rank DOES is new.
 export function academyScore(s){ return s.level + Math.floor(totalCollectionValue(s)/1000) + s.stats.won + (s.academyBonus||0); }
 export function academyRank(s){ return ACADEMY.yearFor(academyScore(s)).name; }
-// Curriculum perks PLUS any prestige tier's cumulative bonus (BACKLOG §10 "Prestige") PLUS the
-// current real season's bonus (BACKLOG §10 "Seasonal events") — additive, all three stack. This is
-// the one seam every gold/xp reward in the game already reads through (quest rewards, class pay,
-// market discount), so a new stacking bonus source only ever needs to land here, not at every call
-// site — same reasoning Prestige's own addition to this function already documented.
+// Curriculum perks PLUS prestige (BACKLOG §10 "Prestige") PLUS the current real season (BACKLOG
+// §10 "Seasonal events") PLUS an active Cooking buff (BACKLOG §6 "Cooking") — all four stack. This
+// is the one seam every gold/xp reward in the game already reads through (quest rewards, class
+// pay, market discount), so a new stacking bonus source only ever needs to land here.
 export function academyPerks(s){
   const base = ACADEMY.perksFor(academyScore(s));
   const p = PRESTIGE.perksFor(PRESTIGE.levelOf(s));
   const season = SEASONS.activeBonus();
-  return { questGold: base.questGold + p.questGold + season.gold, market: base.market + p.market, xp: base.xp + p.xp + season.xp };
+  const food = COOK.foodBuffActive(s) || { gold: 0, xp: 0 };
+  return { questGold: base.questGold + p.questGold + season.gold + food.gold, market: base.market + p.market, xp: base.xp + p.xp + season.xp + food.xp };
 }
 // BACKLOG §10 "Archmage progression" / "Prestige" — what academyScore's uncapped growth actually
 // DOES once it clears the curriculum's own top year, so a maxed-out Archmage isn't just a player
@@ -1117,9 +1179,12 @@ export function usePotion(s, b, p, potionId){
   p.pips -= 1;
   p.potionUsed = true;
   const before = p.hp;
-  p.hp = Math.min(p.maxHp, p.hp + pot.heal);
+  if (pot.heal) p.hp = Math.min(p.maxHp, p.hp + pot.heal);
+  // BACKLOG §6 "Expand Alchemy" — a buff potion's `buff` object names a field already on the duel
+  // participant (atkBonus/defBonus) and how much to add to it, for the rest of the duel.
+  if (pot.buff) for (const [k, n] of Object.entries(pot.buff)) p[k] = (p[k] || 0) + n;
   b.log.push(p.id + " drinks " + pot.name);
-  return { ok:true, healed: p.hp - before, potion: pot };
+  return { ok:true, healed: p.hp - before, potion: pot, buff: pot.buff || null };
 }
 // Potions the player currently holds, for the duel UI.
 export function heldPotions(s){

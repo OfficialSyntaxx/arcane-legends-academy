@@ -14,6 +14,26 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## §6 Crafting & Economy closed out — 2026-08-11
+
+### §6 Crafting & Economy closed out — *pending*
+- The last four unchecked BACKLOG §6 items, scoped with the user first.
+- **Rune crafting** checked off with zero new code: `items.js` `ENCHANTS` already ships this under
+  a different name (Whetting/Warding/Vital Rune).
+- **Advanced Scribing** (`game.js` `scribeAdvanced`): spend triple canvas/ink/reagent to guarantee
+  a specific school instead of a random one. Same rarity odds as a plain scribe — control, not a
+  strictly-better recipe. Gated behind Scribing 25.
+- **Expand Alchemy**: two buff potions (Draught of Focus/Warding), drunk the same way as a healing
+  potion but applying a flat, for-the-duel bonus to `atkBonus`/`defBonus` — fields gear and boss
+  phase escalation already mutate, not a new stat system.
+- **Cooking** (new `cooking.js`): deliberately not a reskinned potion — a meal is eaten OUTSIDE a
+  duel for a timed gold/xp buff, so it stacks with Alchemy instead of competing with it. The active
+  buff (`s.foodBuff = {id, until}`) is a fourth deliberate exception to "derive, don't store."
+  `academyPerks(s)` gained it as a fourth additive term.
+- 17 new engine tests + 6 real-browser tests.
+- *598 engine / 42 online / 36 creature-rule / 218/219 browser (1 pre-existing unrelated VFX
+  flake) / `check:models`, all green.*
+
 ## Seasonal events — 2026-08-11
 
 ### Seasonal events — `73b8a00`
