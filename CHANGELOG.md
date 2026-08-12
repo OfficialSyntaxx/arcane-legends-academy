@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Card evolution — 2026-08-11
 
-### Card evolution — *pending*
+### Card evolution — `9947407`
 - The last BACKLOG §5 item flagged as needing a design decision before it could be built. Asked
   the user; picked a tiered creature line (option B), spend-copies trigger.
 - `evolution.js`: every school's own cost-tiered creature spread doubles as an evolution line
