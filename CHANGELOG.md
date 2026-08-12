@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Rare collectibles + Endgame dungeon tiers — 2026-08-11
 
-### Rare collectibles + Endgame dungeon tiers — *pending*
+### Rare collectibles + Endgame dungeon tiers — `010a40d`
 - Two more BACKLOG §10 items, scoped together (Seasonal events and The Arcanum deliberately
   deferred — see BACKLOG §10's own note on why).
 - **Rare collectibles** (`collectibles.js`): treasure-sourced, not boss-sourced — every dungeon
