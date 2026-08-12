@@ -946,8 +946,15 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // Follows a step behind and to the side of the player, the same lerp-toward-a-target-offset
   // shape the follow camera already uses, just applied to a mesh instead of a camera rig.
   let petEntry = null;   // { model, baseY, bobSeed }
+  // Same traverse+dispose shape the dungeon-teardown/zone-change code already uses elsewhere in
+  // this file — removing a mesh from the scene alone leaks its geometry/textures on the GPU;
+  // switching pets a few times in a session would otherwise slowly leak VRAM with nothing to show
+  // for it.
+  function disposeModel(model){
+    model.traverse(o => { if (o.isMesh){ if (o.geometry) o.geometry.dispose(); if (o.material && o.material.dispose) o.material.dispose(); } });
+  }
   function setPet(petId){
-    if (petEntry && petEntry.model){ scene.remove(petEntry.model); petEntry = null; }
+    if (petEntry && petEntry.model){ scene.remove(petEntry.model); disposeModel(petEntry.model); petEntry = null; }
     const pet = petId && PET_MAP[petId];
     if (!pet) return;
     const loader = new THREE.GLTFLoader();
@@ -997,6 +1004,11 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     spr.scale.set(1.4, 1.4, 1);
     return spr;
   }
+  // A fresh canvas texture is minted per emote (the icon differs each time), so — same disposal
+  // discipline as disposeModel — it must be freed on removal, not just detached.
+  function disposeSprite(spr){
+    if (spr.material){ if (spr.material.map) spr.material.map.dispose(); spr.material.dispose(); }
+  }
   // Restores every bone an emote touched to its captured base pose — shared by both a natural
   // finish and being interrupted by a second emote, so a bone can never get stuck mid-gesture.
   function restoreEmoteBones(def){
@@ -1013,7 +1025,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     const pc = chars.player;
     if (t >= 1 || !pc || !pc.model){
       restoreEmoteBones(def);
-      if (bubble && bubble.parent) bubble.parent.remove(bubble);
+      if (bubble){ if (bubble.parent) bubble.parent.remove(bubble); disposeSprite(bubble); }
       activeEmote = null;
       return;
     }
@@ -1036,7 +1048,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     if (!def) return false;
     if (activeEmote){   // a new emote cuts the old one off cleanly rather than blending
       restoreEmoteBones(activeEmote.def);
-      if (activeEmote.bubble && activeEmote.bubble.parent) activeEmote.bubble.parent.remove(activeEmote.bubble);
+      if (activeEmote.bubble){ if (activeEmote.bubble.parent) activeEmote.bubble.parent.remove(activeEmote.bubble); disposeSprite(activeEmote.bubble); }
     }
     const bubble = makeEmoteBubble(def.icon);
     bubble.renderOrder = 20;
@@ -2025,7 +2037,10 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       const WEAPON_VIS = { bronze:'wpn_wand_A.glb', iron:'wpn_staff_A.glb', gold:'wpn_staff_B.glb', mithril:'wpn_sword_A.glb', rune:'wpn_axe_A.glb' };
       const entry = chars['player'];
       if (!entry || !entry.model) return;
-      if (entry.weaponMesh){ entry.weaponMesh.parent && entry.weaponMesh.parent.remove(entry.weaponMesh); entry.weaponMesh = null; }
+      // A real, pre-existing leak found during a polish pass: removing the mesh alone leaves its
+      // geometry/textures resident on the GPU, so re-forging gear a few times in a session would
+      // quietly leak VRAM. Same disposeModel() the pet-swap code uses (BACKLOG §7).
+      if (entry.weaponMesh){ entry.weaponMesh.parent && entry.weaponMesh.parent.remove(entry.weaponMesh); disposeModel(entry.weaponMesh); entry.weaponMesh = null; }
       const file = metal && WEAPON_VIS[metal];
       if (!file) return;
       const hand = entry.bones['RightHand'];

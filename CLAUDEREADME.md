@@ -1373,6 +1373,31 @@ than blending. `EMOTE_LIST` is exported at module scope with no THREE dependency
 - 624 engine / 42 online / 36 creature-rule / 225/226 browser (the one failure is the pre-existing
   §6.37 VFX flake, unrelated) / `check:models`, all green.
 
+### 6.50 Polish pass: memory-leak fixes + SFX gaps (`world.js`, `index.html`)
+A quality pass rather than a new feature (BACKLOG §9 "Performance profiling"). Audited this
+session's own additions for the two things a feature-focused pass tends to skip: GPU resource
+disposal and interaction-feedback consistency.
+
+- **Real memory leak, found and fixed**: `world.js`'s `setPet` removed the outgoing pet's model
+  from the scene but never disposed its geometry/materials — switching pets a few times in one
+  session would quietly leak VRAM with nothing to show for it. The same bug existed already, before
+  this session, in `setWeapon` (re-forging gear a few times has the identical leak) — fixed
+  alongside since it's the same class of bug in the same file, one line away. Both now share a
+  `disposeModel()` helper matching the traverse-and-dispose shape `removeEnemy`/`removeTreasure`/
+  `clearGear` already use elsewhere in this file — this was the ONE place that pattern had lapsed,
+  not a new pattern invented for the occasion.
+- The Emote system's floating emoji sprite had the identical gap (a fresh `CanvasTexture` minted
+  per emote, never disposed on removal) — fixed with a matching `disposeSprite()` helper.
+- **SFX gaps**: buying a pet, equipping a pet, and playing an emote had no audio feedback at all —
+  every other interactive button in the game plays something on click. Added `AUDIO.play("coin")`
+  for a purchase and `AUDIO.play("ui")` for the two selections, matching the exact sounds identical
+  interactions elsewhere (buying a card, equipping a title) already use.
+- No behavioural test coverage needed (a GPU disposal call has no observable save-state or DOM
+  effect to assert on) — verified by re-running the full real-browser suite to confirm nothing
+  broke, not by asserting the fix itself.
+- 624 engine / 42 online / 36 creature-rule / 226/226 browser (no flake this run) / `check:models`,
+  all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1505,7 +1530,14 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: §7 Pets, Housing & Cosmetics** (§6.49). Auras turned out to already be shipped
+**Last landed: a polish pass** (§6.50), asked for after §7 shipped rather than another feature.
+Found and fixed a real GPU memory leak in `world.js` `setPet` (introduced this session) and the
+pre-existing identical bug in `setWeapon` — both now share a `disposeModel()` helper matching the
+traverse-and-dispose pattern already used elsewhere in the file. Also closed 3 SFX gaps (buying/
+equipping a pet, playing an emote had no audio feedback). 624 engine / 42 online / 36 creature-rule
+/ 226/226 browser (no flake) / `check:models`, all green.
+
+**Before that: §7 Pets, Housing & Cosmetics** (§6.49). Auras turned out to already be shipped
 (character creation's ground glow — checked off, no new code). Robes/hats/cloaks flagged as
 genuinely asset-blocked (single-mesh player model, needs new per-part geometry), not a design gap.
 Pets/familiars + Pet progression and Emotes are both new, both code-only (Pets reuses existing

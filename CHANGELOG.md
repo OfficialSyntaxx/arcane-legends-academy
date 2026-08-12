@@ -14,6 +14,24 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Polish pass: memory-leak fixes + SFX gaps — 2026-08-12
+
+### Polish pass — *pending*
+- Asked for a quality pass rather than another feature after §7 shipped.
+- **Real memory leak found and fixed**: `world.js` `setPet` removed the outgoing pet model from
+  the scene without disposing its geometry/materials — switching pets a few times would leak
+  VRAM. The identical, pre-existing bug in `setWeapon` was fixed alongside (same file, same class
+  of bug). Both now share a `disposeModel()` helper matching the traverse-and-dispose shape
+  `removeEnemy`/`removeTreasure`/`clearGear` already use elsewhere.
+- The Emote system's floating emoji sprite had the same gap (a fresh canvas texture per emote,
+  never disposed) — fixed with a matching `disposeSprite()` helper.
+- **3 SFX gaps closed**: buying a pet, equipping a pet, and playing an emote had no audio feedback
+  at all, unlike every other interactive button in the game.
+- Verified by re-running the full real-browser suite, not a dedicated test (a GPU disposal call
+  has no observable save-state/DOM effect to assert on).
+- *624 engine / 42 online / 36 creature-rule / 226/226 browser (no flake) / `check:models`, all
+  green.*
+
 ## §7 Pets, Housing & Cosmetics — 2026-08-12
 
 ### §7 Pets, Housing & Cosmetics — `c8f02d8`

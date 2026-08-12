@@ -321,7 +321,9 @@
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
 - [x] Expanded automated tests — 485 engine / 42 online / 166 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback/enchant/market/savebackup flows) + model-integrity check, plus CI
-- [ ] Performance profiling
+- [~] Performance profiling — not a full pass, but a targeted audit found and fixed a real GPU
+  memory leak in `world.js` (`setPet` this session, `setWeapon` pre-existing — neither disposed
+  the outgoing model's geometry/materials on swap). No dedicated profiling tooling added yet.
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] UI redesign — bottom nav bar (8 tabs fit on mobile) + muted charcoal/champagne palette (was cartoonish purple)
 - [x] Client analytics + dashboard — `advice.js`/`analytics.js` feed D1; `/api/analytics` (JSON) + `/api/dashboard` (HTML) track sessions, zones, tab clicks, errors, movement-stuck, world/map load, low-FPS, advice shown→click
@@ -518,7 +520,12 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **§7 Pets, Housing & Cosmetics, is done** for the items that were actually buildable
+**Next step:** **A polish pass, is done.** Asked for after §7 rather than another feature. Found
+and fixed a real GPU memory leak (`world.js` `setPet`, plus the pre-existing identical bug in
+`setWeapon`) and 3 missing SFX cues (pet purchase/equip, emotes). 624 engine / 42 online / 36
+creature-rule / 226/226 browser (no flake) / `check:models`, all green.
+
+Before that: **§7 Pets, Housing & Cosmetics, is done** for the items that were actually buildable
 this pass. Auras was already shipped (checked off, no new code). Pets/Pet progression and Emotes
 are new and code-only (existing creature GLBs reused for pets; procedural bone-puppeteering for
 emotes, not new animation clips). Robes/hats/cloaks is flagged genuinely asset-blocked (needs new

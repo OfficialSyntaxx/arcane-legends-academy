@@ -2093,6 +2093,7 @@ window.__EV.buyPet = (id)=>{
   if (!r.ok){ err(r.err==="gold" ? "Not enough gold" : r.err==="owned" ? "Already owned" : LTL); return; }
   save();
   if (world && world.setPet) world.setPet(S.pets.active);
+  AUDIO.play("coin");
   toast(`${r.pet.icon} ${r.pet.name} joins you!`);
   render();
 };
@@ -2101,6 +2102,7 @@ window.__EV.equipPet = (id)=>{
   if (!r.ok) return;
   save();
   if (world && world.setPet) world.setPet(S.pets.active);
+  AUDIO.play("ui");
   render();
 };
 window.__EV.buy = (id)=>{ const r=G.buyCard(S,id); r.ok?toast("Purchased!"):err("Not enough gold"); render(); };
@@ -2936,6 +2938,7 @@ window.__EV.toggleEmoteMenu = ()=>{ $("emoteMenu").classList.toggle("open"); };
 window.__EV.emote = (id)=>{
   $("emoteMenu").classList.remove("open");
   if (world && world.playEmote) world.playEmote(id);
+  AUDIO.play("ui");
 };
 // Fast travel (BACKLOG §3). Reuses changeZone exactly as a zone gateway would — no separate
 // teleport path to keep in sync — just called with no `fromZoneId`, so entryPointFor finds no
