@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Seasonal events — 2026-08-11
 
-### Seasonal events — *pending*
+### Seasonal events — `73b8a00`
 - The last remaining BACKLOG §10 item. Scoped with the user first: this game has no persistent
   server, so "seasonal" can only mean content honestly gated by the real calendar date.
 - `seasons.js`: 4 real astronomical seasons (meteorological months — Spring/Summer/Autumn/Winter),
