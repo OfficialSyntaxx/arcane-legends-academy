@@ -2104,6 +2104,7 @@ check("appearance is fully derived — nothing resolved is written to the save",
 })());
 check("changing school changes the appearance without touching stored fields", (()=>{
   const s = G.newGame();
+  CC.applyAppearance(s, { aura: "ring" }); // aura defaults off; opt in to compare aura colours too
   s.school = "fire"; const a = CC.appearanceFor(s);
   s.school = "ice";  const b = CC.appearanceFor(s);
   return a.hue !== b.hue && a.aura !== b.aura && s.appearance.variant === "standard";
@@ -2126,7 +2127,7 @@ check("an unknown variant or aura is rejected rather than stored", (()=>{
   const s = G.newGame();
   const a = CC.applyAppearance(s, { variant:"chartreuse" });
   const b = CC.applyAppearance(s, { aura:"disco" });
-  return !a.ok && !b.ok && s.appearance.variant === "standard" && s.appearance.aura === "ring";
+  return !a.ok && !b.ok && s.appearance.variant === "standard" && s.appearance.aura === "none";
 })());
 // Names go straight into innerHTML on the Dorm screen, so this is a correctness check, not taste.
 check("names that would break the UI are rejected", (()=>{
@@ -2185,7 +2186,9 @@ check("migrate defaults the appearance so an old save still renders", (()=>{
   const old = G.newGame(); delete old.appearance;
   localStorage_stub(JSON.stringify(old));
   const s = G.load();
-  return s.appearance.variant === "standard" && CC.appearanceFor(s).aura != null;
+  // Aura defaults OFF (no ring at the player's feet unless chosen) — the migration only needs to
+  // guarantee `appearance` itself is a well-formed, resolvable object.
+  return s.appearance.variant === "standard" && s.appearance.aura === "none" && CC.appearanceFor(s).aura === null;
 })());
 
 

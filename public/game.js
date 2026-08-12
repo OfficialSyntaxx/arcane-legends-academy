@@ -50,7 +50,7 @@ export function newGame(){
     deck,
     // `name` starts EMPTY on purpose: charcreate.js derives "creation unfinished" from a missing
     // name, so a default here would skip the creation screen entirely on a fresh save.
-    name:"", appearance:{ variant:"standard", aura:"ring" },
+    name:"", appearance:{ variant:"standard", aura:"none" },
     home:{ owned:false, upgrades:{ treasury:0, library:0, armory:0, tavern:0 }, stock:{}, furniture:{}, cases:{} },
     quests:{ current:0, done:[] },
     // PvP rank (pvprank.js). `rankPoints`/`streak`/`seasonBest` are STORED — the outcome of a
@@ -210,9 +210,9 @@ function migrate(s){
   // NOTE the asymmetry: `appearance` is defaulted here so every save renders, but `name` is left
   // UNSET on purpose. charcreate.js derives "creation is unfinished" from a missing name, so
   // filling one in here would silently skip the creation screen for every existing save.
-  if (!s.appearance || typeof s.appearance !== "object") s.appearance = { variant:"standard", aura:"ring" };
+  if (!s.appearance || typeof s.appearance !== "object") s.appearance = { variant:"standard", aura:"none" };
   if (!s.appearance.variant) s.appearance.variant = "standard";
-  if (!s.appearance.aura) s.appearance.aura = "ring";
+  if (!s.appearance.aura) s.appearance.aura = "none";
   if (!s.home.stock || typeof s.home.stock !== "object") s.home.stock = {};
   if (!s.home.furniture || typeof s.home.furniture !== "object") s.home.furniture = {};
   if (!s.home.cases || typeof s.home.cases !== "object") s.home.cases = {};

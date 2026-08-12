@@ -110,8 +110,8 @@ export function variantFor(save){
   return VARIANTS.find(v => v.id === id) || VARIANTS[0];
 }
 export function auraFor(save){
-  const id = (save && save.appearance && save.appearance.aura) || "ring";
-  return AURAS.find(a => a.id === id) || AURAS[1];
+  const id = (save && save.appearance && save.appearance.aura) || "none";
+  return AURAS.find(a => a.id === id) || AURAS[0];
 }
 export function lookFor(save){
   return SCHOOL_LOOKS[(save && save.school)] || SCHOOL_LOOKS.balance;
@@ -136,7 +136,7 @@ export function appearanceFor(save){
 }
 
 export function applyAppearance(save, patch){
-  save.appearance = save.appearance || { variant: "standard", aura: "ring" };
+  save.appearance = save.appearance || { variant: "standard", aura: "none" };
   if (patch.variant != null){
     if (!VARIANT_IDS.includes(patch.variant)) return { ok: false, err: "unknown variant" };
     save.appearance.variant = patch.variant;

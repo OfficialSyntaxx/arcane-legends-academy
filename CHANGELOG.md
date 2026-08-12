@@ -14,6 +14,27 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Default the Arcane Aura off — 2026-08-12
+
+### Default the Arcane Aura off — *pending*
+- User noticed a ring at their character's feet, visible while walking, and didn't want it. It was
+  the "Rune Ring" arcane aura — a cosmetic choice in character creation (`charcreate.js`'s
+  `AURAS`) that was defaulted ON (`aura: "ring"`) for every new save, and for every legacy save
+  missing an `appearance` block at all.
+- The feature itself (school-coloured ground glow, optional "Rune Ring" or "Drifting Motes")
+  stays — a player who wants it can still turn it on from the ✨ Appearance screen (reachable from
+  the Dorm). Only the default changed, to `"none"`, in the three places it was set:
+  `charcreate.js`'s `auraFor()` fallback and `applyAppearance()`'s seed object, and `game.js`'s
+  `newGame()` default and the `load()` migration for old saves.
+- Existing saves that never explicitly touched `appearance.aura` (i.e. hit the `load()` migration
+  path with no `appearance` at all) now migrate to no aura instead of the ring. A save that already
+  has an explicit `aura:"ring"` stored keeps it — that was a real prior write, not a default worth
+  overriding out from under a player who might have actually chosen it — and can be turned off from
+  the same ✨ Appearance screen.
+- Two engine tests encoded the old "ring is the default" behaviour and needed updating to match
+  the new intent (aura off by default, but still fully functional once chosen).
+- *624 engine / 42 online / 36 creature-rule / UI smoke, all green.*
+
 ## PSA-style graded card slabs — 2026-08-12
 
 ### PSA-style graded card slabs — *pending*
