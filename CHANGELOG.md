@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## §7 Pets, Housing & Cosmetics — 2026-08-12
 
-### §7 Pets, Housing & Cosmetics — *pending*
+### §7 Pets, Housing & Cosmetics — `c8f02d8`
 - Scoped with the user first. Auras was already shipped via character creation — checked off, no
   new code. Robes/hats/cloaks flagged as genuinely asset-blocked (single-mesh player model, needs
   new per-part geometry, BLENDERTODO Tier 5), not a design gap. Mounts and Wand cosmetics
