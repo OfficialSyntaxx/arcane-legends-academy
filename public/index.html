@@ -21,6 +21,12 @@
      the chrome (top bar, active nav) wears it — panels stay neutral so it reads as identity, not
      a full reskin every time someone changes school. */
   --accent:#ffc94d; --accent-glow:rgba(255,201,77,.45); --accent-dim:rgba(255,201,77,.22);
+  /* Reusable depth + focus tokens so every surface shares one lighting model instead of each
+     component inventing its own shadow. Kept to the existing palette — no new hues. */
+  --elev-1:0 4px 12px -4px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+  --elev-2:0 10px 28px -8px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06);
+  --ring:0 0 0 2px var(--panel), 0 0 0 4px var(--accent);
+  --hairline:linear-gradient(90deg,transparent,var(--accent-dim) 20%,var(--accent-dim) 80%,transparent);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
 html,body{margin:0;height:100%;background:#12141a;color:var(--ink);
@@ -43,7 +49,7 @@ html,body{margin:0;height:100%;background:#12141a;color:var(--ink);
 #topbar::-webkit-scrollbar{display:none;}
 #topbar .logo{font-family:Georgia,serif;font-size:20px;font-weight:700;color:var(--gold);
   text-shadow:0 0 12px rgba(255,201,77,.5);letter-spacing:1px;margin-right:auto;}
-.stat{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:14px;white-space:nowrap;flex:0 0 auto;}
+.stat{display:flex;align-items:center;gap:6px;background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-size:14px;white-space:nowrap;flex:0 0 auto;box-shadow:inset 0 1px 0 rgba(255,255,255,.06);}
 .stat b{color:var(--gold);font-weight:700;}
 /* a stat pill that is also a control still needs a real tap target */
 .statbtn{cursor:pointer;font-family:inherit;color:var(--ink);min-height:34px;min-width:44px;
@@ -72,25 +78,39 @@ html,body{margin:0;height:100%;background:#12141a;color:var(--ink);
 .screen{display:none;animation:fade .25s ease;}
 .screen.on{display:block;}
 @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;}}
-h2{font-family:Georgia,serif;color:var(--gold);margin:2px 0 12px;font-size:22px;letter-spacing:.5px;}
+h2{font-family:Georgia,serif;color:var(--gold);margin:2px 0 14px;font-size:22px;letter-spacing:.5px;
+  padding-bottom:8px;position:relative;text-shadow:0 0 14px var(--accent-glow);}
+/* A short accent rule under the title anchors each screen's header without a heavy divider. */
+h2::after{content:"";position:absolute;left:0;bottom:0;width:44px;height:2px;border-radius:2px;
+  background:linear-gradient(90deg,var(--accent),transparent);}
 h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .sub{color:var(--muted);font-size:13px;margin:-6px 0 12px;}
 /* A flat fill + 1px border read as a wireframe, not a designed surface. A gentle top-lit gradient
    plus a real drop shadow is the cheapest possible "this has depth" cue, and costs nothing —
    still pure CSS, no new assets. The inset highlight fakes a soft top edge, like light catching
    a beveled panel. */
-.panel{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);
+.panel{position:relative;background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);
   border-radius:14px;padding:14px;margin-bottom:14px;
   box-shadow:0 6px 18px -4px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);}
+/* A single hairline of the school accent along the top edge — the cheapest way to make a stack of
+   panels read as designed surfaces catching light from above rather than flat boxes. Purely
+   decorative and non-interactive, so it never fights inline-styled panels used as buttons. */
+.panel::before{content:"";position:absolute;top:0;left:14px;right:14px;height:1px;
+  background:var(--hairline);opacity:.7;pointer-events:none;border-radius:1px;}
 .row{display:flex;gap:10px;flex-wrap:wrap;}
 
 /* buttons */
 .btn{background:linear-gradient(180deg,#3a2d6e,#241c44);color:var(--ink);border:1px solid var(--line);border-radius:10px;
   padding:10px 16px;font-size:14px;cursor:pointer;font-weight:600;min-height:44px;touch-action:manipulation;
-  box-shadow:0 3px 8px -2px rgba(0,0,0,.5);transition:transform .08s ease,box-shadow .08s ease;}
+  box-shadow:0 3px 8px -2px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.08);
+  transition:transform .08s ease,box-shadow .08s ease,filter .08s ease;}
 @media (hover:hover){ .btn:hover{filter:brightness(1.15);} }
 .btn:active{transform:translateY(1px);box-shadow:0 1px 4px -1px rgba(0,0,0,.5);}
-.btn.gold{background:linear-gradient(180deg,#e8a33d,#b97a1e);color:#24170a;border-color:#ffd98a;}
+/* Keyboard users get the same clear affordance touch/mouse users already have. Confined to
+   :focus-visible so it never fires on tap. */
+.btn:focus-visible,.card:focus-visible,.navbtn:focus-visible,.statbtn:focus-visible{outline:none;box-shadow:var(--ring);}
+.btn.gold{background:linear-gradient(180deg,#ffce6a,#e8a33d 55%,#b97a1e);color:#24170a;border-color:#ffd98a;
+  box-shadow:0 3px 10px -2px rgba(232,163,61,.5), inset 0 1px 0 rgba(255,255,255,.4);}
 .btn.ok{background:linear-gradient(180deg,#2f9e63,#1f6b42);border-color:#6ee7a0;}
 .btn.danger{background:linear-gradient(180deg,#b33,#6e1f1f);border-color:#ff6b6b;}
 .btn:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.4);box-shadow:none;}
@@ -98,20 +118,23 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 
 /* cards */
 /* fluid so a 320px phone and a 1200px desktop both get a sensible card */
-.card{width:clamp(84px,23vw,108px);border-radius:10px;overflow:hidden;position:relative;border:2px solid #fff;cursor:pointer;
-  background:#0c0a1c;box-shadow:0 4px 12px rgba(0,0,0,.5);transition:transform .1s;flex:0 0 auto;}
+.card{width:clamp(84px,23vw,108px);border-radius:12px;overflow:hidden;position:relative;border:2px solid #fff;cursor:pointer;
+  background:linear-gradient(180deg,#161031,#0c0a1c);box-shadow:0 4px 12px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.06);
+  transition:transform .12s ease,box-shadow .12s ease;flex:0 0 auto;}
 .card.wide{width:clamp(112px,30vw,150px);}
-@media (hover:hover){ .card:hover{transform:translateY(-4px);} }
+@media (hover:hover){ .card:hover{transform:translateY(-4px);box-shadow:0 12px 22px -6px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.1);} }
 /* aspect-ratio keeps the art proportional as the card width flexes */
 .card .art{aspect-ratio:1.46;height:auto;background:center/cover;position:relative;}
 .card.wide .art{aspect-ratio:1.44;height:auto;}
-.card .cost{position:absolute;top:4px;left:4px;background:radial-gradient(circle,#6a8cff,#2c3f8a);color:#fff;font-weight:800;
-  width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;border:1px solid #9db4ff;}
+.card .cost{position:absolute;top:4px;left:4px;background:radial-gradient(circle at 35% 30%,#a9c0ff,#6a8cff 45%,#2c3f8a);color:#fff;font-weight:800;
+  width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;border:1px solid #9db4ff;
+  box-shadow:0 2px 5px rgba(0,0,0,.55), inset 0 1px 1px rgba(255,255,255,.5);text-shadow:0 1px 2px rgba(0,0,0,.5);}
 .card .atk,.card .hp{position:absolute;bottom:4px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-  font-weight:800;font-size:13px;color:#fff;border:1px solid #fff;}
-.card .atk{left:4px;background:#c0392b;}
-.card .hp{right:4px;background:#2e9e5b;}
-.card .body{padding:5px 6px;}
+  font-weight:800;font-size:13px;color:#fff;border:1px solid rgba(255,255,255,.85);
+  box-shadow:0 2px 5px rgba(0,0,0,.55), inset 0 1px 1px rgba(255,255,255,.4);text-shadow:0 1px 2px rgba(0,0,0,.5);}
+.card .atk{left:4px;background:radial-gradient(circle at 35% 30%,#e26152,#c0392b 55%,#8f2418);}
+.card .hp{right:4px;background:radial-gradient(circle at 35% 30%,#57c483,#2e9e5b 55%,#1e6b3d);}
+.card .body{padding:5px 6px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(0,0,0,.15));border-top:1px solid rgba(255,255,255,.06);}
 .card .nm{font-size:12px;font-weight:700;line-height:1.1;min-height:26px;}
 .card .tx{font-size:10px;color:var(--muted);line-height:1.2;margin-top:2px;min-height:26px;}
 .card .grade{position:absolute;top:4px;right:4px;font-size:14px;background:rgba(0,0,0,.5);border-radius:8px;padding:1px 5px;}
@@ -151,7 +174,9 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 @keyframes packglow{from{filter:drop-shadow(0 0 3px var(--glowcolor));}to{filter:drop-shadow(0 0 16px var(--glowcolor));}}
 
 /* list rows */
-.lrow{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--panel2);flex-wrap:wrap;}
+.lrow{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;
+  background:linear-gradient(160deg,var(--panel2),var(--panel));flex-wrap:wrap;box-shadow:var(--elev-1);transition:border-color .12s ease,transform .12s ease;}
+@media (hover:hover){ .lrow:hover{border-color:var(--accent-dim);} }
 .lrow .grow{flex:1;min-width:120px;}
 .lrow .t{font-weight:700;font-size:14px;}
 .lrow .d{font-size:12px;color:var(--muted);}
@@ -159,30 +184,48 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 
 /* duel */
 #duelWrap{display:flex;flex-direction:column;gap:10px;height:100%;}
-.duelzone{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);min-height:120px;background:var(--panel);}
-.duelzone.bg{background:center/cover url(./assets/duel_bg.jpg);min-height:150px;}
-.zonecap{position:absolute;top:6px;left:10px;font-size:12px;color:var(--muted);z-index:2;}
-.wizbar{position:absolute;top:6px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:2px;z-index:2;}
-.wizbar .bar{width:clamp(90px,32vw,150px);height:12px;background:#00000066;border:1px solid #fff3;border-radius:6px;overflow:hidden;}
-.wizbar .bar>div{height:100%;background:linear-gradient(90deg,#ff6b6b,#ff9a5a);}
+.duelzone{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--line);min-height:120px;
+  background:linear-gradient(160deg,var(--panel2),var(--panel));box-shadow:inset 0 1px 0 rgba(255,255,255,.05), inset 0 -20px 40px -20px rgba(0,0,0,.6);}
+/* The dark inset vignette pulls focus to the board centre and, on the art-backed enemy zone,
+   keeps the caption and HP bar legible over a busy photo without a flat scrim. */
+.duelzone.bg{background:center/cover url(./assets/duel_bg.jpg);min-height:150px;
+  box-shadow:inset 0 0 60px 10px rgba(8,4,24,.75);}
+.zonecap{position:absolute;top:6px;left:8px;font-size:12px;color:var(--ink);z-index:2;
+  background:rgba(12,8,28,.62);border:1px solid var(--line);border-radius:20px;padding:3px 10px;
+  backdrop-filter:blur(4px);font-weight:600;letter-spacing:.2px;}
+.wizbar{position:absolute;top:6px;right:8px;display:flex;flex-direction:column;align-items:flex-end;gap:3px;z-index:2;}
+.wizbar .bar{width:clamp(90px,32vw,150px);height:13px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.22);
+  border-radius:7px;overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.6);}
+/* transition on width makes damage/heal read as an animation, not a jump-cut, since the fill
+   width is set inline each render. The top gloss gives the fill a liquid, potion-like sheen. */
+.wizbar .bar>div{height:100%;background:linear-gradient(90deg,#ff6b6b,#ff9a5a);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35);transition:width .35s ease;}
 .wizbar .bar.o>div{background:linear-gradient(90deg,#54a0ff,#7aa8ff);}
+.wizbar>div:last-child{font-size:12px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.8);}
 .board{display:flex;gap:8px;padding:40px 10px 10px;flex-wrap:wrap;justify-content:center;min-height:120px;}
 .hand{display:flex;gap:8px;padding:8px;overflow-x:auto;justify-content:center;flex-wrap:wrap;scrollbar-width:none;}
 .hand::-webkit-scrollbar{display:none;}
 .pipbar{display:flex;gap:4px;align-items:center;padding:6px 10px;}
-.pip{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle,#6a8cff,#2c3f8a);border:1px solid #9db4ff;}
-.pip.full{background:radial-gradient(circle,#ffd94a,#c8860a);border-color:#fff0a0;}
-#duelLog{font-size:12px;color:var(--muted);min-height:20px;padding:6px 10px;background:var(--panel);border-radius:10px;border:1px solid var(--line);}
-#duelStatus{font-size:14px;font-weight:700;color:var(--gold);text-align:center;padding:4px;}
+.pip{width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#a9c0ff,#6a8cff 50%,#2c3f8a);border:1px solid #9db4ff;
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.5), 0 1px 2px rgba(0,0,0,.4);}
+.pip.full{background:radial-gradient(circle at 35% 30%,#fff0a8,#ffd94a 50%,#c8860a);border-color:#fff0a0;
+  box-shadow:inset 0 1px 1px rgba(255,255,255,.6), 0 0 8px rgba(255,201,77,.6);}
+#duelLog{font-size:12px;color:var(--muted);min-height:20px;padding:8px 12px;
+  background:linear-gradient(160deg,var(--panel2),var(--panel));border-radius:10px;border:1px solid var(--line);
+  box-shadow:var(--elev-1);}
+#duelStatus{font-size:15px;font-weight:800;color:var(--gold);text-align:center;padding:6px 4px;
+  letter-spacing:.3px;text-shadow:0 0 12px var(--accent-glow);}
 
 /* progress */
-.pbar{height:10px;background:#00000055;border-radius:6px;overflow:hidden;border:1px solid #fff3;}
-.pbar>div{height:100%;background:linear-gradient(90deg,#e8a33d,#ffd94a);transition:width .1s;}
+.pbar{height:10px;background:rgba(0,0,0,.4);border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.18);
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.5);}
+.pbar>div{height:100%;background:linear-gradient(90deg,#e8a33d,#ffd94a);box-shadow:inset 0 1px 0 rgba(255,255,255,.4);transition:width .3s ease;}
 
 /* skill grid */
 .skillgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;}
-.kpi .lv{font-size:26px;font-weight:800;color:var(--gold);}
+.kpi{background:linear-gradient(160deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center;
+  box-shadow:var(--elev-1);}
+.kpi .lv{font-size:26px;font-weight:800;color:var(--gold);text-shadow:0 0 10px var(--accent-glow);}
 .kpi .nm{font-size:13px;color:var(--muted);margin-top:2px;}
 
 /* toast */
