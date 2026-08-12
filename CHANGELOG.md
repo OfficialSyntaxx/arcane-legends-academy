@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## §6 Crafting & Economy closed out — 2026-08-11
 
-### §6 Crafting & Economy closed out — *pending*
+### §6 Crafting & Economy closed out — `1ab1f59`
 - The last four unchecked BACKLOG §6 items, scoped with the user first.
 - **Rune crafting** checked off with zero new code: `items.js` `ENCHANTS` already ships this under
   a different name (Whetting/Warding/Vital Rune).
