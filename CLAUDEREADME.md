@@ -1333,6 +1333,46 @@ deterministic pseudo-random value every client agrees on with nothing to synchro
 - 610 engine / 42 online / 36 creature-rule / 219/219 browser (no flake this run) / `check:models`,
   all green.
 
+### 6.49 §7 Pets, Housing & Cosmetics: Auras (already done), Pets/Pet progression, Emotes; Robes/hats/cloaks flagged blocked
+Scoped with the user first. Two items resolved with no new build: **Auras** was already fully
+shipped via character creation (`charcreate.js`'s school-coloured ground glow, chosen at creation)
+— checked off, same "already done under a different name" outcome Rune crafting had. **Robes /
+hats / cloaks** stays unchecked, but now with an explicit reason on record: the player model is
+one skinned mesh with one material (`equipment3d.js`'s own `UNSUPPORTED` list already documents
+this), so real per-part gear needs new 3D assets (BLENDERTODO Tier 5) before it's buildable —
+asset-generation work, not a design gap, the same category Multiplayer's server blocker is in.
+
+**Pets / familiars + Pet progression** (new `pets.js`): six pets, ALL reusing creature GLBs
+`assets/models/` already ships for dungeon/world enemies (cat/dog/bunny/frog/chicken/panda) —
+zero new asset generation, the same "reuse what's already in the repo" instinct Ashen Mountains'
+props and Hard Mode's boss rematch both followed. Bought once each with gold from a new Market
+panel, one active at a time. Progression is **fully derived** from `s.stats.won` (no separate pet-
+XP counter to migrate or ever disagree with the wizard's own win record) and **deliberately stays
+cosmetic** — a level number, not a fifth stacking economy bonus alongside Prestige/Seasons/Cooking,
+since §7 files this under Cosmetics, not Crafting & Economy. The equipped pet renders as a real
+companion in the 3D world (`world.js` `setPet`/`updatePet`), trailing behind wherever the player is
+currently facing (not a world-fixed offset), loaded via a bespoke box-fit-to-height loader — the
+same "scale a GLB to a target real-world size" maths `loadLandmarkModel` already uses, just for a
+mobile companion instead of a static prop.
+
+**Emotes** (`world.js` `EMOTE_LIST`/`playEmote`): four gestures (Wave/Bow/Cheer/Spin), deliberately
+NOT new animation clips — the generated character GLBs only ship walk/idle — but a temporary
+quaternion offset applied to a named rig bone on top of its captured base pose, the exact same
+procedural-bone-puppeteering technique `equipment3d.js`'s wand/amulet attachment already relies on
+(the same bone set the "player rig exposes the bones the attachment table names" test already
+proves exists). A floating emoji sprite (reusing the sky dome's canvas-texture-sprite technique)
+fades in/out above the player. A second emote cuts the first off cleanly (bones restored) rather
+than blending. `EMOTE_LIST` is exported at module scope with no THREE dependency specifically so
+`index.html` can build the menu without a live world instance.
+
+- 14 new engine tests (pet level/progress boundaries, buy/equip ownership rules, migration,
+  `EMOTE_LIST` shape) + 7 real-browser tests (a real GLTF-load poll for the pet model — same "poll,
+  don't guess one fixed wait" discipline the gear-load check already uses — and a real emote click
+  that starts, then naturally ends, through the actual DOM). Verified visually: a Playwright
+  screenshot shows the pet rendering as a companion beside the player.
+- 624 engine / 42 online / 36 creature-rule / 225/226 browser (the one failure is the pre-existing
+  §6.37 VFX flake, unrelated) / `check:models`, all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1465,7 +1505,16 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Weather + Dynamic world events** (§6.48) — the last two §3 items, closing out §3
+**Last landed: §7 Pets, Housing & Cosmetics** (§6.49). Auras turned out to already be shipped
+(character creation's ground glow — checked off, no new code). Robes/hats/cloaks flagged as
+genuinely asset-blocked (single-mesh player model, needs new per-part geometry), not a design gap.
+Pets/familiars + Pet progression and Emotes are both new, both code-only (Pets reuses existing
+creature GLBs already in the repo; Emotes is procedural bone-puppeteering, not new animation clips)
+— Pet progression is fully derived from win count and deliberately stays cosmetic, not a fifth
+stacking economy bonus. Mounts and Wand cosmetics deliberately deferred. 624 engine / 42 online /
+36 creature-rule / 225/226 browser (1 pre-existing unrelated flake) / `check:models`, all green.
+
+**Before that: Weather + Dynamic world events** (§6.48) — the last two §3 items, closing out §3
 entirely. Both derived from wall-clock time (no server): Weather is purely atmospheric (rain,
 darker sky, layers on top of day/night rather than overriding it), Dynamic world events DOES touch
 gameplay (a guaranteed bonus gather unit during a zone's live "Bountiful Harvest" window) —

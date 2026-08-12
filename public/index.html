@@ -224,6 +224,16 @@ body.has-touch .worldbtn{display:flex;}
   height:44px;border-radius:50%;z-index:4;display:flex;align-items:center;justify-content:center;
   font-size:20px;background:rgba(20,14,40,.72);color:var(--accent);border:1px solid var(--line);
   cursor:pointer;touch-action:manipulation;line-height:1;padding:0;}
+/* BACKLOG §7 "Emotes" — same treatment as #mapBtn, stacked above it. */
+#emoteBtn{position:absolute;left:calc(16px + var(--sal));bottom:calc(78px + var(--sab));width:44px;
+  height:44px;border-radius:50%;z-index:4;display:flex;align-items:center;justify-content:center;
+  font-size:20px;background:rgba(20,14,40,.72);color:var(--accent);border:1px solid var(--line);
+  cursor:pointer;touch-action:manipulation;line-height:1;padding:0;}
+#emoteMenu{position:absolute;left:calc(16px + var(--sal));bottom:calc(130px + var(--sab));z-index:5;
+  display:none;flex-direction:column;gap:6px;}
+#emoteMenu.open{display:flex;}
+#emoteMenu button{width:44px;height:44px;border-radius:50%;font-size:19px;background:rgba(20,14,40,.85);
+  color:var(--ink);border:1px solid var(--line);cursor:pointer;touch-action:manipulation;line-height:1;padding:0;}
 
 /* ---------------- responsive ----------------
    Card sizes are fluid (clamp) above, so these breakpoints only handle chrome density and
@@ -335,6 +345,8 @@ body.has-touch .worldbtn{display:flex;}
     <button id="zoomIn" class="worldbtn" aria-label="Zoom in">+</button>
     <button id="zoomOut" class="worldbtn" aria-label="Zoom out">−</button>
     <button id="mapBtn" aria-label="Fast travel" onclick="window.__ev('openFastTravel')">🗺️</button>
+    <button id="emoteBtn" aria-label="Emotes" onclick="window.__ev('toggleEmoteMenu')">😀</button>
+    <div id="emoteMenu"></div>
   </div>
   <div id="nav"></div>
 </div>
@@ -392,8 +404,9 @@ import { CARDS, CARD_MAP, SCHOOLS, RARITY, GRADES, gradeForRoll, cardValue, grad
 import { MATERIALS, BARS, POTIONS, METALS, SLOTS, equipmentFor, HOME_UPGRADES, equipStatsLabel, SKILLS, CARD_MATERIALS, ENCHANTS, ENCHANT_MAP, enchantStats, pristineVariantFor } from "./items.js";
 import { FOODS } from "./cooking.js";
 import * as WEVT from "./worldevents.js";
+import * as PETS from "./pets.js";
 import * as G from "./game.js";
-import { createWorld } from "./world.js";
+import { createWorld, EMOTE_LIST } from "./world.js";
 import { createAudio, SFX, audioModeForZone } from "./audio.js";
 import { createBattle3d } from "./battle3d.js";
 import * as VFX from "./vfx.js";
@@ -806,7 +819,7 @@ window.__EV.chooseSchool = (s)=>{
   save();
   stopCharacterPreview();
   $("schoolPicker").style.display = "none";
-  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); world.setPet(S.pets.active); }
   toast(`Welcome to the ${SCHOOLS[s].name} School! Your school's cards were added to your collection.`); render();
   // The school picker is now step 2 of character creation. If creation is still unfinished
   // (no name yet, or no look chosen), fall back into it rather than dumping the player into the
@@ -833,7 +846,7 @@ function closeCharCreate(){
   ccOpen = false;
   $("charCreate").style.display = "none";
   if (preview) preview.stop();          // stop the loop; keep the context so reopening is instant
-  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); world.setPet(S.pets.active); }
   render();
 }
 function renderCharCreate(){
@@ -1999,6 +2012,8 @@ function renderMarket(el){
       <button class="btn sm" onclick="window.__ev('sellItem|${m.id}')">Sell 1</button></div>`;
   }
   h += `</div></div>`;
+  // pets (BACKLOG §7 "Pets / familiars") — bought once each with gold, one active at a time.
+  h += renderPetsPanel();
   // auctions
   h += `<div class="panel"><h3>🔨 Auction House</h3>`;
   if (S.auctions.length===0) h += `<div class="sub">${STR.no_auctions}</div>`;
@@ -2049,6 +2064,45 @@ function renderMarket(el){
   h += `</div>`;
   el.innerHTML = h;
 }
+// BACKLOG §7 "Pets / familiars" — level is derived from wins (pets.js), never stored.
+function renderPetsPanel(){
+  const st = G.petState(S);
+  let h = `<div class="panel"><h3>🐾 Pets</h3>`;
+  h += st.active
+    ? `<p class="sub">${st.active.icon} ${st.active.name} — Level ${st.level}/${PETS.PET_MAX_LEVEL}${st.progress.maxed?" (max)":` (${st.progress.have}/${st.progress.need} wins to next)`}</p>`
+    : `<p class="sub">No pet equipped. Buy one below, or equip one you already own.</p>`;
+  h += `<div class="row" style="flex-wrap:wrap">`;
+  for (const p of PETS.PETS){
+    const owned = st.owned.includes(p.id);
+    const active = st.active && st.active.id === p.id;
+    h += `<div class="panel" style="flex:1;min-width:150px;${active?"border-color:var(--accent)":""}">
+      <div style="font-weight:700">${p.icon} ${p.name}</div>
+      <div class="sub">${owned ? "Owned" : `${p.cost}g`}</div>
+      ${active ? `<button class="btn sm" disabled>Equipped</button>`
+        : owned ? `<button class="btn sm ok" onclick="window.__ev('equipPet|${p.id}')">Equip</button>`
+        : `<button class="btn sm gold" onclick="window.__ev('buyPet|${p.id}')">Buy</button>`}
+    </div>`;
+  }
+  h += `</div>`;
+  if (st.active) h += `<button class="btn sm" style="margin-top:8px" onclick="window.__ev('equipPet|')">Walk alone</button>`;
+  h += `</div>`;
+  return h;
+}
+window.__EV.buyPet = (id)=>{
+  const r = G.buyPet(S, id);
+  if (!r.ok){ err(r.err==="gold" ? "Not enough gold" : r.err==="owned" ? "Already owned" : LTL); return; }
+  save();
+  if (world && world.setPet) world.setPet(S.pets.active);
+  toast(`${r.pet.icon} ${r.pet.name} joins you!`);
+  render();
+};
+window.__EV.equipPet = (id)=>{
+  const r = G.equipPet(S, id || null);
+  if (!r.ok) return;
+  save();
+  if (world && world.setPet) world.setPet(S.pets.active);
+  render();
+};
 window.__EV.buy = (id)=>{ const r=G.buyCard(S,id); r.ok?toast("Purchased!"):err("Not enough gold"); render(); };
 window.__EV.sellItem = (id)=>{ const r=G.sellItem(S,id); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
 window.__EV.listA = (uid)=>{ const c=G.cardInstance(S,uid); const r=G.listAuction(S,uid, c?G.instanceValue(c):0); r.ok?toast("Listed for auction!"):null; render(); };
@@ -2871,6 +2925,18 @@ function enterDorm(){
   if (!worldCfg.zoneIds.includes(z.id)) worldCfg.zoneIds.push(z.id);
   changeZone(z.id, activeZone && activeZone.id);
 }
+// Emotes (BACKLOG §7). The menu is built once (EMOTE_LIST is static) and just shown/hidden,
+// same "toggle visibility, don't rebuild" shape the joystick/zoom buttons already use.
+(function buildEmoteMenu(){
+  const el = $("emoteMenu");
+  if (!el) return;
+  el.innerHTML = EMOTE_LIST.map(e => `<button title="${e.label}" onclick="window.__ev('emote|${e.id}')">${e.icon}</button>`).join("");
+})();
+window.__EV.toggleEmoteMenu = ()=>{ $("emoteMenu").classList.toggle("open"); };
+window.__EV.emote = (id)=>{
+  $("emoteMenu").classList.remove("open");
+  if (world && world.playEmote) world.playEmote(id);
+};
 // Fast travel (BACKLOG §3). Reuses changeZone exactly as a zone gateway would — no separate
 // teleport path to keep in sync — just called with no `fromZoneId`, so entryPointFor finds no
 // reciprocal exit and falls back to the zone's own default spawn point (worldconfig.js). Limited
@@ -2917,6 +2983,7 @@ function changeZone(toZoneId, fromZoneId, spawnOverride){
     window.__world = world;
     world.setPlayerAppearance(CC.appearanceFor(S));
     world.setPlayerGear(EQ3.attachmentsFor(S));
+    world.setPet(S.pets.active);
     world.resize();
     S.worldState.zone = toZoneId;
     if (!S.worldState.visited.includes(toZoneId)) S.worldState.visited.push(toZoneId);
@@ -3223,7 +3290,7 @@ window.__EV.toggleMute = ()=>{
 async function boot(){
   $("muteBtn").textContent = AUDIO.isMuted() ? "🔇" : "🔊";
   await initWorld();
-  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); }
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); world.setPet(S.pets.active); }
   // Character creation replaces the bare school picker on a fresh save. It is skipped for any
   // save that already finished it, and `CC.isComplete` is DERIVED, so an older save that has a
   // school but no name is walked through the remaining steps rather than either re-doing the

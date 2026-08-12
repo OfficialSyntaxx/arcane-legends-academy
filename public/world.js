@@ -9,6 +9,17 @@ import { tintTree } from "./tint.js";
 import { heightAt, isWater, flatsForZone, groundColorAt, BIOMES } from "./terrain.js";
 import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS, ZONE_MAPS } from "./worldconfig.js";
 import { isRaining } from "./weather.js";
+import { PET_MAP } from "./pets.js";
+
+// BACKLOG §7 "Emotes" — id/icon/label metadata at MODULE scope (no THREE dependency) so
+// index.html can build a menu without needing a live world instance. The bone-animation details
+// live inside `createWorld` (they need THREE.Quaternion/Vector3), keyed by these same ids.
+export const EMOTE_LIST = [
+  { id: "wave",  icon: "👋", label: "Wave" },
+  { id: "bow",   icon: "🙇", label: "Bow" },
+  { id: "cheer", icon: "🎉", label: "Cheer" },
+  { id: "spin",  icon: "💃", label: "Spin" },
+];
 
 // `zone` is an optional normalised zone config (see worldconfig.js). Omitted, the world falls
 // back to the academy tables in structures.js/nodes.js — the migration state described in
@@ -909,6 +920,131 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     wanderers.push(g);
   }
 
+  // ---------- Emotes (BACKLOG §7) ----------
+  // Deliberately NOT new animation clips (the generated character GLBs only ship walk/idle) —
+  // the same procedural-bone-puppeteering technique `equipment3d.js`'s wand/amulet attachment
+  // already relies on (a named rig bone is guaranteed by `tools/rig-character.py`'s bone set,
+  // proven by the "player rig exposes the bones the attachment table names" test), applied as a
+  // temporary quaternion offset on top of the bone's own base pose rather than a swapped clip.
+  // Each `update(t)` returns radians of rotation about `axis` at time fraction t∈[0,1] of the
+  // emote's duration; the bone (and its base quaternion) is restored the instant it ends.
+  const EMOTE_DETAILS = {
+    wave:  { duration: 2.0, bone: "RightForeArm", axis: new THREE.Vector3(0,0,1),
+             update: t => Math.sin(t * Math.PI * 6) * 0.9 * Math.sin(t * Math.PI) },
+    bow:   { duration: 1.8, bone: "Spine1", axis: new THREE.Vector3(1,0,0),
+             update: t => Math.sin(t * Math.PI) * 0.6 },
+    cheer: { duration: 2.0, bone: "RightArm", axis: new THREE.Vector3(0,0,1),
+             update: t => -Math.sin(t * Math.PI) * 1.8,
+             bone2: "LeftArm", axis2: new THREE.Vector3(0,0,1), update2: t => Math.sin(t * Math.PI) * 1.8 },
+    spin:  { duration: 1.4, bone: "Hips", axis: new THREE.Vector3(0,1,0),
+             update: t => t * Math.PI * 2 },
+  };
+  const EMOTES = Object.fromEntries(EMOTE_LIST.map(e => [e.id, { icon: e.icon, ...EMOTE_DETAILS[e.id] }]));
+  let activeEmote = null;   // { def, startedAt, bubble }
+
+  // ---------- Pet / familiar companion (BACKLOG §7) ----------
+  // Follows a step behind and to the side of the player, the same lerp-toward-a-target-offset
+  // shape the follow camera already uses, just applied to a mesh instead of a camera rig.
+  let petEntry = null;   // { model, baseY, bobSeed }
+  function setPet(petId){
+    if (petEntry && petEntry.model){ scene.remove(petEntry.model); petEntry = null; }
+    const pet = petId && PET_MAP[petId];
+    if (!pet) return;
+    const loader = new THREE.GLTFLoader();
+    const d = getDraco(); if (d) loader.setDRACOLoader(d);
+    const cdnUrl = CDN[pet.model];
+    const url = cdnUrl || modelUrl(pet.model);
+    const load = (u, fallback) => loader.load(u, gltf => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const h = box.max.y - box.min.y;
+      const scale = h > 0.001 ? pet.height / h : 1;
+      model.scale.setScalar(scale);
+      model.updateMatrixWorld(true);
+      model.traverse(o => { if (o.isMesh){ o.castShadow = true; o.receiveShadow = true; } });
+      model.position.set(player.position.x, groundY(player.position.x, player.position.z), player.position.z);
+      scene.add(model);
+      petEntry = { model, baseY: -box.min.y * scale, bobSeed: Math.random() * 10 };
+    }, undefined, err => {
+      if (fallback){ load(fallback, null); return; }
+      console.warn("pet model failed to load:", u, err && err.message);
+    });
+    load(url, cdnUrl ? modelUrl(pet.model) : null);
+  }
+  function updatePet(dt, now){
+    if (!petEntry || !petEntry.model) return;
+    const m = petEntry.model;
+    // Trails behind-and-right of wherever the player is currently facing, not a world-fixed
+    // offset — so it reads as following, not orbiting a fixed point near the player.
+    const trail = 1.7;
+    const behindX = player.position.x - Math.sin(player.rotation.y) * trail + Math.cos(player.rotation.y) * 0.9;
+    const behindZ = player.position.z - Math.cos(player.rotation.y) * trail - Math.sin(player.rotation.y) * 0.9;
+    const k = Math.min(1, dt * 4);
+    const nx = m.position.x + (behindX - m.position.x) * k;
+    const nz = m.position.z + (behindZ - m.position.z) * k;
+    const dx = nx - m.position.x, dz = nz - m.position.z;
+    if (Math.abs(dx) > 0.005 || Math.abs(dz) > 0.005) m.rotation.y = Math.atan2(dx, dz);
+    m.position.x = nx; m.position.z = nz;
+    m.position.y = groundY(nx, nz) + petEntry.baseY + Math.sin(now / 260 + petEntry.bobSeed) * 0.04;
+  }
+  function makeEmoteBubble(icon){
+    const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    const g = c.getContext('2d');
+    g.font = '46px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(icon, 32, 34);
+    const tex = new THREE.CanvasTexture(c);
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
+    spr.scale.set(1.4, 1.4, 1);
+    return spr;
+  }
+  // Restores every bone an emote touched to its captured base pose — shared by both a natural
+  // finish and being interrupted by a second emote, so a bone can never get stuck mid-gesture.
+  function restoreEmoteBones(def){
+    const pc = chars.player;
+    if (!pc || !pc.bones) return;
+    for (const boneKey of [def.bone, def.bone2]){
+      if (boneKey && pc.bones[boneKey] && pc.baseRot[boneKey]) pc.bones[boneKey].quaternion.copy(pc.baseRot[boneKey]);
+    }
+  }
+  function updateEmote(now){
+    if (!activeEmote) return;
+    const { def, startedAt, bubble } = activeEmote;
+    const t = (now - startedAt) / 1000 / def.duration;
+    const pc = chars.player;
+    if (t >= 1 || !pc || !pc.model){
+      restoreEmoteBones(def);
+      if (bubble && bubble.parent) bubble.parent.remove(bubble);
+      activeEmote = null;
+      return;
+    }
+    if (pc.bones && def.bone && pc.bones[def.bone] && pc.baseRot[def.bone]){
+      const q = new THREE.Quaternion().setFromAxisAngle(def.axis, def.update(t));
+      pc.bones[def.bone].quaternion.copy(pc.baseRot[def.bone]).multiply(q);
+    }
+    if (pc.bones && def.bone2 && pc.bones[def.bone2] && pc.baseRot[def.bone2]){
+      const q2 = new THREE.Quaternion().setFromAxisAngle(def.axis2, def.update2(t));
+      pc.bones[def.bone2].quaternion.copy(pc.baseRot[def.bone2]).multiply(q2);
+    }
+    if (bubble){
+      bubble.position.set(player.position.x, groundY(player.position.x, player.position.z) + 2.6, player.position.z);
+      // fade in, hold, fade out — never an abrupt pop in either direction
+      bubble.material.opacity = t < 0.15 ? t/0.15 : (t > 0.8 ? (1-t)/0.2 : 1);
+    }
+  }
+  function playEmote(id){
+    const def = EMOTES[id];
+    if (!def) return false;
+    if (activeEmote){   // a new emote cuts the old one off cleanly rather than blending
+      restoreEmoteBones(activeEmote.def);
+      if (activeEmote.bubble && activeEmote.bubble.parent) activeEmote.bubble.parent.remove(activeEmote.bubble);
+    }
+    const bubble = makeEmoteBubble(def.icon);
+    bubble.renderOrder = 20;
+    scene.add(bubble);
+    activeEmote = { def, startedAt: performance.now(), bubble };
+    return true;
+  }
+
   // ---------- load GLB character models (replace procedural wizards) ----------
   var chars = {}; // entityKey -> {model, mixer, walk, idle}  (var: groundY reads it before init)
   // Loading progress, so the UI can show a state instead of a silently-empty world.
@@ -1759,6 +1895,8 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     stepAura(now / 1000);
     updateDayNight();
     updateWeather(dt);
+    updateEmote(now);
+    updatePet(dt, now);
     if (sun && sun.castShadow){
       // Keep the sun's fixed offset from the player so its shadow frustum always covers the
       // area actually on screen, instead of only the zone origin the light was authored at.
@@ -1870,6 +2008,13 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       pc.model.traverse(o => { if (o.isBone) out.push(o.name); });
       return out;
     },
+    // BACKLOG §7 "Emotes" — trigger a gesture by id (see EMOTES above). Returns false for an
+    // unknown id so a caller can distinguish "played" from "no such emote" without throwing.
+    playEmote,
+    emoteActive(){ return activeEmote ? activeEmote.def : null; },
+    // BACKLOG §7 "Pets / familiars" — id from pets.js, or null/undefined to walk alone.
+    setPet,
+    petActive(){ return !!(petEntry && petEntry.model); },
     setPlayerGear(list){
       gearList = list || [];
       applyGear();

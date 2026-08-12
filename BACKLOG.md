@@ -248,13 +248,24 @@
 
 ## 7. Pets, Housing & Cosmetics
 
-- [ ] Pets / familiars
-- [ ] Pet progression
-- [ ] Mounts
-- [ ] Robes / hats / cloaks
-- [ ] Wand cosmetics
-- [ ] Auras
-- [ ] Emotes
+- [x] Pets / familiars — 6 pets (`pets.js`), all reusing existing creature GLBs (zero new assets),
+  bought once each with gold from a Market panel, one active at a time, rendered as a real
+  following companion in the 3D world (`world.js` `setPet`).
+- [x] Pet progression — fully derived from `s.stats.won` (no separate XP counter), deliberately
+  cosmetic (a level number) rather than a fifth stacking economy bonus alongside Prestige/Seasons/
+  Cooking — §7 files this under Cosmetics, not Crafting & Economy.
+- [ ] Mounts — deferred: the biggest lift in §7, touches movement speed/camera follow distance and
+  needs a rideable creature model. Scope as its own focused pass.
+- [ ] Robes / hats / cloaks — genuinely asset-blocked, not a design gap: the player model is one
+  skinned mesh with one material (`equipment3d.js`'s own `UNSUPPORTED` list documents this). Needs
+  new 3D assets with real per-part geometry (BLENDERTODO Tier 5) before this is buildable.
+- [ ] Wand cosmetics — deferred this pass (a player-chosen cosmetic effect independent of tier/
+  metal, e.g. a procedural particle trail, unlocked via achievements like card backs).
+- [x] Auras — already shipped via character creation (`charcreate.js`'s school-coloured ground
+  glow, chosen at creation). No new code needed.
+- [x] Emotes — 4 gestures (Wave/Bow/Cheer/Spin, `world.js` `EMOTE_LIST`/`playEmote`), procedural
+  bone-puppeteering (a temporary quaternion offset on a named rig bone) rather than new animation
+  clips, plus a floating emoji bubble. Triggered from a new in-world emote menu.
 - [x] Housing furniture — shipped as §2 "Dorm customization" (D2). §2 is canonical.
 - [x] Slab display cases — shipped as §2 (D3). §2 is canonical.
 - [x] Boss trophies — shipped as §2 "Trophy room" (D3). §2 is canonical.
@@ -507,7 +518,15 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Weather + Dynamic world events, is done** — the last two §3 items, closing out §3
+**Next step:** **§7 Pets, Housing & Cosmetics, is done** for the items that were actually buildable
+this pass. Auras was already shipped (checked off, no new code). Pets/Pet progression and Emotes
+are new and code-only (existing creature GLBs reused for pets; procedural bone-puppeteering for
+emotes, not new animation clips). Robes/hats/cloaks is flagged genuinely asset-blocked (needs new
+3D geometry, BLENDERTODO Tier 5). Mounts and Wand cosmetics deliberately deferred. 624 engine / 42
+online / 36 creature-rule / 225/226 browser (1 pre-existing unrelated flake) / `check:models`, all
+green.
+
+Before that: **Weather + Dynamic world events, is done** — the last two §3 items, closing out §3
 entirely. Weather is purely atmospheric, derived from wall-clock time, layered onto the existing
 day/night darkening. Dynamic world events gives a guaranteed bonus gather unit during a zone's
 timed "Bountiful Harvest" — the deliberate split so the two features don't overlap mechanically.

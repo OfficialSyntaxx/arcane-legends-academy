@@ -30,6 +30,8 @@ import * as SEASONS from "../public/seasons.js";
 import * as COOK from "../public/cooking.js";
 import * as WEATHER from "../public/weather.js";
 import * as WEVT from "../public/worldevents.js";
+import * as PETS from "../public/pets.js";
+import { EMOTE_LIST as WORLD_EMOTE_LIST } from "../public/world.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -3589,6 +3591,90 @@ check("game.js gather() never grants the event bonus when eventBonus is false", 
   const mat = MATERIALS.find(m => m.id === "tin");
   const r = G.gather(s, mat, Date.now(), false);
   return r.ok === true && r.eventBonus === false;
+})());
+
+// ---------------------------------------------------------------- Pets / familiars (BACKLOG §7)
+check("validatePets reports no problems", PETS.validatePets().length === 0);
+check("a fresh save's pet level is 1 with no wins", PETS.levelFor(G.newGame()) === 1);
+check("pet level climbs one per 5 wins and caps at PET_MAX_LEVEL", (()=>{
+  const s = G.newGame();
+  s.stats.won = 12;   // 1 + floor(12/5) = 3
+  const midLevel = PETS.levelFor(s);
+  s.stats.won = 9999;
+  const capped = PETS.levelFor(s);
+  return midLevel === 3 && capped === PETS.PET_MAX_LEVEL;
+})());
+check("progressToNextLevel reports maxed once the cap is reached", (()=>{
+  const s = G.newGame();
+  s.stats.won = 9999;
+  return PETS.progressToNextLevel(s).maxed === true;
+})());
+check("game.js buyPet refuses without enough gold, leaves the save untouched", (()=>{
+  const s = G.newGame();
+  s.gold = 0;
+  const before = { gold: s.gold, owned: s.pets.owned.slice() };
+  const r = G.buyPet(s, "cat");
+  return r.ok === false && s.gold === before.gold && JSON.stringify(s.pets.owned) === JSON.stringify(before.owned);
+})());
+check("game.js buyPet spends gold, records ownership, and auto-equips the first pet", (()=>{
+  const s = G.newGame();
+  s.gold = 1000;
+  const before = s.gold;
+  const r = G.buyPet(s, "cat");
+  return r.ok === true && s.gold === before - PETS.PET_MAP.cat.cost
+      && s.pets.owned.includes("cat") && s.pets.active === "cat";
+})());
+check("game.js buyPet refuses a pet already owned", (()=>{
+  const s = G.newGame();
+  s.gold = 1000;
+  G.buyPet(s, "cat");
+  const r = G.buyPet(s, "cat");
+  return r.ok === false && r.err === "owned";
+})());
+check("buying a second pet does not change which one is active", (()=>{
+  const s = G.newGame();
+  s.gold = 1000;
+  G.buyPet(s, "cat");
+  G.buyPet(s, "dog");
+  return s.pets.active === "cat";
+})());
+check("game.js equipPet refuses a pet the save doesn't own", (()=>{
+  const s = G.newGame();
+  return G.equipPet(s, "cat").ok === false;
+})());
+check("game.js equipPet switches the active pet, and null unequips", (()=>{
+  const s = G.newGame();
+  s.gold = 1000;
+  G.buyPet(s, "cat"); G.buyPet(s, "dog");
+  G.equipPet(s, "dog");
+  const switched = s.pets.active === "dog";
+  G.equipPet(s, null);
+  return switched && s.pets.active === null;
+})());
+check("game.js petState reflects the active pet and derived level", (()=>{
+  const s = G.newGame();
+  s.gold = 1000; s.stats.won = 7;
+  G.buyPet(s, "frog");
+  const st = G.petState(s);
+  return st.active.id === "frog" && st.level === 2 && st.owned.includes("frog");
+})());
+check("game.js newGame() starts with no pets owned and none active", (()=>{
+  const s = G.newGame();
+  return Array.isArray(s.pets.owned) && s.pets.owned.length === 0 && s.pets.active === null;
+})());
+check("game.js load() backfills pets on an old save missing the field", (()=>{
+  const s = G.newGame();
+  delete s.pets;
+  G.save(s);
+  const loaded = G.load();
+  return loaded.pets && Array.isArray(loaded.pets.owned) && loaded.pets.active === null;
+})());
+
+// ---------------------------------------------------------------- Emotes (BACKLOG §7)
+check("EMOTE_LIST from world.js has a unique id/icon/label for every emote", (()=>{
+  const ids = new Set(WORLD_EMOTE_LIST.map(e => e.id));
+  return ids.size === WORLD_EMOTE_LIST.length
+      && WORLD_EMOTE_LIST.every(e => e.id && e.icon && e.label);
 })());
 
 // ---------------------------------------------------------------- endgame dungeon tiers (BACKLOG §10)

@@ -1429,6 +1429,58 @@ if (hasWorld){
   check("cooking through the real DOM mints the food item", crafting.cookedCount === 1, String(crafting.cookedCount));
   check("eating a meal through the real DOM shows the active buff banner", /Hearty Stew active/.test(crafting.afterEat || ""), (crafting.afterEat||"").slice(0,300));
 
+  // --- Pets / familiars (BACKLOG §7) ---
+  const pets = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const s = window.__testSave();
+    s.gold = 1000;
+    document.querySelector('.navbtn[data-screen="market"]').click();
+    await settle(250);
+    const before = document.getElementById("scr_market").innerText;
+    const buyBtn = [...document.querySelectorAll("#scr_market button")].find(b => b.getAttribute("onclick") === "window.__ev('buyPet|cat')");
+    const hasBuyButton = !!buyBtn;
+    if (!buyBtn) return { before, hasBuyButton };
+    buyBtn.click();
+    // A real GLTF load for the pet model, same "poll, don't guess one fixed wait" discipline the
+    // gear-load check above uses — this is real network+decode time under swiftshader, not a
+    // superstitious sleep.
+    let petActiveInWorld = false;
+    for (let i = 0; i < 10 && !petActiveInWorld; i++){
+      await settle(500);
+      petActiveInWorld = !!(window.__world && window.__world.petActive && window.__world.petActive());
+    }
+    const afterBuy = document.getElementById("scr_market").innerText;
+    return { before, hasBuyButton, owned: window.__testSave().pets.owned.slice(),
+             active: window.__testSave().pets.active, petActiveInWorld, afterBuy };
+  });
+  check("a pet is offered for purchase in the Market before any are owned", pets.hasBuyButton === true);
+  check("buying a pet through the real DOM records ownership and auto-equips it", pets.owned && pets.owned.includes("cat") && pets.active === "cat");
+  check("the equipped pet actually renders as a companion in the 3D world", pets.petActiveInWorld === true);
+  check("the Market reflects the pet as equipped right after buying it", /Equipped/.test(pets.afterBuy || ""), (pets.afterBuy||"").slice(0,300));
+
+  // --- Emotes (BACKLOG §7) ---
+  const emotes = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    document.querySelector('.navbtn[data-screen="world"]').click();
+    await settle(200);
+    document.getElementById("emoteBtn").click();
+    await settle(100);
+    const menuOpen = document.getElementById("emoteMenu").classList.contains("open");
+    const waveBtn = [...document.querySelectorAll("#emoteMenu button")].find(b => b.getAttribute("onclick") === "window.__ev('emote|wave')");
+    const hasWave = !!waveBtn;
+    if (!waveBtn) return { menuOpen, hasWave };
+    waveBtn.click();
+    await settle(150);
+    const menuClosedAfter = !document.getElementById("emoteMenu").classList.contains("open");
+    const activeRightAway = window.__world.emoteActive();
+    await settle(2200);   // wave's own duration is 2.0s
+    const activeAfterDuration = window.__world.emoteActive();
+    return { menuOpen, hasWave, menuClosedAfter, activeId: activeRightAway && activeRightAway.icon, activeAfterDuration };
+  });
+  check("the emote button opens a menu listing every emote", emotes.menuOpen === true && emotes.hasWave === true);
+  check("picking an emote closes the menu and actually starts it", emotes.menuClosedAfter === true && !!emotes.activeId);
+  check("the emote ends on its own after its real duration, not left running forever", emotes.activeAfterDuration === null);
+
   // --- Endgame dungeon tiers / Hard Mode (BACKLOG §10) ---
   const hard = await page.evaluate(async () => {
     const settle = ms => new Promise(r => setTimeout(r, ms));

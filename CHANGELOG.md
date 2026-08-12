@@ -14,6 +14,28 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## §7 Pets, Housing & Cosmetics — 2026-08-12
+
+### §7 Pets, Housing & Cosmetics — *pending*
+- Scoped with the user first. Auras was already shipped via character creation — checked off, no
+  new code. Robes/hats/cloaks flagged as genuinely asset-blocked (single-mesh player model, needs
+  new per-part geometry, BLENDERTODO Tier 5), not a design gap. Mounts and Wand cosmetics
+  deliberately deferred.
+- **Pets / familiars + Pet progression** (new `pets.js`): six pets, all reusing existing creature
+  GLBs `assets/models/` already ships for dungeon/world enemies — zero new asset generation.
+  Bought once each with gold from a new Market panel, one active at a time. Progression is fully
+  derived from `s.stats.won` (no separate XP counter) and deliberately stays cosmetic — a level
+  number, not a fifth stacking economy bonus alongside Prestige/Seasons/Cooking. Renders as a real
+  following companion in the 3D world (`world.js` `setPet`/`updatePet`).
+- **Emotes** (`world.js` `EMOTE_LIST`/`playEmote`): four gestures, deliberately not new animation
+  clips (the generated GLBs only ship walk/idle) — a temporary quaternion offset on a named rig
+  bone, the same procedural-bone-puppeteering technique the wand/amulet attachment already uses.
+  A floating emoji sprite fades in/out above the player; a second emote cuts the first off cleanly.
+- 14 new engine tests + 7 real-browser tests (a real GLTF-load poll for the pet model, a real
+  emote click that starts then naturally ends). Verified visually with a Playwright screenshot.
+- *624 engine / 42 online / 36 creature-rule / 225/226 browser (1 pre-existing unrelated VFX
+  flake) / `check:models`, all green.*
+
 ## Weather + Dynamic world events — 2026-08-12
 
 ### Weather + Dynamic world events — `3d6c39c`

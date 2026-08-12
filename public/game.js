@@ -14,6 +14,7 @@ import * as COLLECT from "./collectibles.js";
 import * as EVO from "./evolution.js";
 import * as SEASONS from "./seasons.js";
 import * as COOK from "./cooking.js";
+import * as PETS from "./pets.js";
 import { traitForCard } from "./creatures.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
@@ -65,6 +66,7 @@ export function newGame(){
     collectibles:[],   // BACKLOG §10 "Rare collectibles" — ids found, see collectibles.js's own header
     seasons:{ claimed:[] },   // BACKLOG §10 "Seasonal events" — see seasons.js's own header
     foodBuff:null,   // BACKLOG §6 "Cooking" — {id, until} or null; see cooking.js's own header
+    pets:{ owned:[], active:null },   // BACKLOG §7 "Pets / familiars" — see pets.js's own header
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
     // `treasuresFound` (BACKLOG §3 "Hidden areas / treasure") is a flat list of globally-unique
@@ -149,6 +151,9 @@ function migrate(s){
   if (!s.skills.cooking) s.skills.cooking = 1;
   if (!s.skillXp.cooking) s.skillXp.cooking = 0;
   if (s.foodBuff === undefined) s.foodBuff = null;
+  if (!s.pets || typeof s.pets !== "object") s.pets = { owned:[], active:null };
+  if (!Array.isArray(s.pets.owned)) s.pets.owned = [];
+  if (s.pets.active === undefined) s.pets.active = null;
   if (!s.stats.slabs) s.stats.slabs = 0;
   // Counters the onboarding chain asks about. They record an ACTION the save had no other record
   // of — a scribed card is indistinguishable from a starter one once it is in `cards`.
@@ -478,6 +483,30 @@ export function eatFood(s, foodId){
 export function foodState(s){
   const active = COOK.foodBuffActive(s);
   return { active, remainingMs: active ? Math.max(0, active.until - Date.now()) : 0 };
+}
+
+// ---------------------------------------------------------------- Pets / familiars (BACKLOG §7)
+// Bought once each with gold (no card-pack-style luck involved — a pet is a purchase, not a
+// pull), one active at a time. See pets.js's own header for why progression is derived, not a
+// fifth stacking economy bonus.
+export function buyPet(s, petId){
+  const pet = PETS.PET_MAP[petId];
+  if (!pet) return { ok:false, err:"unknown" };
+  if (s.pets.owned.includes(petId)) return { ok:false, err:"owned" };
+  if (s.gold < pet.cost) return { ok:false, err:"gold" };
+  s.gold -= pet.cost;
+  s.pets.owned.push(petId);
+  if (!s.pets.active) s.pets.active = petId;   // the first pet bought auto-equips
+  return { ok:true, pet };
+}
+export function equipPet(s, petId){
+  if (petId != null && !s.pets.owned.includes(petId)) return { ok:false, err:"not_owned" };
+  s.pets.active = petId;   // null unequips (walk alone)
+  return { ok:true };
+}
+export function petState(s){
+  const active = s.pets.active ? PETS.PET_MAP[s.pets.active] : null;
+  return { owned: s.pets.owned.slice(), active, level: PETS.levelFor(s), progress: PETS.progressToNextLevel(s) };
 }
 
 // ---------- Scribing (the Arcanum card-craft loop) ----------
