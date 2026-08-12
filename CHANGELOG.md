@@ -14,6 +14,29 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Rare collectibles + Endgame dungeon tiers — 2026-08-11
+
+### Rare collectibles + Endgame dungeon tiers — *pending*
+- Two more BACKLOG §10 items, scoped together (Seasonal events and The Arcanum deliberately
+  deferred — see BACKLOG §10's own note on why).
+- **Rare collectibles** (`collectibles.js`): treasure-sourced, not boss-sourced — every dungeon
+  boss dies exactly once per save, so a %-chance drop off a one-time-ever event would be
+  unreachable for most players. The 12 hidden treasure caches are also one-time-each but there are
+  twelve of them, so a flat 20% chance per claim gives a real shot at an 8-item shared pool without
+  promising all of them in one save — same "rare, not rigged" shape `items.js`'s pristine finds
+  have. `claimTreasure` rolls it on top of the normal reward, never instead of it. Shown as a Codex
+  gallery panel (found by name/icon, unfound as a `???` slot).
+- **Endgame dungeon tiers** (`game.js` Hard Mode): a dungeon boss can't be re-triggered in the 3D
+  world (its mesh is gone forever after the first kill), so "replay it harder" is a menu duel on
+  the Quests screen instead — the same shape that screen's Rival Duels/Lab duels already use.
+  Fights the boss's own archetype/deck at 1.6× HP with the toughest quest gear tier. Deliberately
+  unlimited and repeatable (an endgame sink, not a second one-time reward) — never touches
+  `worldState.dungeons`.
+- 12 + 2 new engine tests, 6 new real-browser tests (Codex mystery-slot rendering, Hard Mode
+  gating, a real DOM-button rematch tagged `isHardBoss` at scaled HP, repeatable payout).
+- *557 engine / 42 online / 36 creature-rule / 204/205 browser (1 pre-existing unrelated VFX
+  flake) / `check:models`, all green.*
+
 ## Prestige — 2026-08-11
 
 ### Prestige — `845d869`

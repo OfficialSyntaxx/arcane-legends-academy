@@ -24,6 +24,7 @@ import * as MAGIC from "../public/schoolmagic.js";
 import * as CB from "../public/cardbacks.js";
 import * as ACHV from "../public/achievements.js";
 import * as PRESTIGE from "../public/prestige.js";
+import * as COLLECT from "../public/collectibles.js";
 import * as REP from "../public/reputation.js";
 import * as DORM from "../public/dorm.js";
 import * as CC from "../public/charcreate.js";
@@ -3221,6 +3222,76 @@ check("game.js load() backfills prestige on an old save missing the field", (()=
   G.save(s);
   const loaded = G.load();
   return loaded.prestige && loaded.prestige.level === 0 && Array.isArray(loaded.prestige.history);
+})());
+
+// ---------------------------------------------------------------- collectibles.js (BACKLOG §10)
+check("validateCollectibles reports no problems", COLLECT.validateCollectibles().length === 0);
+check("a fresh save has found no collectibles", (()=>{
+  const s = G.newGame();
+  return COLLECT.foundFor(s).length === 0 && COLLECT.unfoundIds(s).length === COLLECT.COLLECTIBLES.length;
+})());
+check("rollOnClaim never grants a collectible below its own roll threshold", (()=>{
+  const s = G.newGame();
+  // rng returning exactly DROP_CHANCE/100 must MISS — the check is strictly-less-than, mirroring
+  // items.js's own pristine-find roll.
+  const missRng = () => COLLECT.DROP_CHANCE / 100;
+  const r = COLLECT.rollOnClaim(s, missRng);
+  return r === null && (s.collectibles || []).length === 0;
+})());
+check("rollOnClaim grants a real catalog entry on a hit and records it on the save", (()=>{
+  const s = G.newGame();
+  const hitRng = () => 0;   // always clears the DROP_CHANCE check and picks index 0
+  const r = COLLECT.rollOnClaim(s, hitRng);
+  return r !== null && COLLECT.COLLECTIBLE_MAP[r.id] === r && s.collectibles.includes(r.id);
+})());
+check("rollOnClaim never grants the same collectible twice", (()=>{
+  const s = G.newGame();
+  const hitRng = () => 0;
+  const first = COLLECT.rollOnClaim(s, hitRng);
+  const second = COLLECT.rollOnClaim(s, hitRng);
+  return first.id !== second.id;
+})());
+check("once every collectible is found, rollOnClaim always returns null", (()=>{
+  const s = G.newGame();
+  s.collectibles = COLLECT.COLLECTIBLES.map(c => c.id);
+  return COLLECT.rollOnClaim(s, () => 0) === null;
+})());
+check("game.js claimTreasure never grants a collectible on an already-claimed cache", (()=>{
+  const s = G.newGame();
+  const id = Object.keys(G.TREASURE_REWARDS)[0];
+  G.claimTreasure(s, id);
+  const r = G.claimTreasure(s, id);
+  return r.ok === false;
+})());
+check("game.js newGame() starts with an empty collectibles list", Array.isArray(G.newGame().collectibles) && G.newGame().collectibles.length === 0);
+check("game.js load() backfills collectibles on an old save missing the field", (()=>{
+  const s = G.newGame();
+  delete s.collectibles;
+  G.save(s);
+  const loaded = G.load();
+  return Array.isArray(loaded.collectibles);
+})());
+
+// ---------------------------------------------------------------- endgame dungeon tiers (BACKLOG §10)
+check("hardModeAvailable is false until a dungeon's boss is actually dead", (()=>{
+  const s = G.newGame();
+  s.worldState.dungeons.cinderhollow_caverns = { bossDead: false, cleared: [], defeated: [] };
+  const before = G.hardModeAvailable(s, "cinderhollow_caverns");
+  s.worldState.dungeons.cinderhollow_caverns.bossDead = true;
+  const after = G.hardModeAvailable(s, "cinderhollow_caverns");
+  return before === false && after === true;
+})());
+check("hardModeAvailable is false for a dungeon the save has no record of at all", (()=>{
+  const s = G.newGame();
+  return G.hardModeAvailable(s, "not_a_real_dungeon") === false;
+})());
+check("grantHardBossReward pays out real, repeatable gold and cards", (()=>{
+  const s = G.newGame();
+  const goldBefore = s.gold, cardsBefore = s.cards.length;
+  const r1 = G.grantHardBossReward(s);
+  const r2 = G.grantHardBossReward(s);   // repeatable by design — an endgame sink, not one-shot
+  return r1.gold === G.HARD_BOSS_REWARD.gold && s.gold === goldBefore + G.HARD_BOSS_REWARD.gold * 2
+      && s.cards.length === cardsBefore + r1.drops.length + r2.drops.length;
 })());
 
 // ---------------------------------------------------------------- enchanting (BACKLOG §6)

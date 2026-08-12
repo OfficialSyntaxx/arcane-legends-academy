@@ -333,10 +333,15 @@
   reached, mirrors `pvprank.js`'s season pattern (soft reset + honest own-history). Only
   `academyBonus` resets — level/collection value/wins never do. Each tier grants a permanent,
   cumulative perk stacking on top of the curriculum's own, plus an achievement-granted title.
-- [ ] Seasonal events
-- [ ] Rare collectibles
-- [ ] Endgame dungeon tiers
-- [ ] The Arcanum / ultimate endgame zone
+- [ ] Seasonal events — deferred: this game has no server (BACKLOG/CLAUDEREADME §3), so "seasonal"
+  can only mean content honestly gated by the real calendar date, not a server-pushed live event.
+  Needs the exact mechanic scoped with the user before building.
+- [x] Rare collectibles — an 8-item pool, 20% chance per hidden-treasure-cache claim (treasure-
+  sourced, not boss-sourced — see CLAUDEREADME §6.44 for why), shown as a Codex gallery.
+- [x] Endgame dungeon tiers — "Hard Mode": once a dungeon's boss is dead, an unlimited, repeatable
+  menu-duel rematch at 1.6× HP for a scaled reward, offered from the Quests screen.
+- [ ] The Arcanum / ultimate endgame zone — deferred: same scale as the whole Ashen Mountains arc
+  (zone + dungeon + boss + quests), not a same-session item. Treat as its own multi-step project.
 
 ---
 
@@ -506,7 +511,14 @@ and don't respawn) → a rigged, correctly-posed and correctly-scaled player cha
 bands/rock/shoreline/mottling, no textures) → WORLDSPEC steps 3–5 (chunk streaming, zone
 transitions, dungeon instancing).
 
-**Next step:** **Prestige, is done** (§10). Scoped properly first (see CLAUDEREADME §6.43 for the
+**Next step:** **Rare collectibles + Endgame dungeon tiers, is done** (§10). Collectibles are
+treasure-sourced (a shared 8-item pool, 20% per claim), shown in a Codex gallery. Hard Mode is a
+repeatable, unlimited boss rematch from the Quests screen once a dungeon's boss is dead, at 1.6×
+HP for a scaled reward. Seasonal events and The Arcanum deliberately deferred out of this pass.
+557 engine / 42 online / 36 creature-rule / 204/205 browser (1 pre-existing unrelated flake) /
+`check:models`, all green.
+
+Before that: **Prestige, is done** (§10). Scoped properly first (see CLAUDEREADME §6.43 for the
 real problem it solves), then built to mirror `pvprank.js`'s season pattern: 5 stacking tiers,
 player-initiated at Archmage, only `academyBonus` resets, 5 achievement-granted titles. 545 engine
 / 42 online / 36 creature-rule / 199 browser / `check:models`, all green.

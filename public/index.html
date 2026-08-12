@@ -411,6 +411,7 @@ import * as RANK from "./pvprank.js";
 import * as MAGIC from "./schoolmagic.js";
 import * as CB from "./cardbacks.js";
 import * as ACHV from "./achievements.js";
+import * as COLLECT from "./collectibles.js";
 import * as DORM from "./dorm.js";
 import { interiorFor, doorPos, BUILDINGS } from "./structures.js";
 import * as CC from "./charcreate.js";
@@ -1597,6 +1598,20 @@ function buildCodex(){
   }
   h += `</div></div>`;
 
+  // rare collectibles (BACKLOG §10) — a Codex-style gallery of what's been found so far, not a
+  // find-order log; collectibles.js's own header explains why they're treasure-sourced, not boss-sourced.
+  const foundCollectibles = COLLECT.foundFor(S), collectProg = COLLECT.collectionProgress(S);
+  h += `<div class="panel" style="margin-top:14px"><h3>🗝️ Rare Collectibles</h3>
+    <p class="sub">${collectProg.have}/${collectProg.need} found — a rare chance on any hidden treasure cache.</p>
+    <div class="row" style="flex-wrap:wrap;gap:8px;margin-top:6px">`;
+  for (const c of COLLECT.COLLECTIBLES){
+    const has = foundCollectibles.some(f => f.id === c.id);
+    h += `<div class="panel" style="flex:1;min-width:150px;${has?"":"opacity:.4"}" title="${has?c.desc:"Not yet found"}">
+      <div style="font-weight:700"><span class="ic">${has?c.icon:"❔"}</span> ${has?c.name:"???"}</div>
+    </div>`;
+  }
+  h += `</div></div>`;
+
   // collection value analytics (BACKLOG §5) — where the total sits, not just what it is
   const bySchoolValue = G.valueBySchool(S);
   const byRarityValue = G.valueByRarity(S);
@@ -1950,9 +1965,49 @@ function renderQuests(el){
       <button class="btn sm ${done?"":unlocked?"gold":""}" ${done||!unlocked?"disabled":""} onclick="window.__ev('startQuest|${i}')">${done?"Done":unlocked?"Duel":"Locked"}</button>
     </div>`;
   }
+  // BACKLOG §10 "Endgame dungeon tiers" — offered as a menu duel here, not a world trigger: the
+  // boss's mesh is long gone (removed permanently on its first, one-time kill), so this is a
+  // rematch, not a reappearance. Only ever shown for a dungeon whose boss is actually dead.
+  const hardBosses = Object.keys(S.worldState.dungeons)
+    .filter(id => G.hardModeAvailable(S, id))
+    .map(id => ({ id, boss: hardBossFor(id) }))
+    .filter(x => x.boss);
+  if (hardBosses.length){
+    h += `<h3>🔥 Hard Mode</h3><p class="sub">Rematch a beaten dungeon boss at increased strength for a better payout. Unlimited — an endgame gold/card sink, not a one-time reward.</p>`;
+    for (const { id, boss } of hardBosses){
+      const scaledHp = Math.round(boss.hp * G.HARD_MODE_HP_MULT);
+      h += `<div class="lrow">
+        <div class="ic">🔥</div>
+        <div class="grow"><div class="t">${boss.name} (Hard Mode)</div>
+        <div class="d">${ZQ.DUNGEON_NAMES[id] || id} · ${scaledHp} HP</div></div>
+        <div class="d">Reward: 🪙${G.HARD_BOSS_REWARD.gold} + ${G.HARD_BOSS_REWARD.cards} cards</div>
+        <button class="btn sm gold" onclick="window.__ev('hardBoss|${id}')">⚔️ Rematch</button>
+      </div>`;
+    }
+  }
   el.innerHTML = h;
 }
 window.__EV.startQuest = (i)=>{ startLocalDuel(G.QUESTS[i].deck, G.QUESTS[i].gear, G.QUESTS[i].title, i, true); };
+// The boss's own declared stats, read off the compiled dungeon zone worldCfg already holds — no
+// separate boss catalog to keep in sync, same "one source of truth" rule dungeons.json's own
+// `dungeonZone()` enemy list follows for the normal (first-kill) fight.
+function hardBossFor(dungeonId){
+  const dz = worldCfg && worldCfg.get(dungeonId);
+  return dz && (dz.enemies || []).find(e => e.boss);
+}
+window.__EV.hardBoss = (dungeonId)=>{
+  const boss = hardBossFor(dungeonId);
+  if (!boss) return;
+  const archetype = ARCH.archetypeFor(boss);
+  const school = ARCH.flavorSchoolFor(boss);
+  const pool = CARDS.filter(c => c.school === school);
+  const deck = ARCH.archetypeDeckFor(archetype, pool);
+  // The toughest quest gear tier, not the boss's original tier — Hard Mode is meant to be the
+  // hardest fight in the game, not a repeat of whatever the dungeon originally scaled to.
+  const gear = G.QUESTS[G.QUESTS.length - 1].gear;
+  startLocalDuel(deck, gear, `${boss.name} (Hard Mode)`, -1, false, { archetype, school, hp: Math.round(boss.hp * G.HARD_MODE_HP_MULT) });
+  battle.isHardBoss = true;
+};
 
 // ================= PVP =================
 function renderPvp(el){
@@ -2266,6 +2321,22 @@ window.__EV.duelAgain = ()=>{
     render();
     return;
   }
+  // Hard Mode boss rematch (BACKLOG §10 "Endgame dungeon tiers"): unlimited and repeatable by
+  // design, so — unlike the dungeonFoe path below — it never touches worldState.dungeons at all.
+  // No PvP record either; it's a PvE gold/card sink, not a ranked fight.
+  if (battle && battle.isHardBoss){
+    over.winner==="you" ? winSfx() : loseSfx();
+    if (over.winner==="you"){
+      const r = G.grantHardBossReward(S);
+      toast(`☠ Hard Mode boss defeated! +${r.gold}g +${r.drops.length} cards`);
+    } else toast("Defeated — the Hard Mode boss lives on.");
+    save();
+    clearInterval(duelTimerInt);
+    battle=null; pendingTarget=null;
+    screen = "quests";
+    render();
+    return;
+  }
   const isQuest = battle && battle.isQuest;
   const qIdx = battle && battle.questIdx;
   const gear = G.equipStats(S);
@@ -2567,6 +2638,11 @@ function spawnWorld(canvas, zone, spawnAt){
       if (r.reward.gold) bits.push(`+${r.reward.gold}g`);
       toast(`✨ Hidden cache found! ${bits.join(" ")}`);
       AUDIO.play("coin");
+      // BACKLOG §10 "Rare collectibles" — a second, separate toast so a genuinely rare find is
+      // never buried in the routine "cache found" line every treasure already shows.
+      if (r.collectible){
+        setTimeout(()=>{ toast(`${r.collectible.icon} Rare find: ${r.collectible.name}!`); AUDIO.play("levelUp"); }, 900);
+      }
       save(); render();
     },
   }, zone, {

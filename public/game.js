@@ -10,6 +10,7 @@ import * as MAGIC from "./schoolmagic.js";
 import * as CB from "./cardbacks.js";
 import * as ACHV from "./achievements.js";
 import * as PRESTIGE from "./prestige.js";
+import * as COLLECT from "./collectibles.js";
 import { traitForCard } from "./creatures.js";
 
 const SAVE_KEY = "arcane_legends_save_v1";
@@ -58,6 +59,7 @@ export function newGame(){
     // BACKLOG §10 "Prestige" — see prestige.js's own header for why this resets on prestige and
     // level/collection/wins never do.
     prestige:{ level:0, history:[] },
+    collectibles:[],   // BACKLOG §10 "Rare collectibles" — ids found, see collectibles.js's own header
     // WORLDSPEC §10: world progression lives in the save. `zone` is where the player logs back
     // in; `visited` gates fast travel and "new area" moments later.
     // `treasuresFound` (BACKLOG §3 "Hidden areas / treasure") is a flat list of globally-unique
@@ -178,6 +180,7 @@ function migrate(s){
   if (!s.prestige || typeof s.prestige !== "object") s.prestige = { level:0, history:[] };
   if (s.prestige.level == null) s.prestige.level = 0;
   if (!Array.isArray(s.prestige.history)) s.prestige.history = [];
+  if (!Array.isArray(s.collectibles)) s.collectibles = [];
   if (!s.lessons) s.lessons = { enrolled: [], done: [] };
   if (!Array.isArray(s.lessons.enrolled)) s.lessons.enrolled = [];
   if (!Array.isArray(s.lessons.done)) s.lessons.done = [];
@@ -309,7 +312,10 @@ export function claimTreasure(s, id){
   if (!reward) return { ok:false, err:"unknown" };
   if (reward.gold) gainGold(s, reward.gold);
   s.worldState.treasuresFound.push(id);
-  return { ok:true, reward };
+  // BACKLOG §10 "Rare collectibles" — a flat-chance bonus roll on top of the reward, never
+  // instead of it, same "rare, not rigged" shape items.js's pristine finds use.
+  const collectible = COLLECT.rollOnClaim(s, rng);
+  return { ok:true, reward, collectible };
 }
 
 /** Every treasure a zone places must have a reward, and every reward must actually be placed
@@ -320,6 +326,28 @@ export function validateTreasureRewards(placedTreasureIds){
   for (const id of placed) if (!TREASURE_REWARDS[id]) problems.push(`treasure "${id}" is placed in the world but has no TREASURE_REWARDS entry`);
   for (const id of Object.keys(TREASURE_REWARDS)) if (!placed.has(id)) problems.push(`TREASURE_REWARDS has "${id}" but no zone places it`);
   return problems;
+}
+
+// ---------------------------------------------------------------- endgame dungeon tiers
+// (BACKLOG §10 "Endgame dungeon tiers"). A dungeon boss dies exactly once per save (see
+// collectibles.js's own header for why — `recordDungeonKill` removes it from the world
+// permanently), so there is no way to "replay the dungeon" without either building a second
+// instance of it (new content, out of scope for this pass) or reopening the SAME fight on demand
+// once it's been proven beatable. This is the latter: once a dungeon's boss is dead, its Hard Mode
+// rematch is offered from the Quests screen (a menu duel, not a world trigger — no new geometry,
+// same "Rival Duels"/Lab-duel shape this screen already has), scaled up and worth more, and
+// unlimited — an intentional endgame gold/card sink for a player who has already cleared
+// everything else, not a one-time reward like the original boss kill was.
+export const HARD_MODE_HP_MULT = 1.6;
+export const HARD_BOSS_REWARD = { gold: 900, cards: 4 };
+export function hardModeAvailable(s, dungeonId){
+  const st = s.worldState.dungeons[dungeonId];
+  return !!(st && st.bossDead);
+}
+export function grantHardBossReward(s){
+  gainGold(s, HARD_BOSS_REWARD.gold);
+  const drops = dropCards(s, HARD_BOSS_REWARD.cards);
+  return { gold: HARD_BOSS_REWARD.gold, drops };
 }
 
 // ---------- Skills: gather / craft ----------

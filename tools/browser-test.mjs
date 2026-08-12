@@ -1298,6 +1298,61 @@ if (hasWorld){
   check("triggering it again (mesh already gone) never grants the reward twice",
         treasure.goldAfterSecond === treasure.goldAfterFirst, `${treasure.goldAfterFirst} -> ${treasure.goldAfterSecond}`);
 
+  // --- Rare collectibles (BACKLOG §10) ---
+  // The 20% roll is already exhaustively covered deterministically at the engine level
+  // (tools/test.mjs, a mock rng). What only a browser can answer is whether the Codex actually
+  // RENDERS a found one by name/icon and an unfound one as a mystery slot — so this seeds the
+  // save directly (the same shortcut the pristine-find UI tests take for their sell panel) rather
+  // than trying to win a real 20% roll off a one-shot treasure.
+  const collect = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const s = window.__testSave();
+    s.collectibles = [];
+    window.__ev("openCodex");
+    await settle(300);
+    const before = document.getElementById("ovBody").innerText;
+    document.getElementById("overlay").style.display = "none";
+    return { before };
+  });
+  check("the Codex shows every collectible as a mystery slot before any are found",
+        /Rare Collectibles/.test(collect.before) && /\?\?\?/.test(collect.before), collect.before.slice(0, 300));
+
+  // --- Endgame dungeon tiers / Hard Mode (BACKLOG §10) ---
+  const hard = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const s = window.__testSave();
+    const before = { gold: s.gold, cards: s.cards.length };
+    s.worldState.dungeons.cinderhollow_caverns = s.worldState.dungeons.cinderhollow_caverns || { cleared: [], defeated: [] };
+    s.worldState.dungeons.cinderhollow_caverns.bossDead = false;
+    document.querySelector('.navbtn[data-screen="quests"]').click();
+    await settle(200);
+    const beforeUnlock = document.getElementById("scr_quests").innerText;
+    s.worldState.dungeons.cinderhollow_caverns.bossDead = true;
+    document.querySelector('.navbtn[data-screen="quests"]').click();
+    await settle(200);
+    const afterUnlock = document.getElementById("scr_quests").innerText;
+    const btn = [...document.querySelectorAll("#scr_quests button")].find(b => /Rematch/.test(b.textContent));
+    const hasButton = !!btn;
+    if (!btn) return { beforeUnlock, afterUnlock, hasButton, before };
+    btn.click();
+    await settle(300);
+    const b = window.__testBattle();
+    const started = !!b, isHardBoss = b && b.isHardBoss, enemyHp = b && b.enemy.maxHp;
+    if (b) b.enemy.hp = 0;
+    window.__ev("duelAgain");
+    await settle(300);
+    const s2 = window.__testSave();
+    return { beforeUnlock, afterUnlock, hasButton, before, started, isHardBoss, enemyHp,
+             after: { gold: s2.gold, cards: s2.cards.length }, screen: document.getElementById("screen").innerText };
+  });
+  check("Hard Mode is not offered before a dungeon's boss is dead", !/Hard Mode/.test(hard.beforeUnlock || ""));
+  check("Hard Mode is offered once the boss is dead", /Hard Mode/.test(hard.afterUnlock || ""), (hard.afterUnlock||"").slice(0,200));
+  check("the Rematch button starts a real duel tagged isHardBoss", hard.started === true && hard.isHardBoss === true);
+  check("the Hard Mode boss fights at a scaled-up HP, not the open-world default", hard.enemyHp > 100, String(hard.enemyHp));
+  check("winning a Hard Mode rematch pays out real, repeatable gold and cards",
+        hard.after && hard.before && hard.after.gold > hard.before.gold && hard.after.cards > hard.before.cards,
+        `${JSON.stringify(hard.before)} -> ${JSON.stringify(hard.after)}`);
+
   // --- Ashen Mountains (BACKLOG §3) — zone shell, step 1 of the content pass ---
   // The player is currently back in the academy (fast travel above). Walk the real gateway chain
   // academy -> forest -> ashen_mountains and confirm the fourth zone actually BUILDS: terrain,

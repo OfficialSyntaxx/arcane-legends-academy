@@ -1170,6 +1170,45 @@ narrower.
   DOM button, the curriculum panel reflects the new tier afterward).
 - 545 engine / 42 online / 36 creature-rule / 199 browser / `check:models`, all green.
 
+### 6.44 Rare collectibles + Endgame dungeon tiers (`collectibles.js`, `game.js`, `index.html`, BACKLOG §10)
+Two more §10 items, scoped together in one pass (see that scoping conversation for why the other
+two — Seasonal events, The Arcanum — were deliberately deferred: the former needed a real-calendar
+design decision, the latter is Ashen-Mountains-scale and not a same-session item).
+
+**Rare collectibles** (`collectibles.js`) — a flat 20% chance on any hidden-treasure-cache claim to
+also grant a random, not-yet-owned cosmetic collectible from an 8-item pool, on top of the treasure's
+normal gold reward, never instead of it. Sourced from **treasure chests, not dungeon bosses**: every
+boss in this game dies exactly once per save (`recordDungeonKill` removes it from the world
+permanently), so a %-chance drop off a one-time-ever event would mean most players simply never see
+it, with no way to try again — a slot machine, not a rare find. The 12 treasure caches are ALSO
+one-time-each, but there are twelve of them, so a flat per-claim chance gives a real (if unlikely)
+shot without ever promising all of them in one save — the same "rare, not rigged" feel `items.js`'s
+pristine finds have, off a one-shot event instead of a repeatable one. A shared pool (not one
+collectible pinned per cache) means `game.js` never needs a second id-table kept in sync with
+`TREASURE_REWARDS` — `claimTreasure` just calls `COLLECT.rollOnClaim(s, rng)` with nothing but the
+save and the engine's own seeded rng. Shown as a Codex gallery panel (found items by name/icon,
+unfound as a `???` mystery slot) — the same "what have you found" shape codex.js's own achievements
+already use.
+
+**Endgame dungeon tiers** (`game.js` `hardModeAvailable`/`grantHardBossReward`) — since a dungeon
+boss cannot be re-triggered in the 3D world (its mesh is gone forever after the first kill), "replay
+the dungeon harder" can't mean walking up to the corpse again. Instead: once a dungeon's `bossDead`
+flag is true, its Hard Mode rematch appears as a **menu duel** on the Quests screen (the exact same
+"Rival Duels"/Lab-duel shape that screen already has, so no new UI pattern), fighting the boss's own
+declared archetype/school/deck at `HARD_MODE_HP_MULT` (1.6×) HP with the toughest quest gear tier.
+Deliberately **unlimited and repeatable** — this is an endgame gold/card sink for a player who has
+already cleared everything else, not a second one-time reward, so it never touches
+`worldState.dungeons` at all (compare `dungeonFoe`'s handling in `duelAgain`, which does).
+- 12 new engine tests (collectibles: mock-rng hit/miss at the exact threshold, no duplicate grants,
+  exhausted-pool behaviour, `claimTreasure` integration, migration) + 2 (hard mode: gating,
+  repeatable reward) in `tools/test.mjs`.
+- 6 new real-browser tests in `tools/browser-test.mjs`: the Codex renders found vs. mystery slots
+  correctly; Hard Mode is absent before a kill and appears after; the Rematch button starts a real
+  duel tagged `isHardBoss` at scaled HP through the actual DOM, and winning it pays out real,
+  repeatable rewards.
+- 557 engine / 42 online / 36 creature-rule / 204/205 browser (the one failure is the pre-existing
+  §6.37 VFX flake, unrelated) / `check:models`, all green.
+
 ---
 
 ## 7. Conventions & Rules (follow these)
@@ -1302,7 +1341,17 @@ arena 25m across, `WORLD_BOUND` (academy) is 72. **Keep new geometry on this sca
 
 ### Where we left off
 
-**Last landed: Prestige** (§6.43). The first system scoped properly before being built: the real
+**Last landed: Rare collectibles + Endgame dungeon tiers** (§6.44), two more §10 items scoped and
+built together. Collectibles are treasure-sourced (not boss-sourced — bosses die once per save,
+so a %-drop off a one-time event would be unreachable for most players), a shared pool rolled by
+`game.js claimTreasure` on top of the normal reward. Hard Mode is a repeatable menu-duel rematch
+of a dead dungeon boss at 1.6× HP, offered from the Quests screen once `bossDead` is true — an
+endgame gold/card sink, never touching `worldState.dungeons`. Seasonal events and The Arcanum were
+deliberately deferred out of this pass (see BACKLOG §10's own note on why). 557 engine / 42
+online / 36 creature-rule / 204/205 browser (1 pre-existing unrelated flake) / `check:models`, all
+green.
+
+**Before that: Prestige** (§6.43). The first system scoped properly before being built: the real
 problem was `academyScore`'s uncapped growth outliving the 7-year curriculum's own ceiling. Mirrors
 `pvprank.js`'s season pattern (soft reset + honest own-history, no fake leaderboard) rather than a
 new design — 5 stacking tiers, only `academyBonus` resets (level/collection/wins never do), 5
