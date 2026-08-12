@@ -121,8 +121,20 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .card .printing{position:absolute;top:4px;left:4px;font-size:12px;background:rgba(0,0,0,.55);border-radius:8px;padding:1px 5px;letter-spacing:1px;}
 /* A diagonal sheen across the art, so a foil reads as a foil in a grid without any text. */
 .card .sheen{position:absolute;inset:0;pointer-events:none;mix-blend-mode:screen;}
-.card.slab{border-image:linear-gradient(135deg,#e8c36a,#fff,#7be0ff,#e8c36a) 1;box-shadow:0 0 14px rgba(255,201,77,.55),0 4px 12px rgba(0,0,0,.5);}
-.card.slab .art{outline:1px solid rgba(255,215,120,.6);}
+.card.slab{border-image:linear-gradient(135deg,#e8c36a,#fff,#7be0ff,#e8c36a) 1;box-shadow:0 0 14px rgba(255,201,77,.55),0 4px 12px rgba(0,0,0,.5);
+  background:linear-gradient(180deg,#e9ecf2,#c7cedb);padding:3px;}
+.card.slab .art{outline:1px solid rgba(255,215,120,.6);border-radius:3px;}
+/* PSA-style label bar: sits above the art, inside the plastic case, showing school + name + grade —
+   real save data, never baked into the generated art. */
+.card.slab .slabtop{display:flex;align-items:center;gap:4px;background:linear-gradient(180deg,#1a1a22,#000);
+  color:#fff;border-radius:3px 3px 0 0;padding:3px 5px;min-height:16px;}
+.card.slab .slabtop .slabschool{font-size:11px;flex:0 0 auto;}
+.card.slab .slabtop .slabname{flex:1;font-size:9px;font-weight:800;letter-spacing:.3px;line-height:1.1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;}
+.card.slab .slabtop .slabgrade{flex:0 0 auto;font-size:10px;font-weight:800;color:var(--gold);white-space:nowrap;}
+.card.slab .body{background:linear-gradient(180deg,#c7cedb,#e9ecf2);border-radius:0 0 3px 3px;}
+.card.slab .body .nm{display:none;}
+.card.slab .art .grade{display:none;}
 .card .val{position:absolute;bottom:4px;right:4px;font-size:10px;color:var(--gold);background:rgba(0,0,0,.55);padding:1px 5px;border-radius:6px;}
 .card .slot{position:absolute;top:4px;right:4px;font-size:13px;background:rgba(0,0,0,.5);border-radius:8px;padding:1px 5px;}
 .card.sel{outline:3px solid var(--gold);transform:translateY(-6px);}
@@ -781,7 +793,15 @@ function cardFace(c, opts={}){
   const border = printing && printing.color != null ? "#" + printing.color.toString(16).padStart(6,"0") : rarity.color;
   const sheen = printing && printing.glow
     ? `<div class="sheen" style="opacity:${(0.18 + printing.glow * 0.3).toFixed(2)};background:linear-gradient(115deg,transparent 30%,${border} 50%,transparent 70%)"></div>` : "";
+  // PSA-style slab casing: a label bar drawn from REAL save data (school, name, grade), not baked
+  // into the AI art — so it's always accurate to the specific card instance being rendered.
+  const slabTop = opts.slab ? `<div class="slabtop">
+      <span class="slabschool" title="${school.name}">${SCHOOL_ICON[c.school]||"◇"}</span>
+      <span class="slabname" title="${c.name}">${c.name}</span>
+      <span class="slabgrade" title="${grade ? grade.name : ""}">${grade ? grade.icon : ""}</span>
+    </div>` : "";
   return `<div class="${cls.join(" ")}" style="border-color:${border}${printing&&printing.glow?`;box-shadow:0 0 ${Math.round(6+printing.glow*10)}px ${border}66`:""}" ${attrs}>
+    ${slabTop}
     <div class="art" style="background-image:url(./assets/${art})">
       ${sheen}
       <div class="cost">${c.cost}</div>

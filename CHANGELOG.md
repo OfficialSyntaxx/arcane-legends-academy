@@ -14,6 +14,31 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## PSA-style graded card slabs — 2026-08-12
+
+### PSA-style graded card slabs — *pending*
+- User asked for the cards to have a "Pokemon PSA Slab" look: card info, art, and grade visible on
+  the card. First attempt generated the whole slab (casing + label text + a row of icons) as one
+  AI image — user feedback: drop the baked "ARCANE LEGENDS" text, the baked icon row was unclear,
+  and add the card's school next to its name in the label.
+- Landed on the right split: AI generates ONLY the painterly illustration (no border, no text, no
+  icons — confirmed against the existing `school_fire.jpg` style and a fresh test generation the
+  user approved), and the slab casing — plastic case, label bar (real card name + real school
+  icon), and grade seal — is real HTML/CSS/DOM in `cardFace()`, the same way cost/ATK/HP/badges
+  are already overlaid on card art. Nothing about the grade or name is baked into a generated
+  image, so it can never drift from the actual save data.
+- `cardFace()` already had an `opts.slab` flag (true only for actual PSA-tier 9-10 slabs per
+  `gradeForRoll`) with a foil border treatment — the new label bar hooks into that same flag rather
+  than inventing a second gate, so ungraded and grade 1-8 cards are unaffected.
+- Verified with a real-Chromium screenshot (minted a grade-97 and a grade-99 card via test hooks,
+  rendered the Collection grid, captured the `.card.slab` element) across two schools — school
+  icon, truncated name (with a `title` tooltip for the full name), and grade icon all read
+  correctly at the live card size.
+- Per-card art generation (all 47 cards, art-only) is the next step, once this frame is confirmed
+  in-app by the user.
+- *624 engine / 42 online / 36 creature-rule / UI smoke, all green (CSS/markup-only change, no new
+  suite needed for the DOM overlay itself).*
+
 ## Polish pass: memory-leak fixes + SFX gaps — 2026-08-12
 
 ### Polish pass — `3b696d4`
