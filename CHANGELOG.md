@@ -14,6 +14,34 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## The Confluence, step 1 of 5: zone shell — 2026-08-13
+
+### The Confluence, step 1 of 5: zone shell — *pending*
+- First step of BACKLOG §10's last unbuilt item, the endgame zone (scoped in
+  `docs/CONFLUENCE-PLAN.md`) — same 5-step pace Ashen Mountains shipped at.
+- A new `confluence` biome (`terrain.js`): the most jagged terrain shipped yet (rough 3.20,
+  amplitude 8 — both exceed the mountains biome), a void-violet ground with magenta-crystal peaks
+  and a cyan shore glow. Zero new assets — confirmed feasible up front (see the plan doc): reuses
+  the same all-vertex-colour terrain trick every biome already uses, no new geometry or texture.
+- The zone itself (`zones.json`): fully procedural like Lake Arcanum (no baked GLB map needed),
+  reached via a new reciprocal exit pair with Frostborne Peaks (`snow`), plus one treasure cache
+  (`confluence_rift_cache`, 700g — continues the existing per-zone gold scaling: academy 120 →
+  forest 220 → lake 340 → ashen 480 → snow 560 → confluence 700).
+- The terrain's jaggedness fragments into far more small water pools than any existing zone —
+  exit/spawn/treasure positions had to be found by sampling `TER.isWater()` on a grid rather than
+  eyeballing coordinates, which caught 2 real placements that would have landed in water before
+  they ever shipped (both the original exit guess and the original treasure guess).
+- Verified with a new permanent browser test (mirrors the Ashen Mountains zone-shell test): walks
+  the real gateway chain academy → forest → mountains → snow → confluence, confirms the zone
+  builds, the spawn/arrival point is never inside a wall, and the reciprocal exit back to
+  Frostborne Peaks works.
+- Refinement notes captured in `docs/CONFLUENCE-NOTES.md` for Step 5 (Frostborne Peaks' "Frost
+  Keeper" NPC has zero wired quest content — reuse it for this zone's entry quest instead of
+  spawning a redundant NPC) and for a later polish pass (the biome reads much darker than other
+  zones at real night-time — not clearly a bug, since every zone dims at night by design, so
+  flagged rather than guessed at).
+- *624 engine / 42 online / 36 creature-rule / real-browser suite, all green.*
+
 ## Fix the card detail view: real slab proportions — 2026-08-13
 
 ### Card detail refinement — *pending*

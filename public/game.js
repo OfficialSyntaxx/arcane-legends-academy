@@ -335,6 +335,7 @@ export const TREASURE_REWARDS = {
   ashen_summit_cache:      { gold: 480 },
   ashen_ridge_cache:       { gold: 480 },
   snow_hollow_cache:       { gold: 560 },
+  confluence_rift_cache:   { gold: 700 },
 };
 
 /**

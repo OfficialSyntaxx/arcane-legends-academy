@@ -56,6 +56,12 @@ export const BIOMES = {
                palette: { low: 0x5c6a52, mid: 0x6b6b78, high: 0xa8adbc, rock: 0x585461, shore: 0x8c8878 } },
   snow:      { rough: 2.10, octaves: 5, ground: 0xdfe6f5, water: 0x7fb6d8,
                palette: { low: 0xc3d2e6, mid: 0xdfe6f5, high: 0xffffff, rock: 0x6e7385, shore: 0xb9c6d6 } },
+  // The Confluence (BACKLOG §10 endgame zone): the most jagged terrain yet (rough/octaves both
+  // exceed mountains'), a void-violet base with magenta-crystal peaks and a cyan shore glow —
+  // reads as "all seven schools' colour bleeding together" without needing a new ground texture,
+  // the same all-vertex-colour trick every other biome uses.
+  confluence: { rough: 3.20, octaves: 5, ground: 0x2a1b3d, water: 0x8a4fd6,
+               palette: { low: 0x3a2a52, mid: 0x2a1b3d, high: 0xc77dff, rock: 0x241830, shore: 0x7fe0ff } },
 };
 
 // ---------------------------------------------------------------- ground colour

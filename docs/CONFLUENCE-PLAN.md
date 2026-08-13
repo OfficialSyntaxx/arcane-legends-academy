@@ -63,8 +63,9 @@ instead of reusing one school's kit at higher numbers.
 
 ## 5-step build plan (mirrors Ashen Mountains' pace)
 
-1. **Zone shell** — procedural terrain (new `confluence` biome), bounds, spawn, exit back to
-   Frostborne Peaks, the gate condition on entry.
+1. ✅ **Zone shell** — procedural terrain (new `confluence` biome), bounds, spawn, exit back to
+   Frostborne Peaks, the gate condition on entry. *Done — see CHANGELOG "The Confluence, step 1 of
+   5: zone shell". Refinement notes for later steps in `docs/CONFLUENCE-NOTES.md`.*
 2. **Props + resource nodes** — visual dressing from reused/recolored assets, a couple of
    zone-exclusive gather materials (data only, no new models — same pattern every zone's
    materials use).

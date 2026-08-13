@@ -1318,6 +1318,11 @@
           "toZone": "ashen_mountains",
           "x": -30,
           "z": 0
+        },
+        {
+          "toZone": "confluence",
+          "x": 30,
+          "z": 0
         }
       ],
       "npcs": [
@@ -1344,6 +1349,42 @@
           "id": "snow_hollow_cache",
           "x": 25,
           "z": -25
+        }
+      ]
+    },
+    {
+      "id": "confluence",
+      "name": "The Confluence",
+      "spawn": {
+        "x": -40,
+        "z": 20
+      },
+      "bounds": {
+        "minX": -80,
+        "maxX": 80,
+        "minZ": -80,
+        "maxZ": 80
+      },
+      "terrain": {
+        "seed": 20260813,
+        "scale": 40,
+        "amplitude": 8,
+        "baseHeight": 2.0,
+        "waterLevel": 1.0,
+        "biome": "confluence"
+      },
+      "exits": [
+        {
+          "toZone": "snow",
+          "x": -40,
+          "z": -20
+        }
+      ],
+      "treasures": [
+        {
+          "id": "confluence_rift_cache",
+          "x": 40,
+          "z": -10
         }
       ]
     }

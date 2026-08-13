@@ -1545,6 +1545,35 @@ if (hasWorld){
   check("the player does not spawn inside a wall arriving in Ashen Mountains", ashen.spawnClear === true);
   check("Ashen Mountains has a working exit back to the forest", ashen.zoneAfter === "whispering_forest", String(ashen.zoneAfter));
 
+  // --- The Confluence (BACKLOG §10 endgame zone) — zone shell, step 1 of 5 ---
+  // The player is currently back in the whispering_forest (Ashen Mountains block above walked
+  // back out). Walk the real gateway chain forest -> ashen_mountains -> snow -> confluence and
+  // confirm the fifth zone actually BUILDS: terrain, a clear spawn/exit/treasure (none of which
+  // land in water — a real bug this pass found and fixed, see CHANGELOG), and a reciprocal exit
+  // back to Frostborne Peaks. Same shape every zone shell before it was proven with.
+  const confluence = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    for (let hop = 0; hop < 3 && dbg().zone !== "confluence"; hop++){
+      const here = dbg();
+      const want = here.zone === "whispering_forest" ? "ashen_mountains"
+        : here.zone === "ashen_mountains" ? "snow" : "confluence";
+      const e = (here.exits || []).find(x => x.to === want);
+      if (!e) break;
+      window.__world.teleport(e.x, e.z);
+      await settle(1600);
+    }
+    const d = dbg();
+    const out = { zone: d.zone, spawnClear: d.spawnClear, exits: d.exits };
+    const back = (d.exits || []).find(x => x.to === "snow");
+    if (back){ window.__world.teleport(back.x, back.z); await settle(1600); }
+    out.zoneAfter = dbg().zone;
+    return out;
+  });
+  check("the fifth zone (The Confluence) builds and can be walked into", confluence.zone === "confluence", String(confluence.zone));
+  check("the player does not spawn inside a wall arriving in The Confluence", confluence.spawnClear === true);
+  check("The Confluence has a working exit back to Frostborne Peaks", confluence.zoneAfter === "snow", String(confluence.zoneAfter));
+
 }
 
 
