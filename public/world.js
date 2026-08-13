@@ -10,6 +10,7 @@ import { heightAt, isWater, flatsForZone, groundColorAt, BIOMES } from "./terrai
 import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS, ZONE_MAPS } from "./worldconfig.js";
 import { isRaining } from "./weather.js";
 import { PET_MAP } from "./pets.js";
+import { WAND_FX_MAP, DEFAULT_WAND_FX } from "./wandcosmetics.js";
 
 // BACKLOG §7 "Emotes" — id/icon/label metadata at MODULE scope (no THREE dependency) so
 // index.html can build a menu without needing a live world instance. The bone-animation details
@@ -782,8 +783,46 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
         g.add(bead);
       }
     }
+    buildWandFx();   // the wand slot group was just rebuilt (or removed) — the FX group rides on it
   }
   let gearList = [];
+
+  // ---------- wand cosmetics (BACKLOG §7, wandcosmetics.js) ----------
+  // The aura's own trick (a colour + a handful of orbiting motes), reused at the wand's tip
+  // instead of the player's feet — see wandcosmetics.js's own header for why this is data, not a
+  // new asset. Parented to the wand's OWN gear group (not the player), so it moves, scales and
+  // vanishes with the wand automatically — no separate position bookkeeping.
+  let wandFxId = DEFAULT_WAND_FX, wandFxGroup = null;
+  function buildWandFx(){
+    if (wandFxGroup){
+      wandFxGroup.traverse(o => { if (o.isMesh){ o.geometry.dispose(); o.material.dispose(); } });
+      if (wandFxGroup.parent) wandFxGroup.parent.remove(wandFxGroup);
+      wandFxGroup = null;
+    }
+    const fx = WAND_FX_MAP[wandFxId];
+    const wandGroup = gearGroups.wand;
+    if (!fx || !fx.color || !wandGroup) return;   // "none", locked/unknown id, or no wand equipped
+    wandFxGroup = new THREE.Group();
+    // Offset toward the tip, not the grip — measured the same by-eye way equipment3d.js's own
+    // ATTACHMENTS positions were: far enough out to read as coming FROM the wand, not the hand.
+    wandFxGroup.position.set(0, 0.75, 0);
+    const glow = new THREE.MeshBasicMaterial({ color: fx.color, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    for (let i = 0; i < fx.motes; i++){
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), glow);
+      m.userData.phase = (i / fx.motes) * Math.PI * 2;
+      wandFxGroup.add(m);
+    }
+    wandGroup.add(wandFxGroup);
+  }
+  function stepWandFx(t){
+    if (!wandFxGroup) return;
+    for (const m of wandFxGroup.children){
+      if (m.userData.phase == null) continue;
+      const a = m.userData.phase + t * 1.3;
+      m.position.set(Math.cos(a) * 0.18, Math.sin(a * 1.6) * 0.14, Math.sin(a) * 0.18);
+    }
+  }
 
   // A school-coloured glow on the ground under the player. This is the half of the appearance
   // system that is actually unambiguous at a glance — a hue shift on a dark robe is subtle at
@@ -1927,6 +1966,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       g.userData.glint.position.y = 1.35 + Math.sin(now / 500) * 0.08;
     }
     stepAura(now / 1000);
+    stepWandFx(now / 1000);
     updateDayNight();
     updateWeather(dt);
     updateEmote(now);
@@ -2052,6 +2092,15 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     setPlayerGear(list){
       gearList = list || [];
       applyGear();
+    },
+    // BACKLOG §7 "Wand cosmetics" — id from wandcosmetics.js, or null/"none" for no effect.
+    // Remembered like the appearance/gear: usually set before the wand's own gear group exists.
+    setWandFx(id){
+      wandFxId = id || DEFAULT_WAND_FX;
+      buildWandFx();
+    },
+    wandFxDebug(){
+      return wandFxGroup ? { id: wandFxId, motes: wandFxGroup.children.length } : { id: wandFxId, motes: 0 };
     },
     // Show the equipped weapon on the player's right hand (visual equipment). `metal` is the
     // equipment's metal tier (bronze/iron/gold/mithril/rune) -> a matching weapon GLB; null hides it.

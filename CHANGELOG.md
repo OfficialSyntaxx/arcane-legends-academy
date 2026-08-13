@@ -14,6 +14,25 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Wand cosmetics — 2026-08-13
+
+### Wand cosmetics — *pending*
+- BACKLOG §7's last deferred item. `wandcosmetics.js`: 9 particle effects, a colour + a mote count
+  each, unlocked by the same 9 collection achievements card backs/titles already spend — a third
+  reward off the same grind, not a fourth unlock currency. One stored bit (`save.wandFx`), same
+  shape as `cardBack`/`title`.
+- Zero new assets: the effect is the character-creation aura's own trick (a colour + orbiting
+  motes, `world.js`'s `buildAura`/`stepAura`) reused at the wand's tip instead of the player's
+  feet. Parented to the wand's OWN gear group (not the player), so it moves, resizes, and vanishes
+  with the wand automatically — no separate position bookkeeping, and it rebuilds for free
+  whenever `applyGear()` already rebuilds the wand slot (tier change, unequip, etc.).
+- Equipped from the Codex screen (new panel below Titles, same gallery pattern as Card Backs),
+  renders live in the 3D world the moment it's chosen.
+- Verified: 9 new engine tests (mirroring `cardbacks.js`'s own test shape) plus a real-browser
+  check that motes actually appear on the wand's gear group once equipped, and that nothing
+  renders with the default ("none") effect.
+- *634 engine / 42 online / 36 creature-rule / real-browser suite, all green.*
+
 ## The Confluence, step 5 of 5: field quests — BACKLOG §10 complete — 2026-08-13
 
 ### The Confluence, step 5 of 5: field quests — *pending*

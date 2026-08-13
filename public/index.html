@@ -463,6 +463,7 @@ import * as ARCH from "./archetypes.js";
 import * as RANK from "./pvprank.js";
 import * as MAGIC from "./schoolmagic.js";
 import * as CB from "./cardbacks.js";
+import * as WFX from "./wandcosmetics.js";
 import * as ACHV from "./achievements.js";
 import * as COLLECT from "./collectibles.js";
 import * as EVO from "./evolution.js";
@@ -868,7 +869,7 @@ window.__EV.chooseSchool = (s)=>{
   save();
   stopCharacterPreview();
   $("schoolPicker").style.display = "none";
-  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); world.setPet(S.pets.active); }
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); world.setPet(S.pets.active); world.setWandFx(S.wandFx); }
   toast(`Welcome to the ${SCHOOLS[s].name} School! Your school's cards were added to your collection.`); render();
   // The school picker is now step 2 of character creation. If creation is still unfinished
   // (no name yet, or no look chosen), fall back into it rather than dumping the player into the
@@ -895,7 +896,7 @@ function closeCharCreate(){
   ccOpen = false;
   $("charCreate").style.display = "none";
   if (preview) preview.stop();          // stop the loop; keep the context so reopening is instant
-  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); world.setPet(S.pets.active); }
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); world.setPet(S.pets.active); world.setWandFx(S.wandFx); }
   render();
 }
 function renderCharCreate(){
@@ -1823,6 +1824,18 @@ function buildCodex(){
   }
   h += `</div></div>`;
 
+  // wand cosmetics (wandcosmetics.js) — same union of achievement catalogs card backs use, so a
+  // player who has already unlocked a back/title unlocks the matching wand effect too, not a
+  // fourth grind. Visible in the 3D world on the wand's own tip; equip fires it live if the wand
+  // is currently on screen.
+  const equippedWandFx = WFX.equippedFx(S).id;
+  h += `<div class="panel" style="margin-top:14px"><h3>🪄 Wand Cosmetics</h3><p class="sub">Unlocked by the collection achievements above. A small effect at the tip of your equipped wand, visible in the world.</p><div class="row" style="flex-wrap:wrap">`;
+  for (const w of WFX.WAND_FX){
+    const unlocked = WFX.isUnlocked(w.id, doneIds);
+    h += `<button class="btn ${w.id===equippedWandFx?"primary":""}" style="${unlocked?"":"opacity:.4;cursor:not-allowed"}" ${unlocked?`onclick="window.__ev('wandFxEquip|${w.id}')"`:""} title="${unlocked?w.name:w.name+" (locked)"}">${unlocked?"":"🔒 "}${w.id!=="none"?`<span style="color:#${(w.color||0).toString(16).padStart(6,"0")}">●</span> `:""}${w.name}</button>`;
+  }
+  h += `</div></div>`;
+
   // rare collectibles (BACKLOG §10) — a Codex-style gallery of what's been found so far, not a
   // find-order log; collectibles.js's own header explains why they're treasure-sourced, not boss-sourced.
   const foundCollectibles = COLLECT.foundFor(S), collectProg = COLLECT.collectionProgress(S);
@@ -1913,6 +1926,18 @@ window.__EV.titleEquip = (id)=>{
   const doneIds = ACHV.achievementsFor(S).filter(a=>a.done).map(a=>a.id);
   const r = ACHV.setTitle(S, id, doneIds);
   if (r.ok){ save(); toast(`🎖️ "${ACHV.equippedTitle(S).name}" equipped`); refreshCodex(); render(); }
+};
+window.__EV.wandFxEquip = (id)=>{
+  // Same union as the Codex gallery above — a wand effect can be gated by either achievement catalog.
+  const doneIds = CX.achievementsFor(CARDS, S.cards).filter(a=>a.done).map(a=>a.id)
+    .concat(ACHV.achievementsFor(S).filter(a=>a.done).map(a=>a.id));
+  const r = WFX.equip(S, id, doneIds);
+  if (r.ok){
+    save();
+    if (world && world.setWandFx) world.setWandFx(S.wandFx);
+    toast(`🪄 ${WFX.WAND_FX_MAP[id].name} equipped`);
+    refreshCodex();
+  }
 };
 // Booster opening (BACKLOG §5): opening a pack used to be a toast and nothing else — the five
 // cards it minted appeared in the collection with no moment to look at what you got. Reused the
@@ -3161,6 +3186,7 @@ function changeZone(toZoneId, fromZoneId, spawnOverride){
     world.setPlayerAppearance(CC.appearanceFor(S));
     world.setPlayerGear(EQ3.attachmentsFor(S));
     world.setPet(S.pets.active);
+    world.setWandFx(S.wandFx);
     world.resize();
     S.worldState.zone = toZoneId;
     if (!S.worldState.visited.includes(toZoneId)) S.worldState.visited.push(toZoneId);
@@ -3468,7 +3494,7 @@ window.__EV.toggleMute = ()=>{
 async function boot(){
   $("muteBtn").textContent = AUDIO.isMuted() ? "🔇" : "🔊";
   await initWorld();
-  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); world.setPet(S.pets.active); }
+  if (world){ world.setPlayerAppearance(CC.appearanceFor(S)); world.setPlayerGear(EQ3.attachmentsFor(S)); world.setPet(S.pets.active); world.setWandFx(S.wandFx); }
   // Character creation replaces the bare school picker on a fresh save. It is skipped for any
   // save that already finished it, and `CC.isComplete` is DERIVED, so an older save that has a
   // school but no name is walked through the remaining steps rather than either re-doing the

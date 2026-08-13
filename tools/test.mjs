@@ -22,6 +22,7 @@ import * as ARCH from "../public/archetypes.js";
 import * as RANK from "../public/pvprank.js";
 import * as MAGIC from "../public/schoolmagic.js";
 import * as CB from "../public/cardbacks.js";
+import * as WFX from "../public/wandcosmetics.js";
 import * as ACHV from "../public/achievements.js";
 import * as PRESTIGE from "../public/prestige.js";
 import * as COLLECT from "../public/collectibles.js";
@@ -3117,6 +3118,42 @@ check("setBack refuses a locked back and leaves the save unchanged", (()=>{
   const save = { cardBack: CB.DEFAULT_BACK };
   const r = CB.setBack(save, "legends", []);
   return r.ok === false && save.cardBack === CB.DEFAULT_BACK;
+})());
+
+// ---------------------------------------------------------------- wandcosmetics.js
+check("validateWandFx reports no problems", WFX.validateWandFx().length === 0);
+check("the default wand FX is always unlocked, with no achievement gate", WFX.isUnlocked(WFX.DEFAULT_WAND_FX, []) === true);
+check("every non-default wand FX is locked with no achievements done", (()=>{
+  return WFX.WAND_FX.filter(w => w.id !== WFX.DEFAULT_WAND_FX).every(w => WFX.isUnlocked(w.id, []) === false);
+})());
+check("a wand FX unlocks once its matching achievement is done", (()=>{
+  return WFX.isUnlocked("archivist", ["archivist"]) === true
+      && WFX.isUnlocked("archivist", ["curator"]) === false;
+})());
+check("equippedFx falls back to the default for a fresh or bad save", (()=>{
+  return WFX.equippedFx({}).id === WFX.DEFAULT_WAND_FX
+      && WFX.equippedFx({ wandFx: "not-a-real-id" }).id === WFX.DEFAULT_WAND_FX
+      && WFX.equippedFx(null).id === WFX.DEFAULT_WAND_FX;
+})());
+check("equip refuses a locked wand FX and leaves the save unchanged", (()=>{
+  const save = { wandFx: WFX.DEFAULT_WAND_FX };
+  const r = WFX.equip(save, "legends", []);
+  return r.ok === false && save.wandFx === WFX.DEFAULT_WAND_FX;
+})());
+check("equip refuses an unknown wand FX id", (()=>{
+  const save = { wandFx: WFX.DEFAULT_WAND_FX };
+  const r = WFX.equip(save, "not-a-real-id", []);
+  return r.ok === false && save.wandFx === WFX.DEFAULT_WAND_FX;
+})());
+check("equip succeeds once unlocked and stores the choice", (()=>{
+  const save = { wandFx: WFX.DEFAULT_WAND_FX };
+  const r = WFX.equip(save, "shiny", ["shiny"]);
+  return r.ok === true && save.wandFx === "shiny";
+})());
+check("a save with no wandFx migrates to the default", (()=>{
+  const s = G.newGame(); delete s.wandFx;
+  localStorage_stub(JSON.stringify(s));
+  return G.load().wandFx === WFX.DEFAULT_WAND_FX;
 })());
 check("setBack accepts an unlocked back", (()=>{
   const save = { cardBack: CB.DEFAULT_BACK };

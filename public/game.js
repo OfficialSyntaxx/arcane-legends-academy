@@ -8,6 +8,7 @@ import * as ARCH from "./archetypes.js";
 import * as RANK from "./pvprank.js";
 import * as MAGIC from "./schoolmagic.js";
 import * as CB from "./cardbacks.js";
+import * as WFX from "./wandcosmetics.js";
 import * as ACHV from "./achievements.js";
 import * as PRESTIGE from "./prestige.js";
 import * as COLLECT from "./collectibles.js";
@@ -89,6 +90,9 @@ export function newGame(){
     // Equipped player title (achievements.js). Same shape as cardBack: which titles are UNLOCKED
     // is derived from achievements every time; this is only the choice among the unlocked ones.
     title: ACHV.DEFAULT_TITLE,
+    // Equipped wand cosmetic (wandcosmetics.js). Same shape again: which effects are UNLOCKED is
+    // derived from the same collection achievements cardBack/title already use.
+    wandFx: WFX.DEFAULT_WAND_FX,
     // NPC reputation (reputation.js). Only quest givers earn any right now — see that module
     // for why this is a flat {npcKey: number} map rather than a richer per-NPC shape.
     reputation:{},
@@ -182,6 +186,7 @@ function migrate(s){
   if (!Array.isArray(s.favorites)) s.favorites = [];
   if (!s.cardBack || !CB.BACK_MAP[s.cardBack]) s.cardBack = CB.DEFAULT_BACK;
   if (!s.title || !ACHV.TITLES.some(t => t.id === s.title)) s.title = ACHV.DEFAULT_TITLE;
+  if (!s.wandFx || !WFX.WAND_FX_MAP[s.wandFx]) s.wandFx = WFX.DEFAULT_WAND_FX;
   if (!s.gatherCooldowns || typeof s.gatherCooldowns !== "object") s.gatherCooldowns = {};
   // PvP rank. An older save has real wins/losses but never had a rank — it starts at Bronze
   // rather than being credited retroactively, because there is no recorded ORDER for those old

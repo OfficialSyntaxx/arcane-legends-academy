@@ -259,8 +259,10 @@
 - [ ] Robes / hats / cloaks — genuinely asset-blocked, not a design gap: the player model is one
   skinned mesh with one material (`equipment3d.js`'s own `UNSUPPORTED` list documents this). Needs
   new 3D assets with real per-part geometry (BLENDERTODO Tier 5) before this is buildable.
-- [ ] Wand cosmetics — deferred this pass (a player-chosen cosmetic effect independent of tier/
-  metal, e.g. a procedural particle trail, unlocked via achievements like card backs).
+- [x] Wand cosmetics — `wandcosmetics.js`: 9 procedural particle effects (a colour + orbiting
+  motes at the wand's tip, the aura's own trick reused), unlocked by the same 9 collection
+  achievements card backs/titles already spend, one stored choice (`save.wandFx`). Zero new
+  assets. Equipped from the Codex; renders live in the 3D world on the wand's own gear group.
 - [x] Auras — already shipped via character creation (`charcreate.js`'s school-coloured ground
   glow, chosen at creation). No new code needed.
 - [x] Emotes — 4 gestures (Wave/Bow/Cheer/Spin, `world.js` `EMOTE_LIST`/`playEmote`), procedural

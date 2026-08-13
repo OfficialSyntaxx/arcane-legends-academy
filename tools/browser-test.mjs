@@ -1189,6 +1189,23 @@ if (hasWorld){
     return a.worldCenter[1] > 1.2;                 // the player is 2.6m; a neck is ~1.7m up
   })(), JSON.stringify(gear.after && gear.after.amulet && gear.after.amulet.worldCenter));
 
+  // --- BACKLOG §7 "Wand cosmetics" — motes ride on the wand's own gear group ---
+  // The wand is already equipped from the block above. Bypasses the achievement grind the same
+  // way the equip handler's validation does — set the stored choice and call the live hook — to
+  // prove the RENDERING half (the data half is covered headlessly in tools/test.mjs).
+  const wandFx = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const S = window.__testSave();
+    const before = window.__world.wandFxDebug();
+    S.wandFx = "legends";
+    window.__world.setWandFx(S.wandFx);
+    await settle(400);
+    const after = window.__world.wandFxDebug();
+    return { before, after };
+  });
+  check("no wand cosmetic renders with the default (\"none\") effect", wandFx.before.motes === 0, JSON.stringify(wandFx.before));
+  check("equipping a wand cosmetic adds real motes to the wand's own gear group", wandFx.after.id === "legends" && wandFx.after.motes > 0, JSON.stringify(wandFx.after));
+
   // --- WORLDSPEC step 6 content: the third zone and the second dungeon ---
   // Data-level correctness is covered headlessly; what only a browser can answer is whether the
   // zone actually BUILDS — chunk streaming, the water plane, a second dungeon entrance, and
