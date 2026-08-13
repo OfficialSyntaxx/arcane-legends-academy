@@ -1345,7 +1345,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // width when the FOOTPRINT is the gameplay-relevant dimension (the arena floor is the duel
   // space, so its diameter must be right and the height follows from the model's proportions).
   function loadLandmarkModel(key, localUrl, group, opts){
-    const { size, fit = "height", x = 0, z = 0, ry = 0, onReady, quiet = false } = opts;
+    const { size, fit = "height", x = 0, z = 0, ry = 0, onReady, quiet = false, isStale } = opts;
     // streamed chunk content loads continuously, so it must not drive the boot progress HUD
     if (!quiet) loadState.total++;
     // Same CDN-then-local retry as makeCharModel. Characters got this when a CDN outage turned
@@ -1358,6 +1358,21 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     const d = getDraco();
     if (d) loader.setDRACOLoader(d);
     loader.load(url, gltf => {
+      // Chunk streaming can unload the very chunk this load was for before the network/parse
+      // finishes (see world.js's unloadChunk — real GLTF loads take long enough, especially on a
+      // slow connection or an uncached model, that a player crossing back out of a chunk before
+      // it resolves is not a corner case). `group` would still be a live JS reference (held by
+      // this very callback's closure) even though it's a child of a group unloadChunk already
+      // scene.remove()'d and dropped from CHUNKS.loaded — attaching the model to it would leak
+      // GPU buffers forever with nothing left tracking them to dispose. Bail and free immediately.
+      if (isStale && isStale()){
+        gltf.scene.traverse(o => {
+          if (o.geometry && o.geometry.dispose) o.geometry.dispose();
+          const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+          for (const m of mats) if (m && m.dispose) m.dispose();
+        });
+        return;
+      }
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const h = box.max.y - box.min.y;
@@ -1453,16 +1468,20 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     // them — without this, gather/enemy prompts pile up forever as the player wanders (the same
     // model was already being disposed correctly; the INTERACTIVE ENTRY was the part leaking).
     const regs = [];
+    // A load is "stale" once this chunk is no longer the one CHUNKS.loaded tracks under `key` —
+    // covers both a plain unload and the (currently impossible, but cheap to guard) case of the
+    // same key being reloaded into a fresh group before the old load resolves.
+    const isStale = () => CHUNKS.loaded.get(key) !== group;
     for (const p of bucket.props){
       const g = new THREE.Group(); group.add(g);
       loadLandmarkModel("chunk:" + key + ":" + p.url, p.url, g,
-        { size:p.h || 2, fit:"height", x:p.x, z:p.z, ry:p.ry || 0, quiet:true });
+        { size:p.h || 2, fit:"height", x:p.x, z:p.z, ry:p.ry || 0, quiet:true, isStale });
     }
     for (const n of bucket.resourceNodes){
       const spec = ZONE.nodeModels[n.kind];
       const g = new THREE.Group(); group.add(g);
       if (spec) loadLandmarkModel("chunk:" + key + ":" + n.id, spec.url, g,
-        { size:spec.h, fit:"height", x:n.x, z:n.z, ry:(n.x * 0.7) % 3, quiet:true });
+        { size:spec.h, fit:"height", x:n.x, z:n.z, ry:(n.x * 0.7) % 3, quiet:true, isStale });
       regs.push(register("gather", n.x, n.z, n.id, n.label, null, 4.6));
     }
     // Outdoor (count-scattered) enemies previously rendered with no way to fight them — the model
@@ -1474,7 +1493,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     bucket.enemies.forEach((e, i) => {
       const g = new THREE.Group(); group.add(g);
       loadLandmarkModel("chunk:" + key + ":enemy", "./assets/models/" + e.model, g,
-        { size:e.h || 1.9, fit:"height", x:e.x, z:e.z, ry:(e.x) % 3, quiet:true });
+        { size:e.h || 1.9, fit:"height", x:e.x, z:e.z, ry:(e.x) % 3, quiet:true, isStale });
       const data = { outdoor:true, id:"oenemy:" + key + ":" + i, model:e.model, name:e.name, level:e.level || 1 };
       regs.push(register("enemy", e.x, e.z, data, e.name + " (Lv " + (e.level||1) + ")", null, 4.6));
     });
