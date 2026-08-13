@@ -391,6 +391,48 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     return m;
   };
   const srgb = hex => new THREE.Color(hex).convertSRGBToLinear();
+  // Procedural tiling textures for interior floors/walls (map/lighting diagnosis #3): a flat
+  // colour plane the size of a whole dungeon room is the last big "obviously primitive" surface
+  // left after #1 (real furniture models) and #2 (PBR materials). Same trick the sky/cloud-shadow
+  // textures above already use — a canvas pattern baked once and repeated — so this is zero new
+  // asset bytes, just pixels drawn at runtime. Two tones per texture (base + a slightly darker
+  // "mortar" grid) is enough to read as masonry/flagstone at this camera distance without needing
+  // a real normal map.
+  // hex int -> CSS colour string, optionally darkened (mult < 1) for the mortar/grout line.
+  function cssHex(hex, mult = 1){
+    const c = new THREE.Color(hex);
+    if (mult !== 1) c.multiplyScalar(mult);
+    return `#${c.getHexString()}`;
+  }
+  function tileTexture({ base, line, cell = 64, cells = 4, lineW = 3 }){
+    const size = cell * cells;
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const x = c.getContext('2d');
+    x.fillStyle = base; x.fillRect(0, 0, size, size);
+    // per-tile speckle so it doesn't read as a flat colour with a grid drawn over it
+    for (let i = 0; i < size * size / 90; i++){
+      const px = Math.random() * size, py = Math.random() * size;
+      x.fillStyle = `rgba(0,0,0,${(Math.random() * 0.08).toFixed(3)})`;
+      x.fillRect(px, py, 1.5, 1.5);
+    }
+    x.strokeStyle = line; x.lineWidth = lineW;
+    for (let i = 0; i <= cells; i++){
+      x.beginPath(); x.moveTo(i * cell, 0); x.lineTo(i * cell, size); x.stroke();
+      x.beginPath(); x.moveTo(0, i * cell); x.lineTo(size, i * cell); x.stroke();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.encoding = THREE.sRGBEncoding;
+    return tex;
+  }
+  // Repeats a texture across a mesh's real-world size rather than stretching one tile over it —
+  // a 6m room wall and a 30m boss-room wall share the same material, so the repeat count has to
+  // be set per mesh (via UV scale), not once on the shared material.
+  function tileUV(geo, uRepeat, vRepeat){
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * uRepeat, uv.getY(i) * vRepeat);
+    uv.needsUpdate = true;
+  }
   // entityKey -> {model, mixer, walk, idle}  (var: groundY reads it before init)
   var chars = {};
   // Loading progress, so the UI can show a state instead of a silently-empty world. Declared this
@@ -495,20 +537,34 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // dungeons.js — nothing spatial is decided here, matching the rule that world.js renders what
   // the pure modules hand it (§9b d).
   if (ZONE.rooms && ZONE.rooms.length){
-    const floorMat = mat(ZONE.floorColor != null ? ZONE.floorColor : 0x3a3348);
-    const wallMat  = mat(ZONE.wallColor  != null ? ZONE.wallColor  : 0x4a4160);
-    const bossFloorMat = mat(ZONE.bossFloorColor != null ? ZONE.bossFloorColor : 0x5a3a44);
+    const floorColor = ZONE.floorColor != null ? ZONE.floorColor : 0x3a3348;
+    const wallColor  = ZONE.wallColor  != null ? ZONE.wallColor  : 0x4a4160;
+    const bossFloorColor = ZONE.bossFloorColor != null ? ZONE.bossFloorColor : 0x5a3a44;
+    const TILE = 2.2;   // metres per flagstone/masonry tile
+    // The colour lives in the baked texture now, not in material.color (which mat() would also
+    // convertSRGBToLinear and double-tint on top of the map) — so these are built directly rather
+    // than through mat(), with color left white and roughness/metalness matched to it by hand.
+    const roomMat = (color, opts = {}) => new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.85, metalness: 0.05,
+      map: tileTexture({ base: cssHex(color), line: cssHex(color, 0.72), ...opts }),
+    });
+    const floorMat = roomMat(floorColor);
+    const wallMat = roomMat(wallColor, { cells: 3, lineW: 4 });
+    const bossFloorMat = roomMat(bossFloorColor);
     const wallH = ZONE.wallHeight || 7;
     for (const r of ZONE.rooms){
       const f = add(new THREE.PlaneGeometry(r.w, r.d), r.boss ? bossFloorMat : floorMat, r.x, 0.02, r.z, {receive:true, cast:false});
       f.rotation.x = -Math.PI/2;
+      tileUV(f.geometry, r.w / TILE, r.d / TILE);
     }
     for (const c of ZONE.corridors || []){
       const f = add(new THREE.PlaneGeometry(c.w, c.d), floorMat, c.x, 0.02, c.z, {receive:true, cast:false});
       f.rotation.x = -Math.PI/2;
+      tileUV(f.geometry, c.w / TILE, c.d / TILE);
     }
     for (const w of [...ZONE.rooms.flatMap(r => r.walls || []), ...(ZONE.corridorWalls || [])]){
-      add(new THREE.BoxGeometry(w.w, wallH, w.d), wallMat, w.x, wallH/2, w.z);
+      const wm = add(new THREE.BoxGeometry(w.w, wallH, w.d), wallMat, w.x, wallH/2, w.z);
+      tileUV(wm.geometry, Math.max(w.w, w.d) / TILE, wallH / TILE);
     }
   }
   // ---------- dorm furnishing (the Dorm phases, D2–D4) ----------
