@@ -2285,6 +2285,42 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     // engine's own height-source decision.
     groundYAt(x, z){ return groundY(x, z); },
     resize(){ onResize(); },
-    dispose(){ window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); cancelAnimationFrame(raf); renderer.dispose(); },
+    // Every zone change is dispose() then a brand-new createWorld() — a new THREE.Scene, but the
+    // SAME canvas, and browsers hand getContext() back the SAME WebGL context rather than
+    // allocating a fresh one. That means this zone's entire procedural scene graph (walls,
+    // floors, buildings, the ground plane, every canvas-baked texture, chunk-streamed props still
+    // loaded, gear/pet/wand-fx groups — everything that isn't reached by one of the few targeted
+    // dispose() calls elsewhere in this file, e.g. setPet/removeTreasure/unloadChunk) previously
+    // just got dereferenced, not freed: THREE never auto-frees GPU buffers when a JS object is
+    // GC'd, only when .dispose() is called on it. A real profiling pass (20 zone hops via
+    // fastTravel, the same path a player uses) measured this directly: JS heap grew from 74MB at
+    // boot to 633MB after those 20 hops, unbounded — every visit's geometry stacking on the last.
+    // Traversing the whole scene here, once, on real teardown, is the fix: same
+    // geometry/material/texture disposal pattern already used piecemeal elsewhere, just applied
+    // to everything instead of a handful of call sites.
+    dispose(){
+      window.removeEventListener('keydown', kd);
+      window.removeEventListener('keyup', ku);
+      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(raf);
+      const MAP_SLOTS = ['map','normalMap','roughnessMap','metalnessMap','emissiveMap','aoMap',
+        'alphaMap','bumpMap','displacementMap','lightMap','specularMap'];
+      const disposeMaterial = m => {
+        if (!m) return;
+        for (const slot of MAP_SLOTS) if (m[slot] && m[slot].dispose) m[slot].dispose();
+        if (m.dispose) m.dispose();
+      };
+      scene.traverse(o => {
+        if (o.geometry && o.geometry.dispose) o.geometry.dispose();
+        const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+        for (const m of mats) disposeMaterial(m);
+      });
+      // Not reached by the traversal above: textures set directly on the scene rather than on a
+      // mesh's material (the sky gradient, the environment reflection map). The cloud-shadow
+      // texture IS on a mesh's material (cloudShadow.mesh), so the traversal already frees it.
+      if (scene.background && scene.background.isTexture) scene.background.dispose();
+      if (scene.environment && scene.environment.dispose) scene.environment.dispose();
+      renderer.dispose();
+    },
   };
 }

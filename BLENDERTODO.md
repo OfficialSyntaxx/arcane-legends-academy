@@ -444,9 +444,15 @@ That single line covers every fishing spot in every zone, present and future.
 **File:** `prop_gateway.glb`  ·  **Box:** ~6 W × 2 D × 7 H  ·  **Budget:** 1,200 tris
 **Base colour:** `#5a4a8a`, glow `#7be0ff`
 
-Zone exits are currently invisible trigger volumes with minimal dressing — the player walks toward
-the edge of the map and hopes. A visible arch at each gateway is the clearest possible signal that
-*this is a way out*, and there are now **four** of them (academy↔forest, forest↔lake).
+*(Corrected: this brief is stale. `world.js`'s "zone exits (WORLDSPEC step 4)" block already
+builds a procedural gateway arch — two stone pillars, a lintel, an emissive pad — at every exit;
+it is not an invisible trigger volume. This tier is a real-model upgrade of an existing procedural
+fallback, same relationship every other Tier 1/2 brief has to its primitive — not new dressing
+where none exists.)*
+
+A visible arch at each gateway is the clearest possible signal that *this is a way out*. There are
+now **10** exit entries across the 5 zone-pair connections (academy↔forest, forest↔lake,
+forest↔mountains, mountains↔snow, snow↔confluence) — every one already renders an arch.
 
 - Two heavy stone pillars ~5.5 m tall, 1.0 m square, ~4.5 m apart, on a shared plinth step.
 - A carved lintel or a broken arch across the top, reaching ~7 m.
