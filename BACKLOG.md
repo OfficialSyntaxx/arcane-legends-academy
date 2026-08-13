@@ -349,8 +349,11 @@
   sourced, not boss-sourced — see CLAUDEREADME §6.44 for why), shown as a Codex gallery.
 - [x] Endgame dungeon tiers — "Hard Mode": once a dungeon's boss is dead, an unlimited, repeatable
   menu-duel rematch at 1.6× HP for a scaled reward, offered from the Quests screen.
-- [ ] The Arcanum / ultimate endgame zone — deferred: same scale as the whole Ashen Mountains arc
-  (zone + dungeon + boss + quests), not a same-session item. Treat as its own multi-step project.
+- [x] Ultimate endgame zone — **The Confluence**: a 5th outdoor zone (all-schools-convergence
+  theme, past Frostborne Peaks), The Sundered Sanctum dungeon, The Convergence Wyrm (a boss whose
+  deck draws from every school instead of one), and a 5-quest chain. Built as its own 5-step
+  content pass (`docs/CONFLUENCE-PLAN.md`/`docs/CONFLUENCE-NOTES.md`). Not literally named "The
+  Arcanum" — that collides with the existing Lake Arcanum zone.
 
 ---
 
