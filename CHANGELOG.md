@@ -14,6 +14,34 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## The Confluence, step 5 of 5: field quests — BACKLOG §10 complete — 2026-08-13
+
+### The Confluence, step 5 of 5: field quests — *pending*
+- Final step: 5 quests (2 gather, 1 slay, 1 clear, 1 boss), gated behind Ashen Mountains' `ember_wyrm`
+  quest — same "already cleared the previous zone" reasoning every earlier gate uses. **BACKLOG §10
+  has no unbuilt content left.**
+- **Found and fixed another project-wide gap before writing any quest content**: Ashen Mountains'
+  entire 5-quest chain was unreachable in play. Two bugs stacked — `QUEST_GIVERS` (index.html) had
+  no entries for its two NPCs, and one of them (Smelter Voss) had `station:"market"` instead of
+  his own key, opening the Market screen instead of dialogue on click. Verified empirically (real
+  browser, clicked Foreman Grund, no dialogue opened at all) before touching anything.
+  - The existing safety check missed it because it was too lenient (`station === giver OR key ===
+    giver`) — tightened to require `station === key` (scoped to NPCs actually used as a giver),
+    and added a second guard (`window.__testQuestGivers()` + a `ui-smoke.mjs` coverage check) for
+    the half of this bug class no zones.json-only check can see.
+  - Both real bugs fixed: the two missing `QUEST_GIVERS` entries added, Smelter Voss's `station`
+    corrected. Verified live.
+- **Reused Frost Keeper as the entry-quest giver**, per the Step 1 plan note — closed a dead-end
+  NPC instead of spawning a redundant one. New NPC **Rift Warden** (reuses `npc_mage.glb`) gives
+  the remaining four quests from inside The Confluence itself.
+- Learned along the way that a quest's `zone` field means "where the giver stands", not "what the
+  objective is about" — the entry quest's objective is Confluence-flavored but its giver is in
+  Frostborne Peaks, and every prior quest happened to have both match, so this distinction was
+  never exercised before.
+- Verified end-to-end through the real DOM (accept → hand in → real gold payout → next quests
+  offered), promoted into a permanent `browser-test.mjs` check.
+- *625 engine / 42 online / 36 creature-rule / real-browser suite, all green.*
+
 ## The Confluence, step 4 of 5: dungeon + boss — 2026-08-13
 
 ### The Confluence, step 4 of 5: dungeon + boss — *pending*

@@ -117,3 +117,40 @@ noticed and why it was or wasn't acted on immediately.
 - **The dungeon entrance needed the same dry-ground check** Step 1's hand-placed exits did
   (`TER.isWater()` sampling) — confirms that lesson generalizes to every hand-placed `x`/`z` entry
   in this zone, not just exits.
+
+## Step 5 (field quests) — another real engine gap, project-wide this time
+
+- **Ashen Mountains' entire 5-quest chain was unreachable in play**, discovered before writing a
+  single line of Confluence's own quest content (about to wire the exact same mechanism up for
+  Frost Keeper/a new NPC, which would have shipped the same gap a third time). Two independent
+  bugs stacked: (1) `QUEST_GIVERS` (index.html) never got entries for `mountain_miner`/
+  `mountain_smith`, so clicking either NPC fell through `questDialogue`'s null return; (2)
+  Smelter Voss's own `station` field was `"market"`, not his own key, so even fixing (1) alone
+  would not have reached him — clicking him opens the Market screen instead. Verified empirically:
+  walked to Foreman Grund in a real browser, clicked, no dialogue opened at all.
+  - Root cause of why the EXISTING test missed it: `tools/test.mjs`'s "every zone quest names a
+    real zone and giver" check accepted `n.station === q.giver OR n.key === q.giver` — an OR that
+    let a `key`-only match through even though only `station` actually drives dialogue routing.
+    Tightened rather than relaxed: the fix is a stricter check (`n.station === n.key`, scoped to
+    NPCs actually used as a `giver`), not a workaround.
+  - Fixed both real bugs: added the two missing `QUEST_GIVERS` entries, corrected Smelter Voss's
+    `station`. Verified live (walked to both NPCs, confirmed real quest dialogue now opens).
+  - **Added a second guard `QUEST_GIVERS` itself can't catch statically** — it's a plain `const`
+    inside index.html's inline module, invisible to `tools/test.mjs`. Added
+    `window.__testQuestGivers()` and a coverage check in `ui-smoke.mjs` (which actually boots that
+    module) so a giver with no dialogue entry fails a real test run, not just a manual check.
+- **Reused Frost Keeper (`snow_keeper`) as the entry-quest giver**, per the Step 1 plan — closed a
+  dead-end NPC (role `"quest"`, zero wired content) instead of spawning a redundant new one. Also
+  needed its own `station` fix (was `"quests"`, a generic shortcut with no personal dialogue) once
+  it became a real giver.
+- **A quest's `zone` field means "where the giver physically stands", not "what the objective is
+  about"** — learned by getting it wrong first. The entry quest's objective is about Confluence
+  (gather runite found there) but its giver is in Frostborne Peaks; tagging it `zone:"confluence"`
+  failed the existing "giver NPC found in q.zone" check. Every prior quest happened to have both
+  match, so this distinction was never exercised before.
+- New NPC: **Rift Warden** (`confluence_warden`, reuses `npc_mage.glb`) gives the remaining four
+  quests from inside The Confluence itself, avoiding a full backtrack to Frostborne Peaks for the
+  whole chain.
+- Verified end-to-end through the real DOM: accepted the entry quest, handed it in for a real gold
+  payout, confirmed the next two quests are then offered — promoted into a permanent
+  `browser-test.mjs` check.

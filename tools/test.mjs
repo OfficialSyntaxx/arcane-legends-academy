@@ -1474,6 +1474,26 @@ check("every zone quest names a real zone and giver", (()=>{
   if (bad.length) console.log("   " + bad.join("\n   "));
   return bad.length === 0;
 })());
+// A quest GIVER's dialogue is routed by `station` alone (world.js registers the interactive with
+// `n.station`, and index.html's onStation only ever reads that field) — `key` is used for the 3D
+// model/rig, not for dialogue lookup. Scoped to NPCs actually named as a `giver` somewhere in
+// ZONE_QUESTS — plenty of role:"quest" NPCs are legitimately something else (a generic shortcut
+// to the Quests tab via station:"quests", or a vendor with station:"market") and must NOT be
+// flagged. An NPC whose station doesn't match its own key silently falls through to whatever that
+// other screen is instead of ever showing quest dialogue. This is a REAL bug this exact check
+// caught: Ashen Mountains' Smelter Voss shipped with `station:"market"` — the lenient OR-check
+// above passed (his `key` matched the quest's `giver`) while he was actually unreachable in play.
+check("every quest giver NPC's station matches its own key (or the dialogue never shows)", (()=>{
+  const givers = new Set(ZQ.ZONE_QUESTS.map(q => q.giver));
+  const bad = [];
+  for (const id of WORLD.zoneIds){
+    for (const n of WORLD.get(id).npcs){
+      if (givers.has(n.key) && n.station !== n.key) bad.push(`${id}/${n.key}: station is "${n.station}", not its own key`);
+    }
+  }
+  if (bad.length) console.log("   " + bad.join("\n   "));
+  return bad.length === 0;
+})());
 check("zone quest ids are unique", new Set(ZQ.ZONE_QUESTS.map(q => q.id)).size === ZQ.ZONE_QUESTS.length);
 check("every quest objective is a kind the code handles", (()=>{
   const known = ["gather", "slay", "boss", "clear", "visit"];

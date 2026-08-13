@@ -180,6 +180,66 @@ export const ZONE_QUESTS = [
     reward: { gold: 1600, xp: 1200, cards: 3 },
     requires: ["cindercleave"],
   },
+
+  // ---- The Confluence (BACKLOG §10, the last endgame zone) ----
+  // Gated on the Ember Wyrm, same reasoning every earlier gate uses: a player standing at this
+  // rift has already cleared three dungeons, so The Convergence Wyrm is a real step up, not a
+  // wall met on arrival. The first quest is given by Frost Keeper — Frostborne Peaks' own
+  // quest-role NPC, which had zero wired content before this (see docs/CONFLUENCE-NOTES.md) —
+  // rather than a redundant new NPC standing at a gateway that already has one.
+  {
+    // `zone: "snow"`, not "confluence" — Frost Keeper physically stands in Frostborne Peaks, and
+    // every other quest's `zone` field means "where the giver is", not "what the objective is
+    // about" (the gather objective itself works from inventory regardless of the tag).
+    id: "rift_warning",
+    zone: "snow",
+    giver: "snow_keeper",
+    title: "The Rift Warning",
+    brief: "Something tore loose past the ridge and it isn't cold. Bring me ten shards of runite from whatever's through there — I want to see what it's doing to the ore before I send anyone else.",
+    objective: { kind: "gather", id: "runite", n: 10 },
+    reward: { gold: 900, xp: 600 },
+    requires: ["ember_wyrm"],
+  },
+  {
+    id: "shard_gathering",
+    zone: "confluence",
+    giver: "confluence_warden",
+    title: "Shard Gathering",
+    brief: "The gold veins here run strange — warm to the touch, humming faintly. Eight pieces, and mind your hands.",
+    objective: { kind: "gather", id: "gold", n: 8 },
+    reward: { gold: 1000, xp: 650 },
+    requires: ["rift_warning"],
+  },
+  {
+    id: "cleanse_the_rift",
+    zone: "confluence",
+    giver: "confluence_warden",
+    title: "Cleanse the Rift",
+    brief: "Whatever wanders here is more than lost — it's unraveling. Put six of them down before they spread further.",
+    objective: { kind: "slay", dungeon: "sundered_sanctum", n: 6 },
+    reward: { gold: 1100, xp: 700 },
+    requires: ["rift_warning"],
+  },
+  {
+    id: "sealing_the_breach",
+    zone: "confluence",
+    giver: "confluence_warden",
+    title: "Sealing the Breach",
+    brief: "There's a vault past the main hall that hasn't been checked since the sanctum cracked open. Make it safe.",
+    objective: { kind: "clear", dungeon: "sundered_sanctum", room: "shard_vault" },
+    reward: { gold: 1200, xp: 800 },
+    requires: ["cleanse_the_rift"],
+  },
+  {
+    id: "the_convergence_wyrm",
+    zone: "confluence",
+    giver: "confluence_warden",
+    title: "The Convergence Wyrm",
+    brief: "At the heart of the sanctum, all seven schools bleed into one thing. End it, and the rift finally closes.",
+    objective: { kind: "boss", dungeon: "sundered_sanctum" },
+    reward: { gold: 2400, xp: 1800, cards: 4 },
+    requires: ["cleanse_the_rift"],
+  },
 ];
 
 const state = s => (s && s.zoneQuests) || { accepted: [], done: [] };
@@ -213,6 +273,7 @@ export const DUNGEON_NAMES = {
   cinderhollow_caverns: "Cinderhollow Caverns",
   drowned_vault: "the Drowned Vault",
   ashen_caverns: "Ashen Caverns",
+  sundered_sanctum: "the Sundered Sanctum",
 };
 const dungeonName = id => DUNGEON_NAMES[id] || id;
 

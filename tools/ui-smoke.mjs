@@ -115,5 +115,23 @@ const missingIds = usedIds.filter(id => !markupIds.has(id) && ![...dynamicIds].s
 if (missingIds.length){ errors++; console.log("✗ UI grabs ids that are not in the markup:", missingIds.join(", ")); }
 else console.log(`element ids ok (${usedIds.length} used)`);
 
+// ---- every zone-quest giver actually has dialogue wired, or it's a dead-end NPC ----
+// The zones.json/zonequests.js checks in tools/test.mjs can only see DATA — they cannot see
+// QUEST_GIVERS, since it's a plain `const` inside index.html's inline module, not an export. This
+// is the one place that table is reachable (the module is actually booted here), so this is the
+// only check that can catch "a giver with no entry here" — exactly the class of bug that let
+// Ashen Mountains' whole 5-quest chain ship unreachable (see tools/test.mjs's station/key check
+// for the other half of that same story).
+try {
+  const ZQ = await import("file://" + path.join(PUBLIC_DIR, "zonequests.js"));
+  const givers = global.window.__testQuestGivers ? global.window.__testQuestGivers() : null;
+  if (!givers){ errors++; console.log("✗ window.__testQuestGivers() is not wired up"); }
+  else {
+    const missing = [...new Set(ZQ.ZONE_QUESTS.map(q => q.giver))].filter(g => !(g in givers));
+    if (missing.length){ errors++; console.log("✗ quest givers with no QUEST_GIVERS dialogue entry:", missing.join(", ")); }
+    else console.log(`quest giver dialogue ok (${Object.keys(givers).length} givers)`);
+  }
+} catch(e){ errors++; console.log("✗ quest giver check failed:", e.message); }
+
 console.log(errors ? `\n${errors} ERRORS` : "\nUI SMOKE PASS");
 process.exit(errors?1:0);

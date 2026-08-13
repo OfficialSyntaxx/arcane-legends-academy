@@ -2808,6 +2808,24 @@ const QUEST_GIVERS = {
                    idle: ["The lake was a valley once. Ask it nicely and it still remembers.", "Fish the shallows before you fish the shelf."] },
   lake_diver:    { name: "Diver Nell",   role: "Vault Diver",
                    idle: ["I have been down twice. I am not going a third time alone.", "Whatever the water took, it did not drown."] },
+  // Ashen Mountains' quest chain existed in zonequests.js/zones.json and was believed shipped
+  // (see CHANGELOG "Ashen Mountains quests") but was never actually reachable in play: neither
+  // giver had an entry here, so clicking either NPC fell through questDialogue's null return to
+  // the station fallback instead of ever showing quest dialogue — Foreman Grund silently sent the
+  // player to the Dorm, and Smelter Voss's own `station` field was "market" (opening the Market
+  // screen) rather than his own key, so even fixing this table alone would not have reached him.
+  // Both are real, needed fixes (this table AND `station` in zones.json), not a name pattern.
+  mountain_miner: { name: "Foreman Grund", role: "Ore Foreman",
+                   idle: ["Ash gets in everything up here. Ore, lungs, boots.", "The seam under the ridge is worth the climb."] },
+  mountain_smith: { name: "Smelter Voss", role: "Mountain Smith",
+                   idle: ["Skeletons keep dragging ore off my carts.", "Whatever's nesting past the forge, it isn't cooling down."] },
+  // Frostborne Peaks' own quest-role NPC (BACKLOG §10, The Confluence entry quest) — same gap
+  // class as above, caught before it shipped rather than after: an NPC with role:"quest" and no
+  // matching entry here is a dead end, not a quest giver.
+  snow_keeper:   { name: "Frost Keeper", role: "Warden of the Frontier",
+                   idle: ["Something tore loose past the ridge. I felt it in the ice.", "Whatever's through there, it isn't cold anymore."] },
+  confluence_warden: { name: "Rift Warden", role: "Keeper of the Sundered Sanctum",
+                   idle: ["Every school's magic bleeds together here. Mind where you step.", "The Wyrm at the heart of it doesn't fight like anything you've faced."] },
 };
 function questDialogue(giver){
   const g = QUEST_GIVERS[giver];
@@ -3330,6 +3348,7 @@ window.__EV.worldGo = ()=>{ if (world) world.trigger(); };
 // them, so the test cannot pass against a path the game does not actually use.
 window.__testBattle = ()=> battle;
 window.__testSave = ()=> S;
+window.__testQuestGivers = ()=> QUEST_GIVERS;
 window.__testAiTurn = ()=>{ if (battle) G.aiTurn(battle); };
 // Leave the duel screen cleanly without going through a real win/loss, for tests that only need
 // to inspect the battle object mid-fight rather than play it out.

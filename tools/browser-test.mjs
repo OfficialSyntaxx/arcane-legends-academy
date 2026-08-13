@@ -1650,6 +1650,67 @@ if (hasWorld){
   check("the boss fights at its own declared HP (350), not the open-world default", dungeon.bossHp === 350, String(dungeon.bossHp));
   check("the boss's deck draws from multiple schools — the all-schools-convergence mechanic", dungeonSchools.size >= 3, String(dungeonSchools.size));
 
+  // --- The Confluence field quests, step 5 of 5 — BACKLOG §10 complete ---
+  // Also the real-browser proof for a bug found and fixed while building this step: Ashen
+  // Mountains' entire 5-quest chain was unreachable in play (neither giver NPC's dialogue ever
+  // showed — see tools/test.mjs's station/key check and ui-smoke.mjs's QUEST_GIVERS coverage
+  // check for the two static guards this adds). Proven end-to-end here rather than just trusting
+  // the data: accept the entry quest from Frost Keeper (a previously-dead-end NPC, now reused
+  // rather than duplicated), hand it in for a real reward, then confirm the next two quests are
+  // offered by The Confluence's own NPC.
+  const quest = await page.evaluate(async () => {
+    const S = window.__testSave();
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    S.zoneQuests = S.zoneQuests || { accepted: [], done: [] };
+    if (!S.zoneQuests.done.includes("ember_wyrm")) S.zoneQuests.done.push("ember_wyrm");
+    // The previous block (dungeon+boss) leaves the player inside sundered_sanctum, not any of the
+    // outdoor zones — walk it out one hop at a time toward "snow" rather than assuming a fixed
+    // starting zone, since where this block starts depends on what ran immediately before it.
+    for (let hop = 0; hop < 5 && dbg().zone !== "snow"; hop++){
+      const here = dbg();
+      const want = here.zone === "sundered_sanctum" ? "confluence"
+        : here.zone === "confluence" ? "snow"
+        : here.zone === "whispering_forest" ? "ashen_mountains"
+        : "whispering_forest";
+      const e = (here.exits || []).find(x => x.to === want);
+      if (!e) break;
+      window.__world.teleport(e.x, e.z); await settle(1600);
+    }
+    window.__world.teleport(0, 6); await settle(1200);
+    if (dbg().nearbyKind !== "station") return { error: "Frost Keeper not found" };
+    window.__world.trigger(); await settle(400);
+    const acceptBtn = [...document.querySelectorAll("#dlgBtns button")].find(b => /Accept/.test(b.textContent));
+    if (acceptBtn) acceptBtn.click();
+    await settle(300);
+    window.__ev("dlgClose");
+    S.inventory.runite = 10;
+    window.__world.trigger();
+    await settle(300);
+    const goldBefore = S.gold;
+    const handInBtn = [...document.querySelectorAll("#dlgBtns button")].find(b => /Hand in/.test(b.textContent));
+    if (handInBtn) handInBtn.click();
+    await settle(300);
+    const goldGained = S.gold - goldBefore;
+    window.__ev("dlgClose");
+    if (dbg().zone !== "confluence"){
+      const e = (dbg().exits || []).find(x => x.to === "confluence");
+      if (e){ window.__world.teleport(e.x, e.z); await settle(1600); }
+    }
+    window.__world.teleport(-50, 40); await settle(1200);
+    if (dbg().nearbyKind !== "station") return { error: "Rift Warden not found", goldGained, riftWarningDone: S.zoneQuests.done.includes("rift_warning") };
+    window.__world.trigger(); await settle(400);
+    const offered = document.getElementById("dlgLines").textContent;
+    return {
+      riftWarningDone: S.zoneQuests.done.includes("rift_warning"), goldGained,
+      wardenOffersShardGathering: /Shard Gathering/.test(offered),
+      wardenOffersCleanseRift: /Cleanse the Rift/.test(offered),
+    };
+  });
+  check("Frost Keeper (previously a dead-end NPC) now gives the entry quest", quest.riftWarningDone === true, JSON.stringify(quest));
+  check("handing in the entry quest pays real gold", quest.goldGained > 0, String(quest.goldGained));
+  check("The Confluence's own NPC then offers the next two quests", quest.wardenOffersShardGathering && quest.wardenOffersCleanseRift);
+
 }
 
 

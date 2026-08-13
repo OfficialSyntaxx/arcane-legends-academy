@@ -1238,7 +1238,7 @@
         {
           "key": "mountain_smith",
           "role": "quest",
-          "station": "market",
+          "station": "mountain_smith",
           "label": "Smelter Voss",
           "x": 50,
           "z": 60,
@@ -1329,7 +1329,7 @@
         {
           "key": "snow_keeper",
           "role": "quest",
-          "station": "quests",
+          "station": "snow_keeper",
           "label": "Frost Keeper",
           "x": 0,
           "z": 6,
@@ -1445,6 +1445,17 @@
           "x": 40,
           "z": 30,
           "model": "./assets/models/dng_doorway.glb"
+        }
+      ],
+      "npcs": [
+        {
+          "key": "confluence_warden",
+          "role": "quest",
+          "station": "confluence_warden",
+          "label": "Rift Warden",
+          "x": -50,
+          "z": 40,
+          "model": "npc_mage.glb"
         }
       ],
       "treasures": [

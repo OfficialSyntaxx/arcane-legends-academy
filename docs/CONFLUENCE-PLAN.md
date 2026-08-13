@@ -78,8 +78,12 @@ instead of reusing one school's kit at higher numbers.
    catalog instead of one flavor school (a new `allSchools` flag), the actual mechanical
    expression of "all seven schools converge here" rather than just a name. *Done — see CHANGELOG
    "The Confluence, step 4 of 5". Notes in `docs/CONFLUENCE-NOTES.md`.*
-5. **Field quests** — 5 quests (gather/slay/clear/boss), same shape as every other zone's chain,
-   gated behind the zone entry condition.
+5. ✅ **Field quests** — 5 quests (2 gather/1 slay/1 clear/1 boss), gated behind Ashen Mountains'
+   final quest. *Done — see CHANGELOG "The Confluence, step 5 of 5". Along the way, found and
+   fixed a project-wide gap: Ashen Mountains' entire quest chain was unreachable in play. Details
+   in `docs/CONFLUENCE-NOTES.md`.*
+
+**All 5 steps complete. BACKLOG §10 has no unbuilt content left.**
 
 Each step: real engine tests + a `validateQuests`/`validateZone`-style structural check where one
 applies, plus a real-browser Playwright screenshot before calling it done — same bar as every
