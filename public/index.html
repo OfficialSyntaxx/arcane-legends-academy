@@ -101,6 +101,19 @@ h3{font-family:Georgia,serif;color:var(--ink);margin:14px 0 8px;font-size:17px;}
 .card{width:clamp(84px,23vw,108px);border-radius:10px;overflow:hidden;position:relative;border:2px solid #fff;cursor:pointer;
   background:#0c0a1c;box-shadow:0 4px 12px rgba(0,0,0,.5);transition:transform .1s;flex:0 0 auto;}
 .card.wide{width:clamp(112px,30vw,150px);}
+/* The card-detail overlay: life-sized, so a slab casing actually reads as one instead of being
+   squeezed into a ~100px grid tile. Text sizes scale up with it or the label bar looks silly. */
+.card.big{width:clamp(220px,70vw,300px);cursor:default;}
+.card.big .nm{font-size:20px;min-height:auto;}
+.card.big .tx{font-size:14px;min-height:auto;margin-top:6px;}
+.card.big .cost,.card.big .atk,.card.big .hp{width:34px;height:34px;font-size:18px;}
+.card.big .grade{font-size:22px;padding:3px 8px;}
+.card.big .serial{font-size:13px;padding:3px 10px;}
+.card.big .val{font-size:14px;padding:3px 8px;}
+.card.big .slabtop{padding:6px 10px;min-height:24px;}
+.card.big .slabtop .slabschool{font-size:18px;}
+.card.big .slabtop .slabname{font-size:15px;}
+.card.big .slabtop .slabgrade{font-size:15px;}
 @media (hover:hover){ .card:hover{transform:translateY(-4px);} }
 /* aspect-ratio keeps the art proportional as the card width flexes */
 .card .art{aspect-ratio:1.46;height:auto;background:center/cover;position:relative;}
@@ -773,6 +786,7 @@ function cardFace(c, opts={}){
   const val = (opts.value!=null) ? opts.value : cardValue(c.id, opts.grade!=null?opts.grade:100);
   const cls = ["card"];
   if (opts.wide) cls.push("wide");
+  if (opts.big) cls.push("big");
   if (opts.sel) cls.push("sel");
   if (opts.target) cls.push("target");
   if (opts.disabled) cls.push("disabled");
@@ -1582,6 +1596,18 @@ window.__EV.scribe = ()=>{
 };
 
 // ================= COLLECTION =================
+// School filter + search, same shape as codexView (codex.js) — the Collection shows what you OWN,
+// so it needed the same "find the one card I'm thinking of" tools the Codex already had.
+let collectionView = { school:"", query:"" };
+function collectionRows(){
+  const q = collectionView.query.trim().toLowerCase();
+  return [...S.cards]
+    .filter(c => !collectionView.school || CARD_MAP[c.id].school === collectionView.school)
+    .filter(c => !q || CARD_MAP[c.id].name.toLowerCase().includes(q))
+    // Rare printings and first editions float to the top: the best thing you own should not be
+    // ninety cards down a scroll.
+    .sort((a,b) => VAR.collectionRank(b) - VAR.collectionRank(a));
+}
 function renderCollection(el){
   const gear = G.equipStats(S);
   let h = `<h2>${STR.collection_title}</h2><p class="sub">${S.cards.length} cards · value ${G.totalCollectionValue(S)}g · pack ${G.PACK_COST}g</p>`;
@@ -1601,14 +1627,21 @@ function renderCollection(el){
       (tally.firstEditions ? `<div class="kpi"><div class="lv" style="font-size:16px">${VAR.FIRST_EDITION_BADGE} ${tally.firstEditions}</div><div class="nm">First Editions</div></div>` : "") +
       `</div>`;
   }
+  h += `<div class="row" style="flex-wrap:wrap;gap:5px;margin-bottom:8px">
+    <button class="btn sm ${collectionView.school===""?"gold":""}" onclick="window.__ev('colSchool|')">All schools</button>` +
+    Object.keys(SCHOOLS).map(id => `<button class="btn sm ${collectionView.school===id?"gold":""}" onclick="window.__ev('colSchool|${id}')">${SCHOOL_ICON[id]}</button>`).join("") +
+    `<input id="colQ" type="text" placeholder="Search…" value="${escapeAttr(collectionView.query)}" oninput="window.__ev('colQuery')"
+      style="flex:1;min-width:120px;padding:6px 10px;border-radius:10px;border:1px solid var(--line);background:#12101c;color:var(--ink)"></div>`;
+  const rows = collectionRows();
+  if (collectionView.school || collectionView.query) h += `<p class="sub">${rows.length} of ${S.cards.length} cards</p>`;
   h += `<div class="row">`;
-  // Rare printings and first editions float to the top: the best thing you own should not be
-  // ninety cards down a scroll.
-  for (const c of [...S.cards].sort((a,b) => VAR.collectionRank(b) - VAR.collectionRank(a))){
+  for (const c of rows){
     const def = CARD_MAP[c.id];
     const val = G.instanceValue(c);          // printing + first edition, not just the grade
     const g = c.graded ? gradeForRoll(c.roll) : null;
-    h += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">${cardFace(def, { inst:c, grade:c.graded?c.roll:null, value:val, slab:g&&g.slab, serial:c.serial })}
+    // Click the card itself to pull up the full detail view — the real slab casing on a graded
+    // card, life-sized rather than squeezed into a ~100px grid tile.
+    h += `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">${cardFace(def, { inst:c, grade:c.graded?c.roll:null, value:val, slab:g&&g.slab, serial:c.serial, onclick:`cardDetail|${c.uid}` })}
       <div class="row" style="gap:4px">
         <button class="btn sm ok" ${c.graded?"disabled":""} onclick="window.__ev('grade|${c.uid}')">${c.graded?`<span style="font-size:10px">${g.icon} ${g.name}</span>`:"Grade"}</button>
         ${c.graded?`<button class="btn sm" onclick="window.__ev('regrade|${c.uid}')">Regrade</button>`:""}
@@ -1621,6 +1654,43 @@ function renderCollection(el){
   h += `</div></div>`;
   el.innerHTML = h;
 }
+window.__EV.colSchool = (id)=>{ collectionView.school = id || ""; render(); };
+window.__EV.colQuery = ()=>{
+  // Same caret-preserving re-render the Codex search box uses — a full render() would blow away
+  // focus on every keystroke.
+  const el = $("colQ"); const pos = el.selectionStart;
+  collectionView.query = el.value;
+  render();
+  const again = $("colQ"); if (again){ again.focus(); again.setSelectionRange(pos, pos); }
+};
+
+// ---- card detail overlay: the big view a grid tile is too small for ----
+function buildCardDetail(uid){
+  const c = G.cardInstance(S, uid);
+  if (!c) return "<p class=\"sub\">That card is gone.</p>";
+  const def = CARD_MAP[c.id];
+  const val = G.instanceValue(c);
+  const g = c.graded ? gradeForRoll(c.roll) : null;
+  const printing = VAR.variantOf(c);
+  const owned = S.cards.filter(x => x.id === c.id).length;
+  return `<div style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center">
+    <div>${cardFace(def, { inst:c, grade:c.graded?c.roll:null, value:val, slab:g&&g.slab, serial:c.serial, wide:true, big:true })}</div>
+    <div style="flex:1;min-width:200px">
+      <h3 style="margin-top:0">${SCHOOL_ICON[def.school]} ${def.name}</h3>
+      <p class="sub">${RARITY[def.rarity].name} ${def.type} · ${SCHOOLS[def.school].name} school</p>
+      ${g ? `<p class="sub">${g.icon} <b style="color:var(--gold)">${g.name}</b> (roll ${c.roll})${g.slab?` · Serial #${c.serial}`:""}</p>` : `<p class="sub">Ungraded</p>`}
+      ${printing ? `<p class="sub">${VAR.labelFor(c)}</p>` : ""}
+      <p class="sub">Value: <b style="color:var(--gold)">🪙${val}</b></p>
+      <p class="sub">You own ${owned} cop${owned===1?"y":"ies"} of this card.</p>
+      <div class="row" style="gap:6px;margin-top:10px">
+        <button class="btn sm ok" ${c.graded?"disabled":""} onclick="window.__ev('grade|${c.uid}')">${c.graded?`${g.icon} ${g.name}`:"Grade"}</button>
+        ${c.graded?`<button class="btn sm" onclick="window.__ev('regrade|${c.uid}')">Regrade</button>`:""}
+        <button class="btn sm danger" onclick="window.__ev('sell|${c.uid}')">Sell</button>
+      </div>
+    </div>
+  </div>`;
+}
+window.__EV.cardDetail = (uid)=>{ showOverlay("🃏 Card Detail", buildCardDetail(uid)); };
 
 // ================= CODEX (codex.js) =================
 // The collection screen shows what you OWN. The Codex shows the whole catalog, so the question a
@@ -1875,9 +1945,14 @@ window.__EV.packFlip = (i)=>{
   AUDIO.play(sfxForDrop(packReveal[i]));
 };
 window.__EV.packSkip = ()=>{ (packReveal||[]).forEach((d,i)=>window.__EV.packFlip(i)); };
-window.__EV.grade = (uid)=>{ const c=G.cardInstance(S,uid); if(!c||c.graded) return; const fee=gradeFee(c.id); const r=G.gradeCard(S,uid); r.ok?toast(`${r.grade.icon} ${r.grade.name}!`):err(`Need ${fee}g to grade`); render(); };
-window.__EV.regrade = (uid)=>{ const r=G.regradeCard(S,uid); if(!r.ok){ err("Not enough gold"); return; } toast(`Regraded: ${r.old.icon} ${r.old.name} → ${r.grade.icon} ${r.grade.name}!`); sfx(500,.1); render(); };
-window.__EV.sell = (uid)=>{ const r=G.sellCard(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; render(); };
+// If the card detail overlay is open on the card an action just touched, refresh it in place —
+// otherwise it keeps showing a stale grade/value after Grade/Regrade/Sell.
+function refreshCardDetailIfOpen(uid){
+  if ($("overlay").style.display === "block" && $("ovTitle").textContent === "🃏 Card Detail") showOverlay("🃏 Card Detail", buildCardDetail(uid));
+}
+window.__EV.grade = (uid)=>{ const c=G.cardInstance(S,uid); if(!c||c.graded) return; const fee=gradeFee(c.id); const r=G.gradeCard(S,uid); r.ok?toast(`${r.grade.icon} ${r.grade.name}!`):err(`Need ${fee}g to grade`); render(); refreshCardDetailIfOpen(uid); };
+window.__EV.regrade = (uid)=>{ const r=G.regradeCard(S,uid); if(!r.ok){ err("Not enough gold"); return; } toast(`Regraded: ${r.old.icon} ${r.old.name} → ${r.grade.icon} ${r.grade.name}!`); sfx(500,.1); render(); refreshCardDetailIfOpen(uid); };
+window.__EV.sell = (uid)=>{ const r=G.sellCard(S,uid); r.ok?toast(`Sold for ${r.value}g`):null; render(); if (r.ok && $("overlay").style.display === "block" && $("ovTitle").textContent === "🃏 Card Detail") window.__EV.ovClose(); };
 window.__EV.toLoadout = ()=>{ screen="loadout"; render(); };
 
 // ================= LOADOUT =================

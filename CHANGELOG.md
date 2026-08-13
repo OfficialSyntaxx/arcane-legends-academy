@@ -14,6 +14,26 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Collection: click-to-detail + search/filter — 2026-08-13
+
+### Collection UI pass — *pending*
+- User asked that clicking a card pull up the full graded slab look, and for the Collection screen
+  generally to get some polish.
+- Every card in the Collection grid is now clickable (`cardFace`'s existing `onclick` hook — the
+  same mechanism cost/atk/hp/grade badges already use, nothing new there) and opens a detail
+  overlay: a much bigger card (`cardFace`'s new `opts.big`, ~2.5x the grid tile) so a graded slab's
+  casing, label bar, and grade seal actually read as a slab instead of being squeezed into a
+  ~100px tile, plus a side panel with rarity/school/grade/value/copies-owned and the same
+  Grade/Regrade/Sell actions the grid already had. Those actions refresh the open overlay in place
+  (or close it, for a sale) instead of leaving it showing stale data.
+- Added a school filter row + search box to the Collection grid itself, mirroring the Codex's
+  existing filter UX (`codexView`/`CX.browse`) so owned cards get the same "find the one I'm
+  thinking of" tools the unowned catalog already had.
+- Verified with a real-Chromium screenshot: minted and force-graded a card, clicked it in the
+  live grid, confirmed the detail overlay renders the full slab casing at the larger size and the
+  filter/search controls render correctly underneath.
+- *624 engine / 42 online / 36 creature-rule, all green.*
+
 ## Per-card art complete: 47 of 47 cards — 2026-08-13
 
 ### fire_dragon art — *pending*
