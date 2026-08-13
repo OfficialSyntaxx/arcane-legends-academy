@@ -325,9 +325,25 @@
 - [ ] Server-authoritative economy
 - [ ] Server validation / anti-cheat
 - [x] Expanded automated tests — 485 engine / 42 online / 166 real-browser (8 viewports + gestures + world/dungeon/quest/dorm/lake/creation/gear/class/printing/codex/archetype/VFX/ultimate/lab/deckbuild/debug/pack/cardback/enchant/market/savebackup flows) + model-integrity check, plus CI
-- [~] Performance profiling — not a full pass, but a targeted audit found and fixed a real GPU
-  memory leak in `world.js` (`setPet` this session, `setWeapon` pre-existing — neither disposed
-  the outgoing model's geometry/materials on swap). No dedicated profiling tooling added yet.
+- [x] Performance profiling — a real pass, not just a targeted audit. Measured JS heap directly
+  across the real `fastTravel` zone-change path (20 hops): confirmed and fixed a severe leak —
+  `world.dispose()` never freed the outgoing scene's geometries/materials/textures before a fresh
+  scene replaced it (browsers hand back the SAME WebGL context per canvas, so nothing was ever
+  actually released). Heap went from climbing unbounded (74MB → 633MB / 20 hops) to plateauing
+  (~294MB by hop 8). Then targeted the chunk-streaming path specifically: found and fixed a real
+  async race (a chunk unloading before its in-flight GLTF load resolves leaves an orphaned,
+  undisposed model) — reproduced deterministically by delaying every `.glb` response 250ms before
+  writing the fix, confirmed fixed the same way after. Also (`setPet`/`setWeapon`, pre-existing)
+  swap leaks were already closed. Wall-clock frame time was tried and abandoned as a metric — this
+  sandbox's software-rendered WebGL isn't representative of real hardware — in favour of a new
+  `world.renderStats()` debug hook (draw calls/triangles/geometries/textures/lights, hardware-
+  independent) run across the 4 heaviest real scenes. Found one legitimate, non-bug risk worth
+  tracking rather than silently "fixing": dungeon rooms don't chunk-stream the way outdoor zones
+  do, so a dungeon's torch-driven real-time lights (documented/intentional — an interior's ambient
+  rig is near-black on purpose) scale with total dungeon size, not with what's actually visible
+  (16 lights in a 4-room dungeon vs. every other zone's baseline of 4). Not fixed here — the real
+  fix (distance-based real-vs-emissive-only torch lighting) is a design change, not a correctness
+  bug, and wasn't authorized to make unilaterally.
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] UI redesign — bottom nav bar (8 tabs fit on mobile) + muted charcoal/champagne palette (was cartoonish purple)
 - [x] Client analytics + dashboard — `advice.js`/`analytics.js` feed D1; `/api/analytics` (JSON) + `/api/dashboard` (HTML) track sessions, zones, tab clicks, errors, movement-stuck, world/map load, low-FPS, advice shown→click

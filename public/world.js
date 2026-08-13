@@ -2202,6 +2202,17 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     wandFxDebug(){
       return wandFxGroup ? { id: wandFxId, motes: wandFxGroup.children.length } : { id: wandFxId, motes: 0 };
     },
+    // Scene-complexity numbers straight from the renderer, not wall-clock frame time — wall-clock
+    // is unusable for profiling in a software-rendered (no real GPU) test environment, but draw
+    // calls / triangles / resident geometry & texture counts are hardware-independent and catch
+    // the same class of problem (e.g. a scatter-dense zone generating an unreasonable number of
+    // unbatched draw calls) without needing real hardware to measure it on.
+    renderStats(){
+      const i = renderer.info;
+      return { drawCalls: i.render.calls, triangles: i.render.triangles,
+        geometries: i.memory.geometries, textures: i.memory.textures,
+        lights: (() => { let n = 0; scene.traverse(o => { if (o.isLight) n++; }); return n; })() };
+    },
     // Show the equipped weapon on the player's right hand (visual equipment). `metal` is the
     // equipment's metal tier (bronze/iron/gold/mithril/rune) -> a matching weapon GLB; null hides it.
     setWeapon(metal){
