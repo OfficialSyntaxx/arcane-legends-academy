@@ -29,7 +29,7 @@ export const CARDS = [
   // ---- Fire ----
   { id:"fire_cat", name:"Fire Cat", school:"fire", type:"creature", art:"cards/fire_cat.jpg", cost:1, atk:2, hp:2, rarity:"common", fx:["haste"], text:"Haste. A loyal little blaze." },
   { id:"fire_elf", name:"Fire Elf", school:"fire", type:"creature", art:"cards/fire_elf.jpg", cost:2, atk:3, hp:3, rarity:"common", fx:[], text:"Spirited, quick-tempered." },
-  { id:"fire_dragon", name:"Fire Dragon", school:"fire", type:"creature", cost:7, atk:8, hp:7, rarity:"legendary", fx:["haste"], text:"Haste. The heart of the school." },
+  { id:"fire_dragon", name:"Fire Dragon", school:"fire", type:"creature", art:"cards/fire_dragon.jpg", cost:7, atk:8, hp:7, rarity:"legendary", fx:["haste"], text:"Haste. The heart of the school." },
   { id:"firebolt", name:"Firebolt", school:"fire", type:"spell", art:"cards/firebolt.jpg", cost:1, rarity:"common", fx:[{k:"dmg",n:4}], text:"Deal 4 damage.", target:true },
   { id:"fireball", name:"Fireball", school:"fire", type:"spell", art:"cards/fireball.jpg", cost:3, rarity:"uncommon", fx:[{k:"dmg",n:6}], text:"Deal 6 damage.", target:true },
   { id:"meteor", name:"Meteor Strike", school:"fire", type:"spell", art:"cards/meteor.jpg", cost:5, rarity:"epic", fx:[{k:"dmgAll",n:3},{k:"dmgWiz",n:4}], text:"Deal 3 to all enemy creatures, 4 to the enemy wizard." },

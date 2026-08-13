@@ -14,6 +14,17 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Per-card art complete: 47 of 47 cards — 2026-08-13
+
+### fire_dragon art — *pending*
+- Closed the last gap from the 46-card batch: `fire_dragon`'s art (the original approved test
+  image) is now actually saved into the repo at `public/assets/cards/fire_dragon.jpg` and wired
+  into `cards.js`, using the same prompt that was approved back when this whole effort started.
+- Every card in the catalog now has unique art; the `school.art` fallback in `cardFace()` is no
+  longer hit by anything in the default catalog (it still exists for any future card added without
+  art yet).
+- *624 engine / 42 online / 36 creature-rule, all green.*
+
 ## Per-card art for 46 of 47 cards — 2026-08-13
 
 ### Per-card art — *pending*
