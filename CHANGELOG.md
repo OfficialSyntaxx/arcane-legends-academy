@@ -14,6 +14,28 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Fix the card detail view: real slab proportions — 2026-08-13
+
+### Card detail refinement — *pending*
+- User feedback on the just-shipped detail view: it looked "smudged up and compact," not like a
+  real graded card.
+- Root cause: the slab casing's plastic bezel (`.card.slab{padding:3px}`) and every badge's
+  position/size were fixed pixel values written for a ~100px grid tile. `opts.big` scaled the
+  card's *width* up to ~300px but nothing else scaled with it, so the bezel that read as a case at
+  100px was an invisible hairline at 300px, and the corner badges sat pressed against the edges
+  with grid-tile spacing — the whole thing read as flat and cramped instead of a chunky graded
+  slab.
+- Fixed by scaling everything with `.card.big`: bezel padding, corner-badge offsets and sizes,
+  label bar padding, border-radius, and a stronger drop shadow/glow so the case reads as a
+  physical object sitting on the page.
+- Also restructured the detail overlay's layout: the card is now centered on its own above a clean
+  "spec sheet" info panel (label : value rows) instead of a cramped side-by-side column, and fixed
+  a real bug found while rebuilding it — the Printing row rendered a blank line for every ordinary
+  card because `VAR.variantOf()` always returns an object (never null); it needed
+  `VAR.labelFor()`'s string instead.
+- Verified with real-Chromium screenshots of both a graded slab and an ungraded card.
+- *624 engine / 42 online / 36 creature-rule, all green.*
+
 ## Collection: click-to-detail + search/filter — 2026-08-13
 
 ### Collection UI pass — *pending*
