@@ -856,10 +856,22 @@
       "props": [
         {
           "url": "./assets/models/nat_CommonTree_1.glb",
-          "count": 90,
+          "count": 60,
           "h": 9,
           "solid": 1.4,
           "minDistFromSpawn": 14
+        },
+        {
+          "url": "./assets/models/kaykit_tree.glb",
+          "count": 30,
+          "h": 8.5,
+          "solid": 1.4,
+          "minDistFromSpawn": 14
+        },
+        {
+          "url": "./assets/models/kaykit_rock.glb",
+          "count": 15,
+          "h": 1.6
         },
         {
           "url": "./assets/models/nat_Mushroom_Common.glb",
@@ -1010,8 +1022,15 @@
       "props": [
         {
           "url": "./assets/models/nat_CommonTree_1.glb",
-          "count": 45,
+          "count": 30,
           "h": 9,
+          "solid": 1.4,
+          "minDistFromSpawn": 16
+        },
+        {
+          "url": "./assets/models/kaykit_tree.glb",
+          "count": 20,
+          "h": 8.5,
           "solid": 1.4,
           "minDistFromSpawn": 16
         },
@@ -1019,6 +1038,11 @@
           "url": "./assets/models/nat_Flower_3_Single.glb",
           "count": 70,
           "h": 0.8
+        },
+        {
+          "url": "./assets/models/nat_Mushroom_Common.glb",
+          "count": 15,
+          "h": 1.2
         },
         {
           "url": "./assets/models/kaykit_rock.glb",
@@ -1178,13 +1202,19 @@
       "props": [
         {
           "url": "./assets/models/kaykit_rock.glb",
-          "count": 60,
+          "count": 55,
           "h": 2.2
         },
         {
           "url": "./assets/models/nat_CommonTree_1.glb",
-          "count": 22,
+          "count": 16,
           "h": 7,
+          "minDistFromSpawn": 12
+        },
+        {
+          "url": "./assets/models/kaykit_tree.glb",
+          "count": 10,
+          "h": 6.5,
           "minDistFromSpawn": 12
         },
         {
@@ -1313,6 +1343,22 @@
         "waterLevel": null,
         "biome": "snow"
       },
+      "props": [
+        {
+          "url": "./assets/models/kaykit_rock.glb",
+          "count": 16,
+          "h": 2.2,
+          "solid": 1.2,
+          "minDistFromSpawn": 8
+        },
+        {
+          "url": "./assets/models/nat_CommonTree_1.glb",
+          "count": 7,
+          "h": 7.5,
+          "solid": 1.2,
+          "minDistFromSpawn": 10
+        }
+      ],
       "exits": [
         {
           "toZone": "ashen_mountains",
@@ -1391,6 +1437,13 @@
           "count": 10,
           "h": 3.2,
           "minDistFromSpawn": 8
+        },
+        {
+          "url": "./assets/models/nat_CommonTree_1.glb",
+          "count": 8,
+          "h": 7,
+          "solid": 1.4,
+          "minDistFromSpawn": 10
         }
       ],
       "resourceNodes": [
