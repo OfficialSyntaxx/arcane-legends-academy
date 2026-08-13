@@ -378,8 +378,15 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
 
   // Procedural colours are authored as sRGB hex, so they must be converted to linear now that
   // the renderer gamma-encodes its output. Without this the whole hand-built world washes out.
+  //
+  // Standard, not Lambert: every GLB in this game is PBR (see the sky/env-map comment above), so
+  // hand-built primitives sitting next to them in Lambert's pure-diffuse flat shading is exactly
+  // the "primitive vs. modeled" seam the map/lighting diagnosis called out. Standard picks up a
+  // little real specular response from the same light rig and the dim env map already authored
+  // for metal gear, at zero art cost. Roughness/metalness stay high/low (matte, non-metal) by
+  // default — this is not meant to make plaster read as chrome, just to stop it reading as chalk.
   const mat = c => {
-    const m = new THREE.MeshLambertMaterial({ color: c });
+    const m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0.05 });
     m.color.convertSRGBToLinear();
     return m;
   };
@@ -448,7 +455,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // White base colour so the vertex colours come through unmultiplied; interiors keep a flat
   // cavern bed since their floors are separate meshes.
   const groundMat = ZONE.interior ? mat(0x1b1526)
-    : Object.assign(new THREE.MeshLambertMaterial({ color: 0xffffff }), { vertexColors: true });
+    : Object.assign(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 }), { vertexColors: true });
   const ground = add(groundGeo, groundMat, groundCX, 0, groundCZ, {receive:true});
   ground.rotation.x = -Math.PI/2;
 
@@ -566,7 +573,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
         // Plinth + glass. The slab itself is drawn from `L.cases` below, so an empty case still
         // reads as a case waiting to be filled rather than as missing geometry.
         put(new THREE.BoxGeometry(p.w, 0.9, p.d), 0.45);
-        const glass = new THREE.MeshLambertMaterial({ color: 0x9fd8ff, transparent:true, opacity:0.22 });
+        const glass = new THREE.MeshStandardMaterial({ color: 0x9fd8ff, transparent:true, opacity:0.22, roughness: 0.15, metalness: 0 });
         glass.color.convertSRGBToLinear();
         const g = add(new THREE.BoxGeometry(p.w, p.h - 0.9, p.d), glass, p.x, 0.9 + (p.h-0.9)/2, p.z, {cast:false});
         g.rotation.y = p.ry || 0;
@@ -600,7 +607,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   }
   // water, only where the zone declares a level
   if (ZONE.terrain.waterLevel != null){
-    const wm = new THREE.MeshLambertMaterial({ color: biome.water, transparent:true, opacity:0.72 });
+    const wm = new THREE.MeshStandardMaterial({ color: biome.water, transparent:true, opacity:0.72, roughness: 0.1, metalness: 0 });
     wm.color.convertSRGBToLinear();
     const water = add(new THREE.PlaneGeometry(groundSpan, groundSpan), wm, groundCX, ZONE.terrain.waterLevel, groundCZ, {receive:true, cast:false});
     water.rotation.x = -Math.PI/2;
