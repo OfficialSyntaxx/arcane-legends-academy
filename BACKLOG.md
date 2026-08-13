@@ -6,6 +6,8 @@
 > - **`docs/ASSET-BUDGET.md`** — asset platform costs, CC0 sources, licensing.
 > - **`docs/NEXT-PHASE-PLAN.md`** — the systems audit and phase tracker (Phases A–D).
 > - **`BLENDERTODO.md`** — modelling briefs for every asset still drawn as a procedural primitive.
+> - **`docs/ART-DIRECTION.md`** — planning doc for a Wizard101-anchored painterly-texture pivot;
+>   not yet implemented, amends `BLENDERTODO.md`'s style/material rules once a pilot asset ships.
 > - **`CHANGELOG.md`** — what shipped when, newest first, with per-entry test counts.
 >
 > **Status markers below:** `[x]` done, `[~]` partly done. Items were re-checked against the
