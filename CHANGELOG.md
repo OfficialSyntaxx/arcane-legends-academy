@@ -14,6 +14,43 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## The Confluence, step 3 of 5: enemies + a real engine gap fixed — 2026-08-13
+
+### The Confluence, step 3 of 5: enemies + a real engine gap fixed — *pending*
+- Third step of the endgame zone content pass: a small enemy roster (Rift Skeleton, Storm Wraith,
+  Rift Demon — named to hint at different converging schools via the existing
+  `archetypes.js` flavor-matching regex, zero new assets).
+- **Found a real, project-wide gap before placing anything**: count-scattered outdoor enemies —
+  the exact shape Ashen Mountains (16), Whispering Forest (8) and Lake Arcanum (7) already ship —
+  were completely non-functional for combat. The chunk-streaming loader registered resource nodes
+  as interactive but never called the equivalent for enemies; confirmed both by code read and by
+  walking a real browser session through Ashen Mountains, where nothing was ever clickable despite
+  16 enemies rendering. Not introduced this session — that zone's content arrived pre-built via a
+  `main`-branch merge, already broken this way, unnoticed because everything built on top of it
+  since only ever used the (working) hand-placed dungeon-enemy path.
+- **Asked the user how to handle it** rather than deciding alone, since a proper fix touches shared
+  engine code affecting three already-shipped zones. Chose to fix it properly rather than route
+  around it with hand-placed-only enemies for Confluence.
+- **The fix** (`world.js`): `register()` now returns its entry so a caller can un-register it;
+  `loadChunk` registers scattered enemies the same way resource nodes already were, tagging the
+  interactive's data as a small object (`{outdoor:true, id, model, name, level}`) rather than a
+  bare id, since scattered instances have no entry in the zone's own hand-authored list the
+  dungeon-fight lookup depends on; `unloadChunk` now un-registers everything a chunk registered.
+  Also fixed a second bug found in the same code: gather-node interactive entries were never
+  un-registered on chunk unload either (only the 3D model was disposed) — every gather prompt the
+  player ever walked near stayed registered for the rest of the session.
+- **New reward path** (`index.html`): `startOutdoorFight()` + a `battle.outdoorFoe` branch in
+  `duelAgain`, deliberately not the generic PvP fallback (which would have incremented
+  `S.pvp.wins/losses` and touched PvP rank for a wandering trash-mob fight). No new save fields —
+  outdoor fights are fully repeatable, same reasoning Hard Mode rematches and Lab duels follow.
+- **Ashen Mountains, Whispering Forest and Lake Arcanum's existing enemies are fixed retroactively**
+  by this change alone — no data edits needed, the bug was in the shared code all four zones go
+  through.
+- Verified with a real-browser proof (walked to an actual scattered enemy position, fought it,
+  confirmed gold paid out and `S.pvp` stayed untouched), promoted into a permanent
+  `browser-test.mjs` check.
+- *624 engine / 42 online / 36 creature-rule / real-browser suite, all green.*
+
 ## The Confluence, step 2 of 5: props + resource nodes — 2026-08-13
 
 ### The Confluence, step 2 of 5: props + resource nodes — *pending*

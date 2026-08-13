@@ -69,8 +69,10 @@ instead of reusing one school's kit at higher numbers.
 2. ✅ **Props + resource nodes** — visual dressing from reused assets, resource nodes reusing
    existing top-tier materials rather than inventing new ones. *Done — see CHANGELOG "The
    Confluence, step 2 of 5". Notes in `docs/CONFLUENCE-NOTES.md`.*
-3. **Enemies** — a small roster of reused creature GLBs, reskinned via existing fx (freeze/drain/
-   dmgAll etc.) to feel "converged" rather than single-school.
+3. ✅ **Enemies** — a small roster of reused creature GLBs, named to hint at different schools
+   converging. *Done — see CHANGELOG "The Confluence, step 3 of 5". Along the way, found and fixed
+   a real engine gap: outdoor scattered enemies (already shipped in 3 other zones) were completely
+   non-functional for combat. Details in `docs/CONFLUENCE-NOTES.md`.*
 4. **Dungeon + boss** — a 5-room dungeon (matching Cinderhollow/Drowned Vault/Ashen Caverns'
    shape) ending in the multi-school boss described above.
 5. **Field quests** — 5 quests (gather/slay/clear/boss), same shape as every other zone's chain,

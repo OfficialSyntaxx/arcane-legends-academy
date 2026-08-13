@@ -1574,6 +1574,48 @@ if (hasWorld){
   check("the player does not spawn inside a wall arriving in The Confluence", confluence.spawnClear === true);
   check("The Confluence has a working exit back to Frostborne Peaks", confluence.zoneAfter === "snow", String(confluence.zoneAfter));
 
+  // --- outdoor (count-scattered) enemies are actually fightable — BACKLOG §10 step 3 ---
+  // A real, pre-existing gap found while building this step: count-scattered enemies (the shape
+  // Ashen Mountains, Whispering Forest and Lake Arcanum ALL already ship) rendered with zero
+  // interactivity — no register('enemy', ...) call existed for the chunk-streamed path, only for
+  // hand-placed (dungeon) enemies. Fixed in world.js's loadChunk/unloadChunk; this proves it from
+  // the outside: walk to a real scattered enemy position (computed offline for this zone's seed),
+  // fight it, and confirm the reward path is the dedicated outdoor one — no PvP record touched.
+  const outdoor = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    const S = window.__testSave();
+    // the previous block deliberately walks back OUT to snow at its end — get back into confluence
+    if (dbg().zone !== "confluence"){
+      const e = (dbg().exits || []).find(x => x.to === "confluence");
+      if (e){ window.__world.teleport(e.x, e.z); await settle(1800); }
+    }
+    // real scattered "Rift Skeleton" positions for confluence's seed (tools/browser-test.mjs pins
+    // these the same way other zone tests pin hardcoded exit coordinates)
+    const spots = [[37,14],[-25,25],[27,28],[55,19],[0,-79]];
+    let found = null;
+    for (const [x,z] of spots){
+      window.__world.teleport(x,z); await settle(1800);
+      if (dbg().nearbyKind === "enemy"){ found = dbg().nearbyLabel; break; }
+    }
+    if (!found) return { found: null };
+    const pvpBefore = { w: S.pvp.wins, l: S.pvp.losses };
+    const goldBefore = S.gold;
+    window.__world.trigger();
+    await settle(400);
+    const b = window.__testBattle();
+    const isOutdoor = !!(b && b.outdoorFoe);
+    if (b) b.enemy.hp = 0;
+    window.__ev("duelAgain");
+    await settle(400);
+    return { found, isOutdoor, goldGained: S.gold - goldBefore, pvpAfter: { w: S.pvp.wins, l: S.pvp.losses }, pvpBefore };
+  });
+  check("a scattered outdoor enemy is actually interactive (the fixed gap)", !!outdoor.found, JSON.stringify(outdoor));
+  check("fighting it starts a real, correctly-tagged outdoor battle", outdoor.isOutdoor === true);
+  check("winning pays real gold", outdoor.goldGained > 0, String(outdoor.goldGained));
+  check("an outdoor world fight never touches the PvP record", JSON.stringify(outdoor.pvpAfter) === JSON.stringify(outdoor.pvpBefore),
+        `${JSON.stringify(outdoor.pvpBefore)} -> ${JSON.stringify(outdoor.pvpAfter)}`);
+
 }
 
 

@@ -52,3 +52,45 @@ noticed and why it was or wasn't acted on immediately.
   (`gold`) instead — kept the zone visually unified around jagged rock/crystal formations, and
   cost nothing since gold/mithril/runite already existed. Chose to route around the mismatch
   rather than force a wood node in for the sake of "resource variety."
+
+## Step 3 (enemies) — a real engine gap, fixed
+
+- **Count-scattered outdoor enemies were completely non-functional for combat, project-wide.**
+  Before placing anything for Confluence, checked whether the existing pattern (Ashen Mountains
+  ships 16 of these, Whispering Forest 8, Lake Arcanum 7 — 31 total already shipped) actually
+  works. It doesn't: the chunk-streaming loader (`world.js` `loadChunk`) calls
+  `register("gather", ...)` for resource nodes but had no equivalent `register("enemy", ...)` call
+  for enemies — confirmed both by code read and by walking a real browser session through Ashen
+  Mountains, where `nearbyKind`/`enemyList` stayed empty the whole time despite 16 enemies
+  supposedly present. They render (and presumably wander) but were pure decoration — un-clickable,
+  un-fightable, with zero interaction of any kind.
+  - This was NOT introduced this session — Ashen Mountains' zone content "shipped fully built
+    during the `main` merge" per its own CHANGELOG entry, i.e. arrived from elsewhere already
+    broken this way, and nothing built on top of it since (its quest chain only ever added
+    hand-placed dungeon enemies, which use the working code path) had reason to notice.
+  - **Asked the user how to handle it** rather than deciding alone, since fixing it properly
+    touches shared engine code affecting three already-shipped zones, not just Confluence. Chose
+    to fix it properly.
+  - **The fix**: `register()` now returns its entry so a caller can un-register it later;
+    `loadChunk` registers scattered enemies the same way it already did resource nodes (tagging
+    the interactive's `data` as `{outdoor:true, id, model, name, level}` rather than a bare
+    string id, since scattered instances have no entry in the zone's own hand-authored `enemies`
+    list the dungeon lookup path depends on); `unloadChunk` now un-registers everything a chunk
+    registered when it unloads.
+  - **Also fixed a second, related leak found while touching this code**: gather-node interactive
+    entries were never un-registered on chunk unload either (only their 3D model/GPU memory was
+    freed) — every gather prompt the player had ever walked near stayed in the interactives list
+    for the rest of the session. Same root cause, same fix, bundled in since it was the same two
+    functions.
+  - **New reward path**: `index.html` gained `startOutdoorFight()` and a `battle.outdoorFoe`
+    branch in `duelAgain` — deliberately NOT routed through the generic PvP fallback the code
+    would otherwise have hit (that path increments `S.pvp.wins/losses` and touches PvP rank,
+    which a wandering trash-mob fight must not do). No new save fields: outdoor fights are fully
+    repeatable, same "no stored bit where none is needed" reasoning Hard Mode rematches and Lab
+    duels already follow.
+  - Verified two ways: a real-browser proof-of-fix script (walked to a real scattered enemy
+    position, fought it, confirmed gold paid out and `S.pvp` untouched) which was then promoted
+    into a permanent `browser-test.mjs` check rather than thrown away.
+  - **Ashen Mountains, Whispering Forest and Lake Arcanum's existing enemies are fixed
+    retroactively** by this change — no data edits needed there, since the bug was in the shared
+    engine code they all go through.

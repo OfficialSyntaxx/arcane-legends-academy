@@ -2638,6 +2638,25 @@ window.__EV.duelAgain = ()=>{
     render();
     return;
   }
+  // Outdoor world enemy (see startOutdoorFight): a small, level-scaled reward, no PvP record —
+  // fighting a wandering skeleton is not a ranked match. Screen returns to the world, not "pvp".
+  if (battle && battle.outdoorFoe){
+    over.winner==="you" ? winSfx() : loseSfx();
+    if (over.winner==="you"){
+      const g = G.equipStats(S);
+      const base = 20 + battle.outdoorFoe.level * 6;
+      const total = base + Math.round(base * g.gold/100);
+      G.gainGold(S, total);
+      const drops = G.dropCards(S, 1);
+      toast(`Victory! +${total}g +${drops.length} card`);
+    } else toast("Defeated");
+    save();
+    clearInterval(duelTimerInt);
+    battle=null; pendingTarget=null;
+    screen = "world";
+    render();
+    return;
+  }
   const isQuest = battle && battle.isQuest;
   const qIdx = battle && battle.questIdx;
   const gear = G.equipStats(S);
@@ -2944,7 +2963,7 @@ function spawnWorld(canvas, zone, spawnAt){
       changeZone(e.toZone, e.fromZone);
     },
     onDungeon(id){ enterDungeon(id); },
-    onEnemy(name){ startDungeonFight(name); },
+    onEnemy(data){ (data && data.outdoor) ? startOutdoorFight(data) : startDungeonFight(data); },
     onTreasure(id){
       const r = G.claimTreasure(S, id);
       if (!r.ok) return;                      // already claimed or unknown — silently no-op, never re-grant
@@ -3007,6 +3026,21 @@ function startDungeonFight(id){
   startLocalDuel(deck, q.gear, foe.name, tier, false, { archetype, school, hp: foe.hp });
   // Remembered on the battle so the reward/persistence step knows what was actually beaten.
   battle.dungeonFoe = { zone: zone.id, id: foe.id, room: foe.room, boss: !!foe.boss };
+}
+// A count-scattered outdoor enemy (world.js's chunk streamer — see its own header for why this
+// exists as a separate path from startDungeonFight): a repeatable wandering encounter, not a
+// one-time named kill. No worldState persistence at all, deliberately — the same "no stored bit
+// where none is needed" reasoning gather-node cooldowns and Hard Mode rematches already follow;
+// walking away and back just offers the fight again, same as a Lab duel or a Hard Mode boss.
+function startOutdoorFight(foe){
+  const tier = Math.max(0, Math.min(G.QUESTS.length - 1, Math.floor((foe.level || 1) / 2)));
+  const q = G.QUESTS[tier];
+  const archetype = ARCH.archetypeFor(foe);
+  const school = ARCH.flavorSchoolFor(foe);
+  const pool = CARDS.filter(c => c.school === school);
+  const deck = ARCH.archetypeDeckFor(archetype, pool);
+  startLocalDuel(deck, q.gear, foe.name, tier, false, { archetype, school });
+  battle.outdoorFoe = { level: foe.level || 1 };
 }
 // Record a dungeon kill: remove it from the world, persist it, and mark the room cleared once
 // nothing in it is left standing.

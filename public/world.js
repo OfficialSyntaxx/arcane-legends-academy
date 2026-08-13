@@ -833,8 +833,16 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
 
   // ---------- gathering nodes (all materials) ----------
   const interactives = [];
+  // Returns the created entry so a caller that owns a lifecycle shorter than the whole zone
+  // (the chunk streamer, below) can un-register it later instead of leaking it forever.
   function register(kind, x, z, data, label, mesh, radius=4.6){
-    interactives.push({ kind, x, z, data, label, mesh, radius });
+    const it = { kind, x, z, data, label, mesh, radius };
+    interactives.push(it);
+    return it;
+  }
+  function unregister(it){
+    const i = interactives.indexOf(it);
+    if (i >= 0) interactives.splice(i, 1);
   }
   function crystalNode(x,z,color,data,label){
     const c = add(new THREE.IcosahedronGeometry(1.0, 0), mat(color), x, 1.3, z);
@@ -1321,6 +1329,10 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     const group = new THREE.Group();
     scene.add(group);
     CHUNKS.loaded.set(key, group);
+    // Every register() call this chunk makes gets tracked here so unloadChunk can un-register
+    // them — without this, gather/enemy prompts pile up forever as the player wanders (the same
+    // model was already being disposed correctly; the INTERACTIVE ENTRY was the part leaking).
+    const regs = [];
     for (const p of bucket.props){
       const g = new THREE.Group(); group.add(g);
       loadLandmarkModel("chunk:" + key + ":" + p.url, p.url, g,
@@ -1331,17 +1343,27 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       const g = new THREE.Group(); group.add(g);
       if (spec) loadLandmarkModel("chunk:" + key + ":" + n.id, spec.url, g,
         { size:spec.h, fit:"height", x:n.x, z:n.z, ry:(n.x * 0.7) % 3, quiet:true });
-      register("gather", n.x, n.z, n.id, n.label, null, 4.6);
+      regs.push(register("gather", n.x, n.z, n.id, n.label, null, 4.6));
     }
-    for (const e of bucket.enemies){
+    // Outdoor (count-scattered) enemies previously rendered with no way to fight them — the model
+    // loaded, but nothing ever called register('enemy', ...) for them, unlike every other
+    // interactive kind. `data` is a small object rather than a bare id (dungeon enemies use a
+    // string id looked up in the zone's own hand-authored `enemies` list, which scattered
+    // instances aren't part of) — index.html's onEnemy callback branches on `data.outdoor` to
+    // route these to a dedicated open-world fight instead of the dungeon-foe lookup.
+    bucket.enemies.forEach((e, i) => {
       const g = new THREE.Group(); group.add(g);
       loadLandmarkModel("chunk:" + key + ":enemy", "./assets/models/" + e.model, g,
         { size:e.h || 1.9, fit:"height", x:e.x, z:e.z, ry:(e.x) % 3, quiet:true });
-    }
+      const data = { outdoor:true, id:"oenemy:" + key + ":" + i, model:e.model, name:e.name, level:e.level || 1 };
+      regs.push(register("enemy", e.x, e.z, data, e.name + " (Lv " + (e.level||1) + ")", null, 4.6));
+    });
+    group.userData.regs = regs;
   }
   function unloadChunk(key){
     const group = CHUNKS.loaded.get(key);
     if (!group) return;
+    for (const it of (group.userData.regs || [])) unregister(it);
     // free GPU memory rather than just detaching — a long session would otherwise leak every
     // chunk the player has ever walked through
     group.traverse(o => {

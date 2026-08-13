@@ -1419,6 +1419,26 @@
           "h": 2.2
         }
       },
+      "enemies": [
+        {
+          "model": "creature_Skeleton.glb",
+          "name": "Rift Skeleton",
+          "count": 8,
+          "level": 8
+        },
+        {
+          "model": "creature_Ghost.glb",
+          "name": "Storm Wraith",
+          "count": 6,
+          "level": 9
+        },
+        {
+          "model": "creature_Demon.glb",
+          "name": "Rift Demon",
+          "count": 5,
+          "level": 10
+        }
+      ],
       "treasures": [
         {
           "id": "confluence_rift_cache",
