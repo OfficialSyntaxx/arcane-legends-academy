@@ -3017,7 +3017,9 @@ function startDungeonFight(id){
   const q = G.QUESTS[tier];
   const archetype = ARCH.archetypeFor(foe);
   const school = ARCH.flavorSchoolFor(foe);
-  const pool = CARDS.filter(c => c.school === school);
+  // allSchools (The Confluence's boss): the ENTIRE catalog, not one school's slice — the deck
+  // itself is the "all seven schools converge" mechanic, not just the name/palette around it.
+  const pool = foe.allSchools ? CARDS : CARDS.filter(c => c.school === school);
   const deck = ARCH.archetypeDeckFor(archetype, pool);
   // The boss's own declared HP (dungeons.json `boss.hp`) — previously ignored entirely, so the
   // Cinder Wyrm and the Drowned Archon were fighting at the open-world default of 100, not the

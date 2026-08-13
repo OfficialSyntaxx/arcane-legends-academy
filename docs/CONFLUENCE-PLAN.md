@@ -73,8 +73,11 @@ instead of reusing one school's kit at higher numbers.
    converging. *Done — see CHANGELOG "The Confluence, step 3 of 5". Along the way, found and fixed
    a real engine gap: outdoor scattered enemies (already shipped in 3 other zones) were completely
    non-functional for combat. Details in `docs/CONFLUENCE-NOTES.md`.*
-4. **Dungeon + boss** — a 5-room dungeon (matching Cinderhollow/Drowned Vault/Ashen Caverns'
-   shape) ending in the multi-school boss described above.
+4. ✅ **Dungeon + boss** — "The Sundered Sanctum", 4 rooms (mirrors Ashen Caverns' exact proven
+   layout), ending in The Convergence Wyrm (Lv 18, 350 HP) — whose deck draws from the FULL card
+   catalog instead of one flavor school (a new `allSchools` flag), the actual mechanical
+   expression of "all seven schools converge here" rather than just a name. *Done — see CHANGELOG
+   "The Confluence, step 4 of 5". Notes in `docs/CONFLUENCE-NOTES.md`.*
 5. **Field quests** — 5 quests (gather/slay/clear/boss), same shape as every other zone's chain,
    gated behind the zone entry condition.
 

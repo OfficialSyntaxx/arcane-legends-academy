@@ -1439,6 +1439,14 @@
           "level": 10
         }
       ],
+      "dungeonEntrances": [
+        {
+          "id": "sundered_sanctum",
+          "x": 40,
+          "z": 30,
+          "model": "./assets/models/dng_doorway.glb"
+        }
+      ],
       "treasures": [
         {
           "id": "confluence_rift_cache",

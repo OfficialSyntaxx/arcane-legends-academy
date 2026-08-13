@@ -12,6 +12,8 @@ import http from "http";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { CARDS } from "../public/cards.js";
+const CARD_SCHOOL = Object.fromEntries(CARDS.map(c => [c.id, c.school]));
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
 // Port 0 asks the OS for a free one. A fixed 8099 meant two runs on the same machine — a stale
@@ -1615,6 +1617,38 @@ if (hasWorld){
   check("winning pays real gold", outdoor.goldGained > 0, String(outdoor.goldGained));
   check("an outdoor world fight never touches the PvP record", JSON.stringify(outdoor.pvpAfter) === JSON.stringify(outdoor.pvpBefore),
         `${JSON.stringify(outdoor.pvpBefore)} -> ${JSON.stringify(outdoor.pvpAfter)}`);
+
+  // --- The Sundered Sanctum (BACKLOG §10) — dungeon + boss, step 4 of 5 ---
+  // The player is currently in confluence (the outdoor-enemy block above). Walk to the entrance,
+  // enter, confirm the dungeon actually builds with its 4 rooms, then confirm the boss's fight is
+  // wired to the all-schools deck (The Confluence's whole point) rather than one flavor school.
+  const dungeon = await page.evaluate(async () => {
+    const settle = ms => new Promise(r => setTimeout(r, ms));
+    const dbg = () => window.__worldDebug();
+    if (dbg().zone !== "confluence"){
+      const e = (dbg().exits || []).find(x => x.to === "confluence");
+      if (e){ window.__world.teleport(e.x, e.z); await settle(1800); }
+    }
+    window.__world.teleport(40, 30); await settle(1500);
+    if (dbg().nearbyKind !== "dungeon") return { error: "no dungeon prompt", dbg: dbg() };
+    window.__world.trigger();
+    await settle(2000);
+    const shell = dbg();
+    // walk to the boss room and start the fight
+    window.__world.teleport(0, 34); await settle(1200);
+    window.__world.teleport(0, 68); await settle(1800);
+    if (dbg().nearbyKind !== "enemy") return { error: "no boss prompt", shell };
+    window.__world.trigger();
+    await settle(500);
+    const b = window.__testBattle();
+    return { zone: shell.zone, rooms: shell.rooms, spawnClear: shell.spawnClear,
+             bossHp: b && b.enemy.maxHp, deckIds: b ? [...b.enemy.deck, ...b.enemy.hand] : [] };
+  });
+  const dungeonSchools = new Set((dungeon.deckIds || []).map(id => CARD_SCHOOL[id]));
+  check("The Sundered Sanctum builds (4 rooms) when entered from The Confluence", dungeon.zone === "sundered_sanctum" && dungeon.rooms === 4, JSON.stringify(dungeon));
+  check("the dungeon spawn is not inside a wall", dungeon.spawnClear === true);
+  check("the boss fights at its own declared HP (350), not the open-world default", dungeon.bossHp === 350, String(dungeon.bossHp));
+  check("the boss's deck draws from multiple schools — the all-schools-convergence mechanic", dungeonSchools.size >= 3, String(dungeonSchools.size));
 
 }
 

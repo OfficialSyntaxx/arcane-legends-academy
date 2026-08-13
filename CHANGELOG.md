@@ -14,6 +14,34 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## The Confluence, step 4 of 5: dungeon + boss — 2026-08-13
+
+### The Confluence, step 4 of 5: dungeon + boss — *pending*
+- Fourth step: **The Sundered Sanctum**, a 4-room dungeon reached from a new entrance in The
+  Confluence, ending in **The Convergence Wyrm** (Lv 18, 350 HP — above the previous top boss,
+  the Drowned Archon at 14/280).
+- **The "all schools converge" identity is a real mechanic, not just a name**: added an
+  `allSchools` flag (`dungeons.js`'s `dungeonZone()` compiler, consumed in `index.html`'s
+  `startDungeonFight`) that gives this one boss a deck built from the FULL 47-card catalog instead
+  of the single flavor-school slice every other enemy in the game gets. Verified the resulting
+  deck actually spans multiple schools rather than trusting the flag did what it says.
+- Reused `creature_Dragon.glb` for the boss model — checked all three existing dungeon bosses
+  first and found every one of them already reuses the same model (distinguished by name/level/
+  HP/room palette, not a unique mesh), so this follows established precedent rather than either
+  reinventing it or assuming a new model was needed.
+- Room layout mirrors Ashen Caverns' exact proven geometry (4 rooms: entry → hall → a side branch
+  → boss chamber) rather than authoring new coordinates from scratch — zero risk of a corridor/
+  overlap bug, and the palette (violet/magenta, matching the zone) and enemy roster already carry
+  the visual distinction.
+- The dungeon entrance needed the same dry-ground check (`TER.isWater()` sampling) Step 1's
+  hand-placed exits did — confirms that lesson generalizes to every hand-placed point in this
+  zone.
+- Verified with real-Chromium screenshots (dungeon entry room, boss-chamber approach with the
+  correct prompt) and a permanent `browser-test.mjs` check: enters the dungeon, confirms 4 rooms
+  and a clear spawn, fights the boss, confirms its declared 350 HP (not the open-world default)
+  and a multi-school deck.
+- *624 engine / 42 online / 36 creature-rule / real-browser suite, all green.*
+
 ## The Confluence, step 3 of 5: enemies + a real engine gap fixed — 2026-08-13
 
 ### The Confluence, step 3 of 5: enemies + a real engine gap fixed — *pending*

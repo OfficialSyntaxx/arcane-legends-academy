@@ -272,8 +272,12 @@ export function dungeonZone(d){
                      x: r.x + (e.x || 0), z: r.z + (e.z || 0) });
     }
     if (r.boss){
+      // `allSchools` (BACKLOG §10, The Confluence): a boss whose deck draws from every school's
+      // cards instead of one flavor-matched school (see index.html's startDungeonFight) — the
+      // mechanical expression of "all seven schools converge here", not just a name/palette.
       enemies.push({ id: r.id + ":boss", model: r.boss.model, name: r.boss.name, level: r.boss.level,
-                     boss: true, room: r.id, size: r.boss.size || 6.5, x: r.x, z: r.z, hp: r.boss.hp });
+                     boss: true, room: r.id, size: r.boss.size || 6.5, x: r.x, z: r.z, hp: r.boss.hp,
+                     allSchools: !!r.boss.allSchools });
     }
   }
   const obstacles = [

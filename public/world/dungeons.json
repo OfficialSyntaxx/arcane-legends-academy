@@ -693,6 +693,222 @@
           "to": "emberhall"
         }
       ]
+    },
+    {
+      "id": "sundered_sanctum",
+      "name": "The Sundered Sanctum",
+      "entranceZone": "confluence",
+      "entranceX": 40,
+      "entranceZ": 30,
+      "background": 1708080,
+      "wallHeight": 8,
+      "corridorWidth": 6,
+      "spawnRoom": "entry",
+      "floorColor": 2759485,
+      "wallColor": 3811922,
+      "bossFloorColor": 4860522,
+      "lightTint": 11559167,
+      "lightScale": 1.2,
+      "rooms": [
+        {
+          "id": "entry",
+          "x": 0,
+          "z": 0,
+          "w": 24,
+          "d": 20,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -9,
+              "z": 7,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 9,
+              "z": 7,
+              "size": 2.6
+            },
+            {
+              "model": "dng_doorway.glb",
+              "x": 0,
+              "z": -7,
+              "size": 5
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Ghost.glb",
+              "name": "Shard Wisp",
+              "level": 10,
+              "x": -6,
+              "z": -3,
+              "size": 1.8
+            },
+            {
+              "model": "creature_Ghost.glb",
+              "name": "Shard Wisp",
+              "level": 10,
+              "x": 6,
+              "z": -4,
+              "size": 1.8
+            }
+          ]
+        },
+        {
+          "id": "rift_hall",
+          "x": 0,
+          "z": 34,
+          "w": 30,
+          "d": 22,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -12,
+              "z": -8,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 12,
+              "z": -8,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": -12,
+              "z": 8,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 12,
+              "z": 8,
+              "size": 2.6
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Fractured Skeleton",
+              "level": 11,
+              "x": -8,
+              "z": 2,
+              "size": 2.4
+            },
+            {
+              "model": "creature_Skeleton.glb",
+              "name": "Fractured Skeleton",
+              "level": 11,
+              "x": 8,
+              "z": 3,
+              "size": 2.4
+            },
+            {
+              "model": "creature_BlueDemon.glb",
+              "name": "Frost Shard",
+              "level": 12,
+              "x": 0,
+              "z": -6,
+              "size": 2.6
+            }
+          ]
+        },
+        {
+          "id": "shard_vault",
+          "x": 38,
+          "z": 34,
+          "w": 22,
+          "d": 18,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -8,
+              "z": 6,
+              "size": 2.6
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 8,
+              "z": 6,
+              "size": 2.6
+            }
+          ],
+          "enemies": [
+            {
+              "model": "creature_Orc_Skull.glb",
+              "name": "Bone Convergence",
+              "level": 12,
+              "x": -5,
+              "z": 0,
+              "size": 2.4
+            },
+            {
+              "model": "creature_Demon.glb",
+              "name": "Rift Fiend",
+              "level": 13,
+              "x": 5,
+              "z": -2,
+              "size": 2.6
+            }
+          ]
+        },
+        {
+          "id": "convergence_core",
+          "x": 0,
+          "z": 74,
+          "w": 34,
+          "d": 30,
+          "props": [
+            {
+              "model": "dng_torch.glb",
+              "x": -14,
+              "z": -11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 14,
+              "z": -11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": -14,
+              "z": 11,
+              "size": 3.2
+            },
+            {
+              "model": "dng_torch.glb",
+              "x": 14,
+              "z": 11,
+              "size": 3.2
+            }
+          ],
+          "boss": {
+            "model": "creature_Dragon.glb",
+            "name": "The Convergence Wyrm",
+            "level": 18,
+            "hp": 350,
+            "size": 7.5,
+            "allSchools": true
+          }
+        }
+      ],
+      "connections": [
+        {
+          "from": "entry",
+          "to": "rift_hall"
+        },
+        {
+          "from": "rift_hall",
+          "to": "shard_vault"
+        },
+        {
+          "from": "rift_hall",
+          "to": "convergence_core"
+        }
+      ]
     }
   ]
 }

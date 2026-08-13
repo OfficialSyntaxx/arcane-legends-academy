@@ -94,3 +94,26 @@ noticed and why it was or wasn't acted on immediately.
   - **Ashen Mountains, Whispering Forest and Lake Arcanum's existing enemies are fixed
     retroactively** by this change — no data edits needed there, since the bug was in the shared
     engine code they all go through.
+
+## Step 4 (dungeon + boss)
+
+- **The boss's "all schools converge" identity is a real mechanic, not just a name.** Every other
+  dungeon boss in the game (`startDungeonFight`) gets a deck built from `CARDS.filter(c => c.school
+  === school)` — one school's slice, picked by name/model regex matching in `archetypes.js`. That
+  can't express "the place where all seven schools collide." Added a small `allSchools` flag
+  (plumbed through `dungeons.js`'s `dungeonZone()` compiler from the room's `boss` config) that
+  swaps the pool to the FULL 47-card catalog instead. Verified the resulting deck actually spans
+  multiple schools (5 of 7, in the run checked) rather than trusting the flag did what it says.
+- **Reused `creature_Dragon.glb` for the boss, matching existing precedent rather than breaking
+  it.** Checked all three existing dungeon bosses (Cinder Wyrm, Ember Wyrm, Drowned Archon) before
+  assuming a new model was needed — every one of them already reuses the same Dragon model,
+  distinguished by name/level/HP/room palette, not by a unique mesh. Followed the established
+  pattern instead of introducing an inconsistency.
+- **Room layout mirrors Ashen Caverns' exact coordinates** (4 rooms: entry → hall → a side branch
+  → boss chamber) rather than authoring a new geometry from scratch — a proven-valid layout
+  (corridor alignment, wall generation, reachability) carries zero risk of the kind of
+  connection/overlap bug `validateDungeon` exists to catch, and there was no reason this dungeon
+  needed a different shape to feel distinct (the palette and enemy roster already do that work).
+- **The dungeon entrance needed the same dry-ground check** Step 1's hand-placed exits did
+  (`TER.isWater()` sampling) — confirms that lesson generalizes to every hand-placed `x`/`z` entry
+  in this zone, not just exits.
