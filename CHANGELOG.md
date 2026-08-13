@@ -16,7 +16,7 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ## Wand cosmetics — 2026-08-13
 
-### Wand cosmetics — *pending*
+### Wand cosmetics — `6d75448`
 - BACKLOG §7's last deferred item. `wandcosmetics.js`: 9 particle effects, a colour + a mote count
   each, unlocked by the same 9 collection achievements card backs/titles already spend — a third
   reward off the same grind, not a fourth unlock currency. One stored bit (`save.wandFx`), same
