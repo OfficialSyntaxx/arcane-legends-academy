@@ -66,9 +66,9 @@ instead of reusing one school's kit at higher numbers.
 1. ✅ **Zone shell** — procedural terrain (new `confluence` biome), bounds, spawn, exit back to
    Frostborne Peaks, the gate condition on entry. *Done — see CHANGELOG "The Confluence, step 1 of
    5: zone shell". Refinement notes for later steps in `docs/CONFLUENCE-NOTES.md`.*
-2. **Props + resource nodes** — visual dressing from reused/recolored assets, a couple of
-   zone-exclusive gather materials (data only, no new models — same pattern every zone's
-   materials use).
+2. ✅ **Props + resource nodes** — visual dressing from reused assets, resource nodes reusing
+   existing top-tier materials rather than inventing new ones. *Done — see CHANGELOG "The
+   Confluence, step 2 of 5". Notes in `docs/CONFLUENCE-NOTES.md`.*
 3. **Enemies** — a small roster of reused creature GLBs, reskinned via existing fx (freeze/drain/
    dmgAll etc.) to feel "converged" rather than single-school.
 4. **Dungeon + boss** — a 5-room dungeon (matching Cinderhollow/Drowned Vault/Ashen Caverns'

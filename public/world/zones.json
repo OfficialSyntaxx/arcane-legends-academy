@@ -1380,6 +1380,45 @@
           "z": -20
         }
       ],
+      "props": [
+        {
+          "url": "./assets/models/kaykit_rock.glb",
+          "count": 45,
+          "h": 2.4
+        },
+        {
+          "url": "./assets/models/dng_torch.glb",
+          "count": 10,
+          "h": 3.2,
+          "minDistFromSpawn": 8
+        }
+      ],
+      "resourceNodes": [
+        {
+          "kind": "crystal",
+          "id": "runite",
+          "label": "Mine Runite",
+          "count": 6
+        },
+        {
+          "kind": "crystal",
+          "id": "mithril",
+          "label": "Mine Mithril",
+          "count": 5
+        },
+        {
+          "kind": "crystal",
+          "id": "gold",
+          "label": "Mine Gold",
+          "count": 5
+        }
+      ],
+      "nodeModels": {
+        "crystal": {
+          "url": "./assets/models/kaykit_rock.glb",
+          "h": 2.2
+        }
+      },
       "treasures": [
         {
           "id": "confluence_rift_cache",

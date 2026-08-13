@@ -26,7 +26,29 @@ noticed and why it was or wasn't acted on immediately.
   biome's terrain (rough 3.20, amplitude 8, waterLevel 1.0 — the most jagged combination shipped
   so far) fragments into a LOT of small water pools, more than any existing zone. Positions had to
   be found by directly sampling `TER.isWater()` on a grid rather than eyeballing coordinates the
-  way earlier zones' exits were placed. Not a problem this time (found dry spots fine), but if
-  Step 2's prop/resource-node placement turns up the same friction repeatedly, it's worth writing
-  a small one-off "find N dry spots at least D apart" helper rather than hand-sampling every
-  position — flagging so it's not rediscovered fresh in Step 2.
+  way earlier zones' exits were placed. **Resolved in Step 2**: this only matters for HAND-PLACED
+  entries (exits, treasures, NPCs — anything with explicit `x`/`z`). Count-based scatter
+  (`props`/`resourceNodes` with a `count` instead of coordinates) already avoids water and steep
+  slopes automatically (`worldconfig.js`'s `scatterZone` → `groundOk`) — no manual sampling needed
+  for those. Turned out to be a narrower problem than it looked in Step 1.
+
+## Step 2 (props + resource nodes)
+
+- **Requesting more props than the fragmented terrain can host silently starves resource nodes.**
+  `scatterZone` places `props` before `resourceNodes` (object-literal order in its `return`), each
+  reserving ground out of the same limited dry, non-overlapping space (80 bounded attempts per
+  item). First pass asked for 65 rocks + 10 torches + 16 resource nodes; only 8 of 16 nodes
+  actually landed — the props had already claimed most of the placeable ground in this
+  unusually fragmented terrain. Fixed by measuring actual placement counts directly
+  (`WC.scatterZone()` from a one-off node script) rather than trusting the requested `count`, and
+  trimming the rock count from 65 → 45 until all 16 resource nodes placed cleanly (55/55 props,
+  16/16 nodes). **Worth remembering for Step 3 (enemies)**: `enemies` scatters last in the same
+  object, so it inherits the same risk — check actual placement counts before committing numbers,
+  don't just pick round ones.
+- **The wood-gather node model doesn't fit the theme.** `magic_log` (wood-kind) resource nodes
+  render as `kaykit_tree.glb` — the only wood-node model that exists, reused from every other
+  zone. A cheerful green tree looked wrong in a "reality tear, nothing organic" zone (screenshot
+  comparison made this obvious immediately). Swapped `magic_log` for a third crystal-kind material
+  (`gold`) instead — kept the zone visually unified around jagged rock/crystal formations, and
+  cost nothing since gold/mithril/runite already existed. Chose to route around the mismatch
+  rather than force a wood node in for the sake of "resource variety."

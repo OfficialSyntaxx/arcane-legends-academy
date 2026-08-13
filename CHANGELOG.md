@@ -14,6 +14,32 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## The Confluence, step 2 of 5: props + resource nodes — 2026-08-13
+
+### The Confluence, step 2 of 5: props + resource nodes — *pending*
+- Second step of the endgame zone content pass. Zero new assets, per the plan: scattered
+  `kaykit_rock.glb` (jagged debris) and `dng_torch.glb` (eerie rift beacons) for dressing, and
+  resource nodes reusing existing top-tier materials (runite/mithril/gold) rather than inventing
+  new ones — Confluence reads as "the best place to find the rarest existing resources," not a
+  new economy tier to balance.
+- **Found and fixed a real placement bug before it shipped**: `scatterZone` places `props` before
+  `resourceNodes`, both drawing from the same limited dry ground in this zone's unusually
+  fragmented terrain (see Step 1's notes). The first prop counts (65 rocks + 10 torches) starved
+  resource node placement down to 8 of 16 requested — silent under-delivery, no error. Caught by
+  measuring actual placement counts directly rather than trusting the requested numbers, fixed by
+  trimming the rock count until all 55 props and all 16 resource nodes place cleanly every time.
+- **Swapped a wood-gather node for a third ore type**: the only wood-node model in the game
+  (`kaykit_tree.glb`, a plain green tree) visibly clashed with the zone's "reality tear, nothing
+  organic" theme in an actual screenshot. Replaced `magic_log` with `gold` (crystal-kind, already
+  existed) instead of forcing the mismatch in for material variety.
+- Verified with real-Chromium screenshots at forced in-world noon: rock/torch props scattered
+  correctly, a "Mine Runite" gather prompt triggers on approach, unified crystal aesthetic with
+  no stray tree.
+- Refinement notes (Frost Keeper NPC reuse for Step 5, night-time darkness) carried forward from
+  Step 1, unchanged; one new note added for Step 3 (enemies scatter last in the same limited
+  ground — check actual placement counts, don't just pick round numbers).
+- *624 engine / 42 online / 36 creature-rule / real-browser suite, all green.*
+
 ## The Confluence, step 1 of 5: zone shell — 2026-08-13
 
 ### The Confluence, step 1 of 5: zone shell — *pending*
