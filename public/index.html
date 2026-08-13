@@ -778,7 +778,9 @@ function cardFace(c, opts={}){
   if (opts.disabled) cls.push("disabled");
   if (opts.tired) cls.push("tired");
   if (opts.slab) cls.push("slab");
-  const art = school.art;
+  // Per-card art (cards.js `art`) wins when it exists; the shared school art is the fallback for
+  // any card not yet generated — so a partially-filled catalog never breaks anything.
+  const art = c.art || school.art;
   let flag = "";
   if (opts.tired) flag = `<div class="tired-ic">😴</div>`;
   let attrs = "";

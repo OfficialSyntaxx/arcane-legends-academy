@@ -14,6 +14,29 @@ behaviour. The four suites are: `npm test` (engine + online-rules + UI smoke),
 
 ---
 
+## Per-card art for 46 of 47 cards — 2026-08-13
+
+### Per-card art — *pending*
+- The 46 remaining cards' art (per `docs/CARD-ART-PROMPTS.md`) was generated outside this session
+  (this session can't download from Higgsfield's CDN — org egress policy) and pushed straight to
+  `public/assets/cards/<id>.jpg`, one file per card, at commit `906deda`.
+- Wired into `cards.js`: every card whose art file exists on disk got an `art:"cards/<id>.jpg"`
+  field added (scripted, not hand-edited, to avoid 46 chances to typo an id). `cardFace()` in
+  `index.html` now prefers `c.art` and only falls back to the shared `school.art` when it's
+  absent — so `fire_dragon` (the original approved test image, never actually downloaded into
+  this repo) still renders correctly via the fallback instead of breaking.
+- No image-compression pass exists for card art (the repo's only `compress` pipeline is Draco/WebP
+  for GLB models) — the generated JPGs are already reasonably sized (150-280KB each, 8.7MB total
+  for all 46) and didn't need one.
+- Verified with a real-Chromium screenshot: minted one card from each of several schools, opened
+  the Collection grid, confirmed each shows its own distinct art and the ungenerated card
+  (`fire_dragon`) correctly falls back rather than breaking.
+- 46/47 cards now have unique art; `fire_dragon` is the only one still on the shared school
+  fallback — regenerating and dropping in `public/assets/cards/fire_dragon.jpg` would complete the
+  set.
+- *624 engine / 42 online / 36 creature-rule, all green (art + data wiring only, no logic
+  changed).*
+
 ## Default the Arcane Aura off — 2026-08-12
 
 ### Default the Arcane Aura off — *pending*
