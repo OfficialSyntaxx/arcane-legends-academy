@@ -889,19 +889,19 @@
           "kind": "wood",
           "id": "oak_log",
           "label": "Chop Oak",
-          "count": 10
+          "count": 15
         },
         {
           "kind": "wood",
           "id": "willow_log",
           "label": "Chop Willow",
-          "count": 6
+          "count": 10
         },
         {
           "kind": "crystal",
           "id": "copper",
           "label": "Mine Copper",
-          "count": 8,
+          "count": 12,
           "color": 13467442
         }
       ],
@@ -1055,21 +1055,21 @@
           "kind": "pond",
           "id": "raw_salmon",
           "label": "Fish Salmon",
-          "count": 6,
+          "count": 9,
           "nearWater": true
         },
         {
           "kind": "pond",
           "id": "raw_lobster",
           "label": "Fish Lobster",
-          "count": 5,
+          "count": 8,
           "nearWater": true
         },
         {
           "kind": "pond",
           "id": "raw_shark",
           "label": "Fish Shark",
-          "count": 3,
+          "count": 5,
           "deep": true,
           "nearWater": true
         },
@@ -1077,21 +1077,21 @@
           "kind": "crystal",
           "id": "silver",
           "label": "Mine Silver",
-          "count": 6,
+          "count": 9,
           "color": 13224416
         },
         {
           "kind": "crystal",
           "id": "mithril",
           "label": "Mine Mithril",
-          "count": 4,
+          "count": 6,
           "color": 4886745
         },
         {
           "kind": "wood",
           "id": "magic_log",
           "label": "Chop Magic Tree",
-          "count": 4,
+          "count": 6,
           "magic": true
         }
       ],
@@ -1228,25 +1228,25 @@
           "kind": "crystal",
           "id": "iron",
           "label": "Mine Iron",
-          "count": 8
+          "count": 12
         },
         {
           "kind": "crystal",
           "id": "gold",
           "label": "Mine Gold",
-          "count": 6
+          "count": 9
         },
         {
           "kind": "crystal",
           "id": "mithril",
           "label": "Mine Mithril",
-          "count": 5
+          "count": 7
         },
         {
           "kind": "crystal",
           "id": "runite",
           "label": "Mine Runite",
-          "count": 3
+          "count": 5
         }
       ],
       "nodeModels": {
@@ -1359,6 +1359,35 @@
           "minDistFromSpawn": 10
         }
       ],
+      "resourceNodes": [
+        {
+          "kind": "crystal",
+          "id": "silver",
+          "label": "Mine Silver",
+          "count": 5,
+          "color": 13224416
+        },
+        {
+          "kind": "crystal",
+          "id": "mithril",
+          "label": "Mine Mithril",
+          "count": 4,
+          "color": 4886745
+        },
+        {
+          "kind": "crystal",
+          "id": "runite",
+          "label": "Mine Runite",
+          "count": 3,
+          "color": 16757705
+        }
+      ],
+      "nodeModels": {
+        "crystal": {
+          "url": "./assets/models/kaykit_rock.glb",
+          "h": 2.2
+        }
+      },
       "exits": [
         {
           "toZone": "ashen_mountains",
@@ -1451,19 +1480,19 @@
           "kind": "crystal",
           "id": "runite",
           "label": "Mine Runite",
-          "count": 6
+          "count": 8
         },
         {
           "kind": "crystal",
           "id": "mithril",
           "label": "Mine Mithril",
-          "count": 5
+          "count": 7
         },
         {
           "kind": "crystal",
           "id": "gold",
           "label": "Mine Gold",
-          "count": 5
+          "count": 7
         }
       ],
       "nodeModels": {
