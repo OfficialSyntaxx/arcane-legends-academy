@@ -384,6 +384,27 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     return m;
   };
   const srgb = hex => new THREE.Color(hex).convertSRGBToLinear();
+  // entityKey -> {model, mixer, walk, idle}  (var: groundY reads it before init)
+  var chars = {};
+  // Loading progress, so the UI can show a state instead of a silently-empty world. Declared this
+  // early — not down by makeCharModel where it conceptually belongs — because loadLandmarkModel
+  // is now also called from the dorm-furniture block above the old declaration point, and a
+  // `const` referenced before its line throws (temporal dead zone), not just "undefined".
+  const loadState = { total:0, done:0, failed:[] };
+  function loadProgress(){
+    if (callbacks.onLoadProgress) callbacks.onLoadProgress({ ...loadState, models:{ ...chars } });
+  }
+  // Draco decoder, shared by every model load. The GLBs are Draco-compressed (22MB -> 3.4MB
+  // across the character set), which the loader cannot read without this. Declared here (not
+  // down by makeCharModel) for the same temporal-dead-zone reason as loadState above.
+  let dracoLoader = null;
+  function getDraco(){
+    if (dracoLoader || !THREE.DRACOLoader) return dracoLoader;
+    dracoLoader = new THREE.DRACOLoader();
+    dracoLoader.setDecoderPath('./vendor/draco/');   // relative: the game is served under a subpath
+    dracoLoader.setDecoderConfig({ type: 'js' });
+    return dracoLoader;
+  }
   const add = (geo, m, x, y, z, o={}) => {
     const mesh = new THREE.Mesh(geo, m);
     mesh.position.set(x, y, z);
@@ -490,6 +511,19 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   if (ZONE.dormLayout){
     const L = ZONE.dormLayout;
     for (const p of L.pieces){
+      // A piece with a real GLB (dorm.js FURNITURE.model) renders as that model instead of the
+      // primitive `shape` build below — same loader/grounding/fallback contract every other
+      // landmark already uses, just pointed at furniture that already ships in assets/models.
+      if (p.model){
+        const g = new THREE.Group();
+        scene.add(g);
+        loadLandmarkModel('dorm:' + p.slot, p.model, g, { size: p.h, fit: "height", x: p.x, z: p.z, ry: p.ry || 0 });
+        if (p.light){
+          const l = new THREE.PointLight(p.light.color, p.light.intensity, p.light.distance);
+          l.position.set(p.x, p.light.y, p.z); scene.add(l);
+        }
+        continue;
+      }
       const m = mat(p.color);
       const put = (geo, y, h) => {
         const o = add(geo, m, p.x, y, p.z);
@@ -1105,22 +1139,6 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   }
 
   // ---------- load GLB character models (replace procedural wizards) ----------
-  var chars = {}; // entityKey -> {model, mixer, walk, idle}  (var: groundY reads it before init)
-  // Loading progress, so the UI can show a state instead of a silently-empty world.
-  const loadState = { total:0, done:0, failed:[] };
-  function loadProgress(){
-    if (callbacks.onLoadProgress) callbacks.onLoadProgress({ ...loadState, models:{ ...chars } });
-  }
-  // Draco decoder, shared by every model load. The GLBs are Draco-compressed (22MB -> 3.4MB
-  // across the character set), which the loader cannot read without this.
-  let dracoLoader = null;
-  function getDraco(){
-    if (dracoLoader || !THREE.DRACOLoader) return dracoLoader;
-    dracoLoader = new THREE.DRACOLoader();
-    dracoLoader.setDecoderPath('./vendor/draco/');   // relative: the game is served under a subpath
-    dracoLoader.setDecoderConfig({ type: 'js' });
-    return dracoLoader;
-  }
   function makeCharModel(key, localUrl, group, onReady){
     loadState.total++;
     // Characters ship in `public/assets/models/` AND on the CDN. Try the CDN first (it keeps

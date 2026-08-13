@@ -68,8 +68,13 @@ export function progressToNextTier(save){
 // Every piece is PROCEDURAL: `shape` tells world.js which primitive to build. No new GLB bytes,
 // which is the same call terrain painting and the spell VFX made.
 export const FURNITURE = [
+  // `model` is an existing CC0 GLB already shipped in assets/models (used elsewhere for
+  // landmarks/props) — reusing it here is the same "no new bytes" rule, just pointed at an
+  // asset that already exists instead of a hand-built primitive. Pieces without a `model` keep
+  // the original procedural `shape` build in world.js.
   { id: "bed",       name: "Straw Bed",        icon: "🛏️", kind: "floor", gold: 60,  timber: 2,
-    shape: "bed",    w: 2.0, d: 3.4, h: 0.9, color: 0x7a5a6a },
+    shape: "bed",    w: 2.0, d: 3.4, h: 0.9, color: 0x7a5a6a,
+    model: "./assets/models/fur_bed_single_A.glb" },
   { id: "desk",      name: "Study Desk",       icon: "🪑", kind: "floor", gold: 90,  timber: 3,
     shape: "desk",   w: 2.4, d: 1.2, h: 1.1, color: 0x8a6a3a },
   { id: "rug",       name: "Woven Rug",        icon: "🧶", kind: "floor", gold: 45,  timber: 0,
@@ -78,7 +83,8 @@ export const FURNITURE = [
     shape: "brazier",w: 0.9, d: 0.9, h: 1.4, color: 0x5a4a8a,
     light: { color: 0xff9440, intensity: 1.5, distance: 22, y: 1.7 } },
   { id: "bookshelf", name: "Bookshelf",        icon: "📚", kind: "wall",  gold: 120, timber: 4,
-    shape: "shelf",  w: 2.6, d: 0.6, h: 2.4, color: 0x4a3a2a },
+    shape: "shelf",  w: 2.6, d: 0.6, h: 2.4, color: 0x4a3a2a,
+    model: "./assets/models/fur_book_set.glb" },
   { id: "banner",    name: "School Banner",    icon: "🚩", kind: "wall",  gold: 70,  timber: 1,
     shape: "banner", w: 1.6, d: 0.15, h: 3.0, color: null },   // null = takes the player's school colour
   { id: "sconce",    name: "Wall Sconce",      icon: "🕯️", kind: "wall",  gold: 55,  timber: 0,
@@ -326,7 +332,7 @@ export function layoutFor(save, opts = {}){
                   w: item.w, d: item.d, h: item.h, ry: slot.ry,
                   x: slot.x, z: slot.z,
                   color: item.color != null ? item.color : (opts.schoolColor || 0x6a5b9e),
-                  light: item.light || null });
+                  light: item.light || null, model: item.model || null });
   }
   return { room: dormRoom(save), pieces,
            cases: caseContents(save, opts.gradeOf), trophies: trophyPlacements(save) };
