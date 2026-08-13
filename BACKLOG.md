@@ -337,13 +337,18 @@
   swap leaks were already closed. Wall-clock frame time was tried and abandoned as a metric — this
   sandbox's software-rendered WebGL isn't representative of real hardware — in favour of a new
   `world.renderStats()` debug hook (draw calls/triangles/geometries/textures/lights, hardware-
-  independent) run across the 4 heaviest real scenes. Found one legitimate, non-bug risk worth
-  tracking rather than silently "fixing": dungeon rooms don't chunk-stream the way outdoor zones
-  do, so a dungeon's torch-driven real-time lights (documented/intentional — an interior's ambient
-  rig is near-black on purpose) scale with total dungeon size, not with what's actually visible
-  (16 lights in a 4-room dungeon vs. every other zone's baseline of 4). Not fixed here — the real
-  fix (distance-based real-vs-emissive-only torch lighting) is a design change, not a correctness
-  bug, and wasn't authorized to make unilaterally.
+  independent) run across the 4 heaviest real scenes. Found one legitimate, non-bug risk — dungeon
+  rooms don't chunk-stream the way outdoor zones do, so a dungeon's torch-driven real-time lights
+  (documented/intentional — an interior's ambient rig is near-black on purpose) scaled with total
+  dungeon size, not with what's actually visible (16 lights in a 4-room dungeon vs. every other
+  zone's baseline of 4) — flagged rather than fixed unilaterally, since capping it is a design
+  choice. **Now fixed** (follow-up session): `updateLightCulling()` hides each torch's real
+  `PointLight` past its own configured falloff distance every frame — a light already contributes
+  ~zero beyond that radius, so this is a free win, not a visual downgrade (the emissive bulb mesh
+  stays lit-looking regardless; only the expensive dynamic light toggles). `renderStats()` now
+  reports `lights` (visible/active) separately from `lightsTotal`, confirming active count drops
+  to 6-8 depending on player position instead of all 16 firing constantly, with zero visible
+  change screenshotted from both the boss room and the entrance room.
 - [x] Mobile UX pass — safe areas, fluid cards, landscape, 44px targets, Pointer-Events input rewrite
 - [x] UI redesign — bottom nav bar (8 tabs fit on mobile) + muted charcoal/champagne palette (was cartoonish purple)
 - [x] Client analytics + dashboard — `advice.js`/`analytics.js` feed D1; `/api/analytics` (JSON) + `/api/dashboard` (HTML) track sessions, zones, tab clicks, errors, movement-stuck, world/map load, low-FPS, advice shown→click
