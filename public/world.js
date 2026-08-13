@@ -1423,6 +1423,13 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // CC0 world dressing (KayKit / Quaternius — see ASSETS.md). Each goes in its own Group so a
   // failed load leaves nothing behind rather than a half-placed object.
   const ZPROPS = ZONE.props.filter(p => p.x != null);   // count-based props are streamed
+  // Culled per-frame below (see updateLightCulling): a dungeon's rooms all build at once — no
+  // chunk streaming for interiors — so torch count (and therefore real-time light count) scales
+  // with total dungeon size, not with what's actually near the player. A light already
+  // contributes ~nothing past its own configured `distance` falloff (THREE's default decay
+  // zeroes it there), so hiding it beyond that radius is a free win: same lit look up close,
+  // zero shader cost for every torch the player isn't standing next to.
+  const cullableLights = [];
   for (let i = 0; i < ZPROPS.length; i++){
     const pr = ZPROPS[i];
     const g = new THREE.Group(); scene.add(g);
@@ -1436,6 +1443,17 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       scene.add(l);
       const bulb = add(new THREE.SphereGeometry(0.28, 8, 6), mat(pr.light.color), pr.x, l.position.y, pr.z, {cast:false});
       bulb.material.emissive = srgb(pr.light.color); bulb.material.emissiveIntensity = 1.0;
+      // The bulb itself stays lit-looking (emissive) regardless of culling — only the real
+      // dynamic light (the expensive part) gets hidden, so a distant torch still reads as glowing.
+      cullableLights.push({ light: l, x: pr.x, z: pr.z, r2: (pr.light.distance || 26) ** 2 });
+    }
+  }
+  function updateLightCulling(){
+    if (!cullableLights.length) return;
+    const px = player.position.x, pz = player.position.z;
+    for (const cl of cullableLights){
+      const dx = cl.x - px, dz = cl.z - pz;
+      cl.light.visible = (dx*dx + dz*dz) <= cl.r2;
     }
   }
   // Gathering nodes swap their procedural mesh for the CC0 model, keeping the procedural one as
@@ -2067,6 +2085,7 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     }
     stepAura(now / 1000);
     stepWandFx(now / 1000);
+    updateLightCulling();
     updateDayNight();
     updateWeather(dt);
     updateEmote(now);
@@ -2209,9 +2228,14 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     // unbatched draw calls) without needing real hardware to measure it on.
     renderStats(){
       const i = renderer.info;
+      // Counts `.visible` lights only — THREE's own light-collection pass does the same, so this
+      // is what the shader actually receives this frame, not just what exists in the scene graph
+      // (updateLightCulling hides far-away dungeon torch lights via `.visible`, not by removal).
+      let lights = 0, lightsTotal = 0;
+      scene.traverse(o => { if (o.isLight){ lightsTotal++; if (o.visible) lights++; } });
       return { drawCalls: i.render.calls, triangles: i.render.triangles,
         geometries: i.memory.geometries, textures: i.memory.textures,
-        lights: (() => { let n = 0; scene.traverse(o => { if (o.isLight) n++; }); return n; })() };
+        lights, lightsTotal };
     },
     // Show the equipped weapon on the player's right hand (visual equipment). `metal` is the
     // equipment's metal tier (bronze/iron/gold/mithril/rune) -> a matching weapon GLB; null hides it.
