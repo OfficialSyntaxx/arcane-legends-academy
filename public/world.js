@@ -1840,7 +1840,10 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   }
   function trigger(){
     if (!nearby) return;
-    if (nearby.kind === 'gather') callbacks.onGather && callbacks.onGather(nearby.data);
+    if (nearby.kind === 'gather'){
+      startPlayerAction('gather');          // swing at the node, rather than silently gaining ore
+      callbacks.onGather && callbacks.onGather(nearby.data);
+    }
     else if (nearby.kind === 'station') callbacks.onStation && callbacks.onStation(nearby.data);
     else if (nearby.kind === 'dungeon') callbacks.onDungeon && callbacks.onDungeon(nearby.data);
     else if (nearby.kind === 'enemy') callbacks.onEnemy && callbacks.onEnemy(nearby.data);
@@ -1985,6 +1988,49 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     setBone(c,'RightForeArm', -sw2*0.3, 0, 0);
     setBone(c,'Spine', Math.sin(t*9)*0.05*s, 0, 0);
   }
+  // ---------- player action gestures ----------
+  // player_wizard.glb ships exactly two clips, "Idle" and "Walk" — no cast, no swing, no gather.
+  // So unlike the idle/walk fixes (which only had to REACH clips that already existed), giving the
+  // player's actions any physical expression means posing bones directly. That is the same
+  // technique applyWalkCycle already uses on the same standard bone names, so it costs no assets
+  // and no new machinery — it is the honest ceiling of this rig until a richer one is authored
+  // (BLENDERTODO.md Tier 5, which also unblocks robes/hats).
+  //
+  // Gathering is the action worth animating first: it is the most-repeated thing a player does in
+  // the world (every ore, log and fishing spot), and until now pressing it changed numbers with no
+  // motion at all.
+  const ACTION_GESTURES = {
+    // chop/mine: right arm hauls back and drives down, twice, with the spine following through
+    gather(c, u){
+      const swing = Math.sin(u * Math.PI * 4);        // two full strokes across the gesture
+      const drive = Math.max(0, swing);
+      setBone(c, 'RightArm',     -1.15 + drive * 1.75, 0, 0);
+      setBone(c, 'RightForeArm', -0.55 + drive * 0.5,  0, 0);
+      setBone(c, 'LeftArm',      -0.35 + drive * 0.6,  0, 0);
+      setBone(c, 'LeftForeArm',  -0.3,                 0, 0);
+      setBone(c, 'Spine',         drive * 0.28,        0, 0);
+      setBone(c, 'Head',          drive * 0.16,        0, 0);
+    },
+    // cast: both arms sweep up and hold, spine opens back — reads as channelling, not swinging
+    cast(c, u){
+      const rise = Math.sin(Math.min(1, u * 1.6) * Math.PI * 0.5);   // ease up, then hold
+      const flare = Math.sin(u * Math.PI * 6) * 0.06 * rise;         // small tremor while held
+      setBone(c, 'RightArm',     -1.5 * rise + flare, 0, -0.35 * rise);
+      setBone(c, 'LeftArm',      -1.5 * rise - flare, 0,  0.35 * rise);
+      setBone(c, 'RightForeArm', -0.45 * rise,        0, 0);
+      setBone(c, 'LeftForeArm',  -0.45 * rise,        0, 0);
+      setBone(c, 'Spine',        -0.18 * rise,        0, 0);
+      setBone(c, 'Head',         -0.22 * rise,        0, 0);
+    },
+  };
+  const ACTION_DUR = { gather: 1.15, cast: 0.9 };
+  function startPlayerAction(kind){
+    if (!ACTION_GESTURES[kind]) return false;
+    const c = chars.player;
+    if (!c || !c.model) return false;
+    c.action = { kind, t: 0, dur: ACTION_DUR[kind] || 1 };
+    return true;
+  }
   // Restore the bones the procedural cycle posed. Without this, a character that walks
   // procedurally and then stops keeps its last mid-stride pose frozen underneath whatever the
   // mixer does next — visible as a permanently lunging NPC once it reaches its destination.
@@ -2001,6 +2047,22 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     for (const key in chars){
       const c = chars[key];
       if (!c.model) continue;
+      // An in-progress action gesture outranks idle/walk — you're swinging a pick, not strolling.
+      // It ends by falling through to the normal idle/walk path on the next frame, and the bones
+      // it posed are restored by the same clearWalkCycle() the walk cycle uses.
+      if (c.action){
+        c.action.t += dt;
+        const u = c.action.t / c.action.dur;
+        if (u >= 1){
+          c.action = null;
+          clearWalkCycle(c);
+        } else {
+          if (c.mixer) c.mixer.stopAllAction();
+          ACTION_GESTURES[c.action.kind](c, u);
+          c.posed = true;
+          continue;
+        }
+      }
       // A real walk clip always beats the hand-rolled bone cycle. The procedural cycle exists
       // because most of the cast ships ONLY an idle (students, merchant, trainer, librarian,
       // referee) — but npc_mage.glb and enemy_skeleton.glb both ship a real "Walking_A", and
@@ -2302,6 +2364,13 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     setWandFx(id){
       wandFxId = id || DEFAULT_WAND_FX;
       buildWandFx();
+    },
+    /** Play a procedural action gesture on the player ("gather" | "cast"). */
+    playerAction(kind){ return startPlayerAction(kind); },
+    /** The gesture currently playing, for tests — null when the player is idle/walking. */
+    playerActionDebug(){
+      const a = chars.player && chars.player.action;
+      return a ? { kind: a.kind, t: +a.t.toFixed(3), dur: a.dur } : null;
     },
     wandFxDebug(){
       return wandFxGroup ? { id: wandFxId, motes: wandFxGroup.children.length } : { id: wandFxId, motes: 0 };
