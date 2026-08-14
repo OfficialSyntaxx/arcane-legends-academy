@@ -35,12 +35,24 @@ const force = process.argv.includes("--force");
 // Compression is LOSSY and this script is not idempotent: the `webp` pass decodes Draco and
 // re-encodes the textures, so running it twice re-encodes an already-encoded texture and quality
 // drops again. Skip anything already compressed unless --force.
+//
+// BUG FIXED (found via docs/ART-DIRECTION.md's batch repaint): checking only `extensionsUsed`
+// for EXT_texture_webp is a DOCUMENT-LEVEL declaration, not a per-image fact, and it goes stale.
+// A tool that reads a GLB via gltf-transform, replaces every image with a fresh raw PNG, and
+// writes it back out does not necessarily prune that declaration — several assets this repo's own
+// batch-repaint-assets.mjs had just re-textured with 512px PNGs were reported "already compressed,
+// skipped" here, leaving genuinely uncompressed ~270KB PNG textures shipping as if they were the
+// ~9KB WebP equivalent. Confirmed directly: kaykit_rock.glb's own image.mimeType read "image/png"
+// while extensionsUsed still listed EXT_texture_webp from before that file was last touched.
+// Fix: check each image's own declared mimeType, not the document-level flag.
 function isCompressed(file){
   const b = fs.readFileSync(file);
   if (b.readUInt32LE(0) !== 0x46546C67) return false;                  // not a GLB
   const json = JSON.parse(b.slice(20, 20 + b.readUInt32LE(12)).toString("utf8"));
   const used = json.extensionsUsed || [];
-  return used.includes("EXT_texture_webp") && used.includes("KHR_draco_mesh_compression");
+  if (!used.includes("KHR_draco_mesh_compression")) return false;
+  const images = json.images || [];
+  return images.length === 0 || images.every(img => img.mimeType === "image/webp");
 }
 const mb = b => (b / 1048576).toFixed(2) + "MB";
 
