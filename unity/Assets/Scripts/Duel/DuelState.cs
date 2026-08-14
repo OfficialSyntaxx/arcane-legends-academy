@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ArcaneLegends.Data;
 
 namespace ArcaneLegends.Duel
@@ -7,8 +8,7 @@ namespace ArcaneLegends.Duel
     /// <summary>
     /// A creature in play. Distinct from <see cref="Card"/>: a Card is the immutable printed
     /// definition, a CreatureInstance is one copy on the board with its own mutable hp/atk/state.
-    /// The web build conflated these early on and it caused real bugs (buffing one copy buffed
-    /// every copy), so the split is deliberate.
+    /// Ported from logic.js makeCreature().
     /// </summary>
     [Serializable]
     public class CreatureInstance
@@ -16,75 +16,79 @@ namespace ArcaneLegends.Duel
         public string cardId;
         public string name;
         public string school;
+        public string ownerId;
+
+        /// <summary>
+        /// Attack is BAKED AT SUMMON TIME, not derived: it already includes the field bonus and
+        /// the same-school affinity bonus that applied when this creature entered play. That is
+        /// deliberate parity with logic.js — a field card played later buffs the board at that
+        /// moment via buffAll, it does not retroactively re-derive every creature's attack.
+        /// </summary>
         public int atk;
         public int hp;
         public int maxHp;
 
-        /// <summary>Cannot attack the turn it is played, unless it has haste.</summary>
+        public bool taunt, haste, drain;
+        /// <summary>Attacks allowed per turn: 2 for multiAttack, otherwise 1.</summary>
+        public int multi = 1;
+        public int attacks;
+        public bool exhausted;
         public bool summoning = true;
-        /// <summary>Frozen creatures skip their attack for a turn.</summary>
-        public bool frozen;
-        /// <summary>Already attacked this turn (multiAttack creatures may act again).</summary>
-        public bool hasAttacked;
-        /// <summary>Evade consumes itself on the first attack it dodges.</summary>
-        public bool evadeUsed;
-        /// <summary>Survive (cheat death at 1hp) fires at most once.</summary>
-        public bool surviveUsed;
+        /// <summary>Turns remaining frozen. Ticks down at the END of the owner's turn.</summary>
+        public int freeze;
 
-        public List<string> keywords = new();
+        /// <summary>Passive/active rules from creatures.js RULES, or null for a plain creature.</summary>
         public CreatureTrait trait;
 
-        public bool Has(string keyword) => keywords.Contains(keyword);
         public bool IsAlive => hp > 0;
-
-        /// <summary>
-        /// Attack including conditional bonuses. Rage adds while below half HP; warband scales
-        /// with allies. Computed rather than stored so the value can never disagree with the
-        /// board state that produces it — the same derive-don't-store rule the web build used
-        /// for unlocks and trophies.
-        /// </summary>
-        public int EffectiveAtk(int allyCount)
-        {
-            int a = atk;
-            if (trait != null)
-            {
-                if (trait.rageAtk > 0 && hp * 2 < maxHp) a += trait.rageAtk;
-                if (trait.warband) a += Math.Max(0, allyCount - 1);
-            }
-            return Math.Max(0, a);
-        }
-
-        /// <summary>May this creature attack right now?</summary>
-        public bool CanAttack =>
-            IsAlive && !frozen && !hasAttacked && (!summoning || Has("haste") || (trait?.haste ?? false));
+        public bool CanAttack => IsAlive && !exhausted && freeze <= 0 && !summoning;
     }
 
-    /// <summary>One side of a duel.</summary>
+    /// <summary>A persistent field card in play. Its effects re-apply every turn.</summary>
+    [Serializable]
+    public class FieldCard
+    {
+        public string cardId;
+    }
+
+    /// <summary>An armed trap. Triggers once, FIFO, then is consumed.</summary>
+    [Serializable]
+    public class TrapCard
+    {
+        public string cardId;
+        public List<Effect> effects = new();
+    }
+
+    /// <summary>One side of a duel. Ported from logic.js startBattle()'s player shape.</summary>
     [Serializable]
     public class DuelSide
     {
         public string playerId;
         public string school = "balance";
 
-        public int hp = 30;
-        public int maxHp = 30;
+        // 100, not 30 — matches logic.js. Duels are long enough for fields and fatigue to matter.
+        public int hp = 100;
+        public int maxHp = 100;
         public int shield;
 
-        /// <summary>Mana. Grows by one each turn up to <see cref="maxPips"/>.</summary>
-        public int pips;
-        public int maxPips;
+        public int pips = 1;
+        public int maxPips = 1;
+
+        /// <summary>Deck damage: once empty, each draw costs an escalating amount of hp.</summary>
+        public int fatigue;
 
         public List<string> deck = new();
         public List<string> hand = new();
         public List<CreatureInstance> board = new();
+        public List<FieldCard> field = new();
+        public List<TrapCard> traps = new();
 
-        /// <summary>Banked ultimate charge; spendable once per duel at ultChargeMax.</summary>
         public int ultCharge;
         public bool ultUsed;
 
         /// <summary>
-        /// Shield absorbs before hp, and never goes negative. Creatures are damaged directly —
-        /// shield is a wizard-only resource, which is why this is not used for board damage.
+        /// Shield absorbs before hp. Creature damage does NOT route through here — shield is a
+        /// wizard-only resource, which is why board damage subtracts hp directly.
         /// </summary>
         public void TakeDamage(int dmg)
         {
@@ -95,6 +99,11 @@ namespace ArcaneLegends.Duel
         }
 
         public void Heal(int amount) => hp = Math.Min(maxHp, hp + amount);
+
+        /// <summary>Total +atk that field cards currently grant to newly summoned creatures.</summary>
+        public int FieldAtkBonus(GameData data) =>
+            field.Sum(f => data.CardById(f.cardId)?.effects
+                .Where(e => e.k == "fieldAtk").Sum(e => e.n) ?? 0);
     }
 
     [Serializable]
@@ -102,12 +111,14 @@ namespace ArcaneLegends.Duel
     {
         public DuelSide you = new();
         public DuelSide enemy = new();
-        public string turn;            // playerId whose turn it is
-        public int turnNumber = 1;
+        public string turn;
+        public int turns;
         public bool over;
-        public string winner;          // playerId, or null while in progress
+        /// <summary>Winner's playerId; null when the duel is ongoing OR drawn.</summary>
+        public string winner;
+        public bool draw;
+        public string endReason;
 
-        /// <summary>Human-readable log of what resolved, for UI and for test assertions.</summary>
         public List<string> log = new();
 
         public DuelSide SideOf(string playerId) => you.playerId == playerId ? you : enemy;

@@ -79,14 +79,35 @@ makes the data faithful by construction.
 Report compile errors and failures back and they can be fixed remotely — that loop is the
 intended workflow.
 
+## Corrections already made to this draft
+
+Recorded because they show what *else* may still be wrong. The first draft was written from a skim
+of `logic.js` rather than a close read, and was wrong in six ways at once — all found and fixed,
+but the same cause could easily have produced more:
+
+- Wizard HP was 30; it is **100**.
+- Opening hand was 4; it is **5**.
+- Only `creature` and `spell` were handled. There are **four** types — `field` (×3) and `trap`
+  (×2) would have been silently played as spells.
+- **Fatigue** (escalating damage once the deck empties) was missing entirely.
+- The **elemental ring +1** on attack was never applied, despite the lookup existing.
+- Retaliation was modelled as thorns-only; defenders actually hit back with their **full attack**.
+
+Also: `TraitKeyFor()` originally re-implemented `creatures.js`'s keyword matcher in C# and got
+several cases wrong. It has been **deleted** — the exporter now runs the real `traitForCard()` and
+emits card→trait as data, so C# looks the answer up instead of deriving it. See
+`docs/MISTAKES.md` A5/A6.
+
 ## Known gaps in this draft
 
-- `TraitKeyFor()` re-implements `creatures.js` `traitForCard()`'s keyword matching by hand. The
-  ordering is significant (specific before general) and it is **unverified** — this is the most
-  likely place for a silent mismatch. Worth an early test that every card resolving to a trait in
-  JS resolves to the same trait key here.
-- Status effects that live in `game.js` rather than `logic.js` (freeze-on-hit, some multi-phase
-  boss behaviour, archetype AI) are **not ported yet**.
+- **Nothing here is compiled or tested.** See the verification warning above.
+- Status effects and behaviour that live in `game.js` rather than `logic.js` (freeze-on-hit,
+  multi-phase boss behaviour, archetype AI) are **not ported yet**.
 - No deck construction, no PvP, no progression, no rendering. Duel rules only.
-- `logic.js`'s hand-cap-10 burn rule is ported; its exact reshuffle/fatigue behaviour is not,
-  because the web build does not implement fatigue either.
+- 6 creature cards (minotaur, hydra, basilisk, unicorn, satyr, arcane_guardian) map to no trait.
+  That is **correct** — they match no keyword in the source matcher either, so they are plain
+  stat-lines by design. Noted so it is not "fixed" later by mistake.
+- Evade-spent and survive-used are tracked in `HashSet`s on the engine rather than as fields on
+  `CreatureInstance`, to keep the serialised creature shape a faithful mirror of `logic.js`. That
+  means those flags do **not** survive serialising a duel mid-game. Fine for a local duel; needs
+  revisiting if duels are ever saved or sent over a wire.

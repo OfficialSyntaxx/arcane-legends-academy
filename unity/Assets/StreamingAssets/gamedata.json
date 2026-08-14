@@ -2421,6 +2421,27 @@
       "passive": "Haste — buzzes in fast."
     }
   ],
+  "cardTraits": {
+    "fire_cat": "cat",
+    "fire_elf": "ninja",
+    "fire_dragon": "dragon",
+    "ice_golem": "goleling",
+    "frost_giant": "yeti",
+    "ice_wyrm": "dragon",
+    "storm_bat": "bat",
+    "storm_shark": "fish",
+    "storm_titan": "dragon",
+    "myth_walker": "ninja",
+    "pixie": "ninja",
+    "skeleton": "skeleton",
+    "ghoul": "demon",
+    "vampire": "ghost",
+    "reaper": "ghost",
+    "novice": "ninja",
+    "sunbird": "chicken",
+    "balance_dragon": "dragon",
+    "golden_golem": "goleling"
+  },
   "affinities": [
     {
       "school": "fire",

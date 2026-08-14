@@ -6,26 +6,29 @@ using ArcaneLegends.Data;
 namespace ArcaneLegends.Duel
 {
     /// <summary>
-    /// The duel rules. A faithful port of the web build's logic.js (the stateless referee) plus
-    /// the creature-trait rules from game.js — the two together are what the existing 644-check
-    /// engine suite and 36-check creature-rule suite already pin down.
+    /// The duel rules — a port of logic.js, the web build's stateless referee.
     ///
-    /// PORTING NOTE: those JS tests are the specification for this class. Port a rule, then port
-    /// its test, and do not treat the rule as done until the test passes here too. That is what
-    /// turns this rewrite into a translation against a known-good reference instead of a redesign
-    /// — see docs/UNITY-MIGRATION.md §3.
+    /// PORTING NOTE: logic.js is the authority, and tools/test.mjs (644 checks) plus
+    /// tools/creature-rule-test.mjs (36 checks) are the specification. Port a rule, then port its
+    /// test, and do not treat the rule as done until it passes here. See
+    /// docs/UNITY-MIGRATION.md §3.
     ///
-    /// No UnityEngine dependency on purpose: the rules must be testable without opening the
+    /// No UnityEngine dependency on purpose: the rules must be unit-testable without opening the
     /// Editor, exactly as the JS modules were testable without a browser.
     /// </summary>
     public class DuelEngine
     {
+        public const int MaxTurns = 100;
+        public const int HandLimit = 10;
+        public const int BoardLimit = 5;
+        public const int OpeningHand = 5;
+
         private readonly GameData _data;
         private readonly Func<double> _rand;
 
         /// <param name="rand">
-        /// Injected RNG so duels are reproducible in tests. The web build used a seeded mulberry32
-        /// for exactly this reason — an unseeded Random makes a failing test unrepeatable.
+        /// Injected RNG so duels are reproducible. logic.js seeds mulberry32 for exactly this
+        /// reason — an unseeded Random makes a failing test unrepeatable.
         /// </param>
         public DuelEngine(GameData data, Func<double> rand = null)
         {
@@ -39,12 +42,11 @@ namespace ArcaneLegends.Duel
                                    string foeId, string foeSchool, List<string> foeDeck)
         {
             var s = new DuelStateData();
-            s.you.playerId = youId;   s.you.school = youSchool;   s.you.deck = Shuffle(youDeck);
-            s.enemy.playerId = foeId; s.enemy.school = foeSchool; s.enemy.deck = Shuffle(foeDeck);
+            s.you.playerId = youId;   s.you.school = youSchool ?? "balance";   s.you.deck = Shuffle(youDeck);
+            s.enemy.playerId = foeId; s.enemy.school = foeSchool ?? "balance"; s.enemy.deck = Shuffle(foeDeck);
 
-            for (int i = 0; i < 4; i++) { Draw(s.you); Draw(s.enemy); }
+            for (int i = 0; i < OpeningHand; i++) { Draw(s.you); Draw(s.enemy); }
             s.turn = youId;
-            BeginTurn(s, s.you);
             return s;
         }
 
@@ -59,45 +61,63 @@ namespace ArcaneLegends.Duel
             return d;
         }
 
-        /// <summary>Hand caps at 10 — draws past that are burned, matching logic.js.</summary>
+        /// <summary>Draw one. Hand caps at 10 — draws past the cap are burned, as in logic.js.</summary>
         private void Draw(DuelSide p)
         {
-            if (p.hand.Count >= 10 || p.deck.Count == 0) return;
+            if (p.hand.Count >= HandLimit || p.deck.Count == 0) return;
             p.hand.Add(p.deck[^1]);
             p.deck.RemoveAt(p.deck.Count - 1);
         }
 
         // ---------------------------------------------------------------- turn flow
 
+        /// <summary>
+        /// Start of turn: grow max pips, apply persistent field effects, draw (or take escalating
+        /// fatigue damage on an empty deck), and refresh the board's attack allowance.
+        /// </summary>
         public void BeginTurn(DuelStateData s, DuelSide p)
         {
             p.maxPips = Math.Min(10, p.maxPips + 1);
-            p.pips = p.maxPips;
-            Draw(p);
 
-            foreach (var c in p.board)
+            int pipBonus = 0;
+            foreach (var f in p.field)
             {
-                c.summoning = false;
-                c.hasAttacked = false;
-                c.frozen = false;                       // freeze lasts one turn
-                if (c.trait != null && c.trait.regen > 0 && c.IsAlive)
-                    c.hp = Math.Min(c.maxHp, c.hp + c.trait.regen);
+                var def = _data.CardById(f.cardId);
+                if (def == null) continue;
+                foreach (var fx in def.effects)
+                {
+                    if (fx.k == "fieldPip") pipBonus += fx.n;
+                    else if (fx.k == "fieldHeal") p.Heal(fx.n);
+                }
             }
+            p.pips = Math.Min(10, p.maxPips + pipBonus);
+
+            if (p.deck.Count > 0) Draw(p);
+            else { p.fatigue++; p.hp -= p.fatigue; }   // deck-out damage escalates each turn
+
+            foreach (var c in p.board) { c.exhausted = false; c.attacks = 0; c.summoning = false; }
+            CheckGameOver(s);
         }
 
+        /// <summary>
+        /// End the current turn. Freeze ticks down on the OUTGOING player's board so a frozen
+        /// creature actually loses a turn rather than thawing before it would have acted.
+        /// </summary>
         public void EndTurn(DuelStateData s)
         {
             if (s.over) return;
-            var current = s.SideOf(s.turn);
-            var next = s.FoeOf(current);
+            var outgoing = s.SideOf(s.turn);
+            foreach (var c in outgoing.board) if (c.freeze > 0) c.freeze--;
+
+            var next = s.FoeOf(outgoing);
             s.turn = next.playerId;
-            s.turnNumber++;
+            s.turns++;
             BeginTurn(s, next);
+            CheckGameOver(s);
         }
 
         // ---------------------------------------------------------------- playing cards
 
-        /// <summary>Whether this card may legally be played right now, and why not if it can't.</summary>
         public bool CanPlay(DuelStateData s, DuelSide p, string cardId, out string reason)
         {
             reason = null;
@@ -108,10 +128,14 @@ namespace ArcaneLegends.Duel
             var card = _data.CardById(cardId);
             if (card == null) { reason = $"unknown card \"{cardId}\""; return false; }
             if (card.cost > p.pips) { reason = "not enough pips"; return false; }
-            if (card.IsCreature && p.board.Count >= 5) { reason = "board is full"; return false; }
+            if (card.type == "creature" && p.board.Count >= BoardLimit) { reason = "board is full"; return false; }
             return true;
         }
 
+        /// <summary>
+        /// Play a card from hand. <paramref name="target"/> applies to targeted spells; pass null
+        /// to aim a damage spell at the enemy wizard.
+        /// </summary>
         public bool Play(DuelStateData s, DuelSide p, string cardId, CreatureInstance target = null)
         {
             if (!CanPlay(s, p, cardId, out var reason)) { s.log.Add($"illegal play: {reason}"); return false; }
@@ -120,8 +144,13 @@ namespace ArcaneLegends.Duel
             p.hand.Remove(cardId);
             p.pips -= card.cost;
 
-            if (card.IsCreature) PlayCreature(s, p, card);
-            else PlaySpell(s, p, card, target);
+            switch (card.type)
+            {
+                case "creature": PlayCreature(s, p, card); break;
+                case "field":    PlayField(s, p, card);    break;
+                case "trap":     PlayTrap(p, card);        break;
+                default:         PlaySpell(s, p, card, target); break;   // "spell"
+            }
 
             CleanUpDead(s);
             CheckGameOver(s);
@@ -130,77 +159,120 @@ namespace ArcaneLegends.Duel
 
         private void PlayCreature(DuelStateData s, DuelSide p, Card card)
         {
-            var trait = _data.TraitById(TraitKeyFor(card));
+            var foe = s.FoeOf(p);
+
+            // Same-school affinity: a creature hits harder for a wizard of its own school. Baked
+            // in at summon along with the current field bonus — see CreatureInstance.atk.
+            int affinity = (!string.IsNullOrEmpty(p.school) && card.school == p.school) ? 1 : 0;
+
             var c = new CreatureInstance
             {
-                cardId = card.id, name = card.name, school = card.school,
-                atk = card.atk, hp = card.hp, maxHp = card.hp,
-                keywords = new List<string>(card.keywords),
-                trait = trait,
+                cardId = card.id, name = card.name, school = card.school, ownerId = p.playerId,
+                atk = card.atk + p.FieldAtkBonus(_data) + affinity,
+                hp = card.hp, maxHp = card.hp,
+                taunt = card.Has("taunt"),
+                haste = card.Has("haste"),
+                drain = card.Has("drain"),
+                multi = card.Has("multiAttack") ? 2 : 1,
                 summoning = true,
+                trait = _data.TraitForCard(card.id),
             };
+            if (c.haste || (c.trait?.haste ?? false)) c.summoning = false;
+
+            // Printed on-play effects that resolve for the caster rather than the board.
+            foreach (var f in card.effects)
+            {
+                if (f.k == "healPlay") p.Heal(f.n);
+                else if (f.k == "buffAll") foreach (var x in p.board) x.atk += f.n;
+            }
+
             p.board.Add(c);
             s.log.Add($"{p.playerId} played {card.name}");
 
-            if (trait == null) return;
-            var foe = s.FoeOf(p);
+            ApplyOnPlayTraits(s, p, foe, c);
 
-            // "On play" traits. Order matches game.js: board-wide effects first, then targeted.
-            if (trait.shield > 0) p.shield += trait.shield;
-            if (trait.onPlayDmgAll > 0)
-                foreach (var e in foe.board) e.hp -= trait.onPlayDmgAll;
-            if (trait.onPlayHealAll > 0)
-                foreach (var a in p.board) a.hp = Math.Min(a.maxHp, a.hp + trait.onPlayHealAll);
-            if (trait.onPlayBuffAll > 0)
-                foreach (var a in p.board) a.atk += trait.onPlayBuffAll;
-            if (trait.onPlayFreeze)
-                foreach (var e in foe.board) e.frozen = true;
-            if (trait.onPlayDraw > 0)
-                for (int i = 0; i < trait.onPlayDraw; i++) Draw(p);
+            // Enemy traps fire on creature play — one trap, FIFO, consumed whether or not it
+            // matches. Matches logic.js's shift() semantics exactly.
+            if (foe.traps.Count > 0)
+            {
+                var t = foe.traps[0];
+                foe.traps.RemoveAt(0);
+                foreach (var fx in t.effects)
+                    if (fx.k == "trapDmg")
+                    {
+                        c.hp -= fx.n;
+                        s.log.Add($"Trap! {c.name} takes {fx.n}");
+                    }
+            }
+        }
 
-            // Bolt hits a random enemy CREATURE, falling through to the wizard on an empty board —
-            // the behaviour the "firespell hits the wizard when no creatures" test pins.
-            if (trait.onPlayBolt > 0)
+        /// <summary>Creature passives that fire the moment the creature enters play.</summary>
+        private void ApplyOnPlayTraits(DuelStateData s, DuelSide p, DuelSide foe, CreatureInstance c)
+        {
+            var t = c.trait;
+            if (t == null) return;
+
+            if (t.shield > 0) p.shield += t.shield;
+            if (t.onPlayDmgAll > 0) foreach (var e in foe.board) e.hp -= t.onPlayDmgAll;
+            if (t.onPlayHealAll > 0)
+                foreach (var a in p.board) a.hp = Math.Min(a.maxHp, a.hp + t.onPlayHealAll);
+            if (t.onPlayBuffAll > 0) foreach (var a in p.board) a.atk += t.onPlayBuffAll;
+            if (t.onPlayFreeze) foreach (var e in foe.board) e.freeze = 1;
+            if (t.onPlayDraw > 0) for (int i = 0; i < t.onPlayDraw; i++) Draw(p);
+
+            // Bolt hits a random enemy CREATURE, falling through to the wizard on an empty board.
+            if (t.onPlayBolt > 0)
             {
                 var pick = RandomLiving(foe.board);
-                if (pick != null) pick.hp -= trait.onPlayBolt;
-                else foe.TakeDamage(trait.onPlayBolt);
+                if (pick != null) pick.hp -= t.onPlayBolt;
+                else foe.TakeDamage(t.onPlayBolt);
             }
 
-            // Tongue: steal attack from one random enemy creature only, never the whole board.
-            if (trait.onPlayStealAtk > 0)
+            // Tongue: steal attack from ONE random enemy creature, never the whole board.
+            if (t.onPlayStealAtk > 0)
             {
                 var victim = RandomLiving(foe.board);
                 if (victim != null)
                 {
-                    int stolen = Math.Min(trait.onPlayStealAtk, victim.atk);
+                    int stolen = Math.Min(t.onPlayStealAtk, victim.atk);
                     victim.atk -= stolen;
                     c.atk += stolen;
                 }
             }
         }
 
+        private void PlayField(DuelStateData s, DuelSide p, Card card)
+        {
+            p.field.Add(new FieldCard { cardId = card.id });
+            // fieldAtk buffs the board that exists NOW; later summons pick it up via FieldAtkBonus.
+            foreach (var f in card.effects)
+                if (f.k == "fieldAtk")
+                    foreach (var x in p.board) x.atk += f.n;
+            s.log.Add($"{p.playerId} played field {card.name}");
+        }
+
+        private void PlayTrap(DuelSide p, Card card) =>
+            p.traps.Add(new TrapCard { cardId = card.id, effects = new List<Effect>(card.effects) });
+
         private void PlaySpell(DuelStateData s, DuelSide p, Card card, CreatureInstance target)
         {
             s.log.Add($"{p.playerId} cast {card.name}");
             ApplyEffects(s, p, card.effects, target);
 
-            // School affinity: a caster's own school appends one bonus effect to a matching spell.
             var bonus = _data.AffinityFor(p.school, card.school);
             if (bonus != null) ApplyEffects(s, p, new List<Effect> { bonus }, target);
 
-            // Casting builds the ultimate meter. Capped so it cannot bank beyond one use.
             p.ultCharge = Math.Min(_data.ultChargeMax, p.ultCharge + 1);
         }
 
         // ---------------------------------------------------------------- effects
 
         /// <summary>
-        /// The effect dispatch table. Same {k,n} shapes cards, ultimates and affinities all use,
-        /// which is why an ultimate needs no special-casing here.
+        /// The effect dispatch table — the same {k,n} shapes cards, ultimates and affinities all
+        /// speak, which is why an ultimate needs no special-casing.
         ///
-        /// Note the targeting rule, ported exactly: "dmg" against a creature bypasses shield
-        /// (shield is a wizard resource), and with no target it hits the enemy wizard instead.
+        /// Targeting rule, ported exactly: "dmg" against a creature bypasses shield (a wizard-only
+        /// resource); with no target it hits the enemy wizard instead.
         /// </summary>
         public void ApplyEffects(DuelStateData s, DuelSide owner, List<Effect> effects, CreatureInstance target)
         {
@@ -212,18 +284,27 @@ namespace ArcaneLegends.Duel
                 switch (f.k)
                 {
                     case "dmg":
-                        if (target != null && !IsSpellImmune(target)) target.hp -= f.n;
-                        else if (target == null) foe.TakeDamage(f.n);
+                        if (target != null) { if (!IsSpellImmune(target)) target.hp -= f.n; }
+                        else foe.TakeDamage(f.n);
                         break;
                     case "dmgAll":
                         foreach (var c in foe.board.Where(c => !IsSpellImmune(c))) c.hp -= f.n;
                         break;
-                    case "dmgWiz":  foe.TakeDamage(f.n); break;
-                    case "heal":    owner.Heal(f.n); break;
-                    case "shield":  owner.shield += f.n; break;
-                    case "buffAll": foreach (var c in owner.board) c.atk += f.n; break;
-                    case "draw":    for (int i = 0; i < f.n; i++) Draw(owner); break;
-                    case "freezeAll": foreach (var c in foe.board) c.frozen = true; break;
+                    case "dmgWiz":    foe.TakeDamage(f.n); break;
+                    case "heal":      owner.Heal(f.n); break;
+                    case "healPlay":  owner.Heal(f.n); break;
+                    case "shield":    owner.shield += f.n; break;
+                    case "buffAll":   foreach (var c in owner.board) c.atk += f.n; break;
+                    case "draw":      for (int i = 0; i < f.n; i++) Draw(owner); break;
+                    case "freezeAll": foreach (var c in foe.board) c.freeze = 1; break;
+
+                    // Persistent effects are handled where they live (BeginTurn / PlayField /
+                    // trap triggers), not here. Listed explicitly so they are ignored knowingly
+                    // rather than falling into the "unknown effect" warning.
+                    case "fieldAtk": case "fieldHeal": case "fieldPip":
+                    case "trapDmg":  case "trapShield":
+                        break;
+
                     default:
                         s.log.Add($"unknown effect \"{f.k}\" ignored");
                         break;
@@ -238,60 +319,104 @@ namespace ArcaneLegends.Duel
 
         /// <summary>
         /// Attack with one creature. <paramref name="target"/> null means "face" — legal only if
-        /// no taunt creature is guarding, which is the rule the "taunt blocks wizard attack" test
-        /// pins down.
+        /// no taunt creature is guarding.
         /// </summary>
         public bool Attack(DuelStateData s, DuelSide p, CreatureInstance attacker, CreatureInstance target)
         {
             if (s.over || s.turn != p.playerId || attacker == null || !attacker.CanAttack) return false;
 
             var foe = s.FoeOf(p);
-            var taunts = foe.board.Where(c => c.IsAlive && (c.Has("taunt") || (c.trait?.taunt ?? false))).ToList();
+            var taunts = foe.board.Where(c => c.IsAlive && (c.taunt || (c.trait?.taunt ?? false))).ToList();
             if (taunts.Count > 0 && (target == null || !taunts.Contains(target))) return false;
             if (target != null && !foe.board.Contains(target)) return false;
 
-            int dmg = attacker.EffectiveAtk(p.board.Count(c => c.IsAlive));
+            int dmg = EffectiveAtk(attacker, p);
 
             if (target == null)
             {
                 foe.TakeDamage(dmg);
-                if (attacker.trait?.drain ?? false) p.Heal(dmg);
+                if (attacker.drain || (attacker.trait?.drain ?? false)) p.Heal(dmg);
             }
             else
             {
                 // Evade dodges the first attack against it, then is spent.
-                if ((target.trait?.evade ?? false) && !target.evadeUsed)
+                bool evaded = (target.trait?.evade ?? false) && !target.exhausted && !EvadeSpent(target);
+                if (evaded)
                 {
-                    target.evadeUsed = true;
+                    MarkEvadeSpent(target);
                     s.log.Add($"{target.name} evaded");
                 }
                 else
                 {
-                    target.hp -= dmg;
+                    // The elemental ring: attacker's school beating the defender's adds +1.
+                    int ringBonus = _data.SchoolBeats(attacker.school, target.school) ? 1 : 0;
+                    int total = dmg + ringBonus;
+
+                    target.hp -= total;
                     if (attacker.trait?.poison > 0) target.hp -= attacker.trait.poison;
-                    if (attacker.trait?.drain ?? false) p.Heal(dmg);
+                    if (attacker.drain || (attacker.trait?.drain ?? false)) p.Heal(total);
 
-                    // Retaliation the defender deals back on being hit.
-                    if (target.trait?.thorns > 0) attacker.hp -= target.trait.thorns;
-                    if (target.trait?.healOnHit > 0)
-                        target.hp = Math.Min(target.maxHp, target.hp + target.trait.healOnHit);
+                    // Retaliation: a defender that SURVIVES hits back with its own attack.
+                    if (target.hp > 0)
+                    {
+                        attacker.hp -= target.atk;
+                        if (target.trait?.thorns > 0) attacker.hp -= target.trait.thorns;
+                        if (target.trait?.healOnHit > 0)
+                            target.hp = Math.Min(target.maxHp, target.hp + target.trait.healOnHit);
+                    }
+
+                    if (attacker.trait?.onAttackDmgAll > 0)
+                        foreach (var e in foe.board.Where(e => e != target))
+                            e.hp -= attacker.trait.onAttackDmgAll;
+                    if (attacker.trait?.onAttackDebuff > 0)
+                        target.atk = Math.Max(0, target.atk - attacker.trait.onAttackDebuff);
                 }
-
-                // Attacker-side on-hit riders.
-                if (attacker.trait?.onAttackDmgAll > 0)
-                    foreach (var e in foe.board.Where(e => e != target))
-                        e.hp -= attacker.trait.onAttackDmgAll;
-                if (attacker.trait?.onAttackDebuff > 0)
-                    target.atk = Math.Max(0, target.atk - attacker.trait.onAttackDebuff);
             }
 
             if (attacker.trait?.wizardDmg > 0) foe.TakeDamage(attacker.trait.wizardDmg);
 
-            attacker.hasAttacked = !(attacker.Has("multiAttack"));
+            attacker.attacks++;
+            if (attacker.attacks >= attacker.multi) attacker.exhausted = true;
+
+            // Defender traps fire on being attacked — one trap, FIFO, same as on creature play.
+            if (foe.traps.Count > 0)
+            {
+                var t = foe.traps[0];
+                foe.traps.RemoveAt(0);
+                foreach (var fx in t.effects)
+                    if (fx.k == "trapShield")
+                    {
+                        foe.shield += fx.n;
+                        s.log.Add($"Trap! +{fx.n} shield");
+                    }
+            }
+
             CleanUpDead(s);
             CheckGameOver(s);
             return true;
         }
+
+        /// <summary>
+        /// Attack including conditional bonuses that depend on live board state — rage while
+        /// below half HP, warband scaling with allies. Derived rather than stored so it can never
+        /// disagree with the board that produces it.
+        /// </summary>
+        public static int EffectiveAtk(CreatureInstance c, DuelSide owner)
+        {
+            int a = c.atk;
+            if (c.trait != null)
+            {
+                if (c.trait.rageAtk > 0 && c.hp * 2 < c.maxHp) a += c.trait.rageAtk;
+                if (c.trait.warband) a += Math.Max(0, owner.board.Count(x => x.IsAlive) - 1);
+            }
+            return Math.Max(0, a);
+        }
+
+        // Evade is once-per-creature. Tracked via a spent set rather than a field on the instance
+        // so the serialised shape stays a faithful mirror of logic.js's creature record.
+        private readonly HashSet<CreatureInstance> _evadeSpent = new();
+        private bool EvadeSpent(CreatureInstance c) => _evadeSpent.Contains(c);
+        private void MarkEvadeSpent(CreatureInstance c) => _evadeSpent.Add(c);
 
         // ---------------------------------------------------------------- ultimates
 
@@ -312,10 +437,10 @@ namespace ArcaneLegends.Duel
         // ---------------------------------------------------------------- bookkeeping
 
         /// <summary>
-        /// Remove the dead — but give "survive" its one chance to cheat death at 1hp first.
-        /// Ordering matters: survive must resolve before the filter, or the creature is gone
-        /// before its trait ever fires.
+        /// Remove the dead — but let "survive" cheat death at 1hp once first. Ordering matters:
+        /// survive must resolve before the filter, or the creature is gone before it can fire.
         /// </summary>
+        private readonly HashSet<CreatureInstance> _surviveUsed = new();
         private void CleanUpDead(DuelStateData s)
         {
             foreach (var side in new[] { s.you, s.enemy })
@@ -323,9 +448,9 @@ namespace ArcaneLegends.Duel
                 foreach (var c in side.board)
                 {
                     if (c.hp > 0) continue;
-                    if ((c.trait?.survive ?? false) && !c.surviveUsed)
+                    if ((c.trait?.survive ?? false) && !_surviveUsed.Contains(c))
                     {
-                        c.surviveUsed = true;
+                        _surviveUsed.Add(c);
                         c.hp = 1;
                     }
                 }
@@ -333,12 +458,25 @@ namespace ArcaneLegends.Duel
             }
         }
 
+        /// <summary>
+        /// Win/draw resolution. A double knockout is a DRAW, not a win for whichever side happens
+        /// to be checked first — and the turn limit resolves on remaining hp.
+        /// </summary>
         private void CheckGameOver(DuelStateData s)
         {
-            if (s.you.hp <= 0 || s.enemy.hp <= 0)
+            if (s.over) return;
+
+            if (s.you.hp <= 0 && s.enemy.hp <= 0)
             {
-                s.over = true;
-                s.winner = s.you.hp <= 0 ? s.enemy.playerId : s.you.playerId;
+                s.over = true; s.draw = true; s.winner = null; s.endReason = "double knockout";
+            }
+            else if (s.you.hp <= 0) { s.over = true; s.winner = s.enemy.playerId; }
+            else if (s.enemy.hp <= 0) { s.over = true; s.winner = s.you.playerId; }
+            else if (s.turns >= MaxTurns)
+            {
+                s.over = true; s.endReason = "turn limit";
+                if (s.you.hp == s.enemy.hp) { s.draw = true; s.winner = null; }
+                else s.winner = s.you.hp > s.enemy.hp ? s.you.playerId : s.enemy.playerId;
             }
         }
 
@@ -347,62 +485,5 @@ namespace ArcaneLegends.Duel
             var alive = board.Where(c => c.IsAlive).ToList();
             return alive.Count == 0 ? null : alive[(int)(_rand() * alive.Count)];
         }
-
-        /// <summary>
-        /// Map a card to its creature-trait key. Mirrors creatures.js traitForCard()'s keyword
-        /// matching — kept as one method so the mapping has a single definition, the same reason
-        /// the web build shares its clip-role matcher between the world and the duel arena.
-        /// </summary>
-        public static string TraitKeyFor(Card card)
-        {
-            string n = ((card.name ?? "") + " " + (card.id ?? "")).ToLowerInvariant();
-            foreach (var (pattern, key) in TraitKeywords)
-                if (pattern.Split('|').Any(p => n.Contains(p))) return key;
-            return null;
-        }
-
-        // Ordered — first match wins, so more specific entries must come first.
-        private static readonly (string, string)[] TraitKeywords =
-        {
-            ("mushnub_evolved", "mushnub_evolved"),
-            ("mushroomking|mushroom_king", "mushroomking"),
-            ("mushnub", "mushnub"),
-            ("orc_skull|skull", "orc_skull"),
-            ("bluedemon|blue_demon", "bluedemon"),
-            ("greenspikyblob", "greenspikyblob"),
-            ("greenblob", "greenblob"),
-            ("pinkblob", "pinkblob"),
-            ("dragon|wyrm|titan", "dragon"),
-            ("slime|ooze", "slime"),
-            ("skeleton|bone", "skeleton"),
-            ("panda|bear", "panda"),
-            ("deer|stag|elk", "deer"),
-            ("ghost|wraith|spirit", "ghost"),
-            ("mushroom|shroom", "mushroom"),
-            ("yeti|giant", "yeti"),
-            ("dino|rex", "dino"),
-            ("orc|goblin|troll", "orc"),
-            ("demon|devil|imp", "demon"),
-            ("frog|toad", "frog"),
-            ("fish|shark", "fish"),
-            ("bunny|rabbit", "bunny"),
-            ("alien", "alien"),
-            ("wizard|mage", "wizard"),
-            ("ninja|assassin", "ninja"),
-            ("monkroose", "monkroose"),
-            ("birb", "birb"),
-            ("cactoro|cactus", "cactoro"),
-            ("cat|kitten", "cat"),
-            ("dog|hound|wolf", "dog"),
-            ("pigeon|dove", "pigeon"),
-            ("glub", "glub"),
-            ("goleling|golem", "goleling"),
-            ("squidle|squid|kraken", "squidle"),
-            ("hywirl|whirl|cyclone", "hywirl"),
-            ("alpaking|alpaca|llama", "alpaking"),
-            ("armabee|bee|wasp", "armabee"),
-            ("chicken|rooster", "chicken"),
-            ("bat", "bat"),
-        };
     }
 }

@@ -31,6 +31,17 @@ namespace ArcaneLegends.Data
         public List<Affinity> affinities = new();
         public List<Ultimate> ultimates = new();
 
+        /// <summary>
+        /// card id -> creature-trait key, RESOLVED BY THE EXPORTER using creatures.js's real
+        /// traitForCard(). Deliberately a lookup rather than a C# re-implementation of that
+        /// keyword matcher: the first draft of this port did re-implement it and got several
+        /// cases wrong (skeleton needs a word-boundary check, orc+skull is a different trait,
+        /// demon+blue must be tested before plain demon, and mage/elf/pixie resolves to `ninja`
+        /// rather than `wizard`). Each of those is a silent mis-resolution — the creature just
+        /// gets the wrong passive, which reads as a balance quirk instead of a bug.
+        /// </summary>
+        public Dictionary<string, string> cardTraits = new();
+
         // Lookups built once after load. Kept private with accessor methods so callers cannot
         // mutate the shared catalog by accident.
         private Dictionary<string, Card> _cardById;
@@ -38,6 +49,12 @@ namespace ArcaneLegends.Data
         private Dictionary<string, Ultimate> _ultBySchool;
         private Dictionary<string, Affinity> _affinityBySchool;
         private HashSet<string> _beats;
+
+        /// <summary>
+        /// The four real card types. "field" and "trap" are easy to miss — the first draft of this
+        /// port only handled creature/spell and would have played fields and traps as spells.
+        /// </summary>
+        public static readonly HashSet<string> ValidTypes = new() { "creature", "spell", "field", "trap" };
 
         /// <summary>Build the lookup tables. Call once after deserialising.</summary>
         public void Index()
@@ -54,6 +71,15 @@ namespace ArcaneLegends.Data
 
         public CreatureTrait TraitById(string id) =>
             id != null && _traitById != null && _traitById.TryGetValue(id, out var t) ? t : null;
+
+        /// <summary>
+        /// The trait set for a card, or null for a creature with no special rules. Uses the
+        /// exported <see cref="cardTraits"/> mapping — see the note on that field for why this is
+        /// a lookup rather than keyword matching.
+        /// </summary>
+        public CreatureTrait TraitForCard(string cardId) =>
+            cardId != null && cardTraits != null && cardTraits.TryGetValue(cardId, out var key)
+                ? TraitById(key) : null;
 
         public Ultimate UltimateFor(string school) =>
             school != null && _ultBySchool != null && _ultBySchool.TryGetValue(school, out var u) ? u : null;
@@ -97,9 +123,19 @@ namespace ArcaneLegends.Data
                 if (string.IsNullOrEmpty(c.school)) problems.Add($"{c.id}: no school");
                 else if (!schools.Any(s => s.id == c.school)) problems.Add($"{c.id}: unknown school \"{c.school}\"");
                 if (!rarities.Any(r => r.id == c.rarity)) problems.Add($"{c.id}: unknown rarity \"{c.rarity}\"");
+                if (!ValidTypes.Contains(c.type)) problems.Add($"{c.id}: unknown card type \"{c.type}\"");
                 if (c.type == "creature" && c.hp <= 0) problems.Add($"{c.id}: creature with no hp");
-                if (c.type == "spell" && c.effects.Count == 0) problems.Add($"{c.id}: spell with no effects");
+                if (c.type != "creature" && c.effects.Count == 0)
+                    problems.Add($"{c.id}: non-creature card with no effects");
                 if (c.cost < 0) problems.Add($"{c.id}: negative cost");
+            }
+
+            // Every trait key the card mapping points at must actually exist, or a creature
+            // silently loses its passive at runtime.
+            foreach (var kv in cardTraits)
+            {
+                if (CardById(kv.Key) == null) problems.Add($"cardTraits references unknown card \"{kv.Key}\"");
+                if (TraitById(kv.Value) == null) problems.Add($"cardTraits[\"{kv.Key}\"] -> unknown trait \"{kv.Value}\"");
             }
 
             foreach (var s in schools)
@@ -122,6 +158,7 @@ namespace ArcaneLegends.Data
     }
 
     [Serializable] public class School  { public string id; public string name; public string color; }
+
     [Serializable] public class Rarity  { public string id; public string name; public string color; public int baseValue; }
     [Serializable] public class SchoolMatchup { public string attacker; public string defender; }
     [Serializable] public class Affinity { public string school; public Effect effect; public string why; }
@@ -161,6 +198,8 @@ namespace ArcaneLegends.Data
 
         public bool IsCreature => type == "creature";
         public bool IsSpell => type == "spell";
+        public bool IsField => type == "field";
+        public bool IsTrap => type == "trap";
         public bool Has(string keyword) => keywords.Contains(keyword);
     }
 

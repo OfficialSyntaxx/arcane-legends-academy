@@ -49,6 +49,43 @@ nothing about real hardware, and reporting it would have been actively misleadin
 drawing conclusions from it. The fix was pivoting to hardware-independent counts — draw calls,
 triangles, resident textures, active lights.
 
+### A5. Drafting a port from assumption instead of reading the source (AI mistake)
+**What:** the first draft of the C# duel engine was written after skimming `logic.js` rather than
+reading it closely. It was wrong in six ways at once: wizard HP was 30 (really **100**), opening
+hand 4 (really **5**), it handled only `creature` and `spell` while the game has **four** card
+types (`field` ×3 and `trap` ×2 would have been silently played as spells), it omitted **fatigue**
+(deck-out damage) entirely, it never applied the **elemental ring +1** on attack despite having
+the lookup right there, and it modelled retaliation as thorns-only when defenders actually hit
+back with their full attack.
+
+**Why:** the draft was built from a mental model of "how a card game works" plus a skim, rather
+than from the file that defines the rules. Every individual assumption was *plausible*, which is
+exactly what made them survive review.
+
+**How it surfaced:** not by inspection — by generating the card data and noticing the export
+summary contradicted itself (30 creatures by subtraction vs. 25 by filtering). Chasing that
+discrepancy revealed the `field`/`trap` types, which prompted a proper read of `logic.js`.
+
+**Rule:** when porting, read the source of truth line by line before writing, not after. And treat
+a self-contradicting number as a thread worth pulling — the summary line was "just cosmetic" and
+it was hiding a real modelling error.
+
+### A6. Re-implementing a matcher instead of exporting its output (AI mistake)
+**What:** the same C# draft hand-transcribed `creatures.js`'s `traitForCard()` keyword matcher —
+in the very same commit that argued hand-transcription is how silent bugs get in. It was wrong in
+at least four places: `skeleton` needs a word-boundary check as well as a loose match, `orc`+`skull`
+resolves to a *different* trait, `demon`+blue/frost/ice must be tested **before** plain demon, and
+`mage`/`elf`/`pixie`/`novice` falls through to **`ninja`**, not `wizard`.
+
+**Why:** the card *data* was correctly identified as too risky to retype, but the *logic that maps
+cards to traits* was not held to the same standard, even though its failure mode is worse — a
+mis-resolved trait gives a creature the wrong passive, which reads as a balance quirk rather than
+a bug, so it might never be noticed at all.
+
+**Rule:** if the output of a function is a fixed mapping, **export the mapping, don't port the
+function.** Applied: the exporter now runs the real `traitForCard()` and emits card→trait as data,
+and the C# looks it up. The whole error class is gone rather than tested around.
+
 ### A4. Claiming a bug without verifying it (AI mistake)
 **What:** flagged that `npm run compress` had "unnecessarily re-touched 37 creature files" as a
 bug, and wrote it into a commit message as a suspected issue.

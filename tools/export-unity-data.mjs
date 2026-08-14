@@ -24,7 +24,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { CARDS, SCHOOLS, RARITY, SCHOOL_BONUS } from "../public/cards.js";
-import { CREATURES, RULES } from "../public/creatures.js";
+import { CREATURES, RULES, traitForCard } from "../public/creatures.js";
 import { AFFINITY_FX, ULTIMATES, ULT_CHARGE_MAX } from "../public/schoolmagic.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -86,6 +86,28 @@ const creatureTraits = Object.entries(RULES).map(([id, r]) => ({
 
 const creatureModels = Object.entries(CREATURES).map(([id, c]) => ({ id, ...c }));
 
+// card id -> creature-trait key, RESOLVED BY THE REAL traitForCard() rather than by a
+// re-implementation of its keyword matching.
+//
+// The first draft of the C# port hand-transcribed that matcher into a keyword table and got it
+// wrong in several places: "skeleton" needs a word-boundary check as well as the loose match,
+// "orc"+"skull" resolves to orc_skull, "demon"+blue/frost/ice must be tested BEFORE plain demon,
+// and mage/elf/pixie/novice falls through to `ninja`, not `wizard`. Every one of those is a
+// silent mis-resolution — the creature simply gets the wrong passive, which reads as a balance
+// quirk rather than a bug.
+//
+// Exporting the resolved mapping removes the entire class of error: C# looks the answer up
+// instead of deriving it. Same reasoning as generating the card data rather than retyping it.
+const cardTraits = {};
+for (const c of CARDS){
+  if (c.type !== "creature") continue;
+  const t = traitForCard(c.id, c.name);
+  if (!t) continue;
+  // recover the slug by identity against the RULES table the function indexed into
+  const slug = Object.keys(RULES).find(k => RULES[k] === t.rules);
+  if (slug) cardTraits[c.id] = slug;
+}
+
 const affinities = Object.entries(AFFINITY_FX).map(([school, f]) => ({
   school, effect: { k: f.k, n: f.n }, why: f.why,
 }));
@@ -99,13 +121,13 @@ const bundle = {
   generated: "tools/export-unity-data.mjs — do not hand-edit; edit the source modules and re-run",
   sourceCommit: process.env.GIT_COMMIT || null,
   ultChargeMax: ULT_CHARGE_MAX,
-  schools, rarities, schoolBonus, cards, creatureTraits, creatureModels, affinities, ultimates,
+  schools, rarities, schoolBonus, cards, creatureTraits, creatureModels, cardTraits, affinities, ultimates,
 };
 
 const files = {
   "cards.json": cards,
   "schools.json": { schools, rarities, schoolBonus },
-  "creatures.json": { traits: creatureTraits, models: creatureModels },
+  "creatures.json": { traits: creatureTraits, models: creatureModels, cardTraits },
   "schoolmagic.json": { ultChargeMax: ULT_CHARGE_MAX, affinities, ultimates },
   "gamedata.json": bundle,          // everything in one file, for a single-load path
 };
@@ -119,6 +141,7 @@ console.log(`  cards          ${cards.length}`);
 console.log(`  schools        ${schools.length}   rarities ${rarities.length}   ring ${schoolBonus.length}`);
 console.log(`  creatureTraits ${creatureTraits.length}`);
 console.log(`  creatureModels ${creatureModels.length}`);
+console.log(`  cardTraits     ${Object.keys(cardTraits).length} of ${cards.filter(c=>c.type==="creature").length} creature cards resolved`);
 console.log(`  affinities     ${affinities.length}   ultimates ${ultimates.length}`);
 const spells = cards.filter(c => c.type === "spell").length;
 console.log(`  (${cards.length - spells} creatures, ${spells} spells)`);
