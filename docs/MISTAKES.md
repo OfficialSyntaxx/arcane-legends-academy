@@ -101,6 +101,23 @@ fix commit rather than left standing.
 
 ---
 
+### A7. Typing a constant into the port instead of reading it (AI mistake)
+**What:** `SaveData.cs` declared `StartGold = 500`. The real value in `game.js` is
+`START_GOLD = 80` — a 6× error in the opening economy, and one that reads as a *balance choice*
+rather than a bug, so nothing downstream would ever have flagged it.
+
+**Why:** exactly the A5/A6 failure again, in a place too small to feel like it warranted a check.
+Every *table* had been generated from the source; this one loose number was typed from memory
+because it looked too simple to get wrong.
+
+**Rule:** a constant is data too. If a number came from the source, it gets read from the source —
+the fixtures now export `startGold` from `game.js` and the C# asserts against it, so the same
+error cannot recur silently. The reason to be strict about this specifically: transcription errors
+in *numbers* are the only bug class that has no symptom. Wrong code crashes; a wrong constant just
+makes the game slightly different from the one that was designed.
+
+---
+
 ## Category B — applying a technique without checking it fits
 
 ### B1. Batch-repainting a colour-swatch atlas

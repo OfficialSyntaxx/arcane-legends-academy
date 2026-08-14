@@ -2617,5 +2617,1339 @@
         }
       ]
     }
+  ],
+  "economy": {
+    "skills": [
+      {
+        "id": "mining",
+        "name": "Mining",
+        "icon": "⛏️"
+      },
+      {
+        "id": "fishing",
+        "name": "Fishing",
+        "icon": "🎣"
+      },
+      {
+        "id": "woodcutting",
+        "name": "Woodcutting",
+        "icon": "🪓"
+      },
+      {
+        "id": "smithing",
+        "name": "Smithing",
+        "icon": "⚒️"
+      },
+      {
+        "id": "alchemy",
+        "name": "Alchemy",
+        "icon": "⚗️"
+      },
+      {
+        "id": "scribing",
+        "name": "Scribing",
+        "icon": "🪶"
+      },
+      {
+        "id": "enchanting",
+        "name": "Enchanting",
+        "icon": "🔮"
+      },
+      {
+        "id": "cooking",
+        "name": "Cooking",
+        "icon": "🍳"
+      }
+    ],
+    "materials": [
+      {
+        "id": "copper",
+        "name": "Copper Ore",
+        "icon": "🪨",
+        "skill": "mining",
+        "lvl": 1,
+        "xp": 8,
+        "value": 4
+      },
+      {
+        "id": "tin",
+        "name": "Tin Ore",
+        "icon": "🪨",
+        "skill": "mining",
+        "lvl": 1,
+        "xp": 8,
+        "value": 4
+      },
+      {
+        "id": "iron",
+        "name": "Iron Ore",
+        "icon": "🪨",
+        "skill": "mining",
+        "lvl": 15,
+        "xp": 18,
+        "value": 10
+      },
+      {
+        "id": "silver",
+        "name": "Silver Ore",
+        "icon": "🪨",
+        "skill": "mining",
+        "lvl": 20,
+        "xp": 25,
+        "value": 16
+      },
+      {
+        "id": "gold",
+        "name": "Gold Ore",
+        "icon": "🪨",
+        "skill": "mining",
+        "lvl": 30,
+        "xp": 40,
+        "value": 30
+      },
+      {
+        "id": "mithril",
+        "name": "Mithril Ore",
+        "icon": "🪨",
+        "skill": "mining",
+        "lvl": 50,
+        "xp": 70,
+        "value": 55
+      },
+      {
+        "id": "runite",
+        "name": "Runite Ore",
+        "icon": "🪨",
+        "skill": "mining",
+        "lvl": 70,
+        "xp": 110,
+        "value": 90
+      },
+      {
+        "id": "raw_shrimp",
+        "name": "Raw Shrimp",
+        "icon": "🦐",
+        "skill": "fishing",
+        "lvl": 1,
+        "xp": 10,
+        "value": 5
+      },
+      {
+        "id": "raw_salmon",
+        "name": "Raw Salmon",
+        "icon": "🐟",
+        "skill": "fishing",
+        "lvl": 20,
+        "xp": 30,
+        "value": 14
+      },
+      {
+        "id": "raw_lobster",
+        "name": "Raw Lobster",
+        "icon": "🦞",
+        "skill": "fishing",
+        "lvl": 40,
+        "xp": 55,
+        "value": 32
+      },
+      {
+        "id": "raw_shark",
+        "name": "Raw Shark",
+        "icon": "🦈",
+        "skill": "fishing",
+        "lvl": 65,
+        "xp": 95,
+        "value": 70
+      },
+      {
+        "id": "oak_log",
+        "name": "Oak Log",
+        "icon": "🪵",
+        "skill": "woodcutting",
+        "lvl": 1,
+        "xp": 12,
+        "value": 6
+      },
+      {
+        "id": "willow_log",
+        "name": "Willow Log",
+        "icon": "🪵",
+        "skill": "woodcutting",
+        "lvl": 20,
+        "xp": 32,
+        "value": 16
+      },
+      {
+        "id": "magic_log",
+        "name": "Magic Log",
+        "icon": "🪵",
+        "skill": "woodcutting",
+        "lvl": 50,
+        "xp": 70,
+        "value": 48
+      }
+    ],
+    "bars": [
+      {
+        "id": "bar_bronze",
+        "name": "Bronze Bar",
+        "icon": "🟤",
+        "metal": "bronze",
+        "lvl": 1,
+        "xp": 15,
+        "value": 12,
+        "req": {
+          "copper": 1,
+          "tin": 1
+        }
+      },
+      {
+        "id": "bar_iron",
+        "name": "Iron Bar",
+        "icon": "⚪",
+        "metal": "iron",
+        "lvl": 15,
+        "xp": 32,
+        "value": 25,
+        "req": {
+          "iron": 1
+        }
+      },
+      {
+        "id": "bar_silver",
+        "name": "Silver Bar",
+        "icon": "🌫️",
+        "metal": "silver",
+        "lvl": 20,
+        "xp": 45,
+        "value": 38,
+        "req": {
+          "silver": 1
+        }
+      },
+      {
+        "id": "bar_gold",
+        "name": "Gold Bar",
+        "icon": "🟡",
+        "metal": "gold",
+        "lvl": 30,
+        "xp": 65,
+        "value": 65,
+        "req": {
+          "gold": 1
+        }
+      },
+      {
+        "id": "bar_mithril",
+        "name": "Mithril Bar",
+        "icon": "🔷",
+        "metal": "mithril",
+        "lvl": 50,
+        "xp": 110,
+        "value": 120,
+        "req": {
+          "mithril": 1
+        }
+      },
+      {
+        "id": "bar_rune",
+        "name": "Rune Bar",
+        "icon": "🟣",
+        "metal": "rune",
+        "lvl": 70,
+        "xp": 170,
+        "value": 210,
+        "req": {
+          "runite": 1
+        }
+      }
+    ],
+    "potions": [
+      {
+        "id": "potion_small",
+        "name": "Small Healing Potion",
+        "icon": "🧪",
+        "lvl": 1,
+        "xp": 20,
+        "value": 15,
+        "req": {
+          "raw_shrimp": 1
+        },
+        "heal": 15,
+        "atkBonus": 0,
+        "defBonus": 0
+      },
+      {
+        "id": "potion_medium",
+        "name": "Healing Potion",
+        "icon": "🧪",
+        "lvl": 20,
+        "xp": 45,
+        "value": 40,
+        "req": {
+          "raw_salmon": 1
+        },
+        "heal": 35,
+        "atkBonus": 0,
+        "defBonus": 0
+      },
+      {
+        "id": "potion_large",
+        "name": "Great Healing Potion",
+        "icon": "🧪",
+        "lvl": 40,
+        "xp": 80,
+        "value": 80,
+        "req": {
+          "raw_lobster": 1
+        },
+        "heal": 60,
+        "atkBonus": 0,
+        "defBonus": 0
+      },
+      {
+        "id": "potion_great",
+        "name": "Master Healing Potion",
+        "icon": "🧪",
+        "lvl": 65,
+        "xp": 130,
+        "value": 160,
+        "req": {
+          "raw_shark": 1
+        },
+        "heal": 100,
+        "atkBonus": 0,
+        "defBonus": 0
+      },
+      {
+        "id": "potion_focus",
+        "name": "Draught of Focus",
+        "icon": "🎯",
+        "lvl": 30,
+        "xp": 60,
+        "value": 70,
+        "req": {
+          "raw_salmon": 1,
+          "copper": 1
+        },
+        "heal": 0,
+        "atkBonus": 3,
+        "defBonus": 0
+      },
+      {
+        "id": "potion_ward",
+        "name": "Draught of Warding",
+        "icon": "🛡️",
+        "lvl": 30,
+        "xp": 60,
+        "value": 70,
+        "req": {
+          "raw_salmon": 1,
+          "tin": 1
+        },
+        "heal": 0,
+        "atkBonus": 0,
+        "defBonus": 3
+      }
+    ],
+    "metals": [
+      {
+        "id": "bronze",
+        "name": "Bronze",
+        "tier": 1,
+        "color": "#cd7f32"
+      },
+      {
+        "id": "iron",
+        "name": "Iron",
+        "tier": 2,
+        "color": "#c8c8c8"
+      },
+      {
+        "id": "gold",
+        "name": "Gold",
+        "tier": 3,
+        "color": "#ffd766"
+      },
+      {
+        "id": "mithril",
+        "name": "Mithril",
+        "tier": 4,
+        "color": "#5aa2ff"
+      },
+      {
+        "id": "rune",
+        "name": "Rune",
+        "tier": 5,
+        "color": "#b58cff"
+      }
+    ],
+    "slots": [
+      {
+        "id": "wand",
+        "name": "Wand",
+        "icon": "🪄"
+      },
+      {
+        "id": "hat",
+        "name": "Hat",
+        "icon": "🎩"
+      },
+      {
+        "id": "robe",
+        "name": "Robe",
+        "icon": "🥻"
+      },
+      {
+        "id": "boots",
+        "name": "Boots",
+        "icon": "👢"
+      },
+      {
+        "id": "amulet",
+        "name": "Amulet",
+        "icon": "📿"
+      }
+    ],
+    "equipment": [
+      {
+        "id": "bronze_wand",
+        "name": "Bronze Wand",
+        "slot": "wand",
+        "metal": "bronze",
+        "tier": 1,
+        "lvl": 15,
+        "barId": "bar_bronze",
+        "bars": 2,
+        "value": 40,
+        "icon": "🪄",
+        "color": "#cd7f32",
+        "atk": 2,
+        "def": 0,
+        "hp": 0,
+        "pip": 0,
+        "gold": 2
+      },
+      {
+        "id": "bronze_hat",
+        "name": "Bronze Hat",
+        "slot": "hat",
+        "metal": "bronze",
+        "tier": 1,
+        "lvl": 15,
+        "barId": "bar_bronze",
+        "bars": 2,
+        "value": 40,
+        "icon": "🎩",
+        "color": "#cd7f32",
+        "atk": 0,
+        "def": 2,
+        "hp": 0,
+        "pip": 0,
+        "gold": 2
+      },
+      {
+        "id": "bronze_robe",
+        "name": "Bronze Robe",
+        "slot": "robe",
+        "metal": "bronze",
+        "tier": 1,
+        "lvl": 15,
+        "barId": "bar_bronze",
+        "bars": 3,
+        "value": 60,
+        "icon": "🥻",
+        "color": "#cd7f32",
+        "atk": 0,
+        "def": 2,
+        "hp": 3,
+        "pip": 0,
+        "gold": 2
+      },
+      {
+        "id": "bronze_boots",
+        "name": "Bronze Boots",
+        "slot": "boots",
+        "metal": "bronze",
+        "tier": 1,
+        "lvl": 15,
+        "barId": "bar_bronze",
+        "bars": 2,
+        "value": 40,
+        "icon": "👢",
+        "color": "#cd7f32",
+        "atk": 0,
+        "def": 1,
+        "hp": 0,
+        "pip": 0,
+        "gold": 2
+      },
+      {
+        "id": "bronze_amulet",
+        "name": "Bronze Amulet",
+        "slot": "amulet",
+        "metal": "bronze",
+        "tier": 1,
+        "lvl": 15,
+        "barId": "bar_bronze",
+        "bars": 2,
+        "value": 40,
+        "icon": "📿",
+        "color": "#cd7f32",
+        "atk": 1,
+        "def": 0,
+        "hp": 2,
+        "pip": 0,
+        "gold": 2
+      },
+      {
+        "id": "iron_wand",
+        "name": "Iron Wand",
+        "slot": "wand",
+        "metal": "iron",
+        "tier": 2,
+        "lvl": 25,
+        "barId": "bar_iron",
+        "bars": 2,
+        "value": 80,
+        "icon": "🪄",
+        "color": "#c8c8c8",
+        "atk": 4,
+        "def": 0,
+        "hp": 0,
+        "pip": 0,
+        "gold": 4
+      },
+      {
+        "id": "iron_hat",
+        "name": "Iron Hat",
+        "slot": "hat",
+        "metal": "iron",
+        "tier": 2,
+        "lvl": 25,
+        "barId": "bar_iron",
+        "bars": 2,
+        "value": 80,
+        "icon": "🎩",
+        "color": "#c8c8c8",
+        "atk": 0,
+        "def": 3,
+        "hp": 0,
+        "pip": 0,
+        "gold": 4
+      },
+      {
+        "id": "iron_robe",
+        "name": "Iron Robe",
+        "slot": "robe",
+        "metal": "iron",
+        "tier": 2,
+        "lvl": 25,
+        "barId": "bar_iron",
+        "bars": 3,
+        "value": 100,
+        "icon": "🥻",
+        "color": "#c8c8c8",
+        "atk": 0,
+        "def": 4,
+        "hp": 6,
+        "pip": 0,
+        "gold": 4
+      },
+      {
+        "id": "iron_boots",
+        "name": "Iron Boots",
+        "slot": "boots",
+        "metal": "iron",
+        "tier": 2,
+        "lvl": 25,
+        "barId": "bar_iron",
+        "bars": 2,
+        "value": 80,
+        "icon": "👢",
+        "color": "#c8c8c8",
+        "atk": 0,
+        "def": 2,
+        "hp": 0,
+        "pip": 0,
+        "gold": 4
+      },
+      {
+        "id": "iron_amulet",
+        "name": "Iron Amulet",
+        "slot": "amulet",
+        "metal": "iron",
+        "tier": 2,
+        "lvl": 25,
+        "barId": "bar_iron",
+        "bars": 2,
+        "value": 80,
+        "icon": "📿",
+        "color": "#c8c8c8",
+        "atk": 2,
+        "def": 0,
+        "hp": 4,
+        "pip": 0,
+        "gold": 4
+      },
+      {
+        "id": "gold_wand",
+        "name": "Gold Wand",
+        "slot": "wand",
+        "metal": "gold",
+        "tier": 3,
+        "lvl": 35,
+        "barId": "bar_gold",
+        "bars": 2,
+        "value": 120,
+        "icon": "🪄",
+        "color": "#ffd766",
+        "atk": 6,
+        "def": 0,
+        "hp": 0,
+        "pip": 0,
+        "gold": 6
+      },
+      {
+        "id": "gold_hat",
+        "name": "Gold Hat",
+        "slot": "hat",
+        "metal": "gold",
+        "tier": 3,
+        "lvl": 35,
+        "barId": "bar_gold",
+        "bars": 2,
+        "value": 120,
+        "icon": "🎩",
+        "color": "#ffd766",
+        "atk": 0,
+        "def": 4,
+        "hp": 0,
+        "pip": 0,
+        "gold": 6
+      },
+      {
+        "id": "gold_robe",
+        "name": "Gold Robe",
+        "slot": "robe",
+        "metal": "gold",
+        "tier": 3,
+        "lvl": 35,
+        "barId": "bar_gold",
+        "bars": 3,
+        "value": 140,
+        "icon": "🥻",
+        "color": "#ffd766",
+        "atk": 0,
+        "def": 6,
+        "hp": 9,
+        "pip": 0,
+        "gold": 6
+      },
+      {
+        "id": "gold_boots",
+        "name": "Gold Boots",
+        "slot": "boots",
+        "metal": "gold",
+        "tier": 3,
+        "lvl": 35,
+        "barId": "bar_gold",
+        "bars": 2,
+        "value": 120,
+        "icon": "👢",
+        "color": "#ffd766",
+        "atk": 0,
+        "def": 3,
+        "hp": 0,
+        "pip": 0,
+        "gold": 6
+      },
+      {
+        "id": "gold_amulet",
+        "name": "Gold Amulet",
+        "slot": "amulet",
+        "metal": "gold",
+        "tier": 3,
+        "lvl": 35,
+        "barId": "bar_gold",
+        "bars": 2,
+        "value": 120,
+        "icon": "📿",
+        "color": "#ffd766",
+        "atk": 3,
+        "def": 0,
+        "hp": 6,
+        "pip": 0,
+        "gold": 6
+      },
+      {
+        "id": "mithril_wand",
+        "name": "Mithril Wand",
+        "slot": "wand",
+        "metal": "mithril",
+        "tier": 4,
+        "lvl": 45,
+        "barId": "bar_mithril",
+        "bars": 2,
+        "value": 160,
+        "icon": "🪄",
+        "color": "#5aa2ff",
+        "atk": 8,
+        "def": 0,
+        "hp": 0,
+        "pip": 0,
+        "gold": 8
+      },
+      {
+        "id": "mithril_hat",
+        "name": "Mithril Hat",
+        "slot": "hat",
+        "metal": "mithril",
+        "tier": 4,
+        "lvl": 45,
+        "barId": "bar_mithril",
+        "bars": 2,
+        "value": 160,
+        "icon": "🎩",
+        "color": "#5aa2ff",
+        "atk": 0,
+        "def": 5,
+        "hp": 0,
+        "pip": 0,
+        "gold": 8
+      },
+      {
+        "id": "mithril_robe",
+        "name": "Mithril Robe",
+        "slot": "robe",
+        "metal": "mithril",
+        "tier": 4,
+        "lvl": 45,
+        "barId": "bar_mithril",
+        "bars": 3,
+        "value": 180,
+        "icon": "🥻",
+        "color": "#5aa2ff",
+        "atk": 0,
+        "def": 8,
+        "hp": 12,
+        "pip": 0,
+        "gold": 8
+      },
+      {
+        "id": "mithril_boots",
+        "name": "Mithril Boots",
+        "slot": "boots",
+        "metal": "mithril",
+        "tier": 4,
+        "lvl": 45,
+        "barId": "bar_mithril",
+        "bars": 2,
+        "value": 160,
+        "icon": "👢",
+        "color": "#5aa2ff",
+        "atk": 0,
+        "def": 4,
+        "hp": 0,
+        "pip": 0,
+        "gold": 8
+      },
+      {
+        "id": "mithril_amulet",
+        "name": "Mithril Amulet",
+        "slot": "amulet",
+        "metal": "mithril",
+        "tier": 4,
+        "lvl": 45,
+        "barId": "bar_mithril",
+        "bars": 2,
+        "value": 160,
+        "icon": "📿",
+        "color": "#5aa2ff",
+        "atk": 4,
+        "def": 0,
+        "hp": 8,
+        "pip": 1,
+        "gold": 8
+      },
+      {
+        "id": "rune_wand",
+        "name": "Rune Wand",
+        "slot": "wand",
+        "metal": "rune",
+        "tier": 5,
+        "lvl": 55,
+        "barId": "bar_rune",
+        "bars": 2,
+        "value": 200,
+        "icon": "🪄",
+        "color": "#b58cff",
+        "atk": 10,
+        "def": 0,
+        "hp": 0,
+        "pip": 0,
+        "gold": 10
+      },
+      {
+        "id": "rune_hat",
+        "name": "Rune Hat",
+        "slot": "hat",
+        "metal": "rune",
+        "tier": 5,
+        "lvl": 55,
+        "barId": "bar_rune",
+        "bars": 2,
+        "value": 200,
+        "icon": "🎩",
+        "color": "#b58cff",
+        "atk": 0,
+        "def": 6,
+        "hp": 0,
+        "pip": 0,
+        "gold": 10
+      },
+      {
+        "id": "rune_robe",
+        "name": "Rune Robe",
+        "slot": "robe",
+        "metal": "rune",
+        "tier": 5,
+        "lvl": 55,
+        "barId": "bar_rune",
+        "bars": 3,
+        "value": 220,
+        "icon": "🥻",
+        "color": "#b58cff",
+        "atk": 0,
+        "def": 10,
+        "hp": 15,
+        "pip": 0,
+        "gold": 10
+      },
+      {
+        "id": "rune_boots",
+        "name": "Rune Boots",
+        "slot": "boots",
+        "metal": "rune",
+        "tier": 5,
+        "lvl": 55,
+        "barId": "bar_rune",
+        "bars": 2,
+        "value": 200,
+        "icon": "👢",
+        "color": "#b58cff",
+        "atk": 0,
+        "def": 5,
+        "hp": 0,
+        "pip": 0,
+        "gold": 10
+      },
+      {
+        "id": "rune_amulet",
+        "name": "Rune Amulet",
+        "slot": "amulet",
+        "metal": "rune",
+        "tier": 5,
+        "lvl": 55,
+        "barId": "bar_rune",
+        "bars": 2,
+        "value": 200,
+        "icon": "📿",
+        "color": "#b58cff",
+        "atk": 5,
+        "def": 0,
+        "hp": 10,
+        "pip": 1,
+        "gold": 10
+      }
+    ],
+    "cardMaterials": [
+      {
+        "id": "canvas",
+        "name": "Blank Canvas",
+        "icon": "🖼️",
+        "from": [
+          "oak_log",
+          "willow_log",
+          "magic_log"
+        ],
+        "xp": 12,
+        "value": 8
+      },
+      {
+        "id": "ink",
+        "name": "Elemental Ink",
+        "icon": "🖋️",
+        "from": [
+          "raw_shrimp",
+          "raw_salmon",
+          "raw_lobster",
+          "raw_shark"
+        ],
+        "xp": 12,
+        "value": 8
+      },
+      {
+        "id": "reagent",
+        "name": "Arcane Reagent",
+        "icon": "🧪",
+        "from": [
+          "copper",
+          "tin",
+          "iron",
+          "silver",
+          "gold",
+          "mithril",
+          "runite"
+        ],
+        "xp": 12,
+        "value": 8
+      }
+    ],
+    "enchants": [
+      {
+        "id": "whet_1",
+        "name": "Whetting Rune I",
+        "stat": "atk",
+        "n": 1,
+        "lvl": 1,
+        "xp": 20,
+        "cost": 60,
+        "req": {
+          "bar_bronze": 1
+        }
+      },
+      {
+        "id": "whet_2",
+        "name": "Whetting Rune II",
+        "stat": "atk",
+        "n": 2,
+        "lvl": 20,
+        "xp": 55,
+        "cost": 160,
+        "req": {
+          "bar_silver": 1
+        }
+      },
+      {
+        "id": "whet_3",
+        "name": "Whetting Rune III",
+        "stat": "atk",
+        "n": 3,
+        "lvl": 45,
+        "xp": 120,
+        "cost": 340,
+        "req": {
+          "bar_mithril": 1
+        }
+      },
+      {
+        "id": "ward_1",
+        "name": "Warding Rune I",
+        "stat": "def",
+        "n": 1,
+        "lvl": 1,
+        "xp": 20,
+        "cost": 60,
+        "req": {
+          "bar_bronze": 1
+        }
+      },
+      {
+        "id": "ward_2",
+        "name": "Warding Rune II",
+        "stat": "def",
+        "n": 2,
+        "lvl": 20,
+        "xp": 55,
+        "cost": 160,
+        "req": {
+          "bar_silver": 1
+        }
+      },
+      {
+        "id": "ward_3",
+        "name": "Warding Rune III",
+        "stat": "def",
+        "n": 3,
+        "lvl": 45,
+        "xp": 120,
+        "cost": 340,
+        "req": {
+          "bar_mithril": 1
+        }
+      },
+      {
+        "id": "vital_1",
+        "name": "Vital Rune I",
+        "stat": "hp",
+        "n": 3,
+        "lvl": 1,
+        "xp": 20,
+        "cost": 60,
+        "req": {
+          "bar_bronze": 1
+        }
+      },
+      {
+        "id": "vital_2",
+        "name": "Vital Rune II",
+        "stat": "hp",
+        "n": 6,
+        "lvl": 20,
+        "xp": 55,
+        "cost": 160,
+        "req": {
+          "bar_silver": 1
+        }
+      },
+      {
+        "id": "vital_3",
+        "name": "Vital Rune III",
+        "stat": "hp",
+        "n": 9,
+        "lvl": 45,
+        "xp": 120,
+        "cost": 340,
+        "req": {
+          "bar_mithril": 1
+        }
+      }
+    ],
+    "homeUpgrades": [
+      {
+        "id": "treasury",
+        "name": "Treasury",
+        "icon": "💰",
+        "desc": "+10% gold from wins",
+        "max": 5,
+        "levels": [
+          {
+            "from": 0,
+            "cost": 120,
+            "timber": 1
+          },
+          {
+            "from": 1,
+            "cost": 210,
+            "timber": 2
+          },
+          {
+            "from": 2,
+            "cost": 300,
+            "timber": 3
+          },
+          {
+            "from": 3,
+            "cost": 390,
+            "timber": 4
+          },
+          {
+            "from": 4,
+            "cost": 480,
+            "timber": 5
+          }
+        ]
+      },
+      {
+        "id": "library",
+        "name": "Library",
+        "icon": "📚",
+        "desc": "+10% card drop chance",
+        "max": 5,
+        "levels": [
+          {
+            "from": 0,
+            "cost": 150,
+            "timber": 1
+          },
+          {
+            "from": 1,
+            "cost": 260,
+            "timber": 2
+          },
+          {
+            "from": 2,
+            "cost": 370,
+            "timber": 3
+          },
+          {
+            "from": 3,
+            "cost": 480,
+            "timber": 4
+          },
+          {
+            "from": 4,
+            "cost": 590,
+            "timber": 5
+          }
+        ]
+      },
+      {
+        "id": "armory",
+        "name": "Armory",
+        "icon": "🛡️",
+        "desc": "+5% gear stats",
+        "max": 5,
+        "levels": [
+          {
+            "from": 0,
+            "cost": 140,
+            "timber": 1
+          },
+          {
+            "from": 1,
+            "cost": 240,
+            "timber": 2
+          },
+          {
+            "from": 2,
+            "cost": 340,
+            "timber": 3
+          },
+          {
+            "from": 3,
+            "cost": 440,
+            "timber": 4
+          },
+          {
+            "from": 4,
+            "cost": 540,
+            "timber": 5
+          }
+        ]
+      },
+      {
+        "id": "tavern",
+        "name": "Tavern",
+        "icon": "🍺",
+        "desc": "+10% skill XP",
+        "max": 5,
+        "levels": [
+          {
+            "from": 0,
+            "cost": 100,
+            "timber": 1
+          },
+          {
+            "from": 1,
+            "cost": 180,
+            "timber": 2
+          },
+          {
+            "from": 2,
+            "cost": 260,
+            "timber": 3
+          },
+          {
+            "from": 3,
+            "cost": 340,
+            "timber": 4
+          },
+          {
+            "from": 4,
+            "cost": 420,
+            "timber": 5
+          }
+        ]
+      }
+    ],
+    "gatherRegenMs": {
+      "copper": 8500,
+      "tin": 8500,
+      "iron": 15500,
+      "silver": 18000,
+      "gold": 23000,
+      "mithril": 33000,
+      "runite": 43000,
+      "raw_shrimp": 8500,
+      "raw_salmon": 18000,
+      "raw_lobster": 28000,
+      "raw_shark": 40500,
+      "oak_log": 8500,
+      "willow_log": 18000,
+      "magic_log": 33000
+    },
+    "pristine": {
+      "chancePercent": 6,
+      "sellMultiplier": 5,
+      "prefix": "pristine_"
+    },
+    "tavernSkillXpPerLevel": 0.1
+  },
+  "lessonTeaches": [
+    {
+      "id": "l_ink",
+      "year": 0,
+      "teaches": {
+        "scribeBonus": 2
+      }
+    },
+    {
+      "id": "l_firstcard",
+      "year": 0,
+      "teaches": {
+        "scribeBonus": 3
+      }
+    },
+    {
+      "id": "l_field",
+      "year": 0,
+      "teaches": {
+        "gatherBonus": 4
+      }
+    },
+    {
+      "id": "l_grading",
+      "year": 1,
+      "teaches": {
+        "gradeDiscount": 5
+      }
+    },
+    {
+      "id": "l_duel1",
+      "year": 1,
+      "teaches": {
+        "sellBonus": 4
+      }
+    },
+    {
+      "id": "l_ore",
+      "year": 1,
+      "teaches": {
+        "gatherBonus": 4
+      }
+    },
+    {
+      "id": "l_collection",
+      "year": 2,
+      "teaches": {
+        "sellBonus": 5
+      }
+    },
+    {
+      "id": "l_slab",
+      "year": 2,
+      "teaches": {
+        "gradeDiscount": 5
+      }
+    },
+    {
+      "id": "l_scribe2",
+      "year": 2,
+      "teaches": {
+        "scribeBonus": 4
+      }
+    },
+    {
+      "id": "l_duel2",
+      "year": 3,
+      "teaches": {
+        "sellBonus": 5
+      }
+    },
+    {
+      "id": "l_market",
+      "year": 3,
+      "teaches": {
+        "sellBonus": 6
+      }
+    },
+    {
+      "id": "l_smith",
+      "year": 3,
+      "teaches": {
+        "gatherBonus": 5
+      }
+    },
+    {
+      "id": "l_curation",
+      "year": 4,
+      "teaches": {
+        "gradeDiscount": 6
+      }
+    },
+    {
+      "id": "l_scribe3",
+      "year": 4,
+      "teaches": {
+        "scribeBonus": 5
+      }
+    },
+    {
+      "id": "l_alchemy",
+      "year": 4,
+      "teaches": {
+        "gatherBonus": 5
+      }
+    },
+    {
+      "id": "l_duel3",
+      "year": 5,
+      "teaches": {
+        "sellBonus": 6
+      }
+    },
+    {
+      "id": "l_archive",
+      "year": 5,
+      "teaches": {
+        "gradeDiscount": 6
+      }
+    },
+    {
+      "id": "l_fish",
+      "year": 5,
+      "teaches": {
+        "gatherBonus": 6
+      }
+    },
+    {
+      "id": "l_thesis",
+      "year": 6,
+      "teaches": {
+        "gradeDiscount": 7
+      }
+    },
+    {
+      "id": "l_capstone",
+      "year": 6,
+      "teaches": {
+        "scribeBonus": 6
+      }
+    },
+    {
+      "id": "l_archmage",
+      "year": 6,
+      "teaches": {
+        "sellBonus": 8
+      }
+    }
+  ],
+  "techniques": [
+    {
+      "id": "gradeDiscount",
+      "name": "Appraisal",
+      "unit": "%",
+      "desc": "cheaper grading and regrading"
+    },
+    {
+      "id": "scribeBonus",
+      "name": "Penmanship",
+      "unit": "",
+      "desc": "higher scribe rolls"
+    },
+    {
+      "id": "gatherBonus",
+      "name": "Husbandry",
+      "unit": "%",
+      "desc": "chance of a second unit when gathering"
+    },
+    {
+      "id": "sellBonus",
+      "name": "Haggling",
+      "unit": "%",
+      "desc": "more gold when selling cards"
+    }
   ]
 }

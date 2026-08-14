@@ -29,7 +29,9 @@ namespace ArcaneLegends.Save
     public class SaveData
     {
         public const int CurrentVersion = 1;
-        public const int StartGold = 500;
+        /// <summary>game.js START_GOLD. It is 80, not a round number — enough for a couple of
+        /// gathers and not a pack (PACK_COST is 100), which is a deliberate opening pinch.</summary>
+        public const int StartGold = 80;
 
         public int version = CurrentVersion;
 

@@ -11,6 +11,60 @@
     }
   },
   "ultChargeMax": 5,
+  "prng": [
+    {
+      "seed": 1,
+      "values": [
+        0.6270739405881613,
+        0.002735721180215478,
+        0.5274470399599522,
+        0.9810509674716741,
+        0.9683778982143849,
+        0.281103502959013,
+        0.6128388606011868,
+        0.7207431411370635
+      ]
+    },
+    {
+      "seed": 42,
+      "values": [
+        0.6011037519201636,
+        0.44829055899754167,
+        0.8524657934904099,
+        0.6697340414393693,
+        0.17481389874592423,
+        0.5265925421845168,
+        0.2732279943302274,
+        0.6247446539346129
+      ]
+    },
+    {
+      "seed": 12345,
+      "values": [
+        0.9797282677609473,
+        0.3067522644996643,
+        0.484205421525985,
+        0.817934412509203,
+        0.5094283693470061,
+        0.34747186047025025,
+        0.07375754183158278,
+        0.7663964673411101
+      ]
+    },
+    {
+      "seed": 2147483647,
+      "values": [
+        0.4290980885270983,
+        0.12713524978607893,
+        0.3852774982806295,
+        0.39639189024455845,
+        0.11962746665813029,
+        0.9531875969842076,
+        0.6806830384302884,
+        0.9957805015146732
+      ]
+    }
+  ],
   "progression": {
     "xpForLevel": [
       {
@@ -251,6 +305,1335 @@
       }
     ]
   },
+  "economy": [
+    {
+      "name": "gather copper, no husbandry",
+      "seed": 1,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {},
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "copper",
+          "xp": 8,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 8,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {
+          "copper": 8500
+        },
+        "dailyType": "gather",
+        "dailyProgress": 1,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "gather copper, husbandry from two lessons",
+      "seed": 1,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [
+        "l_field",
+        "l_ore"
+      ],
+      "before": {
+        "gold": 80,
+        "inventory": {},
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "copper",
+          "xp": 8,
+          "extra": 0,
+          "pristine": true,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 1,
+          "pristine_copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 8,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {
+          "copper": 8500
+        },
+        "dailyType": "gather",
+        "dailyProgress": 1,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "gather with event bonus",
+      "seed": 7,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {},
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "copper",
+          "xp": 8,
+          "extra": 1,
+          "pristine": true,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 2,
+          "pristine_copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 8,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {
+          "copper": 8500
+        },
+        "dailyType": "gather",
+        "dailyProgress": 1,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "gather twice, second on cooldown",
+      "seed": 3,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {},
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "copper",
+          "xp": 8,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        },
+        {
+          "ok": false,
+          "err": "cooldown",
+          "itemId": null,
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 7500,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 8,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {
+          "copper": 8500
+        },
+        "dailyType": "gather",
+        "dailyProgress": 1,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "gather again after cooldown elapses",
+      "seed": 3,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {},
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "copper",
+          "xp": 8,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        },
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "copper",
+          "xp": 8,
+          "extra": 0,
+          "pristine": true,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 2,
+          "pristine_copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 16,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {
+          "copper": 17000
+        },
+        "dailyType": "gather",
+        "dailyProgress": 2,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "gather runite under-levelled",
+      "seed": 5,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {},
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": false,
+          "err": "level",
+          "itemId": null,
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {},
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "smelt bronze with materials",
+      "seed": 11,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {
+          "copper": 2,
+          "tin": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "bar_bronze",
+          "xp": 15,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 1,
+          "tin": 0,
+          "bar_bronze": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 15,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "smelt bronze without tin",
+      "seed": 11,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {
+          "copper": 2
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": false,
+          "err": "level",
+          "itemId": null,
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 2
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "forge a bronze wand",
+      "seed": 13,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {
+          "bar_bronze": 3
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 20,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "bronze_wand",
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "bar_bronze": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 20,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 35,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": [
+          {
+            "id": "bronze_wand",
+            "metal": "bronze",
+            "slot": "wand",
+            "tier": 1,
+            "enchant": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "brew draught of focus",
+      "seed": 17,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {
+          "raw_salmon": 1,
+          "copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 30,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "potion_focus",
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "raw_salmon": 0,
+          "copper": 0,
+          "potion_focus": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 30,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 60,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "refine ore into reagent at level 1",
+      "seed": 19,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {
+          "copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": "reagent",
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 0,
+          "reagent": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 12,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 1,
+        "equipment": []
+      }
+    },
+    {
+      "name": "refine rejects a wrong source",
+      "seed": 19,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {
+          "copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": false,
+          "err": null,
+          "itemId": null,
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "sell ore and its pristine variant",
+      "seed": 23,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {
+          "copper": 3,
+          "pristine_copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": null,
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 8
+        },
+        {
+          "ok": true,
+          "err": null,
+          "itemId": null,
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 20
+        }
+      ],
+      "after": {
+        "gold": 108,
+        "inventory": {
+          "copper": 1,
+          "pristine_copper": 0
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "sell more than owned",
+      "seed": 23,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 80,
+        "inventory": {
+          "copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      },
+      "results": [
+        {
+          "ok": false,
+          "err": null,
+          "itemId": null,
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 80,
+        "inventory": {
+          "copper": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 1,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": []
+      }
+    },
+    {
+      "name": "enchant then re-enchant the same item",
+      "seed": 29,
+      "dailyDate": "2026-08-14",
+      "lessonsDone": [],
+      "before": {
+        "gold": 1000,
+        "inventory": {
+          "bar_bronze": 1,
+          "bar_silver": 1
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 45,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 0,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": [
+          {
+            "id": "bronze_wand",
+            "metal": "bronze",
+            "slot": "wand",
+            "tier": 1,
+            "enchant": null
+          }
+        ]
+      },
+      "results": [
+        {
+          "ok": true,
+          "err": null,
+          "itemId": null,
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        },
+        {
+          "ok": true,
+          "err": null,
+          "itemId": null,
+          "xp": 0,
+          "extra": 0,
+          "pristine": false,
+          "remaining": 0,
+          "value": 0
+        }
+      ],
+      "after": {
+        "gold": 780,
+        "inventory": {
+          "bar_bronze": 0,
+          "bar_silver": 0
+        },
+        "skills": {
+          "mining": 1,
+          "fishing": 1,
+          "woodcutting": 1,
+          "smithing": 1,
+          "alchemy": 1,
+          "scribing": 1,
+          "enchanting": 45,
+          "cooking": 1
+        },
+        "skillXp": {
+          "mining": 0,
+          "fishing": 0,
+          "woodcutting": 0,
+          "smithing": 0,
+          "alchemy": 0,
+          "scribing": 0,
+          "enchanting": 75,
+          "cooking": 0
+        },
+        "cooldownsFromNow": {},
+        "dailyType": "gather",
+        "dailyProgress": 0,
+        "refined": 0,
+        "equipment": [
+          {
+            "id": "bronze_wand",
+            "metal": "bronze",
+            "slot": "wand",
+            "tier": 1,
+            "enchant": "whet_2"
+          }
+        ]
+      }
+    }
+  ],
+  "masteries": [
+    {
+      "lessonsDone": [],
+      "expected": {
+        "gradeDiscount": 0,
+        "scribeBonus": 0,
+        "gatherBonus": 0,
+        "sellBonus": 0
+      }
+    },
+    {
+      "lessonsDone": [
+        "l_field"
+      ],
+      "expected": {
+        "gradeDiscount": 0,
+        "scribeBonus": 0,
+        "gatherBonus": 4,
+        "sellBonus": 0
+      }
+    },
+    {
+      "lessonsDone": [
+        "l_field",
+        "l_ore"
+      ],
+      "expected": {
+        "gradeDiscount": 0,
+        "scribeBonus": 0,
+        "gatherBonus": 8,
+        "sellBonus": 0
+      }
+    },
+    {
+      "lessonsDone": [
+        "l_field",
+        "l_ore",
+        "l_smith",
+        "l_alchemy",
+        "l_fish"
+      ],
+      "expected": {
+        "gradeDiscount": 0,
+        "scribeBonus": 0,
+        "gatherBonus": 24,
+        "sellBonus": 0
+      }
+    }
+  ],
+  "startGold": 80,
   "cardTraitResolution": [
     {
       "cardId": "fire_cat",

@@ -23,7 +23,19 @@ export const MAX_DECK = 20, MAX_COPIES = 3, START_GOLD = 80, PACK_COST = 100;
 
 // ---------- RNG (seeded for determinism) ----------
 export function mulberry32(seed){ let a=seed>>>0; return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
-export const rng = mulberry32((Date.now()>>>0) % 2147483647);
+// `rng` is a FUNCTION rather than a bound stream so the stream underneath it can be reseeded
+// (`seedRng`) without every call site needing to take an rng parameter. Default behaviour is
+// unchanged: a fresh, time-seeded mulberry32 stream, same as before.
+//
+// WHY THE SEAM EXISTS: the random parts of the economy (a Husbandry second unit, a Pristine find,
+// a pack's rarity roll) could not be tested at all — not here, and not in the Unity port, whose
+// only way to prove agreement with this build is to reproduce known input/output pairs. With a
+// shared seed and the same mulberry32 (an exact integer algorithm, so it ports byte-for-byte),
+// both languages can be driven down the same branch. See tools/export-test-fixtures.mjs.
+let _rngStream = mulberry32((Date.now()>>>0) % 2147483647);
+export function rng(){ return _rngStream(); }
+/** Reseed the shared stream. For tests and fixture generation — production never calls this. */
+export function seedRng(seed){ _rngStream = mulberry32(seed); return rng; }
 
 // ---------- Save / load ----------
 export function newGame(){

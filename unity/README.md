@@ -24,17 +24,19 @@ unity/
       Data/
         GameData.cs         data model + lookups + Validate()
         GameDataLoader.cs   JSON loading, fails loudly on bad data
+        EconomyData.cs      items/skills/recipes/equipment tables + Validate()
       Duel/
         DuelState.cs        DuelSide, CreatureInstance, fields, traps
         DuelEngine.cs       the rules: play, attack, effects, ultimates, traits
       Save/
         SaveData.cs         the full save shape + the derived-state rule
         Progression.cs      wizard/skill XP curves
+        Economy.cs          gather/smelt/forge/brew/refine/enchant/sell, masteries, daily
       Tests/
         FixtureTests.cs     verifies the port against golden JS values
     StreamingAssets/
       gamedata.json         GENERATED — everything, single load
-      cards.json / schools.json / creatures.json / schoolmagic.json
+      cards.json / schools.json / creatures.json / schoolmagic.json / economy.json
       testfixtures.json     GENERATED — golden input/output pairs from the web build
 ```
 
@@ -49,9 +51,21 @@ node tools/export-test-fixtures.mjs
 
 `testfixtures.json` holds golden input/output pairs produced by **the web build's own engine**:
 XP curves (including the cumulative boundaries a naive port fails), all 25 card→trait
-resolutions, every affinity pairing, and the full ultimate gating matrix.
+resolutions, every affinity pairing, the full ultimate gating matrix, and **15 seeded
+end-to-end economy runs**.
 
-`FixtureTests.RunAll(data, json, deserialize)` checks the C# against them. A pass means the port
+The economy runs are the strongest fixtures here, because they pin something no static table can:
+**the order random draws are made in.** `gather()` draws the Husbandry roll *only when the bonus is
+non-zero*, then the Pristine roll, always. A port that draws unconditionally — or in the other
+order — produces different items from the same seed while looking entirely reasonable in review.
+Two fixture cases differ *only* in that, and catch it.
+
+That works because `mulberry32` is integer-only and ports byte-for-byte, and because `game.js` now
+exposes `seedRng()` so the shared stream can be pinned. The PRNG is checked **first** in the run:
+if the stream disagrees, every seeded fixture below it fails in a way that looks like a logic bug
+rather than a broken random source.
+
+`FixtureTests.RunAll(data, json, deserialize, economyData)` checks the C# against them. A pass means the port
 agrees with the **shipped game**, not merely with itself. It is framework-free on purpose (no
 NUnit, no UnityEngine) so it runs from a console runner, an EditMode test, or a MonoBehaviour —
 whatever the project ends up using.
@@ -124,7 +138,12 @@ emits card→trait as data, so C# looks the answer up instead of deriving it. Se
 - **Nothing here is compiled or tested.** See the verification warning above.
 - Status effects and behaviour that live in `game.js` rather than `logic.js` (freeze-on-hit,
   multi-phase boss behaviour, archetype AI) are **not ported yet**.
-- No deck construction, no PvP, no progression, no rendering. Duel rules only.
+- No deck construction, no PvP, no card packs/grading/market, no rendering.
+- `Economy.Smelt` returns `err:"level"` when the shortfall is actually *materials* — faithful to
+  `game.js`, where `canCraft` folds both checks together. If that is ever improved, improve it in
+  `game.js` first so the two do not drift.
+- `Uid.New()` mirrors the JS id shape but is not the same generator; ids are not comparable
+  across builds. Nothing depends on that today (uids are only ever matched within one save).
 - 6 creature cards (minotaur, hydra, basilisk, unicorn, satyr, arcane_guardian) map to no trait.
   That is **correct** — they match no keyword in the source matcher either, so they are plain
   stat-lines by design. Noted so it is not "fixed" later by mistake.
