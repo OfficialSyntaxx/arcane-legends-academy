@@ -1,0 +1,97 @@
+{
+  "schools": [
+    {
+      "id": "fire",
+      "name": "Fire",
+      "color": "#ff6b35"
+    },
+    {
+      "id": "ice",
+      "name": "Ice",
+      "color": "#5fd6ff"
+    },
+    {
+      "id": "storm",
+      "name": "Storm",
+      "color": "#a06bff"
+    },
+    {
+      "id": "myth",
+      "name": "Myth",
+      "color": "#3ddc84"
+    },
+    {
+      "id": "life",
+      "name": "Life",
+      "color": "#ff9ecb"
+    },
+    {
+      "id": "death",
+      "name": "Death",
+      "color": "#e8e6f0"
+    },
+    {
+      "id": "balance",
+      "name": "Balance",
+      "color": "#ffc94d"
+    }
+  ],
+  "rarities": [
+    {
+      "id": "common",
+      "name": "Common",
+      "color": "#6b8cff",
+      "baseValue": 10
+    },
+    {
+      "id": "uncommon",
+      "name": "Uncommon",
+      "color": "#4ade80",
+      "baseValue": 25
+    },
+    {
+      "id": "rare",
+      "name": "Rare",
+      "color": "#c084fc",
+      "baseValue": 60
+    },
+    {
+      "id": "epic",
+      "name": "Epic",
+      "color": "#fb923c",
+      "baseValue": 150
+    },
+    {
+      "id": "legendary",
+      "name": "Legendary",
+      "color": "#fbbf24",
+      "baseValue": 400
+    }
+  ],
+  "schoolBonus": [
+    {
+      "attacker": "fire",
+      "defender": "ice"
+    },
+    {
+      "attacker": "ice",
+      "defender": "storm"
+    },
+    {
+      "attacker": "storm",
+      "defender": "myth"
+    },
+    {
+      "attacker": "myth",
+      "defender": "life"
+    },
+    {
+      "attacker": "life",
+      "defender": "death"
+    },
+    {
+      "attacker": "death",
+      "defender": "fire"
+    }
+  ]
+}

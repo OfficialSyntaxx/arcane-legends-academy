@@ -6,6 +6,8 @@
 > - **`docs/ASSET-BUDGET.md`** — asset platform costs, CC0 sources, licensing.
 > - **`docs/NEXT-PHASE-PLAN.md`** — the systems audit and phase tracker (Phases A–D).
 > - **`BLENDERTODO.md`** — modelling briefs for every asset still drawn as a procedural primitive.
+> - **`docs/MISTAKES.md`** — running log of mistakes made and the rule extracted from each, so the
+>   same class of error is caught faster next time. Add to it whenever something goes wrong.
 > - **`docs/UNITY-MIGRATION.md`** — **READ FIRST.** The project is migrating to Unity (mobile
 >   target). Inventory of what ports directly vs. needs rewriting, porting order, known gaps, and
 >   the engineering findings worth carrying over. Everything below describes the web build, which

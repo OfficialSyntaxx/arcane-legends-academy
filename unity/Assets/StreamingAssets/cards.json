@@ -1,0 +1,877 @@
+[
+  {
+    "id": "fire_cat",
+    "name": "Fire Cat",
+    "school": "fire",
+    "type": "creature",
+    "cost": 1,
+    "atk": 2,
+    "hp": 2,
+    "rarity": "common",
+    "keywords": [
+      "haste"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Haste. A loyal little blaze.",
+    "art": "cards/fire_cat.jpg"
+  },
+  {
+    "id": "fire_elf",
+    "name": "Fire Elf",
+    "school": "fire",
+    "type": "creature",
+    "cost": 2,
+    "atk": 3,
+    "hp": 3,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [],
+    "targeted": false,
+    "text": "Spirited, quick-tempered.",
+    "art": "cards/fire_elf.jpg"
+  },
+  {
+    "id": "fire_dragon",
+    "name": "Fire Dragon",
+    "school": "fire",
+    "type": "creature",
+    "cost": 7,
+    "atk": 8,
+    "hp": 7,
+    "rarity": "legendary",
+    "keywords": [
+      "haste"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Haste. The heart of the school.",
+    "art": "cards/fire_dragon.jpg"
+  },
+  {
+    "id": "firebolt",
+    "name": "Firebolt",
+    "school": "fire",
+    "type": "spell",
+    "cost": 1,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "dmg",
+        "n": 4
+      }
+    ],
+    "targeted": true,
+    "text": "Deal 4 damage.",
+    "art": "cards/firebolt.jpg"
+  },
+  {
+    "id": "fireball",
+    "name": "Fireball",
+    "school": "fire",
+    "type": "spell",
+    "cost": 3,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "uncommon",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "dmg",
+        "n": 6
+      }
+    ],
+    "targeted": true,
+    "text": "Deal 6 damage.",
+    "art": "cards/fireball.jpg"
+  },
+  {
+    "id": "meteor",
+    "name": "Meteor Strike",
+    "school": "fire",
+    "type": "spell",
+    "cost": 5,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "epic",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "dmgAll",
+        "n": 3
+      },
+      {
+        "k": "dmgWiz",
+        "n": 4
+      }
+    ],
+    "targeted": false,
+    "text": "Deal 3 to all enemy creatures, 4 to the enemy wizard.",
+    "art": "cards/meteor.jpg"
+  },
+  {
+    "id": "ice_golem",
+    "name": "Ice Golem",
+    "school": "ice",
+    "type": "creature",
+    "cost": 2,
+    "atk": 2,
+    "hp": 4,
+    "rarity": "common",
+    "keywords": [
+      "taunt"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Taunt. A wall of frost.",
+    "art": "cards/ice_golem.jpg"
+  },
+  {
+    "id": "frost_giant",
+    "name": "Frost Giant",
+    "school": "ice",
+    "type": "creature",
+    "cost": 4,
+    "atk": 4,
+    "hp": 6,
+    "rarity": "rare",
+    "keywords": [
+      "taunt"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Taunt.",
+    "art": "cards/frost_giant.jpg"
+  },
+  {
+    "id": "ice_wyrm",
+    "name": "Ice Wyrm",
+    "school": "ice",
+    "type": "creature",
+    "cost": 6,
+    "atk": 6,
+    "hp": 7,
+    "rarity": "legendary",
+    "keywords": [
+      "taunt"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Taunt. Ancient and patient.",
+    "art": "cards/ice_wyrm.jpg"
+  },
+  {
+    "id": "ice_armor",
+    "name": "Ice Armor",
+    "school": "ice",
+    "type": "spell",
+    "cost": 2,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "shield",
+        "n": 6
+      }
+    ],
+    "targeted": false,
+    "text": "Gain 6 shield.",
+    "art": "cards/ice_armor.jpg"
+  },
+  {
+    "id": "frost_shield",
+    "name": "Frost Shield",
+    "school": "ice",
+    "type": "spell",
+    "cost": 1,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "uncommon",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "shield",
+        "n": 3
+      }
+    ],
+    "targeted": false,
+    "text": "Gain 3 shield.",
+    "art": "cards/frost_shield.jpg"
+  },
+  {
+    "id": "blizzard",
+    "name": "Blizzard",
+    "school": "ice",
+    "type": "spell",
+    "cost": 4,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "epic",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "freezeAll",
+        "n": 0
+      }
+    ],
+    "targeted": false,
+    "text": "Freeze all enemy creatures this turn.",
+    "art": "cards/blizzard.jpg"
+  },
+  {
+    "id": "storm_bat",
+    "name": "Storm Bat",
+    "school": "storm",
+    "type": "creature",
+    "cost": 1,
+    "atk": 2,
+    "hp": 1,
+    "rarity": "common",
+    "keywords": [
+      "haste"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Haste.",
+    "art": "cards/storm_bat.jpg"
+  },
+  {
+    "id": "storm_shark",
+    "name": "Storm Shark",
+    "school": "storm",
+    "type": "creature",
+    "cost": 3,
+    "atk": 4,
+    "hp": 2,
+    "rarity": "rare",
+    "keywords": [
+      "haste"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Haste. Strike fast.",
+    "art": "cards/storm_shark.jpg"
+  },
+  {
+    "id": "storm_titan",
+    "name": "Storm Titan",
+    "school": "storm",
+    "type": "creature",
+    "cost": 8,
+    "atk": 9,
+    "hp": 8,
+    "rarity": "legendary",
+    "keywords": [],
+    "effects": [],
+    "targeted": false,
+    "text": "The storm given form.",
+    "art": "cards/storm_titan.jpg"
+  },
+  {
+    "id": "storm_shift",
+    "name": "Storm Shift",
+    "school": "storm",
+    "type": "spell",
+    "cost": 1,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "dmg",
+        "n": 3
+      }
+    ],
+    "targeted": true,
+    "text": "Deal 3 damage.",
+    "art": "cards/storm_shift.jpg"
+  },
+  {
+    "id": "lightning",
+    "name": "Lightning Bolt",
+    "school": "storm",
+    "type": "spell",
+    "cost": 2,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "uncommon",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "dmg",
+        "n": 5
+      }
+    ],
+    "targeted": true,
+    "text": "Deal 5 damage.",
+    "art": "cards/lightning.jpg"
+  },
+  {
+    "id": "tempest",
+    "name": "Tempest",
+    "school": "storm",
+    "type": "spell",
+    "cost": 6,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "epic",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "dmgWiz",
+        "n": 10
+      }
+    ],
+    "targeted": false,
+    "text": "Deal 10 damage to the enemy wizard.",
+    "art": "cards/tempest.jpg"
+  },
+  {
+    "id": "myth_walker",
+    "name": "Myth Walker",
+    "school": "myth",
+    "type": "creature",
+    "cost": 2,
+    "atk": 3,
+    "hp": 2,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [],
+    "targeted": false,
+    "text": "A guardian of legend.",
+    "art": "cards/myth_walker.jpg"
+  },
+  {
+    "id": "minotaur",
+    "name": "Minotaur",
+    "school": "myth",
+    "type": "creature",
+    "cost": 4,
+    "atk": 5,
+    "hp": 4,
+    "rarity": "rare",
+    "keywords": [],
+    "effects": [],
+    "targeted": false,
+    "text": "Charge into the maze.",
+    "art": "cards/minotaur.jpg"
+  },
+  {
+    "id": "hydra",
+    "name": "Hydra",
+    "school": "myth",
+    "type": "creature",
+    "cost": 7,
+    "atk": 7,
+    "hp": 7,
+    "rarity": "legendary",
+    "keywords": [
+      "multiAttack"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Attacks twice each turn.",
+    "art": "cards/hydra.jpg"
+  },
+  {
+    "id": "basilisk",
+    "name": "Basilisk",
+    "school": "myth",
+    "type": "creature",
+    "cost": 5,
+    "atk": 5,
+    "hp": 6,
+    "rarity": "epic",
+    "keywords": [
+      "taunt"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Taunt.",
+    "art": "cards/basilisk.jpg"
+  },
+  {
+    "id": "myth_blast",
+    "name": "Myth Blast",
+    "school": "myth",
+    "type": "spell",
+    "cost": 2,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "dmg",
+        "n": 5
+      }
+    ],
+    "targeted": true,
+    "text": "Deal 5 damage.",
+    "art": "cards/myth_blast.jpg"
+  },
+  {
+    "id": "pixie",
+    "name": "Pixie",
+    "school": "life",
+    "type": "creature",
+    "cost": 1,
+    "atk": 1,
+    "hp": 2,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "healPlay",
+        "n": 2
+      }
+    ],
+    "targeted": false,
+    "text": "Heal 2 when played.",
+    "art": "cards/pixie.jpg"
+  },
+  {
+    "id": "unicorn",
+    "name": "Unicorn",
+    "school": "life",
+    "type": "creature",
+    "cost": 3,
+    "atk": 3,
+    "hp": 4,
+    "rarity": "rare",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "healPlay",
+        "n": 3
+      }
+    ],
+    "targeted": false,
+    "text": "Heal 3 when played.",
+    "art": "cards/unicorn.jpg"
+  },
+  {
+    "id": "satyr",
+    "name": "Satyr",
+    "school": "life",
+    "type": "creature",
+    "cost": 5,
+    "atk": 4,
+    "hp": 6,
+    "rarity": "epic",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "healPlay",
+        "n": 5
+      }
+    ],
+    "targeted": false,
+    "text": "Heal 5 when played.",
+    "art": "cards/satyr.jpg"
+  },
+  {
+    "id": "healing_wave",
+    "name": "Healing Wave",
+    "school": "life",
+    "type": "spell",
+    "cost": 2,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "heal",
+        "n": 5
+      }
+    ],
+    "targeted": false,
+    "text": "Restore 5 health.",
+    "art": "cards/healing_wave.jpg"
+  },
+  {
+    "id": "rebirth",
+    "name": "Rebirth",
+    "school": "life",
+    "type": "spell",
+    "cost": 6,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "legendary",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "heal",
+        "n": 10
+      }
+    ],
+    "targeted": false,
+    "text": "Restore 10 health.",
+    "art": "cards/rebirth.jpg"
+  },
+  {
+    "id": "skeleton",
+    "name": "Skeleton",
+    "school": "death",
+    "type": "creature",
+    "cost": 1,
+    "atk": 2,
+    "hp": 1,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [],
+    "targeted": false,
+    "text": "Rattle and roll.",
+    "art": "cards/skeleton.jpg"
+  },
+  {
+    "id": "ghoul",
+    "name": "Ghoul",
+    "school": "death",
+    "type": "creature",
+    "cost": 3,
+    "atk": 3,
+    "hp": 3,
+    "rarity": "rare",
+    "keywords": [
+      "drain"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Drain. Heal for damage dealt.",
+    "art": "cards/ghoul.jpg"
+  },
+  {
+    "id": "vampire",
+    "name": "Vampire",
+    "school": "death",
+    "type": "creature",
+    "cost": 4,
+    "atk": 4,
+    "hp": 4,
+    "rarity": "uncommon",
+    "keywords": [
+      "drain"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Drain.",
+    "art": "cards/vampire.jpg"
+  },
+  {
+    "id": "reaper",
+    "name": "Death Reaper",
+    "school": "death",
+    "type": "creature",
+    "cost": 6,
+    "atk": 6,
+    "hp": 6,
+    "rarity": "legendary",
+    "keywords": [
+      "drain"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Drain. The end of all things.",
+    "art": "cards/reaper.jpg"
+  },
+  {
+    "id": "dark_pact",
+    "name": "Dark Pact",
+    "school": "death",
+    "type": "spell",
+    "cost": 2,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "dmg",
+        "n": 4
+      },
+      {
+        "k": "heal",
+        "n": 4
+      }
+    ],
+    "targeted": true,
+    "text": "Deal 4 damage, heal 4.",
+    "art": "cards/dark_pact.jpg"
+  },
+  {
+    "id": "balance_blade",
+    "name": "Balance Blade",
+    "school": "balance",
+    "type": "spell",
+    "cost": 1,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "buffAll",
+        "n": 2
+      }
+    ],
+    "targeted": false,
+    "text": "Your creatures gain +2 attack.",
+    "art": "cards/balance_blade.jpg"
+  },
+  {
+    "id": "novice",
+    "name": "Novice Assistant",
+    "school": "balance",
+    "type": "creature",
+    "cost": 2,
+    "atk": 2,
+    "hp": 3,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [],
+    "targeted": false,
+    "text": "Every school starts somewhere.",
+    "art": "cards/novice.jpg"
+  },
+  {
+    "id": "balance_streak",
+    "name": "Balance Streak",
+    "school": "balance",
+    "type": "spell",
+    "cost": 3,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "rare",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "dmg",
+        "n": 4
+      },
+      {
+        "k": "draw",
+        "n": 1
+      }
+    ],
+    "targeted": true,
+    "text": "Deal 4 damage, draw a card.",
+    "art": "cards/balance_streak.jpg"
+  },
+  {
+    "id": "sunbird",
+    "name": "Sunbird",
+    "school": "balance",
+    "type": "creature",
+    "cost": 4,
+    "atk": 4,
+    "hp": 5,
+    "rarity": "rare",
+    "keywords": [],
+    "effects": [],
+    "targeted": false,
+    "text": "Warm light on the scales.",
+    "art": "cards/sunbird.jpg"
+  },
+  {
+    "id": "balance_dragon",
+    "name": "Balance Dragon",
+    "school": "balance",
+    "type": "creature",
+    "cost": 7,
+    "atk": 7,
+    "hp": 7,
+    "rarity": "legendary",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "buffAll",
+        "n": 1
+      }
+    ],
+    "targeted": false,
+    "text": "Your creatures gain +1 attack.",
+    "art": "cards/balance_dragon.jpg"
+  },
+  {
+    "id": "elixir",
+    "name": "Health Elixir",
+    "school": "balance",
+    "type": "spell",
+    "cost": 1,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "common",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "heal",
+        "n": 3
+      }
+    ],
+    "targeted": false,
+    "text": "Restore 3 health.",
+    "art": "cards/elixir.jpg"
+  },
+  {
+    "id": "golden_golem",
+    "name": "Golden Golem",
+    "school": "balance",
+    "type": "creature",
+    "cost": 4,
+    "atk": 5,
+    "hp": 5,
+    "rarity": "rare",
+    "keywords": [
+      "taunt"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Taunt.",
+    "art": "cards/golden_golem.jpg"
+  },
+  {
+    "id": "master_wand",
+    "name": "Master's Wand",
+    "school": "balance",
+    "type": "spell",
+    "cost": 3,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "epic",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "buffAll",
+        "n": 2
+      }
+    ],
+    "targeted": false,
+    "text": "Your creatures gain +2 attack.",
+    "art": "cards/master_wand.jpg"
+  },
+  {
+    "id": "arcane_guardian",
+    "name": "Arcane Guardian",
+    "school": "balance",
+    "type": "creature",
+    "cost": 5,
+    "atk": 5,
+    "hp": 7,
+    "rarity": "epic",
+    "keywords": [
+      "taunt"
+    ],
+    "effects": [],
+    "targeted": false,
+    "text": "Taunt.",
+    "art": "cards/arcane_guardian.jpg"
+  },
+  {
+    "id": "arcane_nexus",
+    "name": "Arcane Nexus",
+    "school": "balance",
+    "type": "field",
+    "cost": 4,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "rare",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "fieldAtk",
+        "n": 1
+      }
+    ],
+    "targeted": false,
+    "text": "Field: your creatures have +1 attack.",
+    "art": "cards/arcane_nexus.jpg"
+  },
+  {
+    "id": "radiant_aura",
+    "name": "Radiant Aura",
+    "school": "life",
+    "type": "field",
+    "cost": 3,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "rare",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "fieldHeal",
+        "n": 3
+      }
+    ],
+    "targeted": false,
+    "text": "Field: heal 3 at the start of each turn.",
+    "art": "cards/radiant_aura.jpg"
+  },
+  {
+    "id": "storm_conduit",
+    "name": "Storm Conduit",
+    "school": "storm",
+    "type": "field",
+    "cost": 5,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "epic",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "fieldPip",
+        "n": 1
+      }
+    ],
+    "targeted": false,
+    "text": "Field: gain +1 pip each turn.",
+    "art": "cards/storm_conduit.jpg"
+  },
+  {
+    "id": "fire_trap",
+    "name": "Fire Trap",
+    "school": "fire",
+    "type": "trap",
+    "cost": 2,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "uncommon",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "trapDmg",
+        "n": 4
+      }
+    ],
+    "targeted": false,
+    "text": "Trap: when the enemy plays a creature, deal 4 damage to it.",
+    "art": "cards/fire_trap.jpg"
+  },
+  {
+    "id": "mana_ward",
+    "name": "Mana Ward",
+    "school": "ice",
+    "type": "trap",
+    "cost": 2,
+    "atk": 0,
+    "hp": 0,
+    "rarity": "uncommon",
+    "keywords": [],
+    "effects": [
+      {
+        "k": "trapShield",
+        "n": 4
+      }
+    ],
+    "targeted": false,
+    "text": "Trap: when the enemy attacks, gain 4 shield.",
+    "art": "cards/mana_ward.jpg"
+  }
+]

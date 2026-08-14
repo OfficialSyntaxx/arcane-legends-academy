@@ -2,3 +2,6 @@ node_modules/
 *.log
 public/_uitest.mjs
 test-results/
+
+# Generated Unity export staging dir — the committed copy lives in unity/Assets/StreamingAssets/
+unity-data/

@@ -1,0 +1,179 @@
+{
+  "ultChargeMax": 5,
+  "affinities": [
+    {
+      "school": "fire",
+      "effect": {
+        "k": "dmg",
+        "n": 1
+      },
+      "why": "a fire wizard's fire spells burn hotter"
+    },
+    {
+      "school": "ice",
+      "effect": {
+        "k": "shield",
+        "n": 1
+      },
+      "why": "an ice wizard's ice spells leave a rime of frost behind"
+    },
+    {
+      "school": "storm",
+      "effect": {
+        "k": "draw",
+        "n": 1
+      },
+      "why": "a storm wizard's storm spells crackle loose an extra card"
+    },
+    {
+      "school": "myth",
+      "effect": {
+        "k": "buffAll",
+        "n": 1
+      },
+      "why": "a myth wizard's myth spells rally the whole board"
+    },
+    {
+      "school": "life",
+      "effect": {
+        "k": "heal",
+        "n": 2
+      },
+      "why": "a life wizard's life spells heal deeper"
+    },
+    {
+      "school": "death",
+      "effect": {
+        "k": "dmgWiz",
+        "n": 1
+      },
+      "why": "a death wizard's death spells also chip the enemy wizard"
+    },
+    {
+      "school": "balance",
+      "effect": {
+        "k": "heal",
+        "n": 1
+      },
+      "why": "a balance wizard's balance spells give a little of everything"
+    }
+  ],
+  "ultimates": [
+    {
+      "school": "fire",
+      "name": "Inferno",
+      "icon": "🔥",
+      "text": "Deal 5 to every enemy creature, 3 to the enemy wizard.",
+      "effects": [
+        {
+          "k": "dmgAll",
+          "n": 5
+        },
+        {
+          "k": "dmgWiz",
+          "n": 3
+        }
+      ]
+    },
+    {
+      "school": "ice",
+      "name": "Deep Freeze",
+      "icon": "❄️",
+      "text": "Freeze every enemy creature. Shield 8.",
+      "effects": [
+        {
+          "k": "freezeAll",
+          "n": 1
+        },
+        {
+          "k": "shield",
+          "n": 8
+        }
+      ]
+    },
+    {
+      "school": "storm",
+      "name": "Maelstrom",
+      "icon": "⚡",
+      "text": "Deal 6 to the enemy wizard. Draw 2 cards.",
+      "effects": [
+        {
+          "k": "dmgWiz",
+          "n": 6
+        },
+        {
+          "k": "draw",
+          "n": 2
+        }
+      ]
+    },
+    {
+      "school": "myth",
+      "name": "Titan's Call",
+      "icon": "🗿",
+      "text": "Give your whole board +3 ATK. Draw a card.",
+      "effects": [
+        {
+          "k": "buffAll",
+          "n": 3
+        },
+        {
+          "k": "draw",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "school": "life",
+      "name": "Rebirth",
+      "icon": "🌿",
+      "text": "Heal 15. Give your whole board +2 ATK.",
+      "effects": [
+        {
+          "k": "heal",
+          "n": 15
+        },
+        {
+          "k": "buffAll",
+          "n": 2
+        }
+      ]
+    },
+    {
+      "school": "death",
+      "name": "Soul Harvest",
+      "icon": "💀",
+      "text": "Deal 3 to every enemy creature. Heal 6.",
+      "effects": [
+        {
+          "k": "dmgAll",
+          "n": 3
+        },
+        {
+          "k": "heal",
+          "n": 6
+        }
+      ]
+    },
+    {
+      "school": "balance",
+      "name": "Judgement",
+      "icon": "⚖️",
+      "text": "Heal 6. Shield 6. Draw a card.",
+      "effects": [
+        {
+          "k": "heal",
+          "n": 6
+        },
+        {
+          "k": "shield",
+          "n": 6
+        },
+        {
+          "k": "draw",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}
