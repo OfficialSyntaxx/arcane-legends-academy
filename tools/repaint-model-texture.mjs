@@ -17,8 +17,13 @@
  *   node tools/repaint-model-texture.mjs <src.glb> <texture.png> <out.glb>
  *
  *   Overwriting the source in place (out === src) is fine and is the common case.
+ *
+ *   Reads WebP/Draco-compressed input fine (registers both) — most assets past the pilot are
+ *   already-shipped, already-compressed models, not fresh Tripo imports like the pilot's own.
  */
 import { NodeIO } from "@gltf-transform/core";
+import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
+import draco3d from "draco3dgltf";
 import fs from "fs";
 
 const [, , srcPath, texPath, outPath] = process.argv;
@@ -27,7 +32,12 @@ if (!srcPath || !texPath || !outPath){
   process.exit(1);
 }
 
-const io = new NodeIO();
+const io = new NodeIO()
+  .registerExtensions(ALL_EXTENSIONS)
+  .registerDependencies({
+    "draco3d.decoder": await draco3d.createDecoderModule(),
+    "draco3d.encoder": await draco3d.createEncoderModule(),
+  });
 const doc = await io.read(srcPath);
 const root = doc.getRoot();
 
