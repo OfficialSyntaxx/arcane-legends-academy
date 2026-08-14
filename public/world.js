@@ -11,6 +11,9 @@ import { scatterZone, bucketByChunk, chunkDelta, exitNear, EXIT_RADIUS, ZONE_MAP
 import { isRaining } from "./weather.js";
 import { PET_MAP } from "./pets.js";
 import { WAND_FX_MAP, DEFAULT_WAND_FX } from "./wandcosmetics.js";
+// One definition of "which animation clip fills which role", shared with the duel arena — see
+// battle3d.js. Pure name matching, no THREE dependency, so it is safe to import here.
+import { rolesFor } from "./battle3d.js";
 
 // BACKLOG §7 "Emotes" — id/icon/label metadata at MODULE scope (no THREE dependency) so
 // index.html can build a menu without needing a live world instance. The bone-animation details
@@ -1331,12 +1334,17 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
       }
       if (gltf.animations && gltf.animations.length){
         entry.mixer = new THREE.AnimationMixer(model);
-        for (const clip of gltf.animations){
-          const n = clip.name.toLowerCase();
-          if (n.includes('walk') || n.includes('run')) entry.walk = entry.mixer.clipAction(clip);
-          else if (!entry.idle) entry.idle = entry.mixer.clipAction(clip);
-        }
-        if (!entry.idle && gltf.animations[0]) entry.idle = entry.mixer.clipAction(gltf.animations[0]);
+        // Role-matched, not first-match. The old rule here was "first clip that isn't walk/run
+        // becomes the idle", which is the same class of bug battle3d.js had with animations[0]:
+        // glTF stores clips in authoring order, so for the two richest rigs in the game —
+        // npc_mage.glb (76 clips) and enemy_skeleton.glb (95) — that rule picked
+        // "1H_Melee_Attack_Chop". Every mage NPC on campus and every skeleton enemy stood there
+        // looping a melee chop. Sharing battle3d.js's matcher keeps one definition of "which clip
+        // is the idle" for the whole game instead of two that can drift apart.
+        const roles = rolesFor(gltf.animations);
+        if (roles.walk) entry.walk = entry.mixer.clipAction(roles.walk);
+        if (roles.idle) entry.idle = entry.mixer.clipAction(roles.idle);
+        entry.roles = roles;
         if (entry.idle) entry.idle.play();
       }
       chars[key] = entry;
@@ -1977,17 +1985,40 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
     setBone(c,'RightForeArm', -sw2*0.3, 0, 0);
     setBone(c,'Spine', Math.sin(t*9)*0.05*s, 0, 0);
   }
+  // Restore the bones the procedural cycle posed. Without this, a character that walks
+  // procedurally and then stops keeps its last mid-stride pose frozen underneath whatever the
+  // mixer does next — visible as a permanently lunging NPC once it reaches its destination.
+  function clearWalkCycle(c){
+    if (!c.posed) return;
+    for (const name in c.baseRot){
+      const b = c.bones[name];
+      if (b) b.quaternion.copy(c.baseRot[name]);
+    }
+    c.posed = false;
+  }
   // advance GLB character mixers (player walk/idle, NPC idle/walk)
   function updateChars(dt){
     for (const key in chars){
       const c = chars[key];
       if (!c.model) continue;
-      if (c.walking){
-        // procedural walk cycle (NPCs moving around the world)
+      // A real walk clip always beats the hand-rolled bone cycle. The procedural cycle exists
+      // because most of the cast ships ONLY an idle (students, merchant, trainer, librarian,
+      // referee) — but npc_mage.glb and enemy_skeleton.glb both ship a real "Walking_A", and
+      // before role-matched clip selection landed, neither was ever reachable: this loop stopped
+      // the mixer outright whenever a character was walking, so a rig with 76 clips walked with
+      // the same 9 hand-posed bones as a rig with one.
+      if (c.walking && c.walk && c.mixer){
+        clearWalkCycle(c);
+        if (!c.walk.isRunning()){ c.idle && c.idle.stop(); c.walk.reset().play(); }
+        c.mixer.update(dt);
+      } else if (c.walking){
+        // no walk clip on this rig — hand-posed cycle, as before
         if (c.mixer && c.idle && c.idle.isRunning()) c.mixer.stopAllAction();
         applyWalkCycle(c);
+        c.posed = true;
         c.walkT += dt;
       } else {
+        clearWalkCycle(c);
         if (c.mixer){
           if (key === 'player'){
             if (playerMoving){ if (c.walk && !c.walk.isRunning()){ c.idle && c.idle.stop(); c.walk.play(); } }
