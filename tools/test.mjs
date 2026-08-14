@@ -23,6 +23,7 @@ import * as RANK from "../public/pvprank.js";
 import * as MAGIC from "../public/schoolmagic.js";
 import * as CB from "../public/cardbacks.js";
 import * as WFX from "../public/wandcosmetics.js";
+import * as B3D from "../public/battle3d.js";
 import * as ACHV from "../public/achievements.js";
 import * as PRESTIGE from "../public/prestige.js";
 import * as COLLECT from "../public/collectibles.js";
@@ -3118,6 +3119,56 @@ check("setBack refuses a locked back and leaves the save unchanged", (()=>{
   const save = { cardBack: CB.DEFAULT_BACK };
   const r = CB.setBack(save, "legends", []);
   return r.ok === false && save.cardBack === CB.DEFAULT_BACK;
+})());
+
+// ---------------------------------------------------------------- battle3d.js clip roles
+// REGRESSION GUARD. battle3d.js used to play `gltf.animations[0]` as a creature's looping battle
+// idle. In ~20 of the shipped creature GLBs clip 0 is "Death", so those creatures stood in the
+// arena looping their own death animation for the entire duel. These pin the role matcher that
+// replaced it. Plain {name} objects stand in for THREE.AnimationClip — the matcher only reads
+// .name, which is what keeps it testable headlessly.
+const clips = names => names.map(n => ({ name: n }));
+check("a plain Idle beats Jump_Idle and Flying_Idle for the idle role", (()=>{
+  const c = clips(["Death", "Jump_Idle", "Flying_Idle", "Idle", "Walk"]);
+  return B3D.pickClip(c, "idle").name === "Idle";
+})());
+check("the idle role NEVER resolves to a death clip (the actual bug)", (()=>{
+  // exactly the Quaternius layout that broke: Death first, Idle buried mid-list
+  const c = clips(["Death", "Duck", "HitReact", "Idle", "Jump", "Jump_Idle"]);
+  return B3D.pickClip(c, "idle").name === "Idle";
+})());
+check("a flying creature with no plain Idle still resolves Flying_Idle, not Death", (()=>{
+  const c = clips(["Death", "Fast_Flying", "Flying_Idle", "Headbutt", "HitReact"]);
+  return B3D.pickClip(c, "idle").name === "Flying_Idle";
+})());
+check("an armature prefix does not defeat matching", (()=>{
+  const c = clips(["MonsterArmature|Death", "MonsterArmature|Idle", "MonsterArmature|Bite_Front"]);
+  return B3D.pickClip(c, "idle").name === "MonsterArmature|Idle";
+})());
+check("an armature prefix plus a layer suffix still matches", (()=>{
+  return B3D.pickClip(clips(["Armature|Idle|baselayer"]), "idle").name === "Armature|Idle|baselayer";
+})());
+check("attack matches across naming conventions (Attack / Bite / KayKit chop)", (()=>{
+  const a = B3D.pickClip(clips(["Idle", "BatArmature|Bat_Attack"]), "attack");
+  const b = B3D.pickClip(clips(["Idle", "Bite_Front"]), "attack");
+  const c = B3D.pickClip(clips(["Idle", "1H_Melee_Attack_Chop"]), "attack");
+  return a && b && c && /Attack/.test(a.name) && b.name === "Bite_Front" && /Chop/.test(c.name);
+})());
+check("hit matches the source pack's misspelled HitRecieve as well as HitReact", (()=>{
+  return B3D.pickClip(clips(["Idle","HitRecieve"]), "hit").name === "HitRecieve"
+      && B3D.pickClip(clips(["Idle","HitReact"]), "hit").name === "HitReact";
+})());
+check("death still resolves for the death role (it just isn't the idle any more)", (()=>{
+  return B3D.pickClip(clips(["Death","Idle"]), "death").name === "Death";
+})());
+check("rolesFor never hands back a death clip as the idle fallback", (()=>{
+  // a pack with NO idle at all: the fallback must skip the death clip
+  const r = B3D.rolesFor(clips(["Death", "Attack"]));
+  return r.idle && r.idle.name !== "Death";
+})());
+check("an empty clip list yields no roles rather than throwing", (()=>{
+  const r = B3D.rolesFor([]);
+  return r.idle === null && r.attack === null;
 })());
 
 // ---------------------------------------------------------------- wandcosmetics.js

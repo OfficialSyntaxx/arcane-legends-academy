@@ -87,6 +87,63 @@ function colorFor(cardId, school, name) {
   return SCHOOL_COLORS[school] || 0xbd9bff;
 }
 
+// ---------------- animation clip selection ----------------
+// THE BUG THIS FIXES: this file used to play `gltf.animations[0]` — the first clip in the file,
+// whatever it happened to be — as a creature's looping battle idle. For ~20 of the shipped
+// creature GLBs (Alien, Demon, Dino, Orc, Yeti, Frog, Fish, Bunny, MushroomKing, Alpaking,
+// Armabee, Ghost, Glub, Goleling, Hywirl, Squidle, BlueDemon, Monkroose, Orc_Skull...) clip 0 is
+// "Death", so those creatures stood in the arena looping their death animation.
+//
+// The models are far richer than the old code could use: npc_mage.glb ships 76 clips,
+// enemy_skeleton.glb ships 95, most creatures ship 8-14. Picking by ROLE instead of by index
+// unlocks that library without adding a single asset byte.
+//
+// Names are inconsistent across the packs the assets came from, so matching has to be fuzzy:
+//   "Idle"                          (Quaternius)
+//   "MonsterArmature|Idle"          (armature-prefixed)
+//   "Armature|Idle|baselayer"       (armature-prefixed + layer suffix)
+//   "BatArmature|Bat_Attack"        (prefixed + species-prefixed)
+//   "1H_Melee_Attack_Chop"          (KayKit)
+//   "HitRecieve"                    (yes, misspelled in the source pack — matched deliberately)
+export function normalizeClipName(name){
+  const parts = String(name || "").split("|");
+  // drop a leading rig/armature name so "SkeletonArmature|Skeleton_Idle" matches as "skeleton_idle"
+  if (parts.length > 1 && /armature|rig$/i.test(parts[0])) parts.shift();
+  return parts.join("|").toLowerCase();
+}
+// Ordered most-specific-first. The first pattern that matches ANY clip wins the role; among the
+// clips it matched, the shortest name wins — so a plain "Idle" beats "Jump_Idle"/"Flying_Idle",
+// which is exactly the distinction index-0 could never make.
+export const CLIP_ROLES = {
+  idle:   [/^idle$/, /(^|_)idle($|_|\|)/, /idle/],
+  attack: [/(^|_)attack($|_|\|)/, /attack/, /bite/, /headbutt/, /(chop|slice|stab)/, /(punch|kick)/],
+  hit:    [/hit_?(react|recieve|receive)/, /(^|_)hit($|_|\|)/, /(damage|flinch)/],
+  death:  [/(^|_)death($|_|\|)/, /death/, /(^|_)die($|_|\|)/],
+  walk:   [/(^|_)walk($|_|\|)/, /walk/, /(^|_)run($|_|\|)/, /run/, /fast_flying/, /flying/],
+};
+export function pickClip(clips, role){
+  const pats = CLIP_ROLES[role];
+  if (!pats || !clips || !clips.length) return null;
+  for (const pat of pats){
+    const hits = clips.filter(c => pat.test(normalizeClipName(c.name)));
+    if (hits.length){
+      return hits.reduce((best, c) =>
+        normalizeClipName(c.name).length < normalizeClipName(best.name).length ? c : best);
+    }
+  }
+  return null;
+}
+export function rolesFor(clips){
+  const out = {};
+  for (const role of Object.keys(CLIP_ROLES)) out[role] = pickClip(clips, role);
+  // A model with clips but no recognisable idle (e.g. a pack that only ships attacks) still
+  // needs SOMETHING to stand in — but never a death clip, which is the whole bug being fixed.
+  if (!out.idle && clips.length){
+    out.idle = clips.find(c => c !== out.death) || null;
+  }
+  return out;
+}
+
 export function createBattle3d(canvas) {
   const THREE = window.THREE;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -184,6 +241,7 @@ export function createBattle3d(canvas) {
     const x = -2 + i * (4 / Math.max(1, spread - 1));
     return { x, z: 0 };
   }
+
   function getModel(name, cb) {
     if (cache.has(name)) return cb(cache.get(name));
     const cdnUrl = CDN[name];
@@ -199,8 +257,8 @@ export function createBattle3d(canvas) {
       const h = maxY - minY;
       if (h > 0.001) template.scale.setScalar(1.6 / h);
       template.position.y -= minY * (1.6 / (h > 0.001 ? h : 1));
-      const clip = (gltf.animations && gltf.animations[0]) || null;
-      const entry = { template, clip };
+      const clips = (gltf.animations || []).slice();
+      const entry = { template, clips, byRole: rolesFor(clips) };
       cache.set(name, entry);
       cb(entry);
     },
@@ -218,14 +276,25 @@ export function createBattle3d(canvas) {
     scene.add(group);
     const entry = { cardId, group, modelName, color, dropping: true, dropT: 0, bob: Math.random() * 6.28, model: null, mixer: null, baseScale: 1 };
     sides[side][i] = entry;
-    getModel(modelName, ({ template, clip }) => {
+    getModel(modelName, ({ template, byRole }) => {
       const model = template.clone();
       model.traverse(o => { if (o.isMesh){ o.material = o.material.clone(); o.material.color.set(color); } });
       entry.baseScale = model.scale.x || 1;
       model.scale.setScalar(0.01);          // grow in during the spawn
       group.add(model);
       entry.model = model;
-      if (clip) { entry.mixer = new THREE.AnimationMixer(model); entry.mixer.clipAction(clip).play(); }
+      entry.byRole = byRole;
+      if (byRole && byRole.idle){
+        entry.mixer = new THREE.AnimationMixer(model);
+        entry.idleAction = entry.mixer.clipAction(byRole.idle);
+        entry.idleAction.play();
+        // A one-shot (attack/hit) finishing hands the creature back to its idle rather than
+        // freezing on the last frame — without this a creature that got hit stays flinched.
+        entry.mixer.addEventListener("finished", () => {
+          if (entry.oneShot){ entry.oneShot.stop(); entry.oneShot = null; }
+          if (entry.idleAction){ entry.idleAction.reset(); entry.idleAction.fadeIn(0.12).play(); }
+        });
+      }
       // floating trait label: name + passive, so each creature reads as its own identity
       const spec = creatureFor(modelName);
       if (spec){
@@ -244,6 +313,27 @@ export function createBattle3d(canvas) {
         entry.label = label;
       }
     });
+  }
+  /**
+   * Play a one-shot clip (attack / hit / death) on one creature, then fall back to idle via the
+   * mixer's "finished" listener wired in summon(). A model that doesn't ship that role is a no-op
+   * rather than an error — the packs differ wildly in what they include, and a missing hit react
+   * should just mean "no flinch", not a broken duel.
+   */
+  function playAnim(side, index, role){
+    const e = (sides[side] || [])[index];
+    if (!e || !e.mixer || !e.byRole) return false;
+    const clip = e.byRole[role];
+    if (!clip) return false;
+    if (e.oneShot) e.oneShot.stop();
+    const act = e.mixer.clipAction(clip);
+    act.reset();
+    act.setLoop(THREE.LoopOnce, 1);
+    act.clampWhenFinished = true;
+    if (e.idleAction) e.idleAction.fadeOut(0.08);
+    act.fadeIn(0.08).play();
+    e.oneShot = act;
+    return true;
   }
   function removeAt(side, i) {
     const e = sides[side][i];
@@ -300,6 +390,14 @@ export function createBattle3d(canvas) {
     const spec = effectFor(card);
     if (!spec) return null;
     const foeSide = casterSide === "you" ? "enemy" : "you";
+    // The creature being hit visibly reacts. Delayed to roughly when a projectile would land
+    // rather than fired on cast, so the flinch reads as a consequence of the spell instead of
+    // happening alongside it. Untargeted (aura/glyph) spells hit the whole opposing row.
+    const impactDelay = (spec.archetype === "bolt" || spec.archetype === "beam") ? 260 : 120;
+    setTimeout(() => {
+      if (targetIdx != null) playAnim(foeSide, targetIdx, "hit");
+      else (sides[foeSide] || []).forEach((_, i) => playAnim(foeSide, i, "hit"));
+    }, impactDelay);
     const from = anchor(casterSide, null);
     const to = spec.origin === ORIGIN.CASTER || spec.archetype === "aura" || spec.archetype === "glyph"
       ? from : anchor(foeSide, targetIdx);
@@ -468,7 +566,15 @@ export function createBattle3d(canvas) {
   function renderOnce() { renderer.render(scene, camera); }
   function dispose() { stop(); renderer.dispose(); }
 
-  return { setSize, sync, clear, start, stop, renderOnce, dispose, playSpell,
+  return { setSize, sync, clear, start, stop, renderOnce, dispose, playSpell, playAnim,
+           // what clip each loaded model resolved to per role — exposed so a test can prove no
+           // creature is idling on its death animation, the bug this selection logic exists to fix
+           __clipRoles: () => {
+             const out = {};
+             for (const [name, e] of cache) out[name] = Object.fromEntries(
+               Object.entries(e.byRole || {}).map(([r, c]) => [r, c ? c.name : null]));
+             return out;
+           },
            // exposed for tools/browser-test.mjs, which counts lit pixels to prove effects render
            __scene: scene, __frames: () => ({ frames, running }),
            activeFx: () => fx.length };
