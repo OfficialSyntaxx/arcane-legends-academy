@@ -1,0 +1,771 @@
+{
+  "generated": "tools/export-test-fixtures.mjs — golden values from the web build; do not hand-edit",
+  "note": "A C# test reproducing these is verified against the shipped game, not merely self-consistent.",
+  "cardCounts": {
+    "total": 47,
+    "byType": {
+      "creature": 25,
+      "spell": 17,
+      "field": 3,
+      "trap": 2
+    }
+  },
+  "ultChargeMax": 5,
+  "progression": {
+    "xpForLevel": [
+      {
+        "level": 1,
+        "xp": 52
+      },
+      {
+        "level": 2,
+        "xp": 110
+      },
+      {
+        "level": 3,
+        "xp": 172
+      },
+      {
+        "level": 5,
+        "xp": 312
+      },
+      {
+        "level": 10,
+        "xp": 750
+      },
+      {
+        "level": 15,
+        "xp": 1312
+      },
+      {
+        "level": 20,
+        "xp": 2000
+      },
+      {
+        "level": 30,
+        "xp": 3750
+      },
+      {
+        "level": 50,
+        "xp": 8750
+      }
+    ],
+    "wizardLevel": [
+      {
+        "totalXp": 52,
+        "expected": 2
+      },
+      {
+        "totalXp": 51,
+        "expected": 1
+      },
+      {
+        "totalXp": 162,
+        "expected": 3
+      },
+      {
+        "totalXp": 161,
+        "expected": 2
+      },
+      {
+        "totalXp": 334,
+        "expected": 4
+      },
+      {
+        "totalXp": 333,
+        "expected": 3
+      },
+      {
+        "totalXp": 574,
+        "expected": 5
+      },
+      {
+        "totalXp": 573,
+        "expected": 4
+      },
+      {
+        "totalXp": 886,
+        "expected": 6
+      },
+      {
+        "totalXp": 885,
+        "expected": 5
+      },
+      {
+        "totalXp": 1276,
+        "expected": 7
+      },
+      {
+        "totalXp": 1275,
+        "expected": 6
+      },
+      {
+        "totalXp": 1748,
+        "expected": 8
+      },
+      {
+        "totalXp": 1747,
+        "expected": 7
+      },
+      {
+        "totalXp": 2308,
+        "expected": 9
+      },
+      {
+        "totalXp": 2307,
+        "expected": 8
+      },
+      {
+        "totalXp": 2960,
+        "expected": 10
+      },
+      {
+        "totalXp": 2959,
+        "expected": 9
+      },
+      {
+        "totalXp": 3710,
+        "expected": 11
+      },
+      {
+        "totalXp": 3709,
+        "expected": 10
+      },
+      {
+        "totalXp": 4562,
+        "expected": 12
+      },
+      {
+        "totalXp": 4561,
+        "expected": 11
+      },
+      {
+        "totalXp": 5522,
+        "expected": 13
+      },
+      {
+        "totalXp": 5521,
+        "expected": 12
+      },
+      {
+        "totalXp": 0,
+        "expected": 1
+      },
+      {
+        "totalXp": 1,
+        "expected": 1
+      },
+      {
+        "totalXp": 51,
+        "expected": 1
+      },
+      {
+        "totalXp": 52,
+        "expected": 2
+      },
+      {
+        "totalXp": 100,
+        "expected": 2
+      },
+      {
+        "totalXp": 500,
+        "expected": 4
+      },
+      {
+        "totalXp": 2000,
+        "expected": 8
+      },
+      {
+        "totalXp": 10000,
+        "expected": 16
+      },
+      {
+        "totalXp": 99999,
+        "expected": 41
+      }
+    ],
+    "skillXp": [
+      {
+        "tavern": 0,
+        "grants": [
+          10,
+          30,
+          60
+        ],
+        "steps": [
+          {
+            "granted": 10,
+            "level": 1,
+            "xpIntoLevel": 10
+          },
+          {
+            "granted": 30,
+            "level": 1,
+            "xpIntoLevel": 40
+          },
+          {
+            "granted": 60,
+            "level": 2,
+            "xpIntoLevel": 48
+          }
+        ]
+      },
+      {
+        "tavern": 0,
+        "grants": [
+          500
+        ],
+        "steps": [
+          {
+            "granted": 500,
+            "level": 4,
+            "xpIntoLevel": 166
+          }
+        ]
+      },
+      {
+        "tavern": 3,
+        "grants": [
+          100
+        ],
+        "steps": [
+          {
+            "granted": 100,
+            "level": 2,
+            "xpIntoLevel": 78
+          }
+        ]
+      },
+      {
+        "tavern": 5,
+        "grants": [
+          1000
+        ],
+        "steps": [
+          {
+            "granted": 1000,
+            "level": 7,
+            "xpIntoLevel": 224
+          }
+        ]
+      }
+    ]
+  },
+  "cardTraitResolution": [
+    {
+      "cardId": "fire_cat",
+      "name": "Fire Cat",
+      "trait": "cat"
+    },
+    {
+      "cardId": "fire_elf",
+      "name": "Fire Elf",
+      "trait": "ninja"
+    },
+    {
+      "cardId": "fire_dragon",
+      "name": "Fire Dragon",
+      "trait": "dragon"
+    },
+    {
+      "cardId": "ice_golem",
+      "name": "Ice Golem",
+      "trait": "goleling"
+    },
+    {
+      "cardId": "frost_giant",
+      "name": "Frost Giant",
+      "trait": "yeti"
+    },
+    {
+      "cardId": "ice_wyrm",
+      "name": "Ice Wyrm",
+      "trait": "dragon"
+    },
+    {
+      "cardId": "storm_bat",
+      "name": "Storm Bat",
+      "trait": "bat"
+    },
+    {
+      "cardId": "storm_shark",
+      "name": "Storm Shark",
+      "trait": "fish"
+    },
+    {
+      "cardId": "storm_titan",
+      "name": "Storm Titan",
+      "trait": "dragon"
+    },
+    {
+      "cardId": "myth_walker",
+      "name": "Myth Walker",
+      "trait": "ninja"
+    },
+    {
+      "cardId": "minotaur",
+      "name": "Minotaur",
+      "trait": null
+    },
+    {
+      "cardId": "hydra",
+      "name": "Hydra",
+      "trait": null
+    },
+    {
+      "cardId": "basilisk",
+      "name": "Basilisk",
+      "trait": null
+    },
+    {
+      "cardId": "pixie",
+      "name": "Pixie",
+      "trait": "ninja"
+    },
+    {
+      "cardId": "unicorn",
+      "name": "Unicorn",
+      "trait": null
+    },
+    {
+      "cardId": "satyr",
+      "name": "Satyr",
+      "trait": null
+    },
+    {
+      "cardId": "skeleton",
+      "name": "Skeleton",
+      "trait": "skeleton"
+    },
+    {
+      "cardId": "ghoul",
+      "name": "Ghoul",
+      "trait": "demon"
+    },
+    {
+      "cardId": "vampire",
+      "name": "Vampire",
+      "trait": "ghost"
+    },
+    {
+      "cardId": "reaper",
+      "name": "Death Reaper",
+      "trait": "ghost"
+    },
+    {
+      "cardId": "novice",
+      "name": "Novice Assistant",
+      "trait": "ninja"
+    },
+    {
+      "cardId": "sunbird",
+      "name": "Sunbird",
+      "trait": "chicken"
+    },
+    {
+      "cardId": "balance_dragon",
+      "name": "Balance Dragon",
+      "trait": "dragon"
+    },
+    {
+      "cardId": "golden_golem",
+      "name": "Golden Golem",
+      "trait": "goleling"
+    },
+    {
+      "cardId": "arcane_guardian",
+      "name": "Arcane Guardian",
+      "trait": null
+    }
+  ],
+  "affinity": [
+    {
+      "casterSchool": "fire",
+      "spellSchool": "fire",
+      "expected": {
+        "k": "dmg",
+        "n": 1
+      }
+    },
+    {
+      "casterSchool": "fire",
+      "spellSchool": "balance",
+      "expected": null
+    },
+    {
+      "casterSchool": "fire",
+      "spellSchool": "fire",
+      "expected": {
+        "k": "dmg",
+        "n": 1
+      }
+    },
+    {
+      "casterSchool": "fire",
+      "spellSchool": "death",
+      "expected": null
+    },
+    {
+      "casterSchool": "ice",
+      "spellSchool": "ice",
+      "expected": {
+        "k": "shield",
+        "n": 1
+      }
+    },
+    {
+      "casterSchool": "ice",
+      "spellSchool": "balance",
+      "expected": null
+    },
+    {
+      "casterSchool": "ice",
+      "spellSchool": "fire",
+      "expected": null
+    },
+    {
+      "casterSchool": "ice",
+      "spellSchool": "death",
+      "expected": null
+    },
+    {
+      "casterSchool": "storm",
+      "spellSchool": "storm",
+      "expected": {
+        "k": "draw",
+        "n": 1
+      }
+    },
+    {
+      "casterSchool": "storm",
+      "spellSchool": "balance",
+      "expected": null
+    },
+    {
+      "casterSchool": "storm",
+      "spellSchool": "fire",
+      "expected": null
+    },
+    {
+      "casterSchool": "storm",
+      "spellSchool": "death",
+      "expected": null
+    },
+    {
+      "casterSchool": "myth",
+      "spellSchool": "myth",
+      "expected": {
+        "k": "buffAll",
+        "n": 1
+      }
+    },
+    {
+      "casterSchool": "myth",
+      "spellSchool": "balance",
+      "expected": null
+    },
+    {
+      "casterSchool": "myth",
+      "spellSchool": "fire",
+      "expected": null
+    },
+    {
+      "casterSchool": "myth",
+      "spellSchool": "death",
+      "expected": null
+    },
+    {
+      "casterSchool": "life",
+      "spellSchool": "life",
+      "expected": {
+        "k": "heal",
+        "n": 2
+      }
+    },
+    {
+      "casterSchool": "life",
+      "spellSchool": "balance",
+      "expected": null
+    },
+    {
+      "casterSchool": "life",
+      "spellSchool": "fire",
+      "expected": null
+    },
+    {
+      "casterSchool": "life",
+      "spellSchool": "death",
+      "expected": null
+    },
+    {
+      "casterSchool": "death",
+      "spellSchool": "death",
+      "expected": {
+        "k": "dmgWiz",
+        "n": 1
+      }
+    },
+    {
+      "casterSchool": "death",
+      "spellSchool": "balance",
+      "expected": null
+    },
+    {
+      "casterSchool": "death",
+      "spellSchool": "fire",
+      "expected": null
+    },
+    {
+      "casterSchool": "death",
+      "spellSchool": "death",
+      "expected": {
+        "k": "dmgWiz",
+        "n": 1
+      }
+    },
+    {
+      "casterSchool": "balance",
+      "spellSchool": "balance",
+      "expected": {
+        "k": "heal",
+        "n": 1
+      }
+    },
+    {
+      "casterSchool": "balance",
+      "spellSchool": "balance",
+      "expected": {
+        "k": "heal",
+        "n": 1
+      }
+    },
+    {
+      "casterSchool": "balance",
+      "spellSchool": "fire",
+      "expected": null
+    },
+    {
+      "casterSchool": "balance",
+      "spellSchool": "death",
+      "expected": null
+    }
+  ],
+  "ultimateGate": [
+    {
+      "school": "fire",
+      "charge": 0,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "fire",
+      "charge": 4,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "fire",
+      "charge": 5,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "fire",
+      "charge": 5,
+      "alreadyUsed": true,
+      "expected": false
+    },
+    {
+      "school": "fire",
+      "charge": 10,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "ice",
+      "charge": 0,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "ice",
+      "charge": 4,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "ice",
+      "charge": 5,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "ice",
+      "charge": 5,
+      "alreadyUsed": true,
+      "expected": false
+    },
+    {
+      "school": "ice",
+      "charge": 10,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "storm",
+      "charge": 0,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "storm",
+      "charge": 4,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "storm",
+      "charge": 5,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "storm",
+      "charge": 5,
+      "alreadyUsed": true,
+      "expected": false
+    },
+    {
+      "school": "storm",
+      "charge": 10,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "myth",
+      "charge": 0,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "myth",
+      "charge": 4,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "myth",
+      "charge": 5,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "myth",
+      "charge": 5,
+      "alreadyUsed": true,
+      "expected": false
+    },
+    {
+      "school": "myth",
+      "charge": 10,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "life",
+      "charge": 0,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "life",
+      "charge": 4,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "life",
+      "charge": 5,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "life",
+      "charge": 5,
+      "alreadyUsed": true,
+      "expected": false
+    },
+    {
+      "school": "life",
+      "charge": 10,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "death",
+      "charge": 0,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "death",
+      "charge": 4,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "death",
+      "charge": 5,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "death",
+      "charge": 5,
+      "alreadyUsed": true,
+      "expected": false
+    },
+    {
+      "school": "death",
+      "charge": 10,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "balance",
+      "charge": 0,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "balance",
+      "charge": 4,
+      "alreadyUsed": false,
+      "expected": false
+    },
+    {
+      "school": "balance",
+      "charge": 5,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "balance",
+      "charge": 5,
+      "alreadyUsed": true,
+      "expected": false
+    },
+    {
+      "school": "balance",
+      "charge": 10,
+      "alreadyUsed": false,
+      "expected": true
+    },
+    {
+      "school": "nonsense",
+      "charge": 99,
+      "alreadyUsed": false,
+      "expected": false
+    }
+  ]
+}

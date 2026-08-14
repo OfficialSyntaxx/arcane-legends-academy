@@ -25,19 +25,39 @@ unity/
         GameData.cs         data model + lookups + Validate()
         GameDataLoader.cs   JSON loading, fails loudly on bad data
       Duel/
-        DuelState.cs        DuelSide, CreatureInstance, DuelStateData
+        DuelState.cs        DuelSide, CreatureInstance, fields, traps
         DuelEngine.cs       the rules: play, attack, effects, ultimates, traits
+      Save/
+        SaveData.cs         the full save shape + the derived-state rule
+        Progression.cs      wizard/skill XP curves
+      Tests/
+        FixtureTests.cs     verifies the port against golden JS values
     StreamingAssets/
       gamedata.json         GENERATED — everything, single load
       cards.json / schools.json / creatures.json / schoolmagic.json
+      testfixtures.json     GENERATED — golden input/output pairs from the web build
 ```
 
 **The JSON is generated, never hand-edited.** Regenerate with:
 
 ```bash
-node tools/export-unity-data.mjs
-cp unity-data/*.json unity/Assets/StreamingAssets/
+node tools/export-unity-data.mjs && cp unity-data/*.json unity/Assets/StreamingAssets/
+node tools/export-test-fixtures.mjs
 ```
+
+## You can verify this port on day one — do that first
+
+`testfixtures.json` holds golden input/output pairs produced by **the web build's own engine**:
+XP curves (including the cumulative boundaries a naive port fails), all 25 card→trait
+resolutions, every affinity pairing, and the full ultimate gating matrix.
+
+`FixtureTests.RunAll(data, json, deserialize)` checks the C# against them. A pass means the port
+agrees with the **shipped game**, not merely with itself. It is framework-free on purpose (no
+NUnit, no UnityEngine) so it runs from a console runner, an EditMode test, or a MonoBehaviour —
+whatever the project ends up using.
+
+Run it before touching any rendering. If the rules disagree there, everything built on them is
+wrong.
 
 Hand-transcribing 47 cards into C# would introduce errors no compiler catches — a wrong `atk`
 reads as a balance decision, not a bug. Generating from the modules the web build actually runs
@@ -69,12 +89,13 @@ makes the data faithful by construction.
    `JsonUtility` does not handle these nested generic lists and fails *silently* with empty
    collections — a bad failure mode. Then wire `GameDataLoader.Parse(json, JsonConvert.DeserializeObject<GameData>)`.
 3. **Copy `Assets/` in** and let it compile. **Expect errors** — fix or report them.
-4. **Smoke test the data before the rules:** load `gamedata.json` and confirm
-   `Validate()` returns empty and `cards.Count == 47`. If the data is wrong, every rule test
-   downstream is meaningless.
+4. **Run `FixtureTests.RunAll`.** This is the highest-value first action — it verifies the whole
+   data layer and the progression curves against golden values from the shipped game, and it
+   needs no test framework. Expect some failures; report them and they can be fixed remotely.
 5. **Then port tests, not features.** `tools/test.mjs` (644 checks) and
-   `tools/creature-rule-test.mjs` (36 checks) are the specification. Port a rule's tests, watch
-   them fail, make them pass. Do not move to rendering until the duel rules are green.
+   `tools/creature-rule-test.mjs` (36 checks) are the specification for everything the fixtures
+   don't cover — chiefly the duel engine itself. Port a rule's tests, watch them fail, make them
+   pass. Do not move to rendering until the duel rules are green.
 
 Report compile errors and failures back and they can be fixed remotely — that loop is the
 intended workflow.
