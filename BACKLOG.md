@@ -6,6 +6,10 @@
 > - **`docs/ASSET-BUDGET.md`** — asset platform costs, CC0 sources, licensing.
 > - **`docs/NEXT-PHASE-PLAN.md`** — the systems audit and phase tracker (Phases A–D).
 > - **`BLENDERTODO.md`** — modelling briefs for every asset still drawn as a procedural primitive.
+> - **`docs/UNITY-MIGRATION.md`** — **READ FIRST.** The project is migrating to Unity (mobile
+>   target). Inventory of what ports directly vs. needs rewriting, porting order, known gaps, and
+>   the engineering findings worth carrying over. Everything below describes the web build, which
+>   remains the reference implementation and the porting spec.
 > - **`docs/ART-DIRECTION.md`** — planning doc for a Wizard101-anchored painterly-texture pivot;
 >   not yet implemented, amends `BLENDERTODO.md`'s style/material rules once a pilot asset ships.
 > - **`CHANGELOG.md`** — what shipped when, newest first, with per-entry test counts.
