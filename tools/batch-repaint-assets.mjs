@@ -32,13 +32,17 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const DIR = path.join(ROOT, "public", "assets", "models");
 
 const args = process.argv.slice(2);
 const flagVal = (name) => { const i = args.indexOf(name); return i === -1 ? "" : (args[i + 1] || ""); };
 const dryRun = args.includes("--dry-run");
 const only = flagVal("--only").split(",").filter(Boolean);
 const skip = new Set(flagVal("--skip").split(",").filter(Boolean));
+// --dir lets this target public/assets/buildings/ (the standalone landmarks — tower, arena,
+// scribe hall) too, not just public/assets/models/. Same swatch-atlas technique applies; these
+// were the one deliberate gap left after the main library pass (npm run compress kept touching
+// them as an unrelated side effect during that run, so they were reverted rather than processed).
+const DIR = path.join(ROOT, "public", "assets", flagVal("--dir") || "models");
 // node_fishing.glb already got the from-scratch pilot treatment directly (no swatch atlas to
 // preserve — it was a single baked photo texture, not a colour-swatch material). Not reprocessed.
 skip.add("node_fishing.glb");
