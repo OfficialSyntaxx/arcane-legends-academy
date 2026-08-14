@@ -385,8 +385,62 @@ export function createWorld(canvas, callbacks, zone, opts = {}){
   // little real specular response from the same light rig and the dim env map already authored
   // for metal gear, at zero art cost. Roughness/metalness stay high/low (matte, non-metal) by
   // default — this is not meant to make plaster read as chrome, just to stop it reading as chalk.
+  // docs/ART-DIRECTION.md §4.4: every procedural-primitive surface (dorm furniture with no
+  // model, market stalls, banners, sconces, display cases, treasure chests, gather-node fallback
+  // shapes) was still a flat MeshStandardMaterial colour — the last "obviously primitive" surface
+  // left once the asset-library repaint gave every GLB real painted texture. Built once per zone
+  // (like tileTexture already is) and shared across every mat() call rather than baked per-call:
+  // hundreds of objects call mat() in a single zone, and a fresh canvas draw per call would be
+  // real, needless per-frame-independent cost — the exact class of thing the profiling pass spent
+  // real effort trimming. One shared texture, MULTIPLIED against each object's own material.color
+  // (the same relationship the offline batch repaint's overlay mode used, just running live
+  // instead of baked into a GLB), keeps every object's actual hue while adding real paint texture.
+  // Values stay close to white (small multiplicative deltas) on purpose — this multiplies against
+  // EVERY colour in the game at once, so a strong tint here would wash the whole world toward one
+  // colour instead of adding texture to each object's own.
+  let paintedVariationTex = null;
+  function paintVariationTexture(){
+    if (paintedVariationTex) return paintedVariationTex;
+    const size = 512;
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const x = c.getContext('2d');
+    x.fillStyle = '#e8e2d6'; x.fillRect(0, 0, size, size);
+    // warm highlight blobs — scattered, not a single sweep (a sweep reads as baked lighting)
+    for (let i = 0; i < 40; i++){
+      const cx = Math.random()*size, cy = Math.random()*size, r = 20 + Math.random()*55;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(255,248,232,0.5)'); g.addColorStop(1, 'rgba(255,248,232,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI*2); x.fill();
+    }
+    // cool shadow-accent blobs, low opacity — the "shadows read violet-blue" pillar
+    for (let i = 0; i < 14; i++){
+      const cx = Math.random()*size, cy = Math.random()*size, r = 16 + Math.random()*40;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, 'rgba(90,80,120,0.22)'); g.addColorStop(1, 'rgba(90,80,120,0)');
+      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, r, 0, Math.PI*2); x.fill();
+    }
+    // visible brush strokes — the "painted, not flat" tell at close range
+    for (let i = 0; i < 260; i++){
+      const px = Math.random()*size, py = Math.random()*size;
+      const len = 10 + Math.random()*22, ang = Math.random()*Math.PI*2;
+      const lighter = Math.random() > 0.45;
+      x.strokeStyle = lighter ? `rgba(255,255,255,${(0.12+Math.random()*0.14).toFixed(3)})`
+                               : `rgba(40,32,24,${(0.10+Math.random()*0.12).toFixed(3)})`;
+      x.lineWidth = 1.5 + Math.random()*2.5; x.lineCap = 'round';
+      x.beginPath(); x.moveTo(px, py);
+      x.quadraticCurveTo(px+Math.cos(ang)*len*0.5+(Math.random()-0.5)*8, py+Math.sin(ang)*len*0.5+(Math.random()-0.5)*8,
+        px+Math.cos(ang)*len, py+Math.sin(ang)*len);
+      x.stroke();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2, 2);   // tiled twice so a small prop doesn't just show one big blob
+    tex.encoding = THREE.sRGBEncoding;
+    paintedVariationTex = tex;
+    return tex;
+  }
   const mat = c => {
-    const m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0.05 });
+    const m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, metalness: 0.05, map: paintVariationTexture() });
     m.color.convertSRGBToLinear();
     return m;
   };
